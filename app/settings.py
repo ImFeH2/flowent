@@ -7,8 +7,5 @@ class Settings(BaseSettings):
     APP_NAME: str = "Synora"
     DEBUG: bool = False
 
-    API_KEY: str | None = None
-    MODEL: str | None = None
-
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = "logs"

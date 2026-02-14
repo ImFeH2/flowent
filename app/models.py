@@ -79,6 +79,12 @@ class AgentConfig:
 
 
 @dataclass
+class ModelInfo:
+    id: str
+    name: str | None = None
+
+
+@dataclass
 class ToolCall:
     id: str
     name: str

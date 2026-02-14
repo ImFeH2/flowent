@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 from collections.abc import Callable
 
-from app.models import LLMResponse
+from app.models import LLMResponse, ModelInfo
 
 
 class LLMProvider(Protocol):
@@ -13,3 +13,5 @@ class LLMProvider(Protocol):
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
     ) -> LLMResponse: ...
+
+    def list_models(self) -> list[ModelInfo]: ...

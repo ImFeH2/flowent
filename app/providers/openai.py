@@ -8,17 +8,21 @@ from typing import Any
 import httpx
 from loguru import logger
 
-from app.models import LLMResponse, ToolCall
-from app.providers import LLMProvider
-from app.settings import Settings
+from app.models import LLMResponse, ModelInfo, ToolCall
 
 
-class OpenRouterProvider(LLMProvider):
-    BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-    def __init__(self, settings: Settings | None = None) -> None:
-        self._settings = settings or Settings()
+class OpenAIProvider:
+    def __init__(self, api_base_url: str, api_key: str = "", model: str = "") -> None:
+        self._api_base_url = api_base_url.rstrip("/")
+        self._api_key = api_key
+        self._model = model
         self._client = httpx.Client(timeout=120.0)
+
+    def _headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+        return headers
 
     def chat(
         self,
@@ -26,19 +30,15 @@ class OpenRouterProvider(LLMProvider):
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
     ) -> LLMResponse:
+        url = f"{self._api_base_url}/chat/completions"
         payload: dict[str, Any] = {
-            "model": self._settings.MODEL,
+            "model": self._model,
             "messages": messages,
             "stream": True,
         }
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
-
-        headers = {
-            "Authorization": f"Bearer {self._settings.API_KEY}",
-            "Content-Type": "application/json",
-        }
 
         t0 = time.perf_counter()
 
@@ -47,19 +47,19 @@ class OpenRouterProvider(LLMProvider):
         tool_calls_accum: dict[int, dict[str, Any]] = {}
 
         with self._client.stream(
-            "POST", self.BASE_URL, headers=headers, content=json.dumps(payload)
+            "POST", url, headers=self._headers(), content=json.dumps(payload)
         ) as response:
             if response.status_code != 200:
                 body = response.read().decode()
                 elapsed = time.perf_counter() - t0
                 logger.error(
-                    "OpenRouter API error: {} - {} ({:.2f}s)",
+                    "OpenAI API error: {} - {} ({:.2f}s)",
                     response.status_code,
                     body[:200],
                     elapsed,
                 )
                 raise RuntimeError(
-                    f"OpenRouter API error: {response.status_code} - {body}"
+                    f"OpenAI API error: {response.status_code} - {body}"
                 )
 
             for line in response.iter_lines():
@@ -113,9 +113,9 @@ class OpenRouterProvider(LLMProvider):
 
         elapsed = time.perf_counter() - t0
         logger.debug(
-            "OpenRouter stream completed ({:.2f}s, model={})",
+            "OpenAI stream completed ({:.2f}s, model={})",
             elapsed,
-            self._settings.MODEL,
+            self._model,
         )
 
         content = "".join(content_parts) or None
@@ -133,3 +133,18 @@ class OpenRouterProvider(LLMProvider):
             return LLMResponse(content=content, tool_calls=tool_calls, thinking=thinking)
 
         return LLMResponse(content=content or "", thinking=thinking)
+
+    def list_models(self) -> list[ModelInfo]:
+        url = f"{self._api_base_url}/models"
+        try:
+            resp = self._client.get(url, headers=self._headers())
+            resp.raise_for_status()
+            data = resp.json()
+            models = data.get("data", [])
+            return [
+                ModelInfo(id=m["id"], name=m.get("name"))
+                for m in models
+            ]
+        except Exception as e:
+            logger.error("Failed to list models from {}: {}", url, e)
+            return []

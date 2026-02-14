@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Sparkles, Palette, Zap, Database, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { X, Sparkles, Zap, ChevronRight, Eye, EyeOff, Plus, Trash2, Loader2, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -10,7 +10,7 @@ interface SettingsDialogProps {
   onClose: () => void;
 }
 
-type SettingTab = "general" | "model" | "appearance" | "advanced";
+type SettingTab = "general" | "provider" | "model";
 
 interface TabConfig {
   id: SettingTab;
@@ -21,21 +21,45 @@ interface TabConfig {
 
 const tabs: TabConfig[] = [
   { id: "general", label: "General", icon: Zap, color: "text-blue-400" },
+  { id: "provider", label: "Provider", icon: Server, color: "text-amber-400" },
   { id: "model", label: "Model", icon: Sparkles, color: "text-violet-400" },
 ];
 
+interface ProviderConfig {
+  name: string;
+  provider_type: string;
+  api_base_url: string;
+  api_key: string;
+}
 
 interface UserSettings {
   event_log: {
     timestamp_format: string;
   };
   model: {
-    provider: string;
-    default_model: string;
-    api_base_url: string;
-    api_key: string;
+    active_provider: string;
+    active_model: string;
+    providers: ProviderConfig[];
+    all_providers: ProviderConfig[];
   };
 }
+
+interface ModelOption {
+  id: string;
+  name: string | null;
+}
+
+const PROVIDER_TYPES = [
+  { value: "openai", label: "OpenAI Compatible" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "gemini", label: "Google Gemini" },
+  { value: "ollama", label: "Ollama" },
+];
+
+const BUILTIN_PROVIDER_NAMES = [
+  "OpenRouter",
+  "ModelScope",
+];
 
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<SettingTab>("general");
@@ -192,6 +216,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   className="space-y-8"
                 >
                   {activeTab === "general" && <GeneralSettings settings={settings} onUpdate={setSettings} />}
+                  {activeTab === "provider" && <ProviderSettings settings={settings} onUpdate={setSettings} />}
                   {activeTab === "model" && <ModelSettings settings={settings} onUpdate={setSettings} />}
                 </motion.div>
               </AnimatePresence>
@@ -254,6 +279,260 @@ function GeneralSettings({
   );
 }
 
+function ProviderSettings({
+  settings,
+  onUpdate,
+}: {
+  settings: UserSettings;
+  onUpdate: (s: UserSettings) => void;
+}) {
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newProvider, setNewProvider] = useState<ProviderConfig>({
+    name: "",
+    provider_type: "openai",
+    api_base_url: "",
+    api_key: "",
+  });
+
+  const allProviders = settings.model.all_providers || [];
+
+  const handleApiKeyChange = (providerName: string, apiKey: string) => {
+    const isBuiltin = BUILTIN_PROVIDER_NAMES.includes(providerName);
+    const updatedAllProviders = allProviders.map((p) =>
+      p.name === providerName ? { ...p, api_key: apiKey } : p
+    );
+
+    let updatedCustomProviders: ProviderConfig[];
+    if (isBuiltin) {
+      const existing = settings.model.providers.find((p) => p.name === providerName);
+      if (existing) {
+        updatedCustomProviders = settings.model.providers.map((p) =>
+          p.name === providerName ? { ...p, api_key: apiKey } : p
+        );
+      } else {
+        const base = allProviders.find((p) => p.name === providerName)!;
+        updatedCustomProviders = [
+          ...settings.model.providers,
+          { ...base, api_key: apiKey },
+        ];
+      }
+    } else {
+      updatedCustomProviders = settings.model.providers.map((p) =>
+        p.name === providerName ? { ...p, api_key: apiKey } : p
+      );
+    }
+
+    onUpdate({
+      ...settings,
+      model: {
+        ...settings.model,
+        providers: updatedCustomProviders,
+        all_providers: updatedAllProviders,
+      },
+    });
+  };
+
+  const handleAdd = () => {
+    if (!newProvider.name || !newProvider.api_base_url) {
+      toast.error("Name and Base URL are required");
+      return;
+    }
+    if (allProviders.some((p) => p.name === newProvider.name)) {
+      toast.error("Provider name already exists");
+      return;
+    }
+    onUpdate({
+      ...settings,
+      model: {
+        ...settings.model,
+        providers: [...settings.model.providers, { ...newProvider }],
+        all_providers: [...allProviders, { ...newProvider }],
+      },
+    });
+    setNewProvider({ name: "", provider_type: "openai", api_base_url: "", api_key: "" });
+    setShowAddForm(false);
+  };
+
+  const handleDelete = (name: string) => {
+    onUpdate({
+      ...settings,
+      model: {
+        ...settings.model,
+        providers: settings.model.providers.filter((p) => p.name !== name),
+        all_providers: allProviders.filter((p) => p.name !== name),
+        active_provider:
+          settings.model.active_provider === name
+            ? "OpenRouter"
+            : settings.model.active_provider,
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <SettingSection title="Available Providers" description="Manage LLM providers and configure API keys">
+        <div className="space-y-1">
+          {allProviders.map((provider) => {
+            const isBuiltin = BUILTIN_PROVIDER_NAMES.includes(provider.name);
+            return (
+              <ProviderRow
+                key={provider.name}
+                provider={provider}
+                isBuiltin={isBuiltin}
+                onApiKeyChange={(key) => handleApiKeyChange(provider.name, key)}
+                onDelete={isBuiltin ? undefined : () => handleDelete(provider.name)}
+              />
+            );
+          })}
+        </div>
+
+        {showAddForm ? (
+          <div className="mt-4 p-4 rounded-lg border border-zinc-700 bg-zinc-800/50 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Name</label>
+                <input
+                  value={newProvider.name}
+                  onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
+                  placeholder="My Provider"
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1">Type</label>
+                <select
+                  value={newProvider.provider_type}
+                  onChange={(e) =>
+                    setNewProvider({ ...newProvider, provider_type: e.target.value })
+                  }
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 focus:border-emerald-500 focus:outline-none"
+                >
+                  {PROVIDER_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 block mb-1">Base URL</label>
+              <input
+                value={newProvider.api_base_url}
+                onChange={(e) =>
+                  setNewProvider({ ...newProvider, api_base_url: e.target.value })
+                }
+                placeholder="https://api.example.com/v1"
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 block mb-1">API Key</label>
+              <input
+                type="password"
+                value={newProvider.api_key}
+                onChange={(e) =>
+                  setNewProvider({ ...newProvider, api_key: e.target.value })
+                }
+                placeholder="sk-..."
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddForm(false)}
+                className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAdd}
+                className="bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                Add
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="mt-3 flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            <Plus className="size-4" />
+            Add Custom Provider
+          </button>
+        )}
+      </SettingSection>
+    </div>
+  );
+}
+
+function ProviderRow({
+  provider,
+  isBuiltin,
+  onApiKeyChange,
+  onDelete,
+}: {
+  provider: ProviderConfig;
+  isBuiltin: boolean;
+  onApiKeyChange: (key: string) => void;
+  onDelete?: () => void;
+}) {
+  const [showKey, setShowKey] = useState(false);
+  const needsApiKey = provider.provider_type !== "ollama";
+
+  return (
+    <div className="flex items-center gap-3 py-3 px-4 rounded-lg hover:bg-zinc-800/30 transition-colors">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-zinc-300">{provider.name}</span>
+          {isBuiltin && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-400">
+              built-in
+            </span>
+          )}
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
+            {provider.provider_type}
+          </span>
+        </div>
+        <p className="text-xs text-zinc-500 truncate mt-0.5">{provider.api_base_url}</p>
+      </div>
+
+      {needsApiKey && (
+        <div className="relative w-52 shrink-0">
+          <input
+            type={showKey ? "text" : "password"}
+            value={provider.api_key}
+            onChange={(e) => onApiKeyChange(e.target.value)}
+            placeholder="API Key"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 pl-3 pr-8 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setShowKey(!showKey)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            {showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+          </button>
+        </div>
+      )}
+
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="text-zinc-500 hover:text-red-400 transition-colors shrink-0"
+          title="Delete provider"
+        >
+          <Trash2 className="size-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ModelSettings({
   settings,
   onUpdate,
@@ -261,56 +540,97 @@ function ModelSettings({
   settings: UserSettings;
   onUpdate: (s: UserSettings) => void;
 }) {
-  const [showApiKey, setShowApiKey] = useState(false);
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  const allProviders = settings.model.all_providers || [];
+  const activeProviderName = settings.model.active_provider;
+  const activeProvider = allProviders.find((p) => p.name === activeProviderName);
+
+  useEffect(() => {
+    if (!activeProvider) return;
+
+    let cancelled = false;
+    setLoadingModels(true);
+    setModelOptions([]);
+
+    fetch("/api/providers/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider_type: activeProvider.provider_type,
+        api_base_url: activeProvider.api_base_url,
+        api_key: activeProvider.api_key,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.models && data.models.length > 0) {
+          setModelOptions(data.models);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingModels(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeProviderName]);
+
+  const handleProviderChange = (name: string) => {
+    onUpdate({
+      ...settings,
+      model: { ...settings.model, active_provider: name, active_model: "" },
+    });
+  };
 
   return (
     <div className="space-y-6">
-      <SettingSection
-        title="Model Configuration"
-        description="Configure the AI model used by agents"
-      >
-        <SettingRow label="Provider" description="AI model provider">
+      <SettingSection title="Model Selection" description="Choose which provider and model to use for agents">
+        <SettingRow label="Provider" description="Select from your configured providers">
           <Select
-            options={[{ value: "openrouter", label: "OpenRouter" }]}
-            value={settings.model.provider}
-            onChange={(v) => onUpdate({ ...settings, model: { ...settings.model, provider: v } })}
+            options={allProviders.map((p) => ({ value: p.name, label: p.name }))}
+            value={settings.model.active_provider}
+            onChange={handleProviderChange}
           />
         </SettingRow>
-        <SettingRow label="Model" description="Model identifier (e.g., anthropic/claude-3.5-sonnet)">
-          <TextInput
-            value={settings.model.default_model}
-            onChange={(v) =>
-              onUpdate({ ...settings, model: { ...settings.model, default_model: v } })
-            }
-            placeholder="anthropic/claude-3.5-sonnet"
-          />
-        </SettingRow>
-        <SettingRow label="API Base URL" description="OpenRouter API endpoint">
-          <TextInput
-            value={settings.model.api_base_url}
-            onChange={(v) =>
-              onUpdate({ ...settings, model: { ...settings.model, api_base_url: v } })
-            }
-          />
-        </SettingRow>
-        <SettingRow label="API Key" description="Your API key for authentication">
-          <div className="relative w-64">
-            <input
-              type={showApiKey ? "text" : "password"}
-              value={settings.model.api_key}
-              onChange={(e) => onUpdate({ ...settings, model: { ...settings.model, api_key: e.target.value } })}
-              placeholder="sk-..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 pl-3 pr-10 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            />
-            <button
-              type="button"
-              onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors"
-              title={showApiKey ? "Hide API Key" : "Show API Key"}
+        <SettingRow label="Model" description="Select a model or enter an ID manually">
+          {loadingModels ? (
+            <div className="flex items-center gap-2 text-sm text-zinc-400 w-64 justify-center">
+              <Loader2 className="size-4 animate-spin" />
+              <span>Loading models...</span>
+            </div>
+          ) : modelOptions.length > 0 ? (
+            <select
+              value={settings.model.active_model}
+              onChange={(e) =>
+                onUpdate({
+                  ...settings,
+                  model: { ...settings.model, active_model: e.target.value },
+                })
+              }
+              className="w-64 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
+              <option value="">-- Select a model --</option>
+              {modelOptions.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name || m.id}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <TextInput
+              value={settings.model.active_model}
+              onChange={(v) =>
+                onUpdate({
+                  ...settings,
+                  model: { ...settings.model, active_model: v },
+                })
+              }
+              placeholder="model-id"
+            />
+          )}
         </SettingRow>
       </SettingSection>
     </div>
@@ -357,72 +677,18 @@ function SettingRow({
   );
 }
 
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-zinc-900",
-        checked ? "bg-emerald-600" : "bg-zinc-700"
-      )}
-    >
-      <motion.span
-        layout
-        className={cn(
-          "inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform",
-          checked ? "translate-x-6" : "translate-x-1"
-        )}
-      />
-    </button>
-  );
-}
-
-function NumberInput({
-  value,
-  onChange,
-  min,
-  max,
-  step,
-}: {
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-}) {
-  return (
-    <input
-      type="number"
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      min={min}
-      max={max}
-      step={step}
-      className="w-24 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-    />
-  );
-}
-
 function TextInput({
   value,
   onChange,
   placeholder,
-  type = "text",
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  type?: string;
 }) {
   return (
     <input
-      type={type}
+      type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}

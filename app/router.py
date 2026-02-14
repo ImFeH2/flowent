@@ -14,6 +14,7 @@ from app.user_settings import (
     save_user_settings,
     EventLogSettings,
     ModelSettings,
+    ProviderConfig,
 )
 
 router = APIRouter()
@@ -167,8 +168,13 @@ async def health_check() -> dict:
 
 @router.get("/api/settings")
 async def get_settings() -> dict:
+    from app.user_settings import get_all_providers
+
     settings = get_user_settings()
-    return asdict(settings)
+    result = asdict(settings)
+    all_providers = get_all_providers(settings.model)
+    result["model"]["all_providers"] = [asdict(p) for p in all_providers]
+    return result
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -178,13 +184,55 @@ class UpdateSettingsRequest(BaseModel):
 
 @router.post("/api/settings")
 async def update_settings(req: UpdateSettingsRequest) -> dict:
+    from app.user_settings import get_all_providers
+
     current = get_user_settings()
 
     if req.event_log is not None:
         current.event_log = EventLogSettings(**req.event_log)
     if req.model is not None:
-        current.model = ModelSettings(**req.model)
+        providers_raw = req.model.pop("providers", [])
+        providers = [
+            ProviderConfig(**p) if isinstance(p, dict) else p
+            for p in providers_raw
+        ]
+        current.model = ModelSettings(
+            active_provider=req.model.get("active_provider", current.model.active_provider),
+            active_model=req.model.get("active_model", current.model.active_model),
+            providers=providers,
+        )
 
     save_user_settings(current)
     logger.info("User settings updated")
-    return {"status": "saved", "settings": asdict(current)}
+    result = asdict(current)
+    all_providers = get_all_providers(current.model)
+    result["model"]["all_providers"] = [asdict(p) for p in all_providers]
+    return {"status": "saved", "settings": result}
+
+
+class ListModelsRequest(BaseModel):
+    provider_type: str
+    api_base_url: str
+    api_key: str = ""
+
+
+@router.post("/api/providers/models")
+async def list_provider_models(req: ListModelsRequest) -> dict:
+    from app.providers.registry import create_provider
+
+    try:
+        provider = create_provider(
+            provider_type=req.provider_type,
+            api_base_url=req.api_base_url,
+            api_key=req.api_key,
+        )
+        models = provider.list_models()
+        return {
+            "models": [
+                {"id": m.id, "name": m.name}
+                for m in models
+            ]
+        }
+    except Exception as e:
+        logger.error("Failed to list models: {}", e)
+        return {"error": str(e), "models": []}

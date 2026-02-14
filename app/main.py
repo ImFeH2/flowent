@@ -12,9 +12,10 @@ from app.agent import Agent
 from app.events import event_bus
 from app.logging import setup_logging
 from app.models import AgentConfig, Permissions, Role
-from app.providers.openrouter import OpenRouterProvider
+from app.providers.registry import create_provider
 from app.registry import registry
 from app.settings import Settings
+from app.user_settings import get_user_settings, find_provider
 
 settings = Settings()
 setup_logging(settings)
@@ -36,7 +37,25 @@ async def lifespan(app: FastAPI):
         ),
         name="Steward",
     )
-    provider = OpenRouterProvider(settings)
+
+    user_settings = get_user_settings()
+    model_settings = user_settings.model
+    provider_cfg = find_provider(model_settings, model_settings.active_provider)
+
+    if provider_cfg:
+        provider = create_provider(
+            provider_type=provider_cfg.provider_type,
+            api_base_url=provider_cfg.api_base_url,
+            api_key=provider_cfg.api_key,
+            model=model_settings.active_model,
+        )
+    else:
+        provider = create_provider(
+            provider_type="openai",
+            api_base_url="https://openrouter.ai/api/v1",
+            model=model_settings.active_model,
+        )
+
     steward = Agent(config=steward_config, provider=provider)
     registry.register(steward)
 

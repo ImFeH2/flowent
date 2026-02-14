@@ -77,18 +77,16 @@ export function useAgentDetail(agentId: string | null) {
           streaming: true,
         } satisfies HistoryEntry);
       }
-      if (buf.toolResult) {
-        base.push({
-          type: "tool_result",
-          content: buf.toolResult,
-          from_id: null,
-          to_id: null,
-          tool_name: null,
-          tool_call_id: null,
-          arguments: null,
-          timestamp: now,
-          streaming: true,
-        } satisfies HistoryEntry);
+      if (buf.toolResults.size > 0) {
+        for (const [toolCallId, resultText] of buf.toolResults) {
+          for (let i = base.length - 1; i >= 0; i--) {
+            const entry = base[i];
+            if (entry.type === "tool_call" && entry.tool_call_id === toolCallId && entry.streaming) {
+              base[i] = { ...entry, content: resultText };
+              break;
+            }
+          }
+        }
       }
     }
 

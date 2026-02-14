@@ -41,6 +41,7 @@ class HistoryEntry:
     tool_name: str | None = None
     tool_call_id: str | None = None
     arguments: dict[str, Any] | None = None
+    streaming: bool = False
     timestamp: float = field(default_factory=time.time)
 
 

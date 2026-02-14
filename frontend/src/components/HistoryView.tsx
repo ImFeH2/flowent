@@ -105,28 +105,27 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
           label={entry.tool_name ?? "tool"}
           icon={<Wrench className="size-3 text-teal-400" />}
           className="border-teal-500/20 bg-teal-500/5"
-          defaultOpen={false}
+          defaultOpen={entry.streaming ?? false}
         >
-          <pre className="text-[11px] text-teal-200/80 whitespace-pre-wrap break-words leading-relaxed">
-            {JSON.stringify(entry.arguments, null, 2)}
-          </pre>
+          <div className="space-y-2">
+            <div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Arguments</div>
+              <pre className="text-[11px] text-teal-200/80 whitespace-pre-wrap break-words">
+                {JSON.stringify(entry.arguments, null, 2)}
+              </pre>
+            </div>
+            {entry.content && (
+              <div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Result</div>
+                <pre className="text-[11px] text-zinc-400 whitespace-pre-wrap break-words">
+                  <StreamingText text={entry.content} streaming={entry.streaming} />
+                </pre>
+              </div>
+            )}
+          </div>
         </CollapsibleBlock>
       );
     }
-
-    case "tool_result":
-      return (
-        <CollapsibleBlock
-          label="Result"
-          icon={<Terminal className="size-3 text-zinc-400" />}
-          className="border-zinc-700/50 bg-zinc-800/30"
-          defaultOpen={entry.streaming ?? false}
-        >
-          <pre className="text-[11px] text-zinc-400 whitespace-pre-wrap break-words leading-relaxed">
-            <StreamingText text={entry.content} streaming={entry.streaming} />
-          </pre>
-        </CollapsibleBlock>
-      );
 
     case "sent_message":
       return (

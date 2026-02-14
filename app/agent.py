@@ -126,22 +126,7 @@ class Agent:
                             )
                         )
                     for tc in response.tool_calls:
-                        self._append_history(
-                            HistoryEntry(
-                                type=HistoryType.TOOL_CALL,
-                                tool_name=tc.name,
-                                tool_call_id=tc.id,
-                                arguments=tc.arguments,
-                            )
-                        )
-                        result = self._handle_tool_call(tc.name, tc.arguments, tc.id)
-                        self._append_history(
-                            HistoryEntry(
-                                type=HistoryType.TOOL_RESULT,
-                                tool_call_id=tc.id,
-                                content=result,
-                            )
-                        )
+                        self._handle_tool_call(tc.name, tc.arguments, tc.id)
                         if self._terminate.is_set():
                             break
                 elif response.content:
@@ -206,26 +191,29 @@ class Agent:
                 pass
 
             elif entry.type == HistoryType.TOOL_CALL:
+                if entry.streaming:
+                    continue
+
                 pending_tool_calls.append(
                     {
                         "id": entry.tool_call_id,
                         "type": "function",
                         "function": {
                             "name": entry.tool_name,
-                            "arguments": json.dumps(entry.arguments),
+                            "arguments": json.dumps(entry.arguments) if entry.arguments else "{}",
                         },
                     }
                 )
 
-            elif entry.type == HistoryType.TOOL_RESULT:
-                self._flush_tool_calls(messages, pending_tool_calls)
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": entry.tool_call_id,
-                        "content": entry.content,
-                    }
-                )
+                if entry.content is not None:
+                    self._flush_tool_calls(messages, pending_tool_calls)
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": entry.tool_call_id,
+                            "content": entry.content,
+                        }
+                    )
 
             elif entry.type in (HistoryType.SENT_MESSAGE, HistoryType.ERROR):
                 pass
@@ -279,15 +267,37 @@ class Agent:
                 return
 
     def _handle_tool_call(
-        self, name: str, arguments: dict[str, Any], _call_id: str
+        self, name: str, arguments: dict[str, Any], call_id: str
     ) -> str:
         tool = _tool_registry.get(name)
         if tool is None:
-            return json.dumps({"error": f"Unknown tool: {name}"})
+            error_msg = json.dumps({"error": f"Unknown tool: {name}"})
+            self._append_history(
+                HistoryEntry(
+                    type=HistoryType.TOOL_CALL,
+                    tool_name=name,
+                    tool_call_id=call_id,
+                    arguments=arguments,
+                    content=error_msg,
+                    streaming=False,
+                )
+            )
+            return error_msg
 
         if not is_tool_available(self.config.permissions, name):
             self._log.warning("Permission denied for tool: {}", name)
-            return json.dumps({"error": f"Permission denied for tool: {name}"})
+            error_msg = json.dumps({"error": f"Permission denied for tool: {name}"})
+            self._append_history(
+                HistoryEntry(
+                    type=HistoryType.TOOL_CALL,
+                    tool_name=name,
+                    tool_call_id=call_id,
+                    arguments=arguments,
+                    content=error_msg,
+                    streaming=False,
+                )
+            )
+            return error_msg
 
         event_bus.emit(
             Event(
@@ -297,18 +307,72 @@ class Agent:
             )
         )
 
+        self._append_history(
+            HistoryEntry(
+                type=HistoryType.TOOL_CALL,
+                tool_name=name,
+                tool_call_id=call_id,
+                arguments=arguments,
+                streaming=True,
+            )
+        )
+
         def _on_tool_output(text: str) -> None:
             event_bus.emit(Event(
                 type=EventType.HISTORY_ENTRY_DELTA,
                 agent_id=self.uuid,
-                data={"delta_type": "tool_result", "delta": text},
+                data={"delta_type": "tool_result", "tool_call_id": call_id, "delta": text},
             ))
 
         try:
-            return tool.execute(self, arguments, on_output=_on_tool_output)
+            result = tool.execute(self, arguments, on_output=_on_tool_output)
+
+            for i in range(len(self.history) - 1, -1, -1):
+                entry = self.history[i]
+                if (entry.type == HistoryType.TOOL_CALL and
+                    entry.tool_call_id == call_id and
+                    entry.streaming):
+                    self.history[i] = HistoryEntry(
+                        type=HistoryType.TOOL_CALL,
+                        tool_name=name,
+                        tool_call_id=call_id,
+                        arguments=arguments,
+                        content=result,
+                        streaming=False,
+                    )
+                    event_bus.emit(Event(
+                        type=EventType.HISTORY_ENTRY_ADDED,
+                        agent_id=self.uuid,
+                        data=asdict(self.history[i]) | {"type": self.history[i].type.value},
+                    ))
+                    break
+
+            return result
         except Exception as e:
             self._log.exception("Tool {} failed", name)
-            return json.dumps({"error": str(e)})
+            error_msg = json.dumps({"error": str(e)})
+
+            for i in range(len(self.history) - 1, -1, -1):
+                entry = self.history[i]
+                if (entry.type == HistoryType.TOOL_CALL and
+                    entry.tool_call_id == call_id and
+                    entry.streaming):
+                    self.history[i] = HistoryEntry(
+                        type=HistoryType.TOOL_CALL,
+                        tool_name=name,
+                        tool_call_id=call_id,
+                        arguments=arguments,
+                        content=error_msg,
+                        streaming=False,
+                    )
+                    event_bus.emit(Event(
+                        type=EventType.HISTORY_ENTRY_ADDED,
+                        agent_id=self.uuid,
+                        data=asdict(self.history[i]) | {"type": self.history[i].type.value},
+                    ))
+                    break
+
+            return error_msg
 
     def enqueue_message(self, msg: Message) -> None:
         self._message_queue.put(msg)

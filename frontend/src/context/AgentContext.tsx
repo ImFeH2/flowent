@@ -57,7 +57,7 @@ interface AgentContextValue {
 export interface StreamingBuffer {
   content: string;
   thinking: string;
-  toolResult: string;
+  toolResults: Map<string, string>;
 }
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -201,15 +201,23 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       if (event.type === "history_entry_delta") {
         const deltaType = event.data.delta_type as string;
         const delta = event.data.delta as string;
+        const toolCallId = event.data.tool_call_id as string | undefined;
+
         setStreamingBuffers((prev) => {
           const next = new Map(prev);
-          const buf = next.get(event.agent_id) ?? { content: "", thinking: "", toolResult: "" };
+          const buf = next.get(event.agent_id) ?? {
+            content: "",
+            thinking: "",
+            toolResults: new Map(),
+          };
           if (deltaType === "content") {
             next.set(event.agent_id, { ...buf, content: buf.content + delta });
           } else if (deltaType === "thinking") {
             next.set(event.agent_id, { ...buf, thinking: buf.thinking + delta });
-          } else if (deltaType === "tool_result") {
-            next.set(event.agent_id, { ...buf, toolResult: buf.toolResult + delta });
+          } else if (deltaType === "tool_result" && toolCallId) {
+            const newResults = new Map(buf.toolResults);
+            newResults.set(toolCallId, (newResults.get(toolCallId) ?? "") + delta);
+            next.set(event.agent_id, { ...buf, toolResults: newResults });
           }
           return next;
         });
@@ -226,12 +234,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             next.set(event.agent_id, { ...buf, content: "", thinking: "" });
             return next;
           });
-        } else if (entry.type === "tool_result") {
+        } else if (entry.type === "tool_call" && entry.tool_call_id) {
           setStreamingBuffers((prev) => {
             const buf = prev.get(event.agent_id);
             if (!buf) return prev;
             const next = new Map(prev);
-            next.set(event.agent_id, { ...buf, toolResult: "" });
+            const newResults = new Map(buf.toolResults);
+            newResults.delete(entry.tool_call_id!);
+            next.set(event.agent_id, { ...buf, toolResults: newResults });
             return next;
           });
         }
@@ -239,6 +249,22 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         setAgentHistories((prev) => {
           const next = new Map(prev);
           const existing = next.get(event.agent_id) ?? [];
+
+          if (entry.type === "tool_call" && entry.tool_call_id && !entry.streaming) {
+            const idx = existing.findIndex(
+              (e) =>
+                e.type === "tool_call" &&
+                e.tool_call_id === entry.tool_call_id &&
+                e.streaming === true,
+            );
+            if (idx >= 0) {
+              const updated = [...existing];
+              updated[idx] = entry;
+              next.set(event.agent_id, updated);
+              return next;
+            }
+          }
+
           next.set(event.agent_id, [...existing, entry]);
           return next;
         });

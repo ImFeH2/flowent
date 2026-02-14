@@ -125,8 +125,8 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
         width: windowState.width,
         height: windowState.height,
       }}
-      minWidth={500}
-      minHeight={350}
+      minWidth={200}
+      minHeight={200}
       dragHandleClassName="drag-handle"
       scale={zoom}
       onDragStop={(_e, d) => {

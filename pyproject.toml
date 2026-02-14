@@ -1,5 +1,5 @@
 [project]
-name = "synora"
+name = "synode"
 version = "0.1.0"
 description = "A structured multi-agent framework for coordinated AI collaboration"
 readme = "README.md"

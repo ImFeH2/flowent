@@ -42,7 +42,7 @@ def setup_logging(settings: Settings | None = None) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
 
     logger.add(
-        str(log_dir / "synora.log"),
+        str(log_dir / "synode.log"),
         format="{message}",
         level=level,
         rotation="10 MB",

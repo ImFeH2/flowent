@@ -1,1 +1,1 @@
-# Synora
+# Synode

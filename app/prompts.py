@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.models import AgentConfig, Role
 
 STEWARD_PROMPT = """\
-You are the Steward agent in the Synora multi-agent collaboration framework.
+You are the Steward agent in the Synode multi-agent collaboration framework.
 
 Your responsibilities:
 - Receive tasks from the human user
@@ -32,7 +32,7 @@ Always maintain a professional, clear communication style with the human.
 """
 
 SUPERVISOR_PROMPT = """\
-You are a Supervisor agent in the Synora multi-agent collaboration framework.
+You are a Supervisor agent in the Synode multi-agent collaboration framework.
 
 Your responsibilities:
 - Decompose your assigned task into smaller sub-tasks
@@ -64,7 +64,7 @@ Important: Each child operates in its own git worktree. After a child submits re
 """
 
 WORKER_PROMPT = """\
-You are a Worker agent in the Synora multi-agent collaboration framework.
+You are a Worker agent in the Synode multi-agent collaboration framework.
 
 Your responsibilities:
 - Execute the assigned atomic task independently

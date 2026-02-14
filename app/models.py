@@ -16,6 +16,7 @@ class AgentState(StrEnum):
     INITIALIZING = "initializing"
     IDLE = "idle"
     RUNNING = "running"
+    ERROR = "error"
     TERMINATED = "terminated"
 
 
@@ -28,6 +29,7 @@ class HistoryType(StrEnum):
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
     SENT_MESSAGE = "sent_message"
+    ERROR = "error"
 
 
 @dataclass

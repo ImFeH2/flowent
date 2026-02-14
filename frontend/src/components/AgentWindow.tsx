@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Rnd } from "react-rnd";
 import { Group, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { X, Send, Wrench, ChevronDown, ChevronRight, Square, Brain } from "lucide-react";
+import { X, Send, Wrench, ChevronDown, ChevronRight, Square, Brain, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAgent, type WindowState } from "@/context/AgentContext";
@@ -13,7 +13,8 @@ type ChatItem =
   | { kind: "user"; content: string }
   | { kind: "assistant"; content: string; streaming?: boolean }
   | { kind: "thinking"; content: string; streaming?: boolean }
-  | { kind: "tool_use"; toolName: string; toolCallId: string | null; args: Record<string, unknown> | null; result: string | null; resultStreaming?: boolean };
+  | { kind: "tool_use"; toolName: string; toolCallId: string | null; args: Record<string, unknown> | null; result: string | null; resultStreaming?: boolean }
+  | { kind: "error"; content: string };
 
 interface AgentWindowProps {
   agentId: string;
@@ -82,6 +83,8 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
           args: e.arguments,
           result: null,
         });
+      } else if (e.type === "error" && e.content) {
+        items.push({ kind: "error", content: e.content });
       } else if (e.type === "tool_result" && e.content != null) {
         for (let j = items.length - 1; j >= 0; j--) {
           const prev = items[j];
@@ -112,7 +115,7 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
     ? detail.name ?? `${detail.role} ${agentId.slice(0, 8)}`
     : agentId.slice(0, 8);
   const Icon = detail ? roleIcon[detail.role] : roleIcon.worker;
-  const canTerminate = detail && detail.state !== "terminated";
+  const canTerminate = detail && detail.state !== "terminated" && detail.state !== "error";
 
   return (
     <Rnd
@@ -327,6 +330,10 @@ function ChatItemRenderer({ item }: { item: ChatItem }) {
     return <ToolUseBlock item={item} />;
   }
 
+  if (item.kind === "error") {
+    return <ErrorBlock content={item.content} />;
+  }
+
   return null;
 }
 
@@ -368,6 +375,20 @@ function ThinkingBlock({ content, streaming }: { content: string; streaming?: bo
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function ErrorBlock({ content }: { content: string }) {
+  return (
+    <div className="rounded-lg border border-red-500/30 bg-red-950/20 px-3 py-2">
+      <div className="flex items-center gap-1.5 mb-1">
+        <AlertCircle className="size-3.5 text-red-400 shrink-0" />
+        <span className="text-[11px] font-medium text-red-300">Error</span>
+      </div>
+      <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-red-200/70">
+        {content}
+      </p>
     </div>
   );
 }

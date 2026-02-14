@@ -1,6 +1,6 @@
 export type Role = "steward" | "supervisor" | "worker";
 
-export type AgentState = "initializing" | "running" | "idle" | "terminated";
+export type AgentState = "initializing" | "running" | "idle" | "error" | "terminated";
 
 export type DisplayEventType =
   | "agent_created"
@@ -50,7 +50,8 @@ export type HistoryEntryType =
   | "assistant_thinking"
   | "tool_call"
   | "tool_result"
-  | "sent_message";
+  | "sent_message"
+  | "error";
 
 export interface HistoryEntry {
   type: HistoryEntryType;

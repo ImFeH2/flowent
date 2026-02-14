@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import threading
-import time
 from queue import Queue, Empty
 from typing import Any
 
@@ -90,8 +89,8 @@ class Agent:
             self.set_state(AgentState.TERMINATED)
             return
 
-        try:
-            while not self._terminate.is_set():
+        while not self._terminate.is_set():
+            try:
                 self._drain_messages()
 
                 tools_schema = _tool_registry.get_tools_schema(self)
@@ -104,14 +103,11 @@ class Agent:
                         data={"delta_type": chunk_type, "delta": text},
                     ))
 
-                t0 = time.perf_counter()
                 response = self.provider.chat(
                     messages=messages,
                     tools=tools_schema if tools_schema else None,
                     on_chunk=_on_llm_chunk,
                 )
-                elapsed = time.perf_counter() - t0
-                self._log.debug("LLM response received ({:.2f}s)", elapsed)
 
                 if response.thinking:
                     self._append_history(
@@ -138,12 +134,7 @@ class Agent:
                                 arguments=tc.arguments,
                             )
                         )
-                        t0 = time.perf_counter()
                         result = self._handle_tool_call(tc.name, tc.arguments, tc.id)
-                        tool_elapsed = time.perf_counter() - t0
-                        self._log.info(
-                            "Tool called: {} ({:.3f}s)", tc.name, tool_elapsed
-                        )
                         self._append_history(
                             HistoryEntry(
                                 type=HistoryType.TOOL_RESULT,
@@ -160,13 +151,21 @@ class Agent:
                             content=response.content,
                         )
                     )
-                    self._log.info("Agent said: {}", response.content[:100])
                     self.set_state(AgentState.IDLE)
                     self._wait_for_input()
 
-        except Exception:
-            self._log.exception("Agent crashed")
-        finally:
+            except Exception as exc:
+                self._log.error("Agent error: {}", exc)
+                self._append_history(
+                    HistoryEntry(
+                        type=HistoryType.ERROR,
+                        content=f"{type(exc).__name__}: {exc}",
+                    )
+                )
+                self.set_state(AgentState.ERROR)
+                self._wait_for_input()
+                if self._terminate.is_set():
+                    break
             self.set_state(AgentState.TERMINATED)
             self._log.info(
                 "Agent terminated (reason: {})", self._termination_reason or "finished"
@@ -226,7 +225,7 @@ class Agent:
                     }
                 )
 
-            elif entry.type == HistoryType.SENT_MESSAGE:
+            elif entry.type in (HistoryType.SENT_MESSAGE, HistoryType.ERROR):
                 pass
 
         self._flush_tool_calls(messages, pending_tool_calls)

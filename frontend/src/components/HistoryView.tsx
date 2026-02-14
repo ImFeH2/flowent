@@ -1,5 +1,5 @@
 import { useState, useCallback, type ReactNode } from "react";
-import { ChevronRight, MessageSquare, Brain, Wrench, Terminal, Send, Bot } from "lucide-react";
+import { ChevronRight, MessageSquare, Brain, Wrench, Terminal, Send, Bot, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry } from "@/types";
 
@@ -138,6 +138,17 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
             </span>
           </div>
           <p className="text-xs text-purple-200 whitespace-pre-wrap break-words">{entry.content}</p>
+        </div>
+      );
+
+    case "error":
+      return (
+        <div className="rounded border border-red-500/30 bg-red-500/5 px-2.5 py-1.5">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <AlertCircle className="size-3 text-red-400" />
+            <span className="text-[10px] font-medium text-red-400">Error</span>
+          </div>
+          <p className="text-xs text-red-200 whitespace-pre-wrap break-words">{entry.content}</p>
         </div>
       );
 

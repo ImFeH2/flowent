@@ -142,7 +142,7 @@ class OpenAIProvider(LLMProvider):
             resp.raise_for_status()
             data = resp.json()
             models = data.get("data", [])
-            return [ModelInfo(id=m["id"], name=m.get("name")) for m in models]
+            return [ModelInfo(id=m["id"]) for m in models]
         except Exception as e:
             logger.error("Failed to list models from {}: {}", url, e)
             return []

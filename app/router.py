@@ -229,7 +229,7 @@ async def list_provider_models(req: ListModelsRequest) -> dict:
         models = provider.list_models()
         return {
             "models": [
-                {"id": m.id, "name": m.name}
+                {"id": m.id}
                 for m in models
             ]
         }

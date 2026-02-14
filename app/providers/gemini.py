@@ -159,7 +159,7 @@ class GeminiProvider(LLMProvider):
                 methods = m.get("supportedGenerationMethods", [])
                 if "generateContent" in methods:
                     model_id = m.get("name", "").removeprefix("models/")
-                    result.append(ModelInfo(id=model_id, name=m.get("displayName")))
+                    result.append(ModelInfo(id=model_id))
             return result
         except Exception as e:
             logger.error("Failed to list models from {}: {}", url, e)

@@ -46,7 +46,6 @@ interface UserSettings {
 
 interface ModelOption {
   id: string;
-  name: string | null;
 }
 
 const PROVIDER_TYPES = [
@@ -615,7 +614,7 @@ function ModelSettings({
               <option value="">-- Select a model --</option>
               {modelOptions.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name || m.id}
+                  {m.id}
                 </option>
               ))}
             </select>

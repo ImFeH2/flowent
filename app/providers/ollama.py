@@ -107,7 +107,7 @@ class OllamaProvider(LLMProvider):
             resp.raise_for_status()
             data = resp.json()
             models = data.get("models", [])
-            return [ModelInfo(id=m.get("name", ""), name=m.get("name")) for m in models]
+            return [ModelInfo(id=m.get("name", "")) for m in models]
         except Exception as e:
             logger.error("Failed to list models from {}: {}", url, e)
             return []

@@ -23,7 +23,7 @@ class OllamaProvider(LLMProvider):
         self._provider_name = provider_name
         self._api_base_url = api_base_url.rstrip("/")
         self._model = model
-        self._client = httpx.Client(timeout=5.0)
+        self._client = httpx.Client(timeout=120.0)
 
     def chat(
         self,

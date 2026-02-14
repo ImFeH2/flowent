@@ -24,7 +24,7 @@ class OpenAIProvider(LLMProvider):
         self._api_base_url = api_base_url.rstrip("/")
         self._api_key = api_key
         self._model = model
-        self._client = httpx.Client(timeout=5.0)
+        self._client = httpx.Client(timeout=120.0)
 
     def _headers(self) -> dict[str, str]:
         headers: dict[str, str] = {"Content-Type": "application/json"}

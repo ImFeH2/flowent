@@ -50,6 +50,8 @@ interface AgentContextValue {
   streamingBuffers: Map<string, StreamingBuffer>;
   activeMessages: ActiveMessage[];
   activeToolCalls: Map<string, string>;
+  eventPanelVisible: boolean;
+  toggleEventPanel: () => void;
 }
 
 export interface StreamingBuffer {
@@ -85,6 +87,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     () => new Map(),
   );
   const [pendingPathAccess, setPendingPathAccess] = useState<PathAccessRequest[]>([]);
+  const [eventPanelVisible, setEventPanelVisible] = useState(true);
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -319,6 +322,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const toggleEventPanel = useCallback(() => {
+    setEventPanelVisible((prev) => !prev);
+  }, []);
+
   const value = useMemo(
     () => ({
       agents,
@@ -344,6 +351,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       activeToolCalls,
       pendingPathAccess,
       resolvePathAccess,
+      eventPanelVisible,
+      toggleEventPanel,
     }),
     [
       agents,
@@ -368,6 +377,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       activeToolCalls,
       pendingPathAccess,
       resolvePathAccess,
+      eventPanelVisible,
+      toggleEventPanel,
     ],
   );
 

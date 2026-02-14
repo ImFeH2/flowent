@@ -9,6 +9,12 @@ from pydantic import BaseModel
 from app.events import event_bus
 from app.models import Message
 from app.registry import registry
+from app.user_settings import (
+    get_user_settings,
+    save_user_settings,
+    EventLogSettings,
+    ModelSettings,
+)
 
 router = APIRouter()
 
@@ -157,3 +163,28 @@ async def terminate_agent(agent_id: str) -> dict:
 @router.get("/health")
 async def health_check() -> dict:
     return {"status": "healthy"}
+
+
+@router.get("/api/settings")
+async def get_settings() -> dict:
+    settings = get_user_settings()
+    return asdict(settings)
+
+
+class UpdateSettingsRequest(BaseModel):
+    event_log: dict | None = None
+    model: dict | None = None
+
+
+@router.post("/api/settings")
+async def update_settings(req: UpdateSettingsRequest) -> dict:
+    current = get_user_settings()
+
+    if req.event_log is not None:
+        current.event_log = EventLogSettings(**req.event_log)
+    if req.model is not None:
+        current.model = ModelSettings(**req.model)
+
+    save_user_settings(current)
+    logger.info("User settings updated")
+    return {"status": "saved", "settings": asdict(current)}

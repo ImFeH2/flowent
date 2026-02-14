@@ -8,16 +8,18 @@ import { cn } from "@/lib/utils";
 import { useAgent } from "@/context/AgentContext";
 
 export function EventLog() {
-  const { events, connected } = useAgent();
+  const { events, connected, eventPanelVisible } = useAgent();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [events.length]);
 
+  if (!eventPanelVisible) return null;
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-4 py-3">
+    <div className="fixed right-4 top-4 bottom-4 w-80 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col overflow-hidden z-30 shadow-xl">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
         {connected ? (
           <Wifi className="size-4 text-zinc-400" />
         ) : (
@@ -31,7 +33,6 @@ export function EventLog() {
           )}
         />
       </div>
-      <Separator className="bg-zinc-800" />
       <ScrollArea className="flex-1 min-h-0">
         <div className="py-1">
           <AnimatePresence initial={false}>

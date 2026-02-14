@@ -15,8 +15,6 @@ import {
   type XYPosition,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Network } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import { AgentGraphNode } from "@/components/AgentGraphNode";
 import { AgentWindow } from "@/components/AgentWindow";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
@@ -154,6 +152,14 @@ export function AgentTree() {
     [],
   );
 
+  const onNodeMouseMove: NodeMouseHandler = useCallback(
+    (event, node) => {
+      const mouseEvent = event as unknown as MouseEvent;
+      setTooltip({ agentId: node.id, x: mouseEvent.clientX, y: mouseEvent.clientY });
+    },
+    [],
+  );
+
   const onNodeMouseLeave: NodeMouseHandler = useCallback(() => {
     setTooltip(null);
   }, []);
@@ -200,11 +206,6 @@ export function AgentTree() {
 
   return (
     <div className="relative flex h-full flex-col">
-      <div className="flex items-center gap-2 px-4 py-3">
-        <Network className="size-4 text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-200">Agents</span>
-      </div>
-      <Separator className="bg-zinc-800" />
       <div className="flex-1 relative overflow-hidden">
         {nodes.length === 0 ? (
           <p className="px-4 py-8 text-center text-xs text-zinc-500">
@@ -218,6 +219,7 @@ export function AgentTree() {
             edgeTypes={edgeTypes}
             onNodeClick={onNodeClick}
             onNodeMouseEnter={onNodeMouseEnter}
+            onNodeMouseMove={onNodeMouseMove}
             onNodeMouseLeave={onNodeMouseLeave}
             onPaneClick={onPaneClick}
             onPaneContextMenu={onPaneContextMenu}

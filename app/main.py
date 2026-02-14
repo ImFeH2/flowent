@@ -41,10 +41,6 @@ async def lifespan(app: FastAPI):
     steward = Agent(config=steward_config, provider=provider)
     registry.register(steward)
 
-    from app import router as router_module
-
-    router_module.STEWARD_ID = steward.uuid
-
     steward.start()
     logger.info("Steward started: {}", steward.uuid)
 

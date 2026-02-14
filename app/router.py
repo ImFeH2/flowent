@@ -19,8 +19,6 @@ from app.user_settings import (
 
 router = APIRouter()
 
-STEWARD_ID: str | None = None
-
 
 class AgentMessageRequest(BaseModel):
     message: str
@@ -128,7 +126,9 @@ async def resolve_path_access(request_id: str, req: PathAccessResponse) -> dict:
 
     success = _resolve(request_id, req.approved)
     if not success:
-        raise HTTPException(status_code=404, detail="Request not found or already resolved")
+        raise HTTPException(
+            status_code=404, detail="Request not found or already resolved"
+        )
     return {"status": "resolved", "approved": req.approved}
 
 
@@ -183,11 +183,12 @@ async def update_settings(req: UpdateSettingsRequest) -> dict:
     if req.model is not None:
         providers_raw = req.model.pop("providers", [])
         providers = [
-            ProviderConfig(**p) if isinstance(p, dict) else p
-            for p in providers_raw
+            ProviderConfig(**p) if isinstance(p, dict) else p for p in providers_raw
         ]
         current.model = ModelSettings(
-            active_provider=req.model.get("active_provider", current.model.active_provider),
+            active_provider=req.model.get(
+                "active_provider", current.model.active_provider
+            ),
             active_model=req.model.get("active_model", current.model.active_model),
             providers=providers,
         )
@@ -213,7 +214,9 @@ async def list_provider_models(req: ListModelsRequest) -> dict:
     cfg = find_provider(settings.model, req.provider_name)
 
     if cfg is None:
-        raise HTTPException(status_code=404, detail=f"Provider '{req.provider_name}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Provider '{req.provider_name}' not found"
+        )
 
     try:
         provider = create_provider(
@@ -223,12 +226,9 @@ async def list_provider_models(req: ListModelsRequest) -> dict:
             api_key=cfg.api_key,
         )
         models = provider.list_models()
-        return {
-            "models": [
-                {"id": m.id}
-                for m in models
-            ]
-        }
+        return {"models": [{"id": m.id} for m in models]}
     except Exception as e:
-        logger.error("Failed to list models for provider '{}': {}", req.provider_name, e)
+        logger.error(
+            "Failed to list models for provider '{}': {}", req.provider_name, e
+        )
         raise HTTPException(status_code=500, detail=str(e))

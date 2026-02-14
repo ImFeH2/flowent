@@ -166,6 +166,16 @@ async def health_check() -> dict:
     return {"status": "healthy"}
 
 
+@router.get("/api/meta")
+async def get_meta() -> dict:
+    from app.providers.registry import ProviderType, BUILTIN_PROVIDERS
+
+    return {
+        "provider_types": [pt.value for pt in ProviderType],
+        "builtin_provider_names": [p.name for p in BUILTIN_PROVIDERS],
+    }
+
+
 @router.get("/api/settings")
 async def get_settings() -> dict:
     from app.user_settings import get_all_providers

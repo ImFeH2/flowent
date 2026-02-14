@@ -48,35 +48,35 @@ interface ModelOption {
   id: string;
 }
 
-const PROVIDER_TYPES = [
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic" },
-  { value: "gemini", label: "Google Gemini" },
-  { value: "ollama", label: "Ollama" },
-];
-
-const BUILTIN_PROVIDER_NAMES = [
-  "OpenRouter",
-  "ModelScope",
-];
+interface MetaInfo {
+  provider_types: string[];
+  builtin_provider_names: string[];
+}
 
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<SettingTab>("general");
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [meta, setMeta] = useState<MetaInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const mouseUpTargetRef = useRef<EventTarget | null>(null);
 
   useEffect(() => {
-    if (open && !settings) {
-      fetch("/api/settings")
-        .then((res) => res.json())
-        .then((data) => setSettings(data))
-        .catch(() => {
-          toast.error("Failed to load settings");
-        });
+    if (open) {
+      if (!settings) {
+        fetch("/api/settings")
+          .then((res) => res.json())
+          .then((data) => setSettings(data))
+          .catch(() => toast.error("Failed to load settings"));
+      }
+      if (!meta) {
+        fetch("/api/meta")
+          .then((res) => res.json())
+          .then((data) => setMeta(data))
+          .catch(() => {});
+      }
     }
-  }, [open, settings]);
+  }, [open, settings, meta]);
 
   const handleSave = async () => {
     if (!settings) return;
@@ -215,8 +215,10 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   className="space-y-8"
                 >
                   {activeTab === "general" && <GeneralSettings settings={settings} onUpdate={setSettings} />}
-                  {activeTab === "provider" && <ProviderSettings settings={settings} onUpdate={setSettings} />}
-                  {activeTab === "model" && <ModelSettings settings={settings} onUpdate={setSettings} />}
+                  {activeTab === "provider" && meta && (
+                    <ProviderSettings settings={settings} onUpdate={setSettings} meta={meta} />
+                  )}
+                  {activeTab === "model" && <ModelSettings settings={settings} onUpdate={setSettings} meta={meta} />}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -281,14 +283,16 @@ function GeneralSettings({
 function ProviderSettings({
   settings,
   onUpdate,
+  meta,
 }: {
   settings: UserSettings;
   onUpdate: (s: UserSettings) => void;
+  meta: MetaInfo;
 }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newProvider, setNewProvider] = useState<ProviderConfig>({
     name: "",
-    provider_type: "openai",
+    provider_type: meta.provider_types[0] || "openai",
     api_base_url: "",
     api_key: "",
   });
@@ -296,7 +300,7 @@ function ProviderSettings({
   const allProviders = settings.model.all_providers || [];
 
   const handleApiKeyChange = (providerName: string, apiKey: string) => {
-    const isBuiltin = BUILTIN_PROVIDER_NAMES.includes(providerName);
+    const isBuiltin = meta.builtin_provider_names.includes(providerName);
     const updatedAllProviders = allProviders.map((p) =>
       p.name === providerName ? { ...p, api_key: apiKey } : p
     );
@@ -348,7 +352,12 @@ function ProviderSettings({
         all_providers: [...allProviders, { ...newProvider }],
       },
     });
-    setNewProvider({ name: "", provider_type: "openai", api_base_url: "", api_key: "" });
+    setNewProvider({
+      name: "",
+      provider_type: meta.provider_types[0] || "openai",
+      api_base_url: "",
+      api_key: "",
+    });
     setShowAddForm(false);
   };
 
@@ -361,7 +370,7 @@ function ProviderSettings({
         all_providers: allProviders.filter((p) => p.name !== name),
         active_provider:
           settings.model.active_provider === name
-            ? "OpenRouter"
+            ? meta.builtin_provider_names[0] || "OpenRouter"
             : settings.model.active_provider,
       },
     });
@@ -372,7 +381,7 @@ function ProviderSettings({
       <SettingSection title="Available Providers" description="Manage LLM providers and configure API keys">
         <div className="space-y-1">
           {allProviders.map((provider) => {
-            const isBuiltin = BUILTIN_PROVIDER_NAMES.includes(provider.name);
+            const isBuiltin = meta.builtin_provider_names.includes(provider.name);
             return (
               <ProviderRow
                 key={provider.name}
@@ -406,9 +415,9 @@ function ProviderSettings({
                   }
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 focus:border-emerald-500 focus:outline-none"
                 >
-                  {PROVIDER_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
+                  {meta.provider_types.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
                     </option>
                   ))}
                 </select>
@@ -535,9 +544,11 @@ function ProviderRow({
 function ModelSettings({
   settings,
   onUpdate,
+  meta,
 }: {
   settings: UserSettings;
   onUpdate: (s: UserSettings) => void;
+  meta: MetaInfo | null;
 }) {
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -570,7 +581,7 @@ function ModelSettings({
           setModelOptions(data.models);
         }
       })
-      .catch(() => { })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoadingModels(false);
       });

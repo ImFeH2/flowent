@@ -7,10 +7,10 @@ from app.providers import LLMProvider
 
 
 class ProviderType(StrEnum):
-    OPENAI = "openai"
-    ANTHROPIC = "anthropic"
-    GEMINI = "gemini"
-    OLLAMA = "ollama"
+    OPENAI = "OpenAI"
+    ANTHROPIC = "Anthropic"
+    GEMINI = "Gemini"
+    OLLAMA = "Ollama"
 
 
 @dataclass

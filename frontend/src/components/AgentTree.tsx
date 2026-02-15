@@ -1,4 +1,11 @@
-import { useMemo, useCallback, useState, useRef, useEffect, type MouseEvent } from "react";
+import {
+  useMemo,
+  useCallback,
+  useState,
+  useRef,
+  useEffect,
+  type MouseEvent,
+} from "react";
 import {
   ReactFlow,
   Background,
@@ -30,14 +37,18 @@ const nodeTypes: NodeTypes = {
 function AnimatedMessageEdge(props: EdgeProps) {
   const { sourceX, sourceY, targetX, targetY, id, data } = props;
   const [edgePath] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-  const hasActiveMessage = !!(data as Record<string, unknown> | undefined)?.active;
+  const hasActiveMessage = !!(data as Record<string, unknown> | undefined)
+    ?.active;
 
   return (
     <>
       <BaseEdge
         id={id}
         path={edgePath}
-        style={{ stroke: hasActiveMessage ? "#60a5fa" : "#52525b", strokeWidth: 1.5 }}
+        style={{
+          stroke: hasActiveMessage ? "#60a5fa" : "#52525b",
+          strokeWidth: 1.5,
+        }}
       />
       {hasActiveMessage && (
         <circle r="4" fill="#60a5fa" filter="url(#glow)">
@@ -69,7 +80,6 @@ export function AgentTree() {
     agents,
     selectedAgentId,
     selectAgent,
-    openWindows,
     openAgentWindow,
     closeAllWindows,
     activeMessages,
@@ -78,7 +88,9 @@ export function AgentTree() {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-  const screenToFlowRef = useRef<((pos: XYPosition) => XYPosition) | null>(null);
+  const screenToFlowRef = useRef<((pos: XYPosition) => XYPosition) | null>(
+    null,
+  );
 
   const activeEdgeSet = useMemo(() => {
     const set = new Set<string>();
@@ -137,28 +149,33 @@ export function AgentTree() {
 
       const convert = screenToFlowRef.current;
       if (convert) {
-        const flowPos = convert({ x: mouseEvent.clientX, y: mouseEvent.clientY });
+        const flowPos = convert({
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY,
+        });
         openAgentWindow(node.id, flowPos.x + 20, flowPos.y - 40);
       }
     },
     [selectAgent, openAgentWindow],
   );
 
-  const onNodeMouseEnter: NodeMouseHandler = useCallback(
-    (event, node) => {
-      const mouseEvent = event as unknown as MouseEvent;
-      setTooltip({ agentId: node.id, x: mouseEvent.clientX, y: mouseEvent.clientY });
-    },
-    [],
-  );
+  const onNodeMouseEnter: NodeMouseHandler = useCallback((event, node) => {
+    const mouseEvent = event as unknown as MouseEvent;
+    setTooltip({
+      agentId: node.id,
+      x: mouseEvent.clientX,
+      y: mouseEvent.clientY,
+    });
+  }, []);
 
-  const onNodeMouseMove: NodeMouseHandler = useCallback(
-    (event, node) => {
-      const mouseEvent = event as unknown as MouseEvent;
-      setTooltip({ agentId: node.id, x: mouseEvent.clientX, y: mouseEvent.clientY });
-    },
-    [],
-  );
+  const onNodeMouseMove: NodeMouseHandler = useCallback((event, node) => {
+    const mouseEvent = event as unknown as MouseEvent;
+    setTooltip({
+      agentId: node.id,
+      x: mouseEvent.clientX,
+      y: mouseEvent.clientY,
+    });
+  }, []);
 
   const onNodeMouseLeave: NodeMouseHandler = useCallback(() => {
     setTooltip(null);
@@ -168,15 +185,26 @@ export function AgentTree() {
     selectAgent(null);
   }, [selectAgent]);
 
-  const onPaneContextMenu = useCallback((event: MouseEvent | globalThis.MouseEvent) => {
-    event.preventDefault();
-    setContextMenu({ x: (event as globalThis.MouseEvent).clientX, y: (event as globalThis.MouseEvent).clientY, agentId: null });
-  }, []);
+  const onPaneContextMenu = useCallback(
+    (event: MouseEvent | globalThis.MouseEvent) => {
+      event.preventDefault();
+      setContextMenu({
+        x: (event as globalThis.MouseEvent).clientX,
+        y: (event as globalThis.MouseEvent).clientY,
+        agentId: null,
+      });
+    },
+    [],
+  );
 
   const onNodeContextMenu: NodeMouseHandler = useCallback((event, node) => {
     const mouseEvent = event as unknown as globalThis.MouseEvent;
     mouseEvent.preventDefault();
-    setContextMenu({ x: mouseEvent.clientX, y: mouseEvent.clientY, agentId: node.id });
+    setContextMenu({
+      x: mouseEvent.clientX,
+      y: mouseEvent.clientY,
+      agentId: node.id,
+    });
   }, []);
 
   const closeContextMenu = useCallback(() => {
@@ -259,15 +287,24 @@ export function AgentTree() {
         >
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-zinc-200">
-              {tooltipAgent.name ?? <span className="capitalize">{tooltipAgent.role}</span>}
+              {tooltipAgent.name ?? (
+                <span className="capitalize">{tooltipAgent.role}</span>
+              )}
             </span>
-            <Badge variant="outline" className={`text-[10px] ${stateBadgeColor[tooltipAgent.state]}`}>
+            <Badge
+              variant="outline"
+              className={`text-[10px] ${stateBadgeColor[tooltipAgent.state]}`}
+            >
               {tooltipAgent.state}
             </Badge>
           </div>
-          <div className="mt-1 text-[10px] text-zinc-500 font-mono">{tooltip.agentId.slice(0, 8)}</div>
+          <div className="mt-1 text-[10px] text-zinc-500 font-mono">
+            {tooltip.agentId.slice(0, 8)}
+          </div>
           {tooltipAgent.branch && (
-            <div className="mt-0.5 text-[10px] text-zinc-400 font-mono">{tooltipAgent.branch}</div>
+            <div className="mt-0.5 text-[10px] text-zinc-400 font-mono">
+              {tooltipAgent.branch}
+            </div>
           )}
         </div>
       )}
@@ -285,7 +322,9 @@ export function AgentTree() {
 }
 
 interface FlowWindowLayerProps {
-  screenToFlowRef: React.MutableRefObject<((pos: XYPosition) => XYPosition) | null>;
+  screenToFlowRef: React.MutableRefObject<
+    ((pos: XYPosition) => XYPosition) | null
+  >;
 }
 
 function FlowWindowLayer({ screenToFlowRef }: FlowWindowLayerProps) {
@@ -305,7 +344,12 @@ function FlowWindowLayer({ screenToFlowRef }: FlowWindowLayerProps) {
       }}
     >
       {Array.from(openWindows.entries()).map(([id, ws]) => (
-        <AgentWindow key={id} agentId={id} windowState={ws} zoom={viewport.zoom} />
+        <AgentWindow
+          key={id}
+          agentId={id}
+          windowState={ws}
+          zoom={viewport.zoom}
+        />
       ))}
     </div>
   );

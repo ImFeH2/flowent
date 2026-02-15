@@ -56,7 +56,9 @@ export function EventItem({ event }: { event: AgentEvent }) {
           </span>
         )}
       </div>
-      <span className="shrink-0 text-zinc-600">{formatTime(event.timestamp)}</span>
+      <span className="shrink-0 text-zinc-600">
+        {formatTime(event.timestamp)}
+      </span>
     </motion.div>
   );
 }

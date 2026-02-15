@@ -33,7 +33,11 @@ export function AgentGraphNode({ data }: NodeProps) {
         state === "terminated" && "opacity-50",
       )}
     >
-      <Handle type="target" position={Position.Top} className="!bg-zinc-600 !w-2 !h-2 !border-0" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!bg-zinc-600 !w-2 !h-2 !border-0"
+      />
       <Icon className="size-4 shrink-0 text-zinc-400" />
       <div className="flex flex-col min-w-0">
         <span className="text-xs font-medium text-zinc-200 truncate">
@@ -62,7 +66,11 @@ export function AgentGraphNode({ data }: NodeProps) {
           {toolCall}
         </span>
       )}
-      <Handle type="source" position={Position.Bottom} className="!bg-zinc-600 !w-2 !h-2 !border-0" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!bg-zinc-600 !w-2 !h-2 !border-0"
+      />
     </div>
   );
 }

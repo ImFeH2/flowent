@@ -16,12 +16,14 @@ class MergeResult:
 
 def _run(cmd: list[str], cwd: str | None = None) -> subprocess.CompletedProcess[str]:
     logger.debug("git cmd: {} (cwd={})", " ".join(cmd), cwd)
-    return subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, check=True
-    )
+    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=True)
 
 
-def create_worktree(repo_path: str, agent_uuid: str, parent_branch: str = "main") -> str:
+def create_worktree(
+    repo_path: str,
+    agent_uuid: str,
+    parent_branch: str = "main",
+) -> str:
     branch_name = f"agent/{agent_uuid}"
     worktrees_dir = os.path.join(repo_path, "worktrees")
     worktree_path = os.path.join(worktrees_dir, agent_uuid)
@@ -63,9 +65,16 @@ def merge_branch(worktree_path: str, branch_name: str) -> MergeResult:
         _run(["git", "merge", branch_name, "--no-ff"], cwd=worktree_path)
         return MergeResult(success=True, message="Merge completed successfully")
     except subprocess.CalledProcessError:
-        result = _run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree_path)
+        result = _run(
+            ["git", "diff", "--name-only", "--diff-filter=U"],
+            cwd=worktree_path,
+        )
         conflict_files = [f for f in result.stdout.strip().split("\n") if f]
-        logger.warning("Merge conflict in {} file(s): {}", len(conflict_files), conflict_files)
+        logger.warning(
+            "Merge conflict in {} file(s): {}",
+            len(conflict_files),
+            conflict_files,
+        )
         return MergeResult(
             success=False,
             conflict_files=conflict_files,

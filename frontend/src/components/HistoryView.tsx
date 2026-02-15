@@ -1,5 +1,14 @@
 import { useState, useCallback, type ReactNode } from "react";
-import { ChevronRight, MessageSquare, Brain, Wrench, Terminal, Send, Bot, AlertCircle } from "lucide-react";
+import {
+  ChevronRight,
+  MessageSquare,
+  Brain,
+  Wrench,
+  Terminal,
+  Send,
+  Bot,
+  AlertCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry } from "@/types";
 
@@ -17,7 +26,13 @@ export function HistoryView({ history }: HistoryViewProps) {
   );
 }
 
-function StreamingText({ text, streaming }: { text: string | null; streaming?: boolean }) {
+function StreamingText({
+  text,
+  streaming,
+}: {
+  text: string | null;
+  streaming?: boolean;
+}) {
   return (
     <>
       {text}
@@ -52,7 +67,9 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
               From {entry.from_id ? entry.from_id.slice(0, 8) : "unknown"}
             </span>
           </div>
-          <p className="text-xs text-blue-200 whitespace-pre-wrap break-words">{entry.content}</p>
+          <p className="text-xs text-blue-200 whitespace-pre-wrap break-words">
+            {entry.content}
+          </p>
         </div>
       );
 
@@ -75,7 +92,9 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
         <div className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5">
           <div className="flex items-center gap-1.5 mb-0.5">
             <Bot className="size-3 text-emerald-400" />
-            <span className="text-[10px] font-medium text-emerald-400">Assistant</span>
+            <span className="text-[10px] font-medium text-emerald-400">
+              Assistant
+            </span>
           </div>
           <p className="text-xs text-emerald-200 whitespace-pre-wrap break-words leading-relaxed">
             <StreamingText text={entry.content} streaming={entry.streaming} />
@@ -96,7 +115,9 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
                 To {toId ? toId.slice(0, 8) : "unknown"}
               </span>
             </div>
-            <p className="text-xs text-purple-200 whitespace-pre-wrap break-words">{content}</p>
+            <p className="text-xs text-purple-200 whitespace-pre-wrap break-words">
+              {content}
+            </p>
           </div>
         );
       }
@@ -109,16 +130,23 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
         >
           <div className="space-y-2">
             <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Arguments</div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
+                Arguments
+              </div>
               <pre className="text-[11px] text-teal-200/80 whitespace-pre-wrap break-words">
                 {JSON.stringify(entry.arguments, null, 2)}
               </pre>
             </div>
             {entry.content && (
               <div>
-                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Result</div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
+                  Result
+                </div>
                 <pre className="text-[11px] text-zinc-400 whitespace-pre-wrap break-words">
-                  <StreamingText text={entry.content} streaming={entry.streaming} />
+                  <StreamingText
+                    text={entry.content}
+                    streaming={entry.streaming}
+                  />
                 </pre>
               </div>
             )}
@@ -136,7 +164,9 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
               To {entry.to_id ? entry.to_id.slice(0, 8) : "unknown"}
             </span>
           </div>
-          <p className="text-xs text-purple-200 whitespace-pre-wrap break-words">{entry.content}</p>
+          <p className="text-xs text-purple-200 whitespace-pre-wrap break-words">
+            {entry.content}
+          </p>
         </div>
       );
 
@@ -147,7 +177,9 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
             <AlertCircle className="size-3 text-red-400" />
             <span className="text-[10px] font-medium text-red-400">Error</span>
           </div>
-          <p className="text-xs text-red-200 whitespace-pre-wrap break-words">{entry.content}</p>
+          <p className="text-xs text-red-200 whitespace-pre-wrap break-words">
+            {entry.content}
+          </p>
         </div>
       );
 
@@ -179,7 +211,10 @@ function CollapsibleBlock({
         className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-white/5 transition-colors"
       >
         <ChevronRight
-          className={cn("size-3 text-zinc-500 transition-transform", open && "rotate-90")}
+          className={cn(
+            "size-3 text-zinc-500 transition-transform",
+            open && "rotate-90",
+          )}
         />
         {icon}
         <span className="text-[10px] font-medium text-zinc-400">{label}</span>

@@ -115,7 +115,7 @@ def _build_permission_section(config: AgentConfig) -> str:
     lines.append(f"Network access: {'enabled' if perms.network_access else 'disabled'}")
 
     lines.append(
-        "If you need access to additional paths or commands, escalate to your supervisor via send_message."
+        "If you need access to additional paths or commands, escalate to your supervisor via send_message.",
     )
     return "\n".join(lines)
 

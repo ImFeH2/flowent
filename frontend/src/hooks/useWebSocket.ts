@@ -9,7 +9,10 @@ interface UseWebSocketOptions {
   onUpdateEvent: (event: AgentEvent) => void;
 }
 
-export function useWebSocket({ onDisplayEvent, onUpdateEvent }: UseWebSocketOptions) {
+export function useWebSocket({
+  onDisplayEvent,
+  onUpdateEvent,
+}: UseWebSocketOptions) {
   const [displayConnected, setDisplayConnected] = useState(false);
   const [updateConnected, setUpdateConnected] = useState(false);
   const onDisplayRef = useRef(onDisplayEvent);

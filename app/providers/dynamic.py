@@ -17,7 +17,7 @@ class DynamicProvider(LLMProvider):
 
     def _resolve(self) -> LLMProvider:
         from app.providers.registry import create_provider
-        from app.user_settings import get_user_settings, find_provider
+        from app.user_settings import find_provider, get_user_settings
 
         us = get_user_settings()
         ms = us.model
@@ -43,7 +43,10 @@ class DynamicProvider(LLMProvider):
 
         logger.debug(
             "DynamicProvider resolved: provider={}, type={}, model={}, base_url={}",
-            provider_name, provider_type, model, api_base_url,
+            provider_name,
+            provider_type,
+            model,
+            api_base_url,
         )
 
         provider = create_provider(

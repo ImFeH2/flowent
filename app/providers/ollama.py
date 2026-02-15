@@ -44,7 +44,9 @@ class OllamaProvider(LLMProvider):
 
         logger.debug(
             "[{}] Ollama chat request: model={}, messages={}, tools={}",
-            self._provider_name, self._model, len(messages),
+            self._provider_name,
+            self._model,
+            len(messages),
             len(tools) if tools else 0,
         )
 
@@ -80,7 +82,7 @@ class OllamaProvider(LLMProvider):
                     f"Model: {self._model}\n"
                     f"Base URL: {self._api_base_url}\n"
                     f"Status: {response.status_code}\n"
-                    f"Response: {body}"
+                    f"Response: {body}",
                 )
 
             for line in response.iter_lines():
@@ -113,7 +115,7 @@ class OllamaProvider(LLMProvider):
                             id=str(uuid.uuid4()),
                             name=fn.get("name", ""),
                             arguments=fn.get("arguments", {}),
-                        )
+                        ),
                     )
 
                 if chunk.get("done", False):
@@ -135,14 +137,20 @@ class OllamaProvider(LLMProvider):
 
         logger.debug(
             "[{}] Ollama chat done: {:.2f}s, chunks={}, content_len={}, thinking_len={}, tool_calls={}",
-            self._provider_name, elapsed, chunk_count,
+            self._provider_name,
+            elapsed,
+            chunk_count,
             len(content) if content else 0,
             len(thinking) if thinking else 0,
             len(tool_calls_list),
         )
 
         if tool_calls_list:
-            return LLMResponse(content=content, tool_calls=tool_calls_list, thinking=thinking)
+            return LLMResponse(
+                content=content,
+                tool_calls=tool_calls_list,
+                thinking=thinking,
+            )
 
         return LLMResponse(content=content or "", thinking=thinking)
 

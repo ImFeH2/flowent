@@ -31,35 +31,31 @@ export function useAgentDetail(agentId: string | null) {
   const [detail, setDetail] = useState<AgentDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchedAt, setFetchedAt] = useState(0);
-  const { agentHistories, clearAgentHistory, streamingDeltas, agents } = useAgent();
+  const { agentHistories, clearAgentHistory, streamingDeltas, agents } =
+    useAgent();
 
   useEffect(() => {
-    if (!agentId) {
-      setDetail(null);
-      return;
-    }
+    if (!agentId) return;
 
-    setLoading(true);
     let cancelled = false;
 
-    clearAgentHistory(agentId);
-
-    fetch(`/api/agents/${agentId}`)
-      .then((res) => res.json())
-      .then((data) => {
+    const fetchDetail = async () => {
+      setLoading(true);
+      clearAgentHistory(agentId);
+      try {
+        const res = await fetch(`/api/agents/${agentId}`);
+        const data = await res.json();
         if (cancelled) return;
-        if (data.error || !Array.isArray(data.history)) {
-          setLoading(false);
-          return;
-        }
+        if (data.error || !Array.isArray(data.history)) return;
         clearAgentHistory(agentId);
         setDetail(data as AgentDetail);
         setFetchedAt(Date.now());
-        setLoading(false);
-      })
-      .catch(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
+
+    fetchDetail();
 
     return () => {
       cancelled = true;
@@ -67,16 +63,17 @@ export function useAgentDetail(agentId: string | null) {
   }, [agentId, clearAgentHistory]);
 
   const merged = useMemo(() => {
-    if (!detail) return null;
+    if (!detail || !agentId) return null;
     const incremental = agentId ? agentHistories.get(agentId) : undefined;
-    const base = incremental && incremental.length > 0
-      ? [...detail.history, ...incremental]
-      : [...detail.history];
+    const base =
+      incremental && incremental.length > 0
+        ? [...detail.history, ...incremental]
+        : [...detail.history];
 
     const deltas = agentId ? streamingDeltas.get(agentId) : undefined;
     if (deltas && deltas.length > 0) {
       const { content, thinking, toolResults } = reduceDeltas(deltas);
-      const now = Date.now() / 1000;
+      const now = fetchedAt / 1000;
 
       if (thinking) {
         base.push({
@@ -128,7 +125,7 @@ export function useAgentDetail(agentId: string | null) {
       merged.status_description = liveAgent.status_description;
     }
     return merged;
-  }, [detail, agentId, agentHistories, streamingDeltas, agents]);
+  }, [detail, agentId, agentHistories, streamingDeltas, agents, fetchedAt]);
 
   return { detail: merged, loading, fetchedAt };
 }

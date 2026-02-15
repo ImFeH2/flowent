@@ -1,6 +1,11 @@
 export type Role = "steward" | "supervisor" | "worker";
 
-export type AgentState = "initializing" | "running" | "idle" | "error" | "terminated";
+export type AgentState =
+  | "initializing"
+  | "running"
+  | "idle"
+  | "error"
+  | "terminated";
 
 export type DisplayEventType =
   | "agent_created"
@@ -71,7 +76,13 @@ export interface AgentDetail {
   state: AgentState;
   branch: string | null;
   name: string | null;
-  children: { id: string; role: Role; state: AgentState; name: string | null; status_description: string }[];
+  children: {
+    id: string;
+    role: Role;
+    state: AgentState;
+    name: string | null;
+    status_description: string;
+  }[];
   task_prompt: string;
   supervisor_id: string | null;
   status_description: string;

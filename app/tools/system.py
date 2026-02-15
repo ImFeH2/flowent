@@ -5,7 +5,7 @@ import os
 import subprocess
 import threading
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import httpx
 from loguru import logger
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 class ExecuteCommandTool(Tool):
     name = "execute_command"
     description = "Execute a shell command in the agent's working directory."
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "command": {
@@ -55,7 +55,12 @@ class ExecuteCommandTool(Tool):
             return json.dumps({"error": "Working directory access denied"})
 
         timeout = args.get("timeout", 30)
-        logger.debug("Executing command: {} (cwd={}, timeout={}s)", command, cwd, timeout)
+        logger.debug(
+            "Executing command: {} (cwd={}, timeout={}s)",
+            command,
+            cwd,
+            timeout,
+        )
         try:
             proc = subprocess.Popen(
                 command,
@@ -96,11 +101,13 @@ class ExecuteCommandTool(Tool):
             stdout = "".join(stdout_lines)
             stderr = "".join(stderr_lines)
             logger.debug("Command exited with code {}", proc.returncode)
-            return json.dumps({
-                "returncode": proc.returncode,
-                "stdout": stdout[:5000],
-                "stderr": stderr[:2000],
-            })
+            return json.dumps(
+                {
+                    "returncode": proc.returncode,
+                    "stdout": stdout[:5000],
+                    "stderr": stderr[:2000],
+                },
+            )
         except Exception as e:
             return json.dumps({"error": str(e)})
 
@@ -108,7 +115,7 @@ class ExecuteCommandTool(Tool):
 class NetworkRequestTool(Tool):
     name = "network_request"
     description = "Make an HTTP request."
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "method": {
@@ -139,10 +146,12 @@ class NetworkRequestTool(Tool):
                     content=args.get("body"),
                 )
             logger.debug("HTTP {} {} -> {}", method, url, response.status_code)
-            return json.dumps({
-                "status_code": response.status_code,
-                "body": response.text[:5000],
-            })
+            return json.dumps(
+                {
+                    "status_code": response.status_code,
+                    "body": response.text[:5000],
+                },
+            )
         except Exception as e:
             logger.warning("HTTP request failed: {} {} - {}", method, url, e)
             return json.dumps({"error": str(e)})

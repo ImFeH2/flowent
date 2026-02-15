@@ -64,7 +64,8 @@ export function useAgents() {
           ...agent,
           state: event.data.new_state as Agent["state"],
           status_description:
-            (event.data.status_description as string) ?? agent.status_description,
+            (event.data.status_description as string) ??
+            agent.status_description,
         });
         return next;
       });

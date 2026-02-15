@@ -17,7 +17,11 @@ class AgentRegistry:
     def register(self, agent: Agent) -> None:
         with self._lock:
             self._agents[agent.uuid] = agent
-            logger.info("Agent registered: {} (role={})", agent.uuid[:8], agent.config.role.value)
+            logger.info(
+                "Agent registered: {} (role={})",
+                agent.uuid[:8],
+                agent.config.role.value,
+            )
 
     def unregister(self, agent_id: str) -> None:
         with self._lock:
@@ -32,7 +36,8 @@ class AgentRegistry:
     def get_children(self, supervisor_id: str) -> list[Agent]:
         with self._lock:
             return [
-                a for a in self._agents.values()
+                a
+                for a in self._agents.values()
                 if a.config.supervisor_id == supervisor_id
             ]
 

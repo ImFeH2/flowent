@@ -10,7 +10,14 @@ import {
 import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAgents } from "@/hooks/useAgents";
-import type { Agent, AgentEvent, ChatMessage, HistoryEntry, PathAccessRequest, StreamingDelta } from "@/types";
+import type {
+  Agent,
+  AgentEvent,
+  ChatMessage,
+  HistoryEntry,
+  PathAccessRequest,
+  StreamingDelta,
+} from "@/types";
 
 export interface WindowState {
   x: number;
@@ -70,20 +77,26 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     () => new Map(),
   );
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
-  const [agentHistories, setAgentHistories] = useState<Map<string, HistoryEntry[]>>(
-    () => new Map(),
-  );
-  const [streamingDeltas, setStreamingDeltas] = useState<Map<string, StreamingDelta[]>>(
-    () => new Map(),
-  );
+  const [agentHistories, setAgentHistories] = useState<
+    Map<string, HistoryEntry[]>
+  >(() => new Map());
+  const [streamingDeltas, setStreamingDeltas] = useState<
+    Map<string, StreamingDelta[]>
+  >(() => new Map());
   const [activeMessages, setActiveMessages] = useState<ActiveMessage[]>([]);
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, string>>(
     () => new Map(),
   );
-  const [pendingPathAccess, setPendingPathAccess] = useState<PathAccessRequest[]>([]);
+  const [pendingPathAccess, setPendingPathAccess] = useState<
+    PathAccessRequest[]
+  >([]);
   const [eventPanelVisible, setEventPanelVisible] = useState(true);
-  const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+  const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   const clearAgentHistory = useCallback((agentId: string) => {
     setAgentHistories((prev) => {
@@ -110,7 +123,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       }).catch(() => {
         toast.error("Failed to resolve path access request");
       });
-      setPendingPathAccess((prev) => prev.filter((r) => r.requestId !== requestId));
+      setPendingPathAccess((prev) =>
+        prev.filter((r) => r.requestId !== requestId),
+      );
     },
     [],
   );
@@ -205,7 +220,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       if (event.type === "history_entry_added") {
         const entry = event.data as unknown as HistoryEntry;
 
-        if (entry.type === "assistant_text" || entry.type === "assistant_thinking") {
+        if (
+          entry.type === "assistant_text" ||
+          entry.type === "assistant_thinking"
+        ) {
           setStreamingDeltas((prev) => {
             const list = prev.get(event.agent_id);
             if (!list || list.length === 0) return prev;
@@ -220,14 +238,21 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             }
             return next;
           });
-        } else if (entry.type === "tool_call" && entry.tool_call_id && !entry.streaming) {
+        } else if (
+          entry.type === "tool_call" &&
+          entry.tool_call_id &&
+          !entry.streaming
+        ) {
           setStreamingDeltas((prev) => {
             const list = prev.get(event.agent_id);
             if (!list || list.length === 0) return prev;
             const next = new Map(prev);
             const filtered = list.filter(
               (d) =>
-                !(d.type === "tool_result" && d.tool_call_id === entry.tool_call_id),
+                !(
+                  d.type === "tool_result" &&
+                  d.tool_call_id === entry.tool_call_id
+                ),
             );
             if (filtered.length === 0) {
               next.delete(event.agent_id);
@@ -242,7 +267,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           const next = new Map(prev);
           const existing = next.get(event.agent_id) ?? [];
 
-          if (entry.type === "tool_call" && entry.tool_call_id && !entry.streaming) {
+          if (
+            entry.type === "tool_call" &&
+            entry.tool_call_id &&
+            !entry.streaming
+          ) {
             const idx = existing.findIndex(
               (e) =>
                 e.type === "tool_call" &&
@@ -297,14 +326,22 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setSelectedAgentId(id);
   }, []);
 
-  const openAgentWindow = useCallback((agentId: string, x: number, y: number) => {
-    setOpenWindows((prev) => {
-      if (prev.has(agentId)) return prev;
-      const next = new Map(prev);
-      next.set(agentId, { x, y, width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
-      return next;
-    });
-  }, []);
+  const openAgentWindow = useCallback(
+    (agentId: string, x: number, y: number) => {
+      setOpenWindows((prev) => {
+        if (prev.has(agentId)) return prev;
+        const next = new Map(prev);
+        next.set(agentId, {
+          x,
+          y,
+          width: DEFAULT_WIDTH,
+          height: DEFAULT_HEIGHT,
+        });
+        return next;
+      });
+    },
+    [],
+  );
 
   const closeAgentWindow = useCallback((agentId: string) => {
     setOpenWindows((prev) => {

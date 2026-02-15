@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
 from collections.abc import Callable
+from typing import Any, Protocol
 
 from app.models import LLMResponse, ModelInfo
 

@@ -22,7 +22,11 @@ class ProviderDef:
 
 BUILTIN_PROVIDERS: list[ProviderDef] = [
     ProviderDef("OpenRouter", ProviderType.OPENAI, "https://openrouter.ai/api/v1"),
-    ProviderDef("ModelScope", ProviderType.OPENAI, "https://api-inference.modelscope.cn/v1"),
+    ProviderDef(
+        "ModelScope",
+        ProviderType.OPENAI,
+        "https://api-inference.modelscope.cn/v1",
+    ),
 ]
 
 
@@ -35,30 +39,34 @@ def create_provider(
 ) -> LLMProvider:
     if provider_type == ProviderType.OPENAI:
         from app.providers.openai import OpenAIProvider
+
         return OpenAIProvider(
             provider_name=provider_name,
             api_base_url=api_base_url,
             api_key=api_key,
             model=model,
         )
-    elif provider_type == ProviderType.ANTHROPIC:
+    if provider_type == ProviderType.ANTHROPIC:
         from app.providers.anthropic import AnthropicProvider
+
         return AnthropicProvider(
             provider_name=provider_name,
             api_base_url=api_base_url,
             api_key=api_key,
             model=model,
         )
-    elif provider_type == ProviderType.GEMINI:
+    if provider_type == ProviderType.GEMINI:
         from app.providers.gemini import GeminiProvider
+
         return GeminiProvider(
             provider_name=provider_name,
             api_base_url=api_base_url,
             api_key=api_key,
             model=model,
         )
-    elif provider_type == ProviderType.OLLAMA:
+    if provider_type == ProviderType.OLLAMA:
         from app.providers.ollama import OllamaProvider
+
         return OllamaProvider(
             provider_name=provider_name,
             api_base_url=api_base_url,

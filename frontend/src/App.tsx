@@ -27,7 +27,10 @@ function AppContent() {
         <EventLog />
       </div>
       <PathAccessDialog />
-      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
       <Toaster
         theme="dark"
         position="bottom-right"

@@ -28,7 +28,8 @@ class GeminiProvider(LLMProvider):
         self._client = httpx.Client(timeout=120.0)
 
     def _convert_messages(
-        self, messages: list[dict[str, Any]]
+        self,
+        messages: list[dict[str, Any]],
     ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
         system_parts: list[str] = []
         contents: list[dict[str, Any]] = []
@@ -43,7 +44,7 @@ class GeminiProvider(LLMProvider):
                     {
                         "role": gemini_role,
                         "parts": [{"text": msg["content"]}],
-                    }
+                    },
                 )
 
         system_instruction = None
@@ -87,7 +88,9 @@ class GeminiProvider(LLMProvider):
 
         logger.debug(
             "[{}] Gemini chat request: model={}, messages={}, tools={}",
-            self._provider_name, self._model, len(contents),
+            self._provider_name,
+            self._model,
+            len(contents),
             len(tools) if tools else 0,
         )
 
@@ -121,7 +124,7 @@ class GeminiProvider(LLMProvider):
                     f"Model: {self._model}\n"
                     f"Base URL: {self._api_base_url}\n"
                     f"Status: {response.status_code}\n"
-                    f"Response: {body}"
+                    f"Response: {body}",
                 )
 
             for line in response.iter_lines():
@@ -155,7 +158,7 @@ class GeminiProvider(LLMProvider):
                                 id=str(uuid.uuid4()),
                                 name=fc.get("name", ""),
                                 arguments=fc.get("args", {}),
-                            )
+                            ),
                         )
 
         elapsed = time.perf_counter() - t0
@@ -163,7 +166,9 @@ class GeminiProvider(LLMProvider):
 
         logger.debug(
             "[{}] Gemini chat done: {:.2f}s, chunks={}, content_len={}, tool_calls={}",
-            self._provider_name, elapsed, chunk_count,
+            self._provider_name,
+            elapsed,
+            chunk_count,
             len(content) if content else 0,
             len(tool_calls_list),
         )

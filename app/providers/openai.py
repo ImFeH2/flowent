@@ -96,7 +96,10 @@ class OpenAIProvider(LLMProvider):
         think_parser = ThinkTagParser()
 
         with self._client.stream(
-            "POST", url, headers=self._headers(), content=json.dumps(payload)
+            "POST",
+            url,
+            headers=self._headers(),
+            content=json.dumps(payload),
         ) as response:
             if response.status_code != 200:
                 body = response.read().decode()
@@ -116,7 +119,7 @@ class OpenAIProvider(LLMProvider):
                     f"Model: {self._model}\n"
                     f"Base URL: {self._api_base_url}\n"
                     f"Status: {response.status_code}\n"
-                    f"Response: {body}"
+                    f"Response: {body}",
                 )
 
             for line in response.iter_lines():
@@ -209,7 +212,9 @@ class OpenAIProvider(LLMProvider):
                 for _, acc in sorted(tool_calls_accum.items())
             ]
             return LLMResponse(
-                content=content, tool_calls=tool_calls, thinking=thinking
+                content=content,
+                tool_calls=tool_calls,
+                thinking=thinking,
             )
 
         return LLMResponse(content=content or "", thinking=thinking)

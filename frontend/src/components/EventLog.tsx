@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { AnimatePresence } from "motion/react";
 import { Wifi, WifiOff } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { EventItem } from "@/components/EventItem";
 import { cn } from "@/lib/utils";
 import { useAgent } from "@/context/AgentContext";

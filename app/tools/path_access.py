@@ -4,7 +4,7 @@ import json
 import os
 import threading
 import uuid
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
@@ -38,7 +38,7 @@ class RequestPathAccessTool(Tool):
         "Request access to a filesystem path. This will prompt the human user for approval. "
         "If approved, the path is added to your allowed and writable paths."
     )
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "path": {
@@ -68,19 +68,23 @@ class RequestPathAccessTool(Tool):
         }
         _pending_locks[request_id] = lock
 
-        event_bus.emit(Event(
-            type=EventType.PATH_ACCESS_REQUESTED,
-            agent_id=agent.uuid,
-            data={
-                "request_id": request_id,
-                "path": path,
-                "reason": reason,
-            },
-        ))
+        event_bus.emit(
+            Event(
+                type=EventType.PATH_ACCESS_REQUESTED,
+                agent_id=agent.uuid,
+                data={
+                    "request_id": request_id,
+                    "path": path,
+                    "reason": reason,
+                },
+            ),
+        )
 
         logger.info(
             "Path access requested: {} (reason: {}, request_id: {})",
-            path, reason, request_id[:8],
+            path,
+            reason,
+            request_id[:8],
         )
 
         approved = lock.wait(timeout=300)
@@ -97,6 +101,5 @@ class RequestPathAccessTool(Tool):
             agent.config.permissions.writable_paths.append(path)
             logger.info("Path access approved: {} for agent {}", path, agent.uuid[:8])
             return json.dumps({"status": "approved", "path": path})
-        else:
-            logger.info("Path access denied: {} for agent {}", path, agent.uuid[:8])
-            return json.dumps({"status": "denied", "reason": "User denied access"})
+        logger.info("Path access denied: {} for agent {}", path, agent.uuid[:8])
+        return json.dumps({"status": "denied", "reason": "User denied access"})

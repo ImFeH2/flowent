@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 
 class Role(StrEnum):
@@ -64,7 +64,7 @@ class ToolResultDelta:
     text: str = ""
 
 
-StreamingDelta = Union[ContentDelta, ThinkingDelta, ToolResultDelta]
+StreamingDelta = ContentDelta | ThinkingDelta | ToolResultDelta
 
 
 @dataclass

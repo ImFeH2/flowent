@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class EditMemoryTool(Tool):
     name = "edit_memory"
     description = "Read or update the agent's persistent memory (key-value store). Use to track progress and important information."
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "action": {

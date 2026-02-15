@@ -4,7 +4,7 @@ import copy
 import json
 import uuid
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
@@ -35,7 +35,7 @@ class SpawnAgentTool(Tool):
         "Create a new child agent (Supervisor or Worker). "
         "The agent is created and started, then task_prompt is sent as the first message from you to drive it."
     )
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "role": {
@@ -91,9 +91,9 @@ class SpawnAgentTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+        from app import git
         from app.agent import Agent as AgentClass
         from app.registry import registry
-        from app import git
 
         role = Role(args["role"])
         task_prompt = args["task_prompt"]
@@ -108,9 +108,13 @@ class SpawnAgentTool(Tool):
         delta = args.get("permission_delta", {})
         _apply_permission_delta(permissions, delta)
 
-        repo_path = parent_perms.allowed_paths[0] if parent_perms.allowed_paths else None
+        repo_path = (
+            parent_perms.allowed_paths[0] if parent_perms.allowed_paths else None
+        )
         if not repo_path:
-            return json.dumps({"error": "No allowed path configured for worktree creation"})
+            return json.dumps(
+                {"error": "No allowed path configured for worktree creation"},
+            )
 
         agent_uuid = str(uuid.uuid4())
         parent_branch = agent.config.branch or "main"
@@ -140,7 +144,10 @@ class SpawnAgentTool(Tool):
         child.enqueue_message(msg)
 
         logger.info(
-            "Spawned {} agent {} by {}", role.value, agent_uuid[:8], agent.uuid[:8]
+            "Spawned {} agent {} by {}",
+            role.value,
+            agent_uuid[:8],
+            agent.uuid[:8],
         )
 
         return json.dumps(
@@ -149,14 +156,14 @@ class SpawnAgentTool(Tool):
                 "role": role.value,
                 "branch": branch,
                 "worktree_path": worktree_path,
-            }
+            },
         )
 
 
 class UpdateChildPermissionsTool(Tool):
     name = "update_child_permissions"
     description = "Update permissions of a direct child agent. Paths are extended, allowed_commands and network_access are overwritten."
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "agent_id": {
@@ -207,24 +214,24 @@ class UpdateChildPermissionsTool(Tool):
         _apply_permission_delta(target.config.permissions, delta)
 
         target.inject_system_message(
-            f"Your permissions have been updated by your supervisor. Current permissions: {json.dumps(asdict(target.config.permissions))}"
+            f"Your permissions have been updated by your supervisor. Current permissions: {json.dumps(asdict(target.config.permissions))}",
         )
 
-        logger.info(
-            "Updated permissions for {} by {}", target_id[:8], agent.uuid[:8]
-        )
+        logger.info("Updated permissions for {} by {}", target_id[:8], agent.uuid[:8])
 
-        return json.dumps({
-            "status": "updated",
-            "agent_id": target_id,
-            "permissions": asdict(target.config.permissions),
-        })
+        return json.dumps(
+            {
+                "status": "updated",
+                "agent_id": target_id,
+                "permissions": asdict(target.config.permissions),
+            },
+        )
 
 
 class ListAgentsTool(Tool):
     name = "list_agents"
     description = "List all agents in the system with their hierarchy, state, and status description."
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {},
     }
@@ -252,9 +259,11 @@ class ListAgentsTool(Tool):
     ) -> None:
         prefix = "  " * indent
         name_part = f" ({agent.config.name})" if agent.config.name else ""
-        status_part = f'  "{agent.status_description}"' if agent.status_description else ""
+        status_part = (
+            f'  "{agent.status_description}"' if agent.status_description else ""
+        )
         lines.append(
-            f"{prefix}- {agent.uuid[:8]} [{agent.config.role.value}] {agent.state.value}{name_part}{status_part}"
+            f"{prefix}- {agent.uuid[:8]} [{agent.config.role.value}] {agent.state.value}{name_part}{status_part}",
         )
         for child_id in agent.children_ids:
             child = agent_map.get(child_id)
@@ -264,8 +273,10 @@ class ListAgentsTool(Tool):
 
 class SetStatusTool(Tool):
     name = "set_status"
-    description = "Update your status description to indicate what you are currently doing."
-    parameters = {
+    description = (
+        "Update your status description to indicate what you are currently doing."
+    )
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "status": {
@@ -280,22 +291,27 @@ class SetStatusTool(Tool):
         agent.status_description = args["status"]
         from app.events import event_bus
         from app.models import Event, EventType
-        event_bus.emit(Event(
-            type=EventType.AGENT_STATE_CHANGED,
-            agent_id=agent.uuid,
-            data={
-                "old_state": agent.state.value,
-                "new_state": agent.state.value,
-                "status_description": agent.status_description,
-            },
-        ))
-        return json.dumps({"status": "updated", "description": agent.status_description})
+
+        event_bus.emit(
+            Event(
+                type=EventType.AGENT_STATE_CHANGED,
+                agent_id=agent.uuid,
+                data={
+                    "old_state": agent.state.value,
+                    "new_state": agent.state.value,
+                    "status_description": agent.status_description,
+                },
+            ),
+        )
+        return json.dumps(
+            {"status": "updated", "description": agent.status_description},
+        )
 
 
 class ExitTool(Tool):
     name = "exit"
     description = "Terminate this agent. Use after completing all work."
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "reason": {"type": "string", "description": "Reason for exiting"},

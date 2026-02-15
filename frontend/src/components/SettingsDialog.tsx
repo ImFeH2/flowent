@@ -1,6 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Sparkles, Zap, ChevronRight, Eye, EyeOff, Plus, Trash2, Loader2, Server } from "lucide-react";
+import {
+  X,
+  Sparkles,
+  Zap,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Plus,
+  Trash2,
+  Loader2,
+  Server,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -141,8 +152,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         >
           <div className="w-56 border-r border-zinc-800 bg-zinc-950/50 p-4 flex flex-col">
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-zinc-100 px-3">Settings</h2>
-              <p className="text-xs text-zinc-500 px-3 mt-1">Customize your experience</p>
+              <h2 className="text-lg font-semibold text-zinc-100 px-3">
+                Settings
+              </h2>
+              <p className="text-xs text-zinc-500 px-3 mt-1">
+                Customize your experience
+              </p>
             </div>
 
             <nav className="flex-1 space-y-1">
@@ -157,7 +172,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                       "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative",
                       isActive
                         ? "bg-zinc-800 text-zinc-100 shadow-lg"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50",
                     )}
                   >
                     {isActive && (
@@ -167,8 +182,15 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                         transition={{ type: "spring", duration: 0.5 }}
                       />
                     )}
-                    <Icon className={cn("size-4 relative z-10", isActive && tab.color)} />
-                    <span className="text-sm font-medium relative z-10">{tab.label}</span>
+                    <Icon
+                      className={cn(
+                        "size-4 relative z-10",
+                        isActive && tab.color,
+                      )}
+                    />
+                    <span className="text-sm font-medium relative z-10">
+                      {tab.label}
+                    </span>
                     {isActive && (
                       <ChevronRight className="size-4 ml-auto relative z-10 text-zinc-500" />
                     )}
@@ -197,7 +219,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   return (
                     <>
                       {Icon && <Icon className={cn("size-5", tab.color)} />}
-                      <h3 className="text-lg font-semibold text-zinc-100">{tab?.label}</h3>
+                      <h3 className="text-lg font-semibold text-zinc-100">
+                        {tab?.label}
+                      </h3>
                     </>
                   );
                 })()}
@@ -214,11 +238,22 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   transition={{ duration: 0.2 }}
                   className="space-y-8"
                 >
-                  {activeTab === "general" && <GeneralSettings settings={settings} onUpdate={setSettings} />}
-                  {activeTab === "provider" && meta && (
-                    <ProviderSettings settings={settings} onUpdate={setSettings} meta={meta} />
+                  {activeTab === "general" && (
+                    <GeneralSettings
+                      settings={settings}
+                      onUpdate={setSettings}
+                    />
                   )}
-                  {activeTab === "model" && <ModelSettings settings={settings} onUpdate={setSettings} meta={meta} />}
+                  {activeTab === "provider" && meta && (
+                    <ProviderSettings
+                      settings={settings}
+                      onUpdate={setSettings}
+                      meta={meta}
+                    />
+                  )}
+                  {activeTab === "model" && (
+                    <ModelSettings settings={settings} onUpdate={setSettings} />
+                  )}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -258,7 +293,10 @@ function GeneralSettings({
 }) {
   return (
     <div className="space-y-6">
-      <SettingSection title="Event Log" description="Configure how events are displayed">
+      <SettingSection
+        title="Event Log"
+        description="Configure how events are displayed"
+      >
         <SettingRow
           label="Event timestamp format"
           description="Choose how timestamps are displayed"
@@ -271,7 +309,10 @@ function GeneralSettings({
             ]}
             value={settings.event_log.timestamp_format}
             onChange={(v) =>
-              onUpdate({ ...settings, event_log: { ...settings.event_log, timestamp_format: v } })
+              onUpdate({
+                ...settings,
+                event_log: { ...settings.event_log, timestamp_format: v },
+              })
             }
           />
         </SettingRow>
@@ -302,15 +343,17 @@ function ProviderSettings({
   const handleApiKeyChange = (providerName: string, apiKey: string) => {
     const isBuiltin = meta.builtin_provider_names.includes(providerName);
     const updatedAllProviders = allProviders.map((p) =>
-      p.name === providerName ? { ...p, api_key: apiKey } : p
+      p.name === providerName ? { ...p, api_key: apiKey } : p,
     );
 
     let updatedCustomProviders: ProviderConfig[];
     if (isBuiltin) {
-      const existing = settings.model.providers.find((p) => p.name === providerName);
+      const existing = settings.model.providers.find(
+        (p) => p.name === providerName,
+      );
       if (existing) {
         updatedCustomProviders = settings.model.providers.map((p) =>
-          p.name === providerName ? { ...p, api_key: apiKey } : p
+          p.name === providerName ? { ...p, api_key: apiKey } : p,
         );
       } else {
         const base = allProviders.find((p) => p.name === providerName)!;
@@ -321,7 +364,7 @@ function ProviderSettings({
       }
     } else {
       updatedCustomProviders = settings.model.providers.map((p) =>
-        p.name === providerName ? { ...p, api_key: apiKey } : p
+        p.name === providerName ? { ...p, api_key: apiKey } : p,
       );
     }
 
@@ -378,17 +421,24 @@ function ProviderSettings({
 
   return (
     <div className="space-y-6">
-      <SettingSection title="Available Providers" description="Manage LLM providers and configure API keys">
+      <SettingSection
+        title="Available Providers"
+        description="Manage LLM providers and configure API keys"
+      >
         <div className="space-y-1">
           {allProviders.map((provider) => {
-            const isBuiltin = meta.builtin_provider_names.includes(provider.name);
+            const isBuiltin = meta.builtin_provider_names.includes(
+              provider.name,
+            );
             return (
               <ProviderRow
                 key={provider.name}
                 provider={provider}
                 isBuiltin={isBuiltin}
                 onApiKeyChange={(key) => handleApiKeyChange(provider.name, key)}
-                onDelete={isBuiltin ? undefined : () => handleDelete(provider.name)}
+                onDelete={
+                  isBuiltin ? undefined : () => handleDelete(provider.name)
+                }
               />
             );
           })}
@@ -401,7 +451,9 @@ function ProviderSettings({
                 <label className="text-xs text-zinc-400 block mb-1">Name</label>
                 <input
                   value={newProvider.name}
-                  onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewProvider({ ...newProvider, name: e.target.value })
+                  }
                   placeholder="My Provider"
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
                 />
@@ -411,7 +463,10 @@ function ProviderSettings({
                 <select
                   value={newProvider.provider_type}
                   onChange={(e) =>
-                    setNewProvider({ ...newProvider, provider_type: e.target.value })
+                    setNewProvider({
+                      ...newProvider,
+                      provider_type: e.target.value,
+                    })
                   }
                   className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 focus:border-emerald-500 focus:outline-none"
                 >
@@ -424,18 +479,25 @@ function ProviderSettings({
               </div>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 block mb-1">Base URL</label>
+              <label className="text-xs text-zinc-400 block mb-1">
+                Base URL
+              </label>
               <input
                 value={newProvider.api_base_url}
                 onChange={(e) =>
-                  setNewProvider({ ...newProvider, api_base_url: e.target.value })
+                  setNewProvider({
+                    ...newProvider,
+                    api_base_url: e.target.value,
+                  })
                 }
                 placeholder="https://api.example.com/v1"
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-500 focus:border-emerald-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 block mb-1">API Key</label>
+              <label className="text-xs text-zinc-400 block mb-1">
+                API Key
+              </label>
               <input
                 type="password"
                 value={newProvider.api_key}
@@ -496,7 +558,9 @@ function ProviderRow({
     <div className="flex items-center gap-3 py-3 px-4 rounded-lg hover:bg-zinc-800/30 transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-zinc-300">{provider.name}</span>
+          <span className="text-sm font-medium text-zinc-300">
+            {provider.name}
+          </span>
           {isBuiltin && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-400">
               built-in
@@ -506,7 +570,9 @@ function ProviderRow({
             {provider.provider_type}
           </span>
         </div>
-        <p className="text-xs text-zinc-500 truncate mt-0.5">{provider.api_base_url}</p>
+        <p className="text-xs text-zinc-500 truncate mt-0.5">
+          {provider.api_base_url}
+        </p>
       </div>
 
       {needsApiKey && (
@@ -523,7 +589,11 @@ function ProviderRow({
             onClick={() => setShowKey(!showKey)}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
-            {showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+            {showKey ? (
+              <EyeOff className="size-3.5" />
+            ) : (
+              <Eye className="size-3.5" />
+            )}
           </button>
         </div>
       )}
@@ -544,47 +614,50 @@ function ProviderRow({
 function ModelSettings({
   settings,
   onUpdate,
-  meta,
 }: {
   settings: UserSettings;
   onUpdate: (s: UserSettings) => void;
-  meta: MetaInfo | null;
 }) {
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
   const allProviders = settings.model.all_providers || [];
   const activeProviderName = settings.model.active_provider;
-  const activeProvider = allProviders.find((p) => p.name === activeProviderName);
+  const activeProvider = allProviders.find(
+    (p) => p.name === activeProviderName,
+  );
 
   useEffect(() => {
     if (!activeProvider) return;
 
     let cancelled = false;
-    setLoadingModels(true);
-    setModelOptions([]);
 
-    fetch("/api/providers/models", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        provider_name: activeProvider.name,
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.models && data.models.length > 0) {
+    const fetchModels = async () => {
+      setLoadingModels(true);
+      setModelOptions([]);
+      try {
+        const res = await fetch("/api/providers/models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            provider_name: activeProvider.name,
+          }),
+        });
+        const data = await res.json();
+        if (!cancelled && data.models && data.models.length > 0) {
           setModelOptions(data.models);
         }
-      })
-      .catch(() => {})
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoadingModels(false);
-      });
+      }
+    };
 
-    return () => { cancelled = true; };
-  }, [activeProviderName]);
+    fetchModels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProvider]);
 
   const handleProviderChange = (name: string) => {
     onUpdate({
@@ -595,15 +668,27 @@ function ModelSettings({
 
   return (
     <div className="space-y-6">
-      <SettingSection title="Model Selection" description="Choose which provider and model to use for agents">
-        <SettingRow label="Provider" description="Select from your configured providers">
+      <SettingSection
+        title="Model Selection"
+        description="Choose which provider and model to use for agents"
+      >
+        <SettingRow
+          label="Provider"
+          description="Select from your configured providers"
+        >
           <Select
-            options={allProviders.map((p) => ({ value: p.name, label: p.name }))}
+            options={allProviders.map((p) => ({
+              value: p.name,
+              label: p.name,
+            }))}
             value={settings.model.active_provider}
             onChange={handleProviderChange}
           />
         </SettingRow>
-        <SettingRow label="Model" description="Select a model or enter an ID manually">
+        <SettingRow
+          label="Model"
+          description="Select a model or enter an ID manually"
+        >
           {loadingModels ? (
             <div className="flex items-center gap-2 text-sm text-zinc-400 w-64 justify-center">
               <Loader2 className="size-4 animate-spin" />
@@ -677,8 +762,12 @@ function SettingRow({
   return (
     <div className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-zinc-800/30 transition-colors">
       <div className="flex-1 min-w-0 pr-4">
-        <label className="text-sm font-medium text-zinc-300 block">{label}</label>
-        {description && <p className="text-xs text-zinc-500 mt-0.5">{description}</p>}
+        <label className="text-sm font-medium text-zinc-300 block">
+          {label}
+        </label>
+        {description && (
+          <p className="text-xs text-zinc-500 mt-0.5">{description}</p>
+        )}
       </div>
       <div className="shrink-0">{children}</div>
     </div>

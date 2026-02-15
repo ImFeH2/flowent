@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class MergeBranchTool(Tool):
     name = "merge_branch"
     description = "Merge a child agent's branch into the current worktree's branch."
-    parameters = {
+    parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "branch_name": {
@@ -38,9 +38,11 @@ class MergeBranchTool(Tool):
         if result.success:
             return json.dumps({"status": "merged", "message": result.message})
 
-        return json.dumps({
-            "status": "conflict",
-            "conflict_files": result.conflict_files,
-            "message": result.message,
-            "instruction": "Resolve conflicts using write_file, then the merge will auto-complete on next commit.",
-        })
+        return json.dumps(
+            {
+                "status": "conflict",
+                "conflict_files": result.conflict_files,
+                "message": result.message,
+                "instruction": "Resolve conflicts using write_file, then the merge will auto-complete on next commit.",
+            },
+        )

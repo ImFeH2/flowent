@@ -35,7 +35,8 @@ class AnthropicProvider(LLMProvider):
         }
 
     def _convert_messages(
-        self, messages: list[dict[str, Any]]
+        self,
+        messages: list[dict[str, Any]],
     ) -> tuple[str | None, list[dict[str, Any]]]:
         system_text: list[str] = []
         converted: list[dict[str, Any]] = []
@@ -58,7 +59,7 @@ class AnthropicProvider(LLMProvider):
                     "name": fn.get("name", ""),
                     "description": fn.get("description", ""),
                     "input_schema": fn.get("parameters", {}),
-                }
+                },
             )
         return result
 
@@ -84,7 +85,9 @@ class AnthropicProvider(LLMProvider):
 
         logger.debug(
             "[{}] Anthropic chat request: model={}, messages={}, tools={}",
-            self._provider_name, self._model, len(converted_messages),
+            self._provider_name,
+            self._model,
+            len(converted_messages),
             len(tools) if tools else 0,
         )
 
@@ -97,7 +100,10 @@ class AnthropicProvider(LLMProvider):
         event_count = 0
 
         with self._client.stream(
-            "POST", url, headers=self._headers(), content=json.dumps(payload)
+            "POST",
+            url,
+            headers=self._headers(),
+            content=json.dumps(payload),
         ) as response:
             if response.status_code != 200:
                 body = response.read().decode()
@@ -117,7 +123,7 @@ class AnthropicProvider(LLMProvider):
                     f"Model: {self._model}\n"
                     f"Base URL: {self._api_base_url}\n"
                     f"Status: {response.status_code}\n"
-                    f"Response: {body}"
+                    f"Response: {body}",
                 )
 
             for line in response.iter_lines():
@@ -177,7 +183,9 @@ class AnthropicProvider(LLMProvider):
 
         logger.debug(
             "[{}] Anthropic chat done: {:.2f}s, events={}, content_len={}, thinking_len={}, tool_calls={}",
-            self._provider_name, elapsed, event_count,
+            self._provider_name,
+            elapsed,
+            event_count,
             len(content) if content else 0,
             len(thinking) if thinking else 0,
             len(tool_calls_accum),
@@ -192,10 +200,12 @@ class AnthropicProvider(LLMProvider):
                 except json.JSONDecodeError:
                     arguments = {}
                 tool_calls.append(
-                    ToolCall(id=acc["id"], name=acc["name"], arguments=arguments)
+                    ToolCall(id=acc["id"], name=acc["name"], arguments=arguments),
                 )
             return LLMResponse(
-                content=content, tool_calls=tool_calls, thinking=thinking
+                content=content,
+                tool_calls=tool_calls,
+                thinking=thinking,
             )
 
         return LLMResponse(content=content or "", thinking=thinking)

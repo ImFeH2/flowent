@@ -1,0 +1,35 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.1
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+
+  - repo: local
+    hooks:
+      - id: frontend-format
+        name: Frontend Format (Prettier)
+        entry: bash -c 'cd frontend && pnpm format'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|html)$
+        pass_filenames: false
+
+      - id: frontend-lint
+        name: Frontend Lint (ESLint)
+        entry: bash -c 'cd frontend && pnpm lint:fix'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: frontend-type-check
+        name: Frontend Type Check (TypeScript)
+        entry: bash -c 'cd frontend && pnpm type-check'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false

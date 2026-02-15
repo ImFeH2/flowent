@@ -10,11 +10,11 @@ from app.events import event_bus
 from app.models import Message
 from app.registry import registry
 from app.user_settings import (
-    get_user_settings,
-    save_user_settings,
     EventLogSettings,
     ModelSettings,
     ProviderConfig,
+    get_user_settings,
+    save_user_settings,
 )
 
 router = APIRouter()
@@ -79,7 +79,7 @@ async def list_agents() -> dict:
                 "status_description": a.status_description,
             }
             for a in agents
-        ]
+        ],
     }
 
 
@@ -127,7 +127,8 @@ async def resolve_path_access(request_id: str, req: PathAccessResponse) -> dict:
     success = _resolve(request_id, req.approved)
     if not success:
         raise HTTPException(
-            status_code=404, detail="Request not found or already resolved"
+            status_code=404,
+            detail="Request not found or already resolved",
         )
     return {"status": "resolved", "approved": req.approved}
 
@@ -148,7 +149,7 @@ async def health_check() -> dict:
 
 @router.get("/api/meta")
 async def get_meta() -> dict:
-    from app.providers.registry import ProviderType, BUILTIN_PROVIDERS
+    from app.providers.registry import BUILTIN_PROVIDERS, ProviderType
 
     return {
         "provider_types": [pt.value for pt in ProviderType],
@@ -187,7 +188,8 @@ async def update_settings(req: UpdateSettingsRequest) -> dict:
         ]
         current.model = ModelSettings(
             active_provider=req.model.get(
-                "active_provider", current.model.active_provider
+                "active_provider",
+                current.model.active_provider,
             ),
             active_model=req.model.get("active_model", current.model.active_model),
             providers=providers,
@@ -207,7 +209,7 @@ class ListModelsRequest(BaseModel):
 
 @router.post("/api/providers/models")
 async def list_provider_models(req: ListModelsRequest) -> dict:
-    from app.providers.registry import create_provider, ProviderType
+    from app.providers.registry import ProviderType, create_provider
     from app.user_settings import find_provider, get_user_settings
 
     settings = get_user_settings()
@@ -215,7 +217,8 @@ async def list_provider_models(req: ListModelsRequest) -> dict:
 
     if cfg is None:
         raise HTTPException(
-            status_code=404, detail=f"Provider '{req.provider_name}' not found"
+            status_code=404,
+            detail=f"Provider '{req.provider_name}' not found",
         )
 
     try:
@@ -229,6 +232,8 @@ async def list_provider_models(req: ListModelsRequest) -> dict:
         return {"models": [{"id": m.id} for m in models]}
     except Exception as e:
         logger.error(
-            "Failed to list models for provider '{}': {}", req.provider_name, e
+            "Failed to list models for provider '{}': {}",
+            req.provider_name,
+            e,
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

@@ -3,15 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import asdict
-from typing import TYPE_CHECKING
 
 from loguru import logger
 from starlette.websockets import WebSocket
 
 from app.models import DISPLAY_EVENTS, Event
-
-if TYPE_CHECKING:
-    pass
 
 
 class EventBus:
@@ -26,16 +22,12 @@ class EventBus:
     async def connect_display(self, ws: WebSocket) -> None:
         await ws.accept()
         self._display_connections.append(ws)
-        logger.info(
-            "Display WS connected (total: {})", len(self._display_connections)
-        )
+        logger.info("Display WS connected (total: {})", len(self._display_connections))
 
     async def connect_updates(self, ws: WebSocket) -> None:
         await ws.accept()
         self._update_connections.append(ws)
-        logger.info(
-            "Update WS connected (total: {})", len(self._update_connections)
-        )
+        logger.info("Update WS connected (total: {})", len(self._update_connections))
 
     def disconnect_display(self, ws: WebSocket) -> None:
         if ws in self._display_connections:

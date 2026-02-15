@@ -6,13 +6,15 @@ from typing import TYPE_CHECKING, Any
 from app.models import Permissions, Role
 
 if TYPE_CHECKING:
+    from typing import ClassVar
+
     from app.agent import Agent
 
 
 class Tool(ABC):
     name: str
     description: str
-    parameters: dict[str, Any]
+    parameters: ClassVar[dict[str, Any]]
 
     @abstractmethod
     def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str: ...
@@ -64,8 +66,7 @@ class ToolRegistry:
     def get_tools_for_agent(self, agent: Agent) -> list[Tool]:
         perms = agent.config.permissions
         return [
-            tool for tool in self._tools.values()
-            if is_tool_available(perms, tool.name)
+            tool for tool in self._tools.values() if is_tool_available(perms, tool.name)
         ]
 
     def get_tools_schema(self, agent: Agent) -> list[dict[str, Any]]:
@@ -81,26 +82,38 @@ def default_permissions(role: Role) -> Permissions:
 
 
 def build_tool_registry() -> ToolRegistry:
-    from app.tools.messaging import SendMessageTool, IdleTool
-    from app.tools.agent_mgmt import SpawnAgentTool, ListAgentsTool, ExitTool, SetStatusTool, UpdateChildPermissionsTool
-    from app.tools.memory import EditMemoryTool
-    from app.tools.testing import SubmitResultTool
-    from app.tools.git_tools import MergeBranchTool
+    from app.tools.agent_mgmt import (
+        ExitTool,
+        ListAgentsTool,
+        SetStatusTool,
+        SpawnAgentTool,
+        UpdateChildPermissionsTool,
+    )
     from app.tools.filesystem import ReadFileTool, WriteFileTool
-    from app.tools.system import ExecuteCommandTool, NetworkRequestTool
+    from app.tools.git_tools import MergeBranchTool
+    from app.tools.memory import EditMemoryTool
+    from app.tools.messaging import IdleTool, SendMessageTool
     from app.tools.path_access import RequestPathAccessTool
+    from app.tools.system import ExecuteCommandTool, NetworkRequestTool
+    from app.tools.testing import SubmitResultTool
 
     reg = ToolRegistry()
     for tool_cls in [
-        SendMessageTool, IdleTool,
-        SpawnAgentTool, ListAgentsTool, ExitTool, SetStatusTool,
+        SendMessageTool,
+        IdleTool,
+        SpawnAgentTool,
+        ListAgentsTool,
+        ExitTool,
+        SetStatusTool,
         UpdateChildPermissionsTool,
         EditMemoryTool,
         SubmitResultTool,
         MergeBranchTool,
-        ReadFileTool, WriteFileTool,
-        ExecuteCommandTool, NetworkRequestTool,
+        ReadFileTool,
+        WriteFileTool,
+        ExecuteCommandTool,
+        NetworkRequestTool,
         RequestPathAccessTool,
     ]:
-        reg.register(tool_cls())
+        reg.register(tool_cls())  # type: ignore[abstract]
     return reg

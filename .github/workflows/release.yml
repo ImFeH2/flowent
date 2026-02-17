@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+
+      - run: pnpm build
+        working-directory: frontend
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: app/static/
+
+  build-wheel:
+    name: Build Wheel
+    needs: build-frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: app/static/
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: uv build --wheel
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel
+          path: dist/*.whl
+
+  build-binary:
+    name: Build Binary (${{ matrix.os }})
+    needs: build-frontend
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: synode-linux-amd64
+          - os: macos-latest
+            artifact: synode-darwin-arm64
+          - os: windows-latest
+            artifact: synode-windows-amd64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: app/static/
+
+      - uses: astral-sh/setup-uv@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: uv sync
+
+      - run: uv run pyinstaller synode.spec --noconfirm
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            mv dist/synode.exe "dist/${{ matrix.artifact }}"
+          else
+            mv dist/synode "dist/${{ matrix.artifact }}"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
+  publish:
+    name: Publish Release
+    needs: [build-wheel, build-binary]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh artifacts/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build-wheel
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wheel
+          path: dist
+
+      - uses: astral-sh/setup-uv@v6
+
+      - run: uv publish

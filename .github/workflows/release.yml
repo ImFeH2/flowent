@@ -113,6 +113,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          pattern: "{wheel,autopoe-*}"
           merge-multiple: true
 
       - name: List artifacts

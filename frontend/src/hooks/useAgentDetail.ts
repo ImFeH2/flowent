@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAgent } from "@/context/AgentContext";
+import { fetchAgentDetail } from "@/lib/api";
 import type { AgentDetail, HistoryEntry, StreamingDelta } from "@/types";
 
 function reduceDeltas(deltas: StreamingDelta[]) {
@@ -39,23 +40,21 @@ export function useAgentDetail(agentId: string | null) {
 
     let cancelled = false;
 
-    const fetchDetail = async () => {
+    const load = async () => {
       setLoading(true);
       clearAgentHistory(agentId);
       try {
-        const res = await fetch(`/api/agents/${agentId}`);
-        const data = await res.json();
+        const data = await fetchAgentDetail(agentId);
         if (cancelled) return;
-        if (data.error || !Array.isArray(data.history)) return;
         clearAgentHistory(agentId);
-        setDetail(data as AgentDetail);
+        setDetail(data);
         setFetchedAt(Date.now());
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
-    fetchDetail();
+    load();
 
     return () => {
       cancelled = true;

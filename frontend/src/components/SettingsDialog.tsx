@@ -15,6 +15,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  fetchSettings,
+  saveSettings,
+  fetchMeta,
+  fetchProviderModels,
+  type MetaInfo,
+  type ModelOption,
+} from "@/lib/api";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -55,15 +63,6 @@ interface UserSettings {
   };
 }
 
-interface ModelOption {
-  id: string;
-}
-
-interface MetaInfo {
-  provider_types: string[];
-  builtin_provider_names: string[];
-}
-
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<SettingTab>("general");
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -75,14 +74,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   useEffect(() => {
     if (open) {
       if (!settings) {
-        fetch("/api/settings")
-          .then((res) => res.json())
+        fetchSettings<UserSettings>()
           .then((data) => setSettings(data))
           .catch(() => toast.error("Failed to load settings"));
       }
       if (!meta) {
-        fetch("/api/meta")
-          .then((res) => res.json())
+        fetchMeta()
           .then((data) => setMeta(data))
           .catch(() => {});
       }
@@ -93,12 +90,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     if (!settings) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-      if (!res.ok) throw new Error("Failed to save");
+      await saveSettings(settings);
       toast.success("Settings saved successfully");
       onClose();
     } catch {
@@ -632,27 +624,20 @@ function ModelSettings({
 
     let cancelled = false;
 
-    const fetchModels = async () => {
+    const loadModels = async () => {
       setLoadingModels(true);
       setModelOptions([]);
       try {
-        const res = await fetch("/api/providers/models", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            provider_name: activeProvider.name,
-          }),
-        });
-        const data = await res.json();
-        if (!cancelled && data.models && data.models.length > 0) {
-          setModelOptions(data.models);
+        const models = await fetchProviderModels(activeProvider.name);
+        if (!cancelled && models.length > 0) {
+          setModelOptions(models);
         }
       } finally {
         if (!cancelled) setLoadingModels(false);
       }
     };
 
-    fetchModels();
+    loadModels();
 
     return () => {
       cancelled = true;

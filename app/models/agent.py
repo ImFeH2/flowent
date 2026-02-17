@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
+
+from app.sandbox import VIRTUAL_ROOT
 
 
 class Role(StrEnum):
@@ -21,9 +24,9 @@ class AgentState(StrEnum):
 @dataclass
 class AgentConfig:
     role: Role
-    repo_path: str = ""
-    worktree_path: str = ""
-    virtual_root: str = "/project"
+    repo_path: Path | None = None
+    worktree_path: Path | None = None
+    virtual_root: Path = VIRTUAL_ROOT
     supervisor_id: str | None = None
     name: str | None = None
     network_access: bool = False

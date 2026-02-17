@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
@@ -43,14 +43,14 @@ class MergeTool(Tool):
         if not worktree_path:
             return json.dumps({"error": "No worktree configured for this agent"})
 
-        merge_head = os.path.join(worktree_path, ".git", "MERGE_HEAD")
-        is_merge_head_file = os.path.isfile(merge_head)
+        merge_head = worktree_path / ".git" / "MERGE_HEAD"
+        is_merge_head_file = merge_head.is_file()
 
         if not is_merge_head_file:
             git_dir = self._find_git_dir(worktree_path)
             if git_dir:
-                merge_head = os.path.join(git_dir, "MERGE_HEAD")
-                is_merge_head_file = os.path.isfile(merge_head)
+                merge_head = git_dir / "MERGE_HEAD"
+                is_merge_head_file = merge_head.is_file()
 
         if is_merge_head_file:
             logger.info("Agent {} continuing merge (MERGE_HEAD found)", agent.uuid[:8])
@@ -78,15 +78,13 @@ class MergeTool(Tool):
         )
 
     @staticmethod
-    def _find_git_dir(worktree_path: str) -> str | None:
-        git_path = os.path.join(worktree_path, ".git")
-        if os.path.isdir(git_path):
+    def _find_git_dir(worktree_path: Path) -> Path | None:
+        git_path = worktree_path / ".git"
+        if git_path.is_dir():
             return git_path
-        if os.path.isfile(git_path):
+        if git_path.is_file():
             with open(git_path) as f:
                 content = f.read().strip()
             if content.startswith("gitdir: "):
-                return os.path.normpath(
-                    os.path.join(worktree_path, content[len("gitdir: ") :])
-                )
+                return worktree_path / content[len("gitdir: ") :]
         return None

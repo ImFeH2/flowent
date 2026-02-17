@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
 import subprocess
 import threading
 from collections.abc import Callable
@@ -15,9 +17,17 @@ if TYPE_CHECKING:
     from app.agent import Agent
 
 
+def is_wsl() -> bool:
+    if "wsl" in platform.system().lower():
+        return True
+
+    wsl_env_vars = ["WSL_INTEROP", "WSL_DISTRO_NAME", "WSLENV"]
+    return any(var in os.environ for var in wsl_env_vars)
+
+
 class ExecTool(Tool):
     name = "exec"
-    description = "Execute a shell command in a sandboxed environment. Working directory is /project."
+    description = f"Execute a shell command in a sandboxed environment. Working directory is {VIRTUAL_ROOT}."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -47,6 +57,10 @@ class ExecTool(Tool):
             timeout,
         )
 
+        env = os.environ.copy()
+        if is_wsl():
+            env["container"] = "lxc"
+
         try:
             proc = subprocess.Popen(
                 firejail_cmd,
@@ -54,6 +68,7 @@ class ExecTool(Tool):
                 stderr=subprocess.PIPE,
                 text=True,
                 cwd=VIRTUAL_ROOT,
+                env=env,
             )
 
             stdout_lines: list[str] = []
@@ -86,68 +101,6 @@ class ExecTool(Tool):
             stdout = "".join(stdout_lines)
             stderr = "".join(stderr_lines)
             logger.debug("Command exited with code {}", proc.returncode)
-            return json.dumps(
-                {
-                    "returncode": proc.returncode,
-                    "stdout": stdout[:5000],
-                    "stderr": stderr[:2000],
-                }
-            )
-        except FileNotFoundError:
-            return self._fallback_exec(agent, command, timeout, on_output)
-        except Exception as e:
-            return json.dumps({"error": str(e)})
-
-    def _fallback_exec(
-        self,
-        agent: Agent,
-        command: str,
-        timeout: int,
-        on_output: Callable[[str], None] | None,
-    ) -> str:
-        cwd = agent.config.worktree_path
-        if not cwd:
-            return json.dumps({"error": "No working directory available"})
-
-        logger.debug("firejail not found, falling back to direct execution")
-        try:
-            proc = subprocess.Popen(
-                command,
-                shell=True,
-                cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-
-            stdout_lines: list[str] = []
-            stderr_lines: list[str] = []
-
-            def _read_stderr() -> None:
-                assert proc.stderr is not None
-                for line in proc.stderr:
-                    stderr_lines.append(line)
-
-            stderr_thread = threading.Thread(target=_read_stderr, daemon=True)
-            stderr_thread.start()
-
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                stdout_lines.append(line)
-                if on_output:
-                    on_output(line)
-
-            try:
-                proc.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
-                return json.dumps({"error": f"Command timed out after {timeout}s"})
-
-            stderr_thread.join(timeout=5)
-
-            stdout = "".join(stdout_lines)
-            stderr = "".join(stderr_lines)
             return json.dumps(
                 {
                     "returncode": proc.returncode,

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import resolve_path
+from app.sandbox import VIRTUAL_ROOT, resolve_path
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -17,15 +17,13 @@ if TYPE_CHECKING:
 
 class EditTool(Tool):
     name = "edit"
-    description = (
-        "Apply a unified diff patch to a file. Path must start with /project/."
-    )
+    description = "Apply a unified diff patch to a file."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "path": {
                 "type": "string",
-                "description": "File path starting with /project/",
+                "description": f"Relative path within the repository or Absolute path starting with {VIRTUAL_ROOT}",
             },
             "patch": {
                 "type": "string",
@@ -41,7 +39,7 @@ class EditTool(Tool):
         except PermissionError as e:
             return json.dumps({"error": str(e)})
 
-        if not os.path.isfile(real_path):
+        if not real_path.is_file():
             return json.dumps({"error": f"File not found: {args['path']}"})
 
         patch_content = args["patch"]

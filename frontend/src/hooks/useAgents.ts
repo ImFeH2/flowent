@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import type { Agent, AgentEvent } from "@/types";
+import { fetchAgents } from "@/lib/api";
 
 const MAX_EVENTS = 200;
 
@@ -8,11 +9,10 @@ export function useAgents() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
 
   useEffect(() => {
-    fetch("/api/agents")
-      .then((res) => res.json())
-      .then((data: { agents: (Agent & { name?: string | null })[] }) => {
+    fetchAgents()
+      .then((list) => {
         const map = new Map<string, Agent>();
-        for (const a of data.agents) {
+        for (const a of list) {
           map.set(a.id, { ...a, name: a.name ?? null });
         }
         setAgents(map);

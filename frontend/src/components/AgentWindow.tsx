@@ -21,6 +21,7 @@ import { useAgent, type WindowState } from "@/context/AgentContext";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { HistoryView } from "@/components/HistoryView";
 import { roleIcon, stateBadgeColor } from "@/lib/constants";
+import { sendAgentMessage, terminateAgent } from "@/lib/api";
 
 type ChatItem =
   | { kind: "user"; content: string }
@@ -66,11 +67,7 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    fetch(`/api/agents/${agentId}/message`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    });
+    sendAgentMessage(agentId, text);
   }, [agentId, input]);
 
   const onKeyDown = useCallback(
@@ -124,8 +121,8 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
     return items;
   }, [detail]);
 
-  const terminateAgent = useCallback(() => {
-    fetch(`/api/agents/${agentId}/terminate`, { method: "POST" });
+  const handleTerminate = useCallback(() => {
+    terminateAgent(agentId);
   }, [agentId]);
 
   const displayName = detail
@@ -179,7 +176,7 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
           )}
           {canTerminate && (
             <button
-              onClick={terminateAgent}
+              onClick={handleTerminate}
               title="Terminate agent"
               className="rounded p-0.5 text-zinc-500 hover:text-red-400 hover:bg-red-900/20 transition-colors"
             >

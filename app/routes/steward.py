@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import subprocess
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 class CreateStewardRequest(BaseModel):
-    repo_path: str
+    repo_path: Path
     name: str = "Steward"
     branch: str = "main"
     commit: str | None = None
@@ -25,8 +25,8 @@ class CreateStewardRequest(BaseModel):
 async def create_steward(req: CreateStewardRequest) -> dict:
     from app import git
 
-    repo_path = os.path.normpath(os.path.abspath(req.repo_path))
-    if not os.path.isdir(os.path.join(repo_path, ".git")):
+    repo_path = req.repo_path
+    if not (repo_path / ".git").is_dir():
         raise HTTPException(status_code=400, detail="Not a git repository")
 
     import uuid
@@ -99,13 +99,13 @@ async def merge_to_main(agent_id: str) -> dict:
 
 
 class BranchListQuery(BaseModel):
-    repo: str
+    repo: Path
 
 
 @router.get("/api/git/branches")
-async def list_branches(repo: str) -> dict:
-    repo_path = os.path.normpath(os.path.abspath(repo))
-    if not os.path.isdir(os.path.join(repo_path, ".git")):
+async def list_branches(repo: Path) -> dict:
+    repo_path = repo
+    if not (repo_path / ".git").is_dir():
         raise HTTPException(status_code=400, detail="Not a git repository")
 
     try:
@@ -123,9 +123,9 @@ async def list_branches(repo: str) -> dict:
 
 
 @router.get("/api/git/commits")
-async def list_commits(repo: str, branch: str = "main", limit: int = 20) -> dict:
-    repo_path = os.path.normpath(os.path.abspath(repo))
-    if not os.path.isdir(os.path.join(repo_path, ".git")):
+async def list_commits(repo: Path, branch: str = "main", limit: int = 20) -> dict:
+    repo_path = repo
+    if not (repo_path / ".git").is_dir():
         raise HTTPException(status_code=400, detail="Not a git repository")
 
     try:

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import resolve_path
+from app.sandbox import VIRTUAL_ROOT, resolve_path
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -15,13 +14,13 @@ if TYPE_CHECKING:
 
 class WriteTool(Tool):
     name = "write"
-    description = "Write content to a file. Path must start with /project/."
+    description = "Write content to a file."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "path": {
                 "type": "string",
-                "description": "File path starting with /project/",
+                "description": f"Relative path within the repository or Absolute path starting with {VIRTUAL_ROOT}",
             },
             "content": {
                 "type": "string",
@@ -38,7 +37,7 @@ class WriteTool(Tool):
             return json.dumps({"error": str(e)})
 
         try:
-            os.makedirs(os.path.dirname(real_path), exist_ok=True)
+            real_path.parent.mkdir(parents=True, exist_ok=True)
             with open(real_path, "w", encoding="utf-8") as f:
                 f.write(args["content"])
             logger.debug(

@@ -1,4 +1,6 @@
-SUPERVISOR_PROMPT = """\
+from app.sandbox import VIRTUAL_ROOT
+
+SUPERVISOR_PROMPT = f"""\
 You are a Supervisor agent in the Synode multi-agent collaboration framework.
 
 Your responsibilities:
@@ -19,6 +21,6 @@ Workflow:
 7. After all children complete and branches are merged, send a summary to your supervisor
 8. Use exit to terminate
 
-All file paths use /project/ as the virtual root.
+The repository location is {VIRTUAL_ROOT}.
 Each child operates in its own git worktree with full filesystem isolation.
 """

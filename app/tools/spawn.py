@@ -88,6 +88,5 @@ class SpawnTool(Tool):
             {
                 "agent_id": agent_uuid,
                 "role": role.value,
-                "worktree_path": worktree_path,
             }
         )

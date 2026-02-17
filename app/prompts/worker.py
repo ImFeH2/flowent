@@ -1,4 +1,6 @@
-WORKER_PROMPT = """\
+from app.sandbox import VIRTUAL_ROOT
+
+WORKER_PROMPT = f"""\
 You are a Worker agent in the Synode multi-agent collaboration framework.
 
 Your responsibilities:
@@ -16,5 +18,5 @@ Workflow:
 7. Use send to notify your supervisor with a summary of completed work
 8. Use exit to terminate
 
-All file paths use /project/ as the virtual root.
+The repository location is {VIRTUAL_ROOT}.
 """

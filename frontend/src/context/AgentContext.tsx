@@ -7,16 +7,9 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAgents } from "@/hooks/useAgents";
-import type {
-  Agent,
-  AgentEvent,
-  ChatMessage,
-  HistoryEntry,
-  StreamingDelta,
-} from "@/types";
+import type { Agent, AgentEvent, HistoryEntry, StreamingDelta } from "@/types";
 
 export interface WindowState {
   x: number;
@@ -35,12 +28,9 @@ export interface ActiveMessage {
 interface AgentContextValue {
   agents: Map<string, Agent>;
   events: AgentEvent[];
-  messages: ChatMessage[];
   connected: boolean;
-  stewardId: string | null;
   selectedAgentId: string | null;
   selectAgent: (id: string | null) => void;
-  sendMessage: (content: string) => void;
   openWindows: Map<string, WindowState>;
   openAgentWindow: (agentId: string, x: number, y: number) => void;
   closeAgentWindow: (agentId: string) => void;
@@ -68,7 +58,6 @@ const TOOL_CALL_ANIMATION_MS = 2000;
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const { agents, events, handleDisplayEvent, handleUpdateEvent } = useAgents();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [openWindows, setOpenWindows] = useState<Map<string, WindowState>>(
     () => new Map(),
@@ -84,7 +73,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, string>>(
     () => new Map(),
   );
-  const [eventPanelVisible, setEventPanelVisible] = useState(true);
+  const [eventPanelVisible, setEventPanelVisible] = useState(false);
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -101,13 +90,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const stewardId = useMemo(() => {
-    for (const [id, agent] of agents) {
-      if (agent.role === "steward") return id;
-    }
-    return null;
-  }, [agents]);
-
   const onDisplayEvent = useCallback(
     (event: AgentEvent) => {
       handleDisplayEvent(event);
@@ -120,18 +102,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       handleUpdateEvent(event);
 
       if (event.type === "agent_message") {
-        if (event.data.to_id === "human") {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `s-${Date.now()}-${Math.random()}`,
-              from: "steward",
-              content: event.data.content as string,
-              timestamp: event.timestamp,
-            },
-          ]);
-        }
-
         const fromId = event.data.from_id as string | undefined;
         const toId = event.data.to_id as string | undefined;
         if (fromId && toId) {
@@ -261,32 +231,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   const { connected } = useWebSocket({ onDisplayEvent, onUpdateEvent });
 
-  const sendMessage = useCallback(
-    (content: string) => {
-      if (!stewardId) {
-        toast.error("Steward not available");
-        return;
-      }
-
-      const msg: ChatMessage = {
-        id: `h-${Date.now()}-${Math.random()}`,
-        from: "human",
-        content,
-        timestamp: Date.now() / 1000,
-      };
-      setMessages((prev) => [...prev, msg]);
-
-      fetch(`/api/agents/${stewardId}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content }),
-      }).catch(() => {
-        toast.error("Failed to send message");
-      });
-    },
-    [stewardId],
-  );
-
   const selectAgent = useCallback((id: string | null) => {
     setSelectedAgentId(id);
   }, []);
@@ -355,12 +299,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     () => ({
       agents,
       events,
-      messages,
       connected,
-      stewardId,
       selectedAgentId,
       selectAgent,
-      sendMessage,
       openWindows,
       openAgentWindow,
       closeAgentWindow,
@@ -380,12 +321,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     [
       agents,
       events,
-      messages,
       connected,
-      stewardId,
       selectedAgentId,
       selectAgent,
-      sendMessage,
       openWindows,
       openAgentWindow,
       closeAgentWindow,

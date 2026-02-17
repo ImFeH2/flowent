@@ -22,6 +22,8 @@ import {
   type XYPosition,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { Plus, GitMerge } from "lucide-react";
+import { toast } from "sonner";
 import { AgentGraphNode } from "@/components/AgentGraphNode";
 import { AgentWindow } from "@/components/AgentWindow";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
@@ -29,6 +31,7 @@ import { getLayoutedElements } from "@/lib/layout";
 import { useAgent } from "@/context/AgentContext";
 import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
+import { terminateAgent, mergeToMain } from "@/lib/api";
 
 const nodeTypes: NodeTypes = {
   agent: AgentGraphNode,
@@ -75,7 +78,11 @@ interface ContextMenuState {
   agentId: string | null;
 }
 
-export function AgentTree() {
+interface AgentTreeProps {
+  onCreateSteward: () => void;
+}
+
+export function AgentTree({ onCreateSteward }: AgentTreeProps) {
   const {
     agents,
     selectedAgentId,
@@ -220,10 +227,27 @@ export function AgentTree() {
       const agentId = contextMenu.agentId;
       items.push("divider");
       items.push({
+        label: "Merge to Main",
+        onClick: async () => {
+          try {
+            const result = await mergeToMain(agentId);
+            if (result.status === "merged") {
+              toast.success(result.message || "Merged successfully");
+            } else if (result.status === "conflict") {
+              toast.error(
+                `Merge conflict: ${(result.conflict_files ?? []).join(", ")}`,
+              );
+            }
+          } catch {
+            toast.error("Merge failed");
+          }
+        },
+      });
+      items.push({
         label: "Stop Agent",
         danger: true,
         onClick: () => {
-          fetch(`/api/agents/${agentId}/terminate`, { method: "POST" });
+          terminateAgent(agentId);
         },
       });
     }
@@ -234,11 +258,32 @@ export function AgentTree() {
 
   return (
     <div className="relative flex h-full flex-col">
+      <div className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-lg border border-zinc-700/60 bg-zinc-900/80 backdrop-blur-sm px-1.5 py-1.5 shadow-lg">
+        <button
+          onClick={onCreateSteward}
+          title="Create Steward"
+          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700/60 transition-colors"
+        >
+          <Plus className="size-3.5" />
+          Steward
+        </button>
+      </div>
+
       <div className="flex-1 relative overflow-hidden">
         {nodes.length === 0 ? (
-          <p className="px-4 py-8 text-center text-xs text-zinc-500">
-            No agents running
-          </p>
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center space-y-3">
+              <GitMerge className="size-8 text-zinc-600 mx-auto" />
+              <p className="text-sm text-zinc-500">No agents running</p>
+              <button
+                onClick={onCreateSteward}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
+              >
+                <Plus className="size-4" />
+                Create Steward
+              </button>
+            </div>
+          </div>
         ) : (
           <ReactFlow
             nodes={nodes}

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import resolve_path
+from app.sandbox import VIRTUAL_ROOT, resolve_path
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -15,13 +15,13 @@ if TYPE_CHECKING:
 
 class ReadTool(Tool):
     name = "read"
-    description = "Read a file or list a directory. Path must start with /project/."
+    description = "Read a file or list a directory."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path starting with /project/",
+                "description": f"Relative path within the repository or Absolute path starting with {VIRTUAL_ROOT}",
             },
         },
         "required": ["path"],
@@ -33,13 +33,13 @@ class ReadTool(Tool):
         except PermissionError as e:
             return json.dumps({"error": str(e)})
 
-        if os.path.isdir(real_path):
+        if real_path.is_dir():
             try:
                 entries = []
                 for entry in sorted(os.listdir(real_path)):
-                    full = os.path.join(real_path, entry)
-                    kind = "dir" if os.path.isdir(full) else "file"
-                    size = os.path.getsize(full) if kind == "file" else None
+                    full = real_path / entry
+                    kind = "dir" if full.is_dir() else "file"
+                    size = full.stat().st_size if kind == "file" else None
                     entries.append({"name": entry, "type": kind, "size": size})
                 logger.debug(
                     "Listed directory: {} ({} entries)", args["path"], len(entries)
@@ -48,7 +48,7 @@ class ReadTool(Tool):
             except Exception as e:
                 return json.dumps({"error": str(e)})
 
-        if os.path.isfile(real_path):
+        if real_path.is_file():
             try:
                 with open(real_path, encoding="utf-8") as f:
                     content = f.read()

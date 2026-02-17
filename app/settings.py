@@ -5,6 +5,10 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+WORKING_DIR = Path(os.getcwd())
+WORKTREES_DIR = WORKING_DIR / "worktrees"
+_SETTINGS_FILE = WORKING_DIR / "settings.json"
+
 
 @dataclass
 class EventLogSettings:
@@ -32,7 +36,6 @@ class Settings:
     model: ModelSettings = field(default_factory=ModelSettings)
 
 
-_SETTINGS_FILE = Path(os.getcwd()) / "settings.json"
 _cached_settings: Settings | None = None
 
 

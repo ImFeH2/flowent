@@ -16,7 +16,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAgent, type WindowState } from "@/context/AgentContext";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { HistoryView } from "@/components/HistoryView";
@@ -53,12 +52,33 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
   const { detail } = useAgentDetail(agentId);
   const [viewMode, setViewMode] = useState<"chat" | "history">("chat");
   const [input, setInput] = useState("");
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const isAtBottom = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    isAtBottom.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 64;
+  }, []);
+
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [detail?.history, viewMode]);
+    const content = contentRef.current;
+    if (!content) return;
+    const ro = new ResizeObserver(() => {
+      const el = scrollRef.current;
+      if (isAtBottom.current && el) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    isAtBottom.current = true;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [viewMode]);
 
   const sendMsg = useCallback(() => {
     const text = input.trim();
@@ -291,23 +311,25 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
             <PanelResizeHandle className="w-px bg-zinc-700 hover:bg-zinc-500 transition-colors" />
             <Panel defaultSize={70} minSize={30}>
               <div className="flex h-full flex-col">
-                <ScrollArea className="flex-1 min-h-0">
-                  {viewMode === "chat" ? (
-                    <div className="space-y-2 px-3 py-2">
-                      {chatItems.map((item, i) => (
-                        <ChatItemRenderer key={i} item={item} />
-                      ))}
-                      <div ref={chatEndRef} />
-                    </div>
-                  ) : (
-                    <>
-                      {detail?.history && (
+                <div
+                  ref={scrollRef}
+                  onScroll={onScroll}
+                  className="flex-1 min-h-0 overflow-y-auto scroll-smooth"
+                >
+                  <div ref={contentRef}>
+                    {viewMode === "chat" ? (
+                      <div className="space-y-2 px-3 py-2">
+                        {chatItems.map((item, i) => (
+                          <ChatItemRenderer key={i} item={item} />
+                        ))}
+                      </div>
+                    ) : (
+                      detail?.history && (
                         <HistoryView history={detail.history} />
-                      )}
-                      <div ref={chatEndRef} />
-                    </>
-                  )}
-                </ScrollArea>
+                      )
+                    )}
+                  </div>
+                </div>
                 <div className="border-t border-zinc-700/60 p-2 flex gap-2 items-end">
                   <textarea
                     ref={textareaRef}

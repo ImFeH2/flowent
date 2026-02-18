@@ -1,18 +1,32 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { AnimatePresence } from "motion/react";
 import { Wifi, WifiOff } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { EventItem } from "@/components/EventItem";
 import { cn } from "@/lib/utils";
 import { useAgent } from "@/context/AgentContext";
 
 export function EventLog() {
   const { events, connected, eventPanelVisible } = useAgent();
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const isAtBottom = useRef(true);
+
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    isAtBottom.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 64;
+  }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [events.length]);
+    const content = contentRef.current;
+    if (!content) return;
+    const ro = new ResizeObserver(() => {
+      const el = scrollRef.current;
+      if (isAtBottom.current && el) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, []);
 
   if (!eventPanelVisible) return null;
 
@@ -32,8 +46,12 @@ export function EventLog() {
           )}
         />
       </div>
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="py-1">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="flex-1 min-h-0 overflow-y-auto scroll-smooth"
+      >
+        <div ref={contentRef} className="py-1">
           <AnimatePresence initial={false}>
             {events.length === 0 ? (
               <p className="px-4 py-8 text-center text-xs text-zinc-500">
@@ -45,9 +63,8 @@ export function EventLog() {
               ))
             )}
           </AnimatePresence>
-          <div ref={bottomRef} />
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

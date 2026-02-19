@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { CopyButton } from "@/components/CopyButton";
 import { useAgent, type WindowState } from "@/context/AgentContext";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { HistoryView } from "@/components/HistoryView";
@@ -363,7 +364,10 @@ function ChatItemRenderer({ item }: { item: ChatItem }) {
   if (item.kind === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed bg-blue-600/20 text-blue-200">
+        <div className="group relative max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed bg-blue-600/20 text-blue-200">
+          <div className="absolute right-1 top-1">
+            <CopyButton text={item.content} />
+          </div>
           <MarkdownContent content={item.content} className="text-blue-200" />
         </div>
       </div>
@@ -373,7 +377,10 @@ function ChatItemRenderer({ item }: { item: ChatItem }) {
   if (item.kind === "assistant") {
     return (
       <div className="flex justify-start">
-        <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed bg-zinc-800/80 text-zinc-200">
+        <div className="group relative max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed bg-zinc-800/80 text-zinc-200">
+          <div className="absolute right-1 top-1">
+            <CopyButton text={item.content} />
+          </div>
           <MarkdownContent content={item.content} className="text-zinc-200" />
         </div>
       </div>
@@ -408,7 +415,7 @@ function ThinkingBlock({
   const showCollapsed = !expanded && isLong;
 
   return (
-    <div className="rounded-lg border border-amber-500/20 bg-amber-950/20">
+    <div className="group rounded-lg border border-amber-500/20 bg-amber-950/20">
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-amber-300/80 hover:text-amber-200 transition-colors"
@@ -418,7 +425,8 @@ function ThinkingBlock({
         {streaming && (
           <span className="ml-1 text-amber-400/60 animate-pulse">...</span>
         )}
-        <span className="ml-auto">
+        <span className="ml-auto flex items-center gap-1">
+          <CopyButton text={content} />
           {expanded ? (
             <ChevronDown className="size-3" />
           ) : (
@@ -451,10 +459,13 @@ function ThinkingBlock({
 
 function ErrorBlock({ content }: { content: string }) {
   return (
-    <div className="rounded-lg border border-red-500/30 bg-red-950/20 px-3 py-2">
+    <div className="group relative rounded-lg border border-red-500/30 bg-red-950/20 px-3 py-2">
       <div className="flex items-center gap-1.5 mb-1">
         <AlertCircle className="size-3.5 text-red-400 shrink-0" />
         <span className="text-[11px] font-medium text-red-300">Error</span>
+        <span className="ml-auto">
+          <CopyButton text={content} />
+        </span>
       </div>
       <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-red-200/70">
         {content}
@@ -501,9 +512,14 @@ function ToolUseBlock({
       {expanded && (
         <div className="border-t border-zinc-700/30 px-2.5 py-2 space-y-2">
           {item.args && Object.keys(item.args).length > 0 && (
-            <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
-                Arguments
+            <div className="group">
+              <div className="flex items-center mb-1">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                  Arguments
+                </span>
+                <span className="ml-auto">
+                  <CopyButton text={JSON.stringify(item.args, null, 2)} />
+                </span>
               </div>
               <pre className="text-[10px] text-zinc-400 bg-zinc-900/50 rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
                 {JSON.stringify(item.args, null, 2)}
@@ -511,9 +527,14 @@ function ToolUseBlock({
             </div>
           )}
           {item.result !== null && (
-            <div>
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
-                Result
+            <div className="group">
+              <div className="flex items-center mb-1">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                  Result
+                </span>
+                <span className="ml-auto">
+                  <CopyButton text={item.result} />
+                </span>
               </div>
               <pre className="text-[10px] text-zinc-400 bg-zinc-900/50 rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all max-h-48 overflow-y-auto">
                 {item.result}

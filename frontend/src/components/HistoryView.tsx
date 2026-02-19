@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { HistoryEntry } from "@/types";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { CopyButton } from "@/components/CopyButton";
 
 interface HistoryViewProps {
   history: HistoryEntry[];
@@ -61,11 +62,14 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "ReceivedMessage":
       return (
-        <div className="rounded border border-blue-500/20 bg-blue-500/5 px-2.5 py-1.5">
+        <div className="group relative rounded border border-blue-500/20 bg-blue-500/5 px-2.5 py-1.5">
           <div className="flex items-center gap-1.5 mb-0.5">
             <MessageSquare className="size-3 text-blue-400" />
             <span className="text-[10px] font-medium text-blue-400">
               From {entry.from_id ? entry.from_id.slice(0, 8) : "unknown"}
+            </span>
+            <span className="ml-auto">
+              <CopyButton text={entry.content ?? ""} />
             </span>
           </div>
           <MarkdownContent
@@ -91,11 +95,14 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "AssistantText":
       return (
-        <div className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5">
+        <div className="group relative rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5">
           <div className="flex items-center gap-1.5 mb-0.5">
             <Bot className="size-3 text-emerald-400" />
             <span className="text-[10px] font-medium text-emerald-400">
               Assistant
+            </span>
+            <span className="ml-auto">
+              <CopyButton text={entry.content ?? ""} />
             </span>
           </div>
           <MarkdownContent
@@ -112,11 +119,14 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
         const toId = entry.arguments?.to as string | undefined;
         const content = entry.arguments?.content as string | undefined;
         return (
-          <div className="rounded border border-purple-500/20 bg-purple-500/5 px-2.5 py-1.5">
+          <div className="group relative rounded border border-purple-500/20 bg-purple-500/5 px-2.5 py-1.5">
             <div className="flex items-center gap-1.5 mb-0.5">
               <Send className="size-3 text-purple-400" />
               <span className="text-[10px] font-medium text-purple-400">
                 To {toId ? toId.slice(0, 8) : "unknown"}
+              </span>
+              <span className="ml-auto">
+                <CopyButton text={content ?? ""} />
               </span>
             </div>
             <MarkdownContent
@@ -162,10 +172,13 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "ErrorEntry":
       return (
-        <div className="rounded border border-red-500/30 bg-red-500/5 px-2.5 py-1.5">
+        <div className="group relative rounded border border-red-500/30 bg-red-500/5 px-2.5 py-1.5">
           <div className="flex items-center gap-1.5 mb-0.5">
             <AlertCircle className="size-3 text-red-400" />
             <span className="text-[10px] font-medium text-red-400">Error</span>
+            <span className="ml-auto">
+              <CopyButton text={entry.content ?? ""} />
+            </span>
           </div>
           <p className="text-xs text-red-200 whitespace-pre-wrap break-words">
             {entry.content}

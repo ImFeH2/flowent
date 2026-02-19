@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { useAgent, type WindowState } from "@/context/AgentContext";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { HistoryView } from "@/components/HistoryView";
@@ -363,7 +364,7 @@ function ChatItemRenderer({ item }: { item: ChatItem }) {
     return (
       <div className="flex justify-end">
         <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed bg-blue-600/20 text-blue-200">
-          <p className="whitespace-pre-wrap break-words">{item.content}</p>
+          <MarkdownContent content={item.content} className="text-blue-200" />
         </div>
       </div>
     );
@@ -373,7 +374,7 @@ function ChatItemRenderer({ item }: { item: ChatItem }) {
     return (
       <div className="flex justify-start">
         <div className="max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed bg-zinc-800/80 text-zinc-200">
-          <p className="whitespace-pre-wrap break-words">{item.content}</p>
+          <MarkdownContent content={item.content} className="text-zinc-200" />
         </div>
       </div>
     );

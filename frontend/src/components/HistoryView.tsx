@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry } from "@/types";
+import { MarkdownContent } from "@/components/MarkdownContent";
 
 interface HistoryViewProps {
   history: HistoryEntry[];
@@ -67,9 +68,10 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
               From {entry.from_id ? entry.from_id.slice(0, 8) : "unknown"}
             </span>
           </div>
-          <p className="text-xs text-blue-200 whitespace-pre-wrap break-words">
-            {entry.content}
-          </p>
+          <MarkdownContent
+            content={entry.content ?? ""}
+            className="text-xs text-blue-200"
+          />
         </div>
       );
 
@@ -96,9 +98,11 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
               Assistant
             </span>
           </div>
-          <p className="text-xs text-emerald-200 whitespace-pre-wrap break-words leading-relaxed">
-            <StreamingText text={entry.content} streaming={entry.streaming} />
-          </p>
+          <MarkdownContent
+            content={entry.content ?? ""}
+            className="text-xs text-emerald-200"
+          />
+          {entry.streaming && <span className="streaming-cursor" />}
         </div>
       );
 
@@ -115,9 +119,10 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
                 To {toId ? toId.slice(0, 8) : "unknown"}
               </span>
             </div>
-            <p className="text-xs text-purple-200 whitespace-pre-wrap break-words">
-              {content}
-            </p>
+            <MarkdownContent
+              content={content ?? ""}
+              className="text-xs text-purple-200"
+            />
           </div>
         );
       }

@@ -337,7 +337,7 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
                     )}
                   </div>
                 </div>
-                <div className="mx-2 mb-2 rounded-xl border border-zinc-700/40 bg-zinc-800/80 backdrop-blur-md shadow-lg shadow-black/30 flex gap-2 items-end px-3 py-2">
+                <div className="mx-2 mb-2 rounded-xl border border-zinc-700/40 bg-zinc-800/80 backdrop-blur-md shadow-lg shadow-black/30 flex gap-2 items-center px-3 py-2">
                   <textarea
                     ref={textareaRef}
                     value={input}

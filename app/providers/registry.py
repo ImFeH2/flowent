@@ -1,75 +1,63 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
 
 from app.providers import LLMProvider
 
 
 class ProviderType(StrEnum):
-    OPENAI = "OpenAI"
-    ANTHROPIC = "Anthropic"
-    GEMINI = "Gemini"
-    OLLAMA = "Ollama"
-
-
-@dataclass
-class ProviderDef:
-    name: str
-    provider_type: ProviderType
-    api_base_url: str
-
-
-BUILTIN_PROVIDERS: list[ProviderDef] = [
-    ProviderDef("OpenRouter", ProviderType.OPENAI, "https://openrouter.ai/api/v1"),
-    ProviderDef(
-        "ModelScope",
-        ProviderType.OPENAI,
-        "https://api-inference.modelscope.cn/v1",
-    ),
-]
+    OPENAI_COMPATIBLE = "openai_compatible"
+    OPENAI_RESPONSES = "openai_responses"
+    ANTHROPIC = "anthropic"
+    GEMINI = "gemini"
 
 
 def create_provider(
-    provider_name: str,
-    provider_type: ProviderType,
-    api_base_url: str,
+    provider_type: str,
+    base_url: str,
     api_key: str = "",
     model: str = "",
+    provider_name: str = "",
 ) -> LLMProvider:
-    if provider_type == ProviderType.OPENAI:
+    pt = provider_type.lower()
+
+    if pt == ProviderType.OPENAI_COMPATIBLE:
         from app.providers.openai import OpenAIProvider
 
         return OpenAIProvider(
             provider_name=provider_name,
-            api_base_url=api_base_url,
+            api_base_url=base_url,
             api_key=api_key,
             model=model,
         )
-    if provider_type == ProviderType.ANTHROPIC:
+
+    if pt == ProviderType.OPENAI_RESPONSES:
+        from app.providers.openai_responses import OpenAIResponsesProvider
+
+        return OpenAIResponsesProvider(
+            provider_name=provider_name,
+            api_base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
+
+    if pt == ProviderType.ANTHROPIC:
         from app.providers.anthropic import AnthropicProvider
 
         return AnthropicProvider(
             provider_name=provider_name,
-            api_base_url=api_base_url,
+            api_base_url=base_url,
             api_key=api_key,
             model=model,
         )
-    if provider_type == ProviderType.GEMINI:
+
+    if pt == ProviderType.GEMINI:
         from app.providers.gemini import GeminiProvider
 
         return GeminiProvider(
             provider_name=provider_name,
-            api_base_url=api_base_url,
+            api_base_url=base_url,
             api_key=api_key,
-            model=model,
-        )
-    if provider_type == ProviderType.OLLAMA:
-        from app.providers.ollama import OllamaProvider
-
-        return OllamaProvider(
-            provider_name=provider_name,
-            api_base_url=api_base_url,
             model=model,
         )
 

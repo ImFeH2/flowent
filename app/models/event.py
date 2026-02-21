@@ -7,20 +7,24 @@ from typing import Any
 
 
 class EventType(StrEnum):
-    AGENT_CREATED = "agent_created"
-    AGENT_STATE_CHANGED = "agent_state_changed"
-    AGENT_MESSAGE = "agent_message"
-    AGENT_TERMINATED = "agent_terminated"
+    NODE_CREATED = "node_created"
+    NODE_STATE_CHANGED = "node_state_changed"
+    NODE_MESSAGE = "node_message"
+    NODE_TERMINATED = "node_terminated"
+    NODE_CONNECTED = "node_connected"
+    STEWARD_CONTENT = "steward_content"
     TOOL_CALLED = "tool_called"
     HISTORY_ENTRY_ADDED = "history_entry_added"
     HISTORY_ENTRY_DELTA = "history_entry_delta"
 
 
 DISPLAY_EVENTS: set[EventType] = {
-    EventType.AGENT_CREATED,
-    EventType.AGENT_STATE_CHANGED,
-    EventType.AGENT_MESSAGE,
-    EventType.AGENT_TERMINATED,
+    EventType.NODE_CREATED,
+    EventType.NODE_STATE_CHANGED,
+    EventType.NODE_MESSAGE,
+    EventType.NODE_TERMINATED,
+    EventType.NODE_CONNECTED,
+    EventType.STEWARD_CONTENT,
     EventType.TOOL_CALLED,
 }
 

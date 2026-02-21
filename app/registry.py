@@ -18,16 +18,16 @@ class AgentRegistry:
         with self._lock:
             self._agents[agent.uuid] = agent
             logger.info(
-                "Agent registered: {} (role={})",
+                "Node registered: {} (type={})",
                 agent.uuid[:8],
-                agent.config.role.value,
+                agent.config.node_type.value,
             )
 
     def unregister(self, agent_id: str) -> None:
         with self._lock:
             removed = self._agents.pop(agent_id, None)
             if removed:
-                logger.info("Agent unregistered: {}", agent_id[:8])
+                logger.info("Node unregistered: {}", agent_id[:8])
 
     def get(self, agent_id: str) -> Agent | None:
         with self._lock:
@@ -40,23 +40,9 @@ class AgentRegistry:
                 return matches[0]
             return None
 
-    def get_children(self, supervisor_id: str) -> list[Agent]:
-        with self._lock:
-            return [
-                a
-                for a in self._agents.values()
-                if a.config.supervisor_id == supervisor_id
-            ]
-
     def get_all(self) -> list[Agent]:
         with self._lock:
             return list(self._agents.values())
-
-    def get_stewards(self) -> list[Agent]:
-        from app.models import Role
-
-        with self._lock:
-            return [a for a in self._agents.values() if a.config.role == Role.STEWARD]
 
     def reset(self) -> None:
         with self._lock:

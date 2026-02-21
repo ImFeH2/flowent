@@ -21,8 +21,8 @@ import { CopyButton } from "@/components/CopyButton";
 import { useAgent, type WindowState } from "@/context/AgentContext";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { HistoryView } from "@/components/HistoryView";
-import { roleIcon, stateBadgeColor } from "@/lib/constants";
-import { sendAgentMessage, terminateAgent } from "@/lib/api";
+import { nodeTypeIcon, stateBadgeColor } from "@/lib/constants";
+import { sendNodeMessage, terminateNode } from "@/lib/api";
 
 type ChatItem =
   | { kind: "user"; content: string }
@@ -94,7 +94,7 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    sendAgentMessage(agentId, text);
+    sendNodeMessage(agentId, text);
   }, [agentId, input]);
 
   const onKeyDown = useCallback(
@@ -149,15 +149,19 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
   }, [detail]);
 
   const handleTerminate = useCallback(() => {
-    terminateAgent(agentId);
+    terminateNode(agentId);
   }, [agentId]);
 
   const displayName = detail
-    ? (detail.name ?? `${detail.role} ${agentId.slice(0, 8)}`)
+    ? (detail.name ?? `${detail.node_type} ${agentId.slice(0, 8)}`)
     : agentId.slice(0, 8);
-  const Icon = detail ? roleIcon[detail.role] : roleIcon.worker;
+  const Icon = detail ? nodeTypeIcon[detail.node_type] : nodeTypeIcon.agent;
   const canTerminate =
-    detail && detail.state !== "terminated" && detail.state !== "error";
+    detail &&
+    detail.state !== "terminated" &&
+    detail.state !== "error" &&
+    detail.node_type !== "steward" &&
+    detail.node_type !== "conductor";
 
   return (
     <Rnd
@@ -283,26 +287,13 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
                         </div>
                       </DetailField>
                     )}
-                    {detail.supervisor_id && (
-                      <DetailField label="Supervisor">
-                        <span className="text-xs text-zinc-400 font-mono truncate block">
-                          {detail.supervisor_id}
-                        </span>
-                      </DetailField>
-                    )}
-                    {detail.children.length > 0 && (
-                      <DetailField label="Children">
+                    {detail.connections.length > 0 && (
+                      <DetailField label="Connections">
                         <div className="space-y-0.5">
-                          {detail.children.map((c) => (
-                            <div
-                              key={c.id}
-                              className="text-[11px] text-zinc-400"
-                            >
-                              <span className="text-zinc-300">
-                                {c.name ?? c.role}
-                              </span>{" "}
+                          {detail.connections.map((id) => (
+                            <div key={id} className="text-[11px] text-zinc-400">
                               <span className="font-mono text-zinc-500">
-                                {c.id.slice(0, 8)}
+                                {id.slice(0, 8)}
                               </span>
                             </div>
                           ))}

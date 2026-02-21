@@ -25,6 +25,46 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
     event_bus.set_loop(loop)
 
+    from app.agent import Agent
+    from app.models import Event, EventType, NodeConfig, NodeType
+
+    steward_cfg = NodeConfig(
+        node_type=NodeType.STEWARD,
+        tools=["send", "idle", "todo", "list_connections", "exit"],
+    )
+    steward = Agent(steward_cfg, uuid="steward")
+    registry.register(steward)
+    steward.start()
+
+    conductor_cfg = NodeConfig(
+        node_type=NodeType.CONDUCTOR,
+        tools=[
+            "spawn",
+            "connect",
+            "send",
+            "idle",
+            "todo",
+            "list_connections",
+            "exit",
+        ],
+    )
+    conductor = Agent(conductor_cfg, uuid="conductor")
+    registry.register(conductor)
+    conductor.start()
+
+    steward.add_connection("conductor")
+    conductor.add_connection("steward")
+
+    event_bus.emit(
+        Event(
+            type=EventType.NODE_CONNECTED,
+            agent_id="steward",
+            data={"a": "steward", "b": "conductor"},
+        )
+    )
+
+    logger.info("Steward and Conductor started, initial connection established")
+
     yield
 
     logger.info("Shutting down — terminating all agents")

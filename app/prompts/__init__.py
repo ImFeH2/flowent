@@ -1,29 +1,25 @@
 from __future__ import annotations
 
-from app.models import AgentConfig, Role
+from app.models import NodeConfig, NodeType
+from app.prompts.conductor import CONDUCTOR_PROMPT
 from app.prompts.steward import STEWARD_PROMPT
-from app.prompts.supervisor import SUPERVISOR_PROMPT
-from app.prompts.worker import WORKER_PROMPT
-
-_ROLE_PROMPTS = {
-    Role.STEWARD: STEWARD_PROMPT,
-    Role.SUPERVISOR: SUPERVISOR_PROMPT,
-    Role.WORKER: WORKER_PROMPT,
-}
 
 
-def get_system_prompt(config: AgentConfig) -> str:
-    base = _ROLE_PROMPTS[config.role]
-    parts = [base.strip()]
+def get_system_prompt(config: NodeConfig) -> str:
+    if config.node_type == NodeType.STEWARD:
+        return STEWARD_PROMPT.strip()
 
-    parts.append(f"\nYour working directory is {config.virtual_root}")
+    if config.node_type == NodeType.CONDUCTOR:
+        return CONDUCTOR_PROMPT.strip()
 
-    if config.supervisor_id:
-        parts.append(f"Supervisor ID: {config.supervisor_id}")
+    from app.settings import find_role, get_settings
 
-    if config.network_access:
-        parts.append("Network access: enabled")
-    else:
-        parts.append("Network access: disabled")
+    settings = get_settings()
+    if config.role_id:
+        role = find_role(settings, config.role_id)
+        if role:
+            return role.system_prompt.strip()
 
-    return "\n".join(parts)
+    return (
+        "You are a helpful agent. Complete the assigned task and report results back."
+    )

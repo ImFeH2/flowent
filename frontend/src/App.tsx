@@ -7,12 +7,29 @@ import { AgentTree } from "@/components/AgentTree";
 import { EventLog } from "@/components/EventLog";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsDialog } from "@/components/SettingsDialog";
-import { CreateStewardDialog } from "@/components/CreateStewardDialog";
+import { StewardPanel } from "@/components/StewardPanel";
+import { ProvidersPage } from "@/pages/ProvidersPage";
+import { RolesPage } from "@/pages/RolesPage";
+import { ToolsPage } from "@/pages/ToolsPage";
 
 function AppContent() {
-  const { eventPanelVisible, toggleEventPanel } = useAgent();
+  const { eventPanelVisible, toggleEventPanel, currentPage } = useAgent();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [createStewardOpen, setCreateStewardOpen] = useState(false);
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case "steward":
+        return <StewardPanel />;
+      case "providers":
+        return <ProvidersPage />;
+      case "roles":
+        return <RolesPage />;
+      case "tools":
+        return <ToolsPage />;
+      default:
+        return <AgentTree />;
+    }
+  };
 
   return (
     <>
@@ -22,18 +39,12 @@ function AppContent() {
           onToggleEventPanel={toggleEventPanel}
           onOpenSettings={() => setSettingsOpen(true)}
         />
-        <div className="flex-1 ml-12">
-          <AgentTree onCreateSteward={() => setCreateStewardOpen(true)} />
-        </div>
+        <div className="flex-1 ml-12">{renderPage()}</div>
         <EventLog />
       </div>
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-      />
-      <CreateStewardDialog
-        open={createStewardOpen}
-        onClose={() => setCreateStewardOpen(false)}
       />
       <Toaster
         theme="dark"

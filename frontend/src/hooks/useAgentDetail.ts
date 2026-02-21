@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAgent } from "@/context/AgentContext";
-import { fetchAgentDetail } from "@/lib/api";
-import type { AgentDetail, HistoryEntry, StreamingDelta } from "@/types";
+import { fetchNodeDetail } from "@/lib/api";
+import type { NodeDetail, HistoryEntry, StreamingDelta } from "@/types";
 
 function reduceDeltas(deltas: StreamingDelta[]) {
   let content = "";
@@ -29,7 +29,7 @@ function reduceDeltas(deltas: StreamingDelta[]) {
 }
 
 export function useAgentDetail(agentId: string | null) {
-  const [detail, setDetail] = useState<AgentDetail | null>(null);
+  const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchedAt, setFetchedAt] = useState(0);
   const { agentHistories, clearAgentHistory, streamingDeltas, agents } =
@@ -44,7 +44,7 @@ export function useAgentDetail(agentId: string | null) {
       setLoading(true);
       clearAgentHistory(agentId);
       try {
-        const data = await fetchAgentDetail(agentId);
+        const data = await fetchNodeDetail(agentId);
         if (cancelled) return;
         clearAgentHistory(agentId);
         setDetail(data);

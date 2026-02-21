@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.models import AgentConfig, Message, Role
+from app.models import Event, EventType, Message, NodeConfig, NodeType
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -16,16 +16,15 @@ if TYPE_CHECKING:
 class SpawnTool(Tool):
     name = "spawn"
     description = (
-        "Create a new child agent (Supervisor or Worker). "
-        "The agent is created and started, then task_prompt is sent as the first message."
+        "Create a new agent node with a specific role. "
+        "The agent is created, connected to the spawner, and the task_prompt is sent as the first message."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
-            "role": {
+            "role_id": {
                 "type": "string",
-                "enum": ["supervisor", "worker"],
-                "description": "Role of the new agent",
+                "description": "ID of the Role to assign to the new agent",
             },
             "task_prompt": {
                 "type": "string",
@@ -35,58 +34,70 @@ class SpawnTool(Tool):
                 "type": "string",
                 "description": "Human-readable name for the agent (optional)",
             },
-            "network_access": {
-                "type": "boolean",
-                "description": "Whether the child agent needs network access (default false)",
+            "tools": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of tool names to give the agent",
+            },
+            "write_dirs": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of directories the agent can write to",
             },
         },
-        "required": ["role", "task_prompt"],
+        "required": ["role_id", "task_prompt"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app import git
         from app.agent import Agent as AgentClass
+        from app.events import event_bus
         from app.registry import registry
+        from app.settings import find_role, get_settings
 
-        role = Role(args["role"])
+        role_id = args["role_id"]
         task_prompt = args["task_prompt"]
+        name = args.get("name")
+        tools = args.get("tools", [])
+        write_dirs = args.get("write_dirs", [])
 
-        repo_path = agent.config.repo_path
-        if not repo_path:
-            return json.dumps(
-                {"error": "No repo_path configured for worktree creation"}
-            )
+        settings = get_settings()
+        role_cfg = find_role(settings, role_id)
+        if role_cfg is None:
+            return json.dumps({"error": f"Role '{role_id}' not found"})
 
         agent_uuid = str(uuid.uuid4())
-        worktree_path = git.create_worktree(repo_path, agent_uuid)
-
-        config = AgentConfig(
-            role=role,
-            repo_path=repo_path,
-            worktree_path=worktree_path,
-            supervisor_id=agent.uuid,
-            name=args.get("name"),
-            network_access=args.get("network_access", False),
+        config = NodeConfig(
+            node_type=NodeType.AGENT,
+            role_id=role_id,
+            name=name,
+            tools=tools,
+            write_dirs=write_dirs,
         )
 
         child = AgentClass(uuid=agent_uuid, config=config)
         registry.register(child)
-        agent.children_ids.append(agent_uuid)
+
+        agent.add_connection(agent_uuid)
+        child.add_connection(agent.uuid)
+
+        event_bus.emit(
+            Event(
+                type=EventType.NODE_CONNECTED,
+                agent_id=agent.uuid,
+                data={"a": agent.uuid, "b": agent_uuid},
+            )
+        )
+
         child.start()
 
         msg = Message(from_id=agent.uuid, to_id=agent_uuid, content=task_prompt)
         child.enqueue_message(msg)
 
         logger.info(
-            "Spawned {} agent {} by {}",
-            role.value,
+            "Spawned agent {} (role={}) by {}",
             agent_uuid[:8],
+            role_id,
             agent.uuid[:8],
         )
 
-        return json.dumps(
-            {
-                "agent_id": agent_uuid,
-                "role": role.value,
-            }
-        )
+        return json.dumps({"agent_id": agent_uuid, "role_id": role_id})

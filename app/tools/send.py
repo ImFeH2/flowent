@@ -15,13 +15,13 @@ if TYPE_CHECKING:
 
 class SendTool(Tool):
     name = "send"
-    description = "Send a message to another agent by UUID or name."
+    description = "Send a message to a connected node by UUID."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "to": {
                 "type": "string",
-                "description": "Target agent UUID or name",
+                "description": "Target node UUID",
             },
             "content": {"type": "string", "description": "Message content"},
         },
@@ -34,26 +34,14 @@ class SendTool(Tool):
         target_ref = args["to"]
         content = args["content"]
 
-        if target_ref == "human":
-            logger.debug(
-                "Message sent: {} -> human ({} chars)",
-                agent.uuid[:8],
-                len(content),
-            )
-            event_bus.emit(
-                Event(
-                    type=EventType.AGENT_MESSAGE,
-                    agent_id=agent.uuid,
-                    data={"to_id": "human", "content": content},
-                ),
-            )
-            return json.dumps({"status": "sent"})
-
         target = registry.get(target_ref)
         if target is None:
             target = registry.find_by_name(target_ref)
         if target is None:
-            return json.dumps({"error": f"Agent '{target_ref}' not found"})
+            return json.dumps({"error": f"Node '{target_ref}' not found"})
+
+        if not agent.is_connected_to(target.uuid):
+            return json.dumps({"error": f"Not connected to node '{target_ref}'"})
 
         msg = Message(from_id=agent.uuid, to_id=target.uuid, content=content)
         target.enqueue_message(msg)
@@ -67,7 +55,7 @@ class SendTool(Tool):
 
         event_bus.emit(
             Event(
-                type=EventType.AGENT_MESSAGE,
+                type=EventType.NODE_MESSAGE,
                 agent_id=agent.uuid,
                 data={"to_id": target.uuid, "content": content},
             ),

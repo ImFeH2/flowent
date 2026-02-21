@@ -9,7 +9,6 @@ from loguru import logger
 
 from app.events import event_bus
 from app.models import (
-    AgentConfig,
     AgentState,
     AssistantText,
     AssistantThinking,
@@ -19,6 +18,8 @@ from app.models import (
     EventType,
     HistoryEntry,
     Message,
+    NodeConfig,
+    NodeType,
     ReceivedMessage,
     SystemEntry,
     SystemInjection,
@@ -36,23 +37,37 @@ _tool_registry = build_tool_registry()
 class Agent:
     def __init__(
         self,
-        config: AgentConfig,
+        config: NodeConfig,
         uuid: str | None = None,
     ) -> None:
         import uuid as _uuid
 
         self.uuid = uuid or str(_uuid.uuid4())
         self.config = config
+        self.node_type = config.node_type
+        self.role_id = config.role_id
         self.state = AgentState.INITIALIZING
         self.todos: list[TodoItem] = []
-        self.children_ids: list[str] = []
+        self.connections: list[str] = []
         self.history: list[HistoryEntry] = []
         self._message_queue: Queue[Message] = Queue()
         self._terminate = threading.Event()
         self._idle_requested: bool = False
         self._thread: threading.Thread | None = None
         self._termination_reason: str = ""
-        self._log = logger.bind(agent_id=self.uuid[:8], role=self.config.role.value)
+        self._connections_lock = threading.Lock()
+        self._log = logger.bind(
+            agent_id=self.uuid[:8], node_type=self.config.node_type.value
+        )
+
+    def add_connection(self, other_uuid: str) -> None:
+        with self._connections_lock:
+            if other_uuid not in self.connections:
+                self.connections.append(other_uuid)
+
+    def is_connected_to(self, uuid: str) -> bool:
+        with self._connections_lock:
+            return uuid in self.connections
 
     def start(self) -> None:
         self._thread = threading.Thread(
@@ -63,11 +78,11 @@ class Agent:
         self._thread.start()
         event_bus.emit(
             Event(
-                type=EventType.AGENT_CREATED,
+                type=EventType.NODE_CREATED,
                 agent_id=self.uuid,
                 data={
-                    "role": self.config.role.value,
-                    "parent_id": self.config.supervisor_id,
+                    "node_type": self.config.node_type.value,
+                    "role_id": self.config.role_id,
                     "name": self.config.name,
                 },
             ),
@@ -173,9 +188,18 @@ class Agent:
                             self._log.debug("Idle requested, waiting for input")
                             self._wait_for_input()
                 elif response.content:
-                    self._append_history(
-                        AssistantText(content=response.content),
-                    )
+                    entry = AssistantText(content=response.content)
+                    self._append_history(entry)
+
+                    if self.node_type == NodeType.STEWARD:
+                        event_bus.emit(
+                            Event(
+                                type=EventType.STEWARD_CONTENT,
+                                agent_id=self.uuid,
+                                data={"content": response.content},
+                            ),
+                        )
+
                     self._log.debug("No tool calls, transitioning to IDLE")
                     self.set_state(AgentState.IDLE, "text response, no tool calls")
                     self._wait_for_input()
@@ -204,7 +228,7 @@ class Agent:
         )
         event_bus.emit(
             Event(
-                type=EventType.AGENT_TERMINATED,
+                type=EventType.NODE_TERMINATED,
                 agent_id=self.uuid,
                 data={"reason": self._termination_reason or "finished"},
             ),
@@ -451,7 +475,7 @@ class Agent:
             )
             event_bus.emit(
                 Event(
-                    type=EventType.AGENT_STATE_CHANGED,
+                    type=EventType.NODE_STATE_CHANGED,
                     agent_id=self.uuid,
                     data={
                         "old_state": old.value,

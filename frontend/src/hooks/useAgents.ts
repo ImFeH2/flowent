@@ -1,19 +1,19 @@
 import { useState, useCallback, useEffect } from "react";
-import type { Agent, AgentEvent } from "@/types";
-import { fetchAgents } from "@/lib/api";
+import type { Node, AgentEvent } from "@/types";
+import { fetchNodes } from "@/lib/api";
 
 const MAX_EVENTS = 200;
 
 export function useAgents() {
-  const [agents, setAgents] = useState<Map<string, Agent>>(new Map());
+  const [agents, setAgents] = useState<Map<string, Node>>(new Map());
   const [events, setEvents] = useState<AgentEvent[]>([]);
 
   useEffect(() => {
-    fetchAgents()
+    fetchNodes()
       .then((list) => {
-        const map = new Map<string, Agent>();
-        for (const a of list) {
-          map.set(a.id, { ...a, name: a.name ?? null });
+        const map = new Map<string, Node>();
+        for (const n of list) {
+          map.set(n.id, { ...n, name: n.name ?? null });
         }
         setAgents(map);
       })
@@ -28,50 +28,64 @@ export function useAgents() {
   }, []);
 
   const handleUpdateEvent = useCallback((event: AgentEvent) => {
-    if (event.type === "agent_created") {
+    if (event.type === "node_created") {
       const data = event.data as unknown as {
-        role: Agent["role"];
+        node_type: Node["node_type"];
+        role_id?: string | null;
         name?: string | null;
       };
       setAgents((prev) => {
         const next = new Map(prev);
         next.set(event.agent_id, {
           id: event.agent_id,
-          role: data.role,
+          node_type: data.node_type,
+          role_id: data.role_id ?? null,
           state: "initializing",
-          children: [],
+          connections: [],
           name: data.name ?? null,
           todos: [],
         });
-        const parentId = event.data.parent_id as string | undefined;
-        if (parentId && next.has(parentId)) {
-          const parent = next.get(parentId)!;
-          next.set(parentId, {
-            ...parent,
-            children: [...parent.children, event.agent_id],
-          });
-        }
         return next;
       });
-    } else if (event.type === "agent_state_changed") {
+    } else if (event.type === "node_state_changed") {
       setAgents((prev) => {
-        const agent = prev.get(event.agent_id);
-        if (!agent) return prev;
+        const node = prev.get(event.agent_id);
+        if (!node) return prev;
         const next = new Map(prev);
-        const todos = event.data.todos as Agent["todos"] | undefined;
+        const todos = event.data.todos as Node["todos"] | undefined;
         next.set(event.agent_id, {
-          ...agent,
-          state: event.data.new_state as Agent["state"],
-          todos: todos ?? agent.todos,
+          ...node,
+          state: event.data.new_state as Node["state"],
+          todos: todos ?? node.todos,
         });
         return next;
       });
-    } else if (event.type === "agent_terminated") {
+    } else if (event.type === "node_terminated") {
       setAgents((prev) => {
-        const agent = prev.get(event.agent_id);
-        if (!agent) return prev;
+        const node = prev.get(event.agent_id);
+        if (!node) return prev;
         const next = new Map(prev);
-        next.set(event.agent_id, { ...agent, state: "terminated" });
+        next.set(event.agent_id, { ...node, state: "terminated" });
+        return next;
+      });
+    } else if (event.type === "node_connected") {
+      const { a, b } = event.data as { a: string; b: string };
+      setAgents((prev) => {
+        const next = new Map(prev);
+        const nodeA = next.get(a);
+        if (nodeA && !nodeA.connections.includes(b)) {
+          next.set(a, {
+            ...nodeA,
+            connections: [...nodeA.connections, b],
+          });
+        }
+        const nodeB = next.get(b);
+        if (nodeB && !nodeB.connections.includes(a)) {
+          next.set(b, {
+            ...nodeB,
+            connections: [...nodeB.connections, a],
+          });
+        }
         return next;
       });
     }

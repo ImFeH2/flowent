@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 WORKING_DIR = Path(os.getcwd())
-WORKTREES_DIR = WORKING_DIR / "worktrees"
 _SETTINGS_FILE = WORKING_DIR / "settings.json"
 
 
@@ -17,62 +16,36 @@ class EventLogSettings:
 
 @dataclass
 class ProviderConfig:
+    id: str
     name: str
-    provider_type: str
-    api_base_url: str
-    api_key: str = ""
+    type: str
+    base_url: str
+    api_key: str
+    default_model: str
+
+
+@dataclass
+class RoleConfig:
+    id: str
+    name: str
+    system_prompt: str
 
 
 @dataclass
 class ModelSettings:
-    active_provider: str = "OpenRouter"
-    active_model: str = "anthropic/claude-3.5-sonnet"
-    providers: list[ProviderConfig] = field(default_factory=list)
+    active_provider_id: str = ""
+    active_model: str = ""
 
 
 @dataclass
 class Settings:
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
     model: ModelSettings = field(default_factory=ModelSettings)
+    providers: list[ProviderConfig] = field(default_factory=list)
+    roles: list[RoleConfig] = field(default_factory=list)
 
 
 _cached_settings: Settings | None = None
-
-
-def _get_all_providers(custom_providers: list[ProviderConfig]) -> list[ProviderConfig]:
-    from app.providers.registry import BUILTIN_PROVIDERS
-
-    builtin = [
-        ProviderConfig(
-            name=p.name,
-            provider_type=p.provider_type.value,
-            api_base_url=p.api_base_url,
-        )
-        for p in BUILTIN_PROVIDERS
-    ]
-
-    builtin_names = {p.name for p in builtin}
-    for cp in custom_providers:
-        if cp.name not in builtin_names:
-            builtin.append(cp)
-        else:
-            for i, b in enumerate(builtin):
-                if b.name == cp.name:
-                    builtin[i] = cp
-                    break
-
-    return builtin
-
-
-def get_all_providers(settings: ModelSettings) -> list[ProviderConfig]:
-    return _get_all_providers(settings.providers)
-
-
-def find_provider(settings: ModelSettings, name: str) -> ProviderConfig | None:
-    for p in get_all_providers(settings):
-        if p.name == name:
-            return p
-    return None
 
 
 def load_settings() -> Settings:
@@ -88,19 +61,25 @@ def load_settings() -> Settings:
         with open(_SETTINGS_FILE) as f:
             data = json.load(f)
 
-        model_data = data.get("model", {})
-        providers_raw = model_data.pop("providers", [])
-        providers = [ProviderConfig(**p) for p in providers_raw]
+        event_log = EventLogSettings(**data.get("event_log", {}))
 
+        model_data = data.get("model", {})
         model_settings = ModelSettings(
-            active_provider=model_data.get("active_provider", "OpenRouter"),
-            active_model=model_data.get("active_model", "anthropic/claude-3.5-sonnet"),
-            providers=providers,
+            active_provider_id=model_data.get("active_provider_id", ""),
+            active_model=model_data.get("active_model", ""),
         )
 
+        providers_raw = data.get("providers", [])
+        providers = [ProviderConfig(**p) for p in providers_raw]
+
+        roles_raw = data.get("roles", [])
+        roles = [RoleConfig(**r) for r in roles_raw]
+
         _cached_settings = Settings(
-            event_log=EventLogSettings(**data.get("event_log", {})),
+            event_log=event_log,
             model=model_settings,
+            providers=providers,
+            roles=roles,
         )
     except Exception:
         _cached_settings = Settings()
@@ -118,3 +97,17 @@ def save_settings(settings: Settings) -> None:
 
 def get_settings() -> Settings:
     return load_settings()
+
+
+def find_provider(settings: Settings, provider_id: str) -> ProviderConfig | None:
+    for p in settings.providers:
+        if p.id == provider_id:
+            return p
+    return None
+
+
+def find_role(settings: Settings, role_id: str) -> RoleConfig | None:
+    for r in settings.roles:
+        if r.id == role_id:
+            return r
+    return None

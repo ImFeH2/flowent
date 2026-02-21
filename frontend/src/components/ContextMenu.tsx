@@ -4,6 +4,7 @@ export interface ContextMenuItem {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  disabled?: boolean;
 }
 
 export type ContextMenuEntry = ContextMenuItem | "divider";
@@ -48,11 +49,14 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         ) : (
           <button
             key={i}
+            disabled={item.disabled}
             onClick={() => {
-              item.onClick();
-              onClose();
+              if (!item.disabled) {
+                item.onClick();
+                onClose();
+              }
             }}
-            className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${
+            className={`w-full px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               item.danger
                 ? "text-red-400 hover:bg-red-900/30"
                 : "text-zinc-200 hover:bg-zinc-700"

@@ -22,7 +22,7 @@ import {
   type XYPosition,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Plus, GitMerge } from "lucide-react";
+import { Network } from "lucide-react";
 import { toast } from "sonner";
 import { AgentGraphNode } from "@/components/AgentGraphNode";
 import { AgentWindow } from "@/components/AgentWindow";
@@ -35,7 +35,7 @@ import {
 } from "@/context/AgentContext";
 import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
-import { terminateAgent, mergeToMain } from "@/lib/api";
+import { terminateNode } from "@/lib/api";
 
 const nodeTypes: NodeTypes = {
   agent: AgentGraphNode,
@@ -82,11 +82,7 @@ interface ContextMenuState {
   agentId: string | null;
 }
 
-interface AgentTreeProps {
-  onCreateSteward: () => void;
-}
-
-export function AgentTree({ onCreateSteward }: AgentTreeProps) {
+export function AgentTree() {
   const {
     agents,
     selectedAgentId,
@@ -114,6 +110,7 @@ export function AgentTree({ onCreateSteward }: AgentTreeProps) {
 
   const { nodes, edges } = useMemo(() => {
     const rawNodes: Node[] = [];
+    const edgeSet = new Set<string>();
     const rawEdges: Edge[] = [];
 
     for (const [id, agent] of agents) {
@@ -122,7 +119,7 @@ export function AgentTree({ onCreateSteward }: AgentTreeProps) {
         type: "agent",
         position: { x: 0, y: 0 },
         data: {
-          role: agent.role,
+          node_type: agent.node_type,
           state: agent.state,
           shortId: id.slice(0, 8),
           name: agent.name,
@@ -131,18 +128,26 @@ export function AgentTree({ onCreateSteward }: AgentTreeProps) {
         },
       });
 
-      for (const childId of agent.children) {
-        const edgeId = `${id}-${childId}`;
-        const isActive = activeEdgeSet.has(edgeId);
-        rawEdges.push({
-          id: edgeId,
-          source: id,
-          target: childId,
-          type: "animated",
-          data: { active: isActive },
-          style: { stroke: isActive ? "#60a5fa" : "#52525b", strokeWidth: 1.5 },
-          animated: false,
-        });
+      for (const connId of agent.connections) {
+        const edgeId = [id, connId].sort().join("-");
+        if (!edgeSet.has(edgeId)) {
+          edgeSet.add(edgeId);
+          const isActive =
+            activeEdgeSet.has(`${id}-${connId}`) ||
+            activeEdgeSet.has(`${connId}-${id}`);
+          rawEdges.push({
+            id: edgeId,
+            source: id,
+            target: connId,
+            type: "animated",
+            data: { active: isActive },
+            style: {
+              stroke: isActive ? "#60a5fa" : "#52525b",
+              strokeWidth: 1.5,
+            },
+            animated: false,
+          });
+        }
       }
     }
 
@@ -229,63 +234,36 @@ export function AgentTree({ onCreateSteward }: AgentTreeProps) {
     ];
     if (contextMenu.agentId) {
       const agentId = contextMenu.agentId;
+      const node = agents.get(agentId);
+      const isProtected =
+        node?.node_type === "steward" || node?.node_type === "conductor";
       items.push("divider");
-      items.push({
-        label: "Merge to Main",
-        onClick: async () => {
-          try {
-            const result = await mergeToMain(agentId);
-            if (result.status === "merged") {
-              toast.success(result.message || "Merged successfully");
-            } else if (result.status === "conflict") {
-              toast.error(
-                `Merge conflict: ${(result.conflict_files ?? []).join(", ")}`,
-              );
-            }
-          } catch {
-            toast.error("Merge failed");
-          }
-        },
-      });
       items.push({
         label: "Stop Agent",
         danger: true,
+        disabled: isProtected,
         onClick: () => {
-          terminateAgent(agentId);
+          if (!isProtected) {
+            terminateNode(agentId).catch(() =>
+              toast.error("Failed to terminate agent"),
+            );
+          }
         },
       });
     }
     return items;
-  }, [contextMenu, closeAllWindows]);
+  }, [contextMenu, closeAllWindows, agents]);
 
   const tooltipAgent = tooltip ? agents.get(tooltip.agentId) : null;
 
   return (
     <div className="relative flex h-full flex-col">
-      <div className="absolute left-4 top-4 z-20 flex items-center gap-1.5 rounded-lg border border-zinc-700/60 bg-zinc-900/80 backdrop-blur-sm px-1.5 py-1.5 shadow-lg">
-        <button
-          onClick={onCreateSteward}
-          title="Create Steward"
-          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700/60 transition-colors"
-        >
-          <Plus className="size-3.5" />
-          Steward
-        </button>
-      </div>
-
       <div className="flex-1 relative overflow-hidden">
         {nodes.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center space-y-3">
-              <GitMerge className="size-8 text-zinc-600 mx-auto" />
-              <p className="text-sm text-zinc-500">No agents running</p>
-              <button
-                onClick={onCreateSteward}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:text-zinc-100 hover:bg-zinc-700 transition-colors"
-              >
-                <Plus className="size-4" />
-                Create Steward
-              </button>
+              <Network className="size-8 text-zinc-600 mx-auto" />
+              <p className="text-sm text-zinc-500">Loading agent graph...</p>
             </div>
           </div>
         ) : (
@@ -337,7 +315,7 @@ export function AgentTree({ onCreateSteward }: AgentTreeProps) {
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-zinc-200">
               {tooltipAgent.name ?? (
-                <span className="capitalize">{tooltipAgent.role}</span>
+                <span className="capitalize">{tooltipAgent.node_type}</span>
               )}
             </span>
             <Badge

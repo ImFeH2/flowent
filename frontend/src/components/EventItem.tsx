@@ -2,19 +2,23 @@ import { motion } from "motion/react";
 import type { AgentEvent } from "@/types";
 
 const typeColor: Record<string, string> = {
-  agent_created: "bg-emerald-400",
-  agent_state_changed: "bg-blue-400",
-  agent_message: "bg-violet-400",
-  agent_terminated: "bg-zinc-500",
+  node_created: "bg-emerald-400",
+  node_state_changed: "bg-blue-400",
+  node_message: "bg-violet-400",
+  node_terminated: "bg-zinc-500",
+  node_connected: "bg-teal-400",
+  steward_content: "bg-amber-300",
   tool_called: "bg-amber-400",
 };
 
 const typeLabel: Record<string, string> = {
-  agent_created: "created",
-  agent_state_changed: "state changed",
-  agent_message: "message",
-  agent_terminated: "terminated",
-  tool_called: "tool call",
+  node_created: "created",
+  node_state_changed: "state",
+  node_message: "message",
+  node_terminated: "terminated",
+  node_connected: "connected",
+  steward_content: "steward",
+  tool_called: "tool",
 };
 
 function formatTime(ts: number): string {

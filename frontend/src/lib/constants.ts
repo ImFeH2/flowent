@@ -1,10 +1,10 @@
-import { Bot, Shield, Wrench } from "lucide-react";
-import type { AgentState } from "@/types";
+import { Bot, Shield, Wand2 } from "lucide-react";
+import type { AgentState, NodeType } from "@/types";
 
-export const roleIcon = {
+export const nodeTypeIcon = {
   steward: Shield,
-  supervisor: Bot,
-  worker: Wrench,
+  conductor: Wand2,
+  agent: Bot,
 } as const;
 
 export const stateColor: Record<AgentState, string> = {
@@ -29,4 +29,10 @@ export const stateBorder: Record<AgentState, string> = {
   initializing: "border-amber-500/50",
   error: "border-red-500/50",
   terminated: "border-zinc-600/50",
+};
+
+export const nodeTypeBorder: Record<NodeType, string> = {
+  steward: "border-amber-500/60",
+  conductor: "border-purple-500/60",
+  agent: "border-zinc-700/60",
 };

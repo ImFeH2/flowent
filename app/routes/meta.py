@@ -12,9 +12,8 @@ async def health_check() -> dict:
 
 @router.get("/api/meta")
 async def get_meta() -> dict:
-    from app.providers.registry import BUILTIN_PROVIDERS, ProviderType
+    from app.providers.registry import ProviderType
 
     return {
         "provider_types": [pt.value for pt in ProviderType],
-        "builtin_provider_names": [p.name for p in BUILTIN_PROVIDERS],
     }

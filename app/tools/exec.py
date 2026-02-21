@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import VIRTUAL_ROOT, build_firejail_cmd
+from app.sandbox import build_firejail_cmd
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -20,14 +20,13 @@ if TYPE_CHECKING:
 def is_wsl() -> bool:
     if "wsl" in platform.system().lower():
         return True
-
     wsl_env_vars = ["WSL_INTEROP", "WSL_DISTRO_NAME", "WSLENV"]
     return any(var in os.environ for var in wsl_env_vars)
 
 
 class ExecTool(Tool):
     name = "exec"
-    description = f"Execute a shell command in a sandboxed environment. Working directory is {VIRTUAL_ROOT}."
+    description = "Execute a shell command in a sandboxed environment."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -47,15 +46,12 @@ class ExecTool(Tool):
         on_output: Callable[[str], None] | None = kwargs.get("on_output")
 
         command = args["command"]
-        timeout = args.get("timeout", 30)
+        timeout = int(args.get("timeout", 30))
+        write_dirs = agent.config.write_dirs
 
-        firejail_cmd = build_firejail_cmd(agent, command, timeout=timeout)
+        firejail_cmd = build_firejail_cmd(write_dirs, command, timeout_secs=timeout)
 
-        logger.debug(
-            "Executing command: {} (timeout={}s)",
-            command,
-            timeout,
-        )
+        logger.debug("Executing command: {} (timeout={}s)", command, timeout)
 
         env = os.environ.copy()
         if is_wsl():
@@ -67,7 +63,6 @@ class ExecTool(Tool):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                cwd=VIRTUAL_ROOT,
                 env=env,
             )
 

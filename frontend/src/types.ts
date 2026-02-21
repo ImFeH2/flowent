@@ -1,4 +1,4 @@
-export type Role = "steward" | "supervisor" | "worker";
+export type NodeType = "steward" | "conductor" | "agent";
 
 export type AgentState =
   | "initializing"
@@ -8,10 +8,12 @@ export type AgentState =
   | "terminated";
 
 export type DisplayEventType =
-  | "agent_created"
-  | "agent_state_changed"
-  | "agent_message"
-  | "agent_terminated"
+  | "node_created"
+  | "node_state_changed"
+  | "node_message"
+  | "node_terminated"
+  | "node_connected"
+  | "steward_content"
   | "tool_called";
 
 export type UpdateEventType =
@@ -28,13 +30,14 @@ export interface TodoItem {
   type: string;
 }
 
-export interface Agent {
+export interface Node {
   id: string;
-  role: Role;
+  node_type: NodeType;
   state: AgentState;
-  children: string[];
+  connections: string[];
   name: string | null;
   todos: TodoItem[];
+  role_id: string | null;
 }
 
 export interface AgentEvent {
@@ -44,11 +47,10 @@ export interface AgentEvent {
   timestamp: number;
 }
 
-export interface ChatMessage {
-  id: string;
-  from: "human" | "steward";
+export interface StewardMessage {
   content: string;
   timestamp: number;
+  from: "human" | "steward";
 }
 
 export type HistoryEntryType =
@@ -72,19 +74,13 @@ export interface HistoryEntry {
   streaming?: boolean;
 }
 
-export interface AgentDetail {
+export interface NodeDetail {
   id: string;
-  role: Role;
+  node_type: NodeType;
   state: AgentState;
   name: string | null;
-  children: {
-    id: string;
-    role: Role;
-    state: AgentState;
-    name: string | null;
-    todos: TodoItem[];
-  }[];
-  supervisor_id: string | null;
+  connections: string[];
+  role_id: string | null;
   todos: TodoItem[];
   history: HistoryEntry[];
 }
@@ -93,3 +89,18 @@ export type StreamingDelta =
   | { type: "ContentDelta"; text: string }
   | { type: "ThinkingDelta"; text: string }
   | { type: "ToolResultDelta"; tool_call_id: string; text: string };
+
+export interface Role {
+  id: string;
+  name: string;
+  system_prompt: string;
+}
+
+export interface Provider {
+  id: string;
+  name: string;
+  type: string;
+  base_url: string;
+  api_key: string;
+  default_model: string;
+}

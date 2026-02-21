@@ -1,4 +1,4 @@
-from app.models.agent import AgentConfig, AgentState, Role
+from app.models.agent import AgentState, NodeConfig, NodeType
 from app.models.base import Serializable
 from app.models.delta import (
     ContentDelta,
@@ -23,7 +23,6 @@ from app.models.todo import TodoItem
 
 __all__ = [
     "DISPLAY_EVENTS",
-    "AgentConfig",
     "AgentState",
     "AssistantText",
     "AssistantThinking",
@@ -35,8 +34,9 @@ __all__ = [
     "LLMResponse",
     "Message",
     "ModelInfo",
+    "NodeConfig",
+    "NodeType",
     "ReceivedMessage",
-    "Role",
     "Serializable",
     "StreamingDelta",
     "SystemEntry",

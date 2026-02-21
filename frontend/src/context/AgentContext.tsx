@@ -9,7 +9,13 @@ import {
 } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAgents } from "@/hooks/useAgents";
-import type { Agent, AgentEvent, HistoryEntry, StreamingDelta } from "@/types";
+import type {
+  Node,
+  AgentEvent,
+  HistoryEntry,
+  StreamingDelta,
+  StewardMessage,
+} from "@/types";
 
 export interface WindowState {
   x: number;
@@ -26,7 +32,7 @@ export interface ActiveMessage {
 }
 
 interface AgentContextValue {
-  agents: Map<string, Agent>;
+  agents: Map<string, Node>;
   events: AgentEvent[];
   connected: boolean;
   selectedAgentId: string | null;
@@ -46,6 +52,9 @@ interface AgentContextValue {
   activeToolCalls: Map<string, string>;
   eventPanelVisible: boolean;
   toggleEventPanel: () => void;
+  stewardMessages: StewardMessage[];
+  currentPage: string;
+  setCurrentPage: (page: string) => void;
 }
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -74,6 +83,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     () => new Map(),
   );
   const [eventPanelVisible, setEventPanelVisible] = useState(false);
+  const [stewardMessages, setStewardMessages] = useState<StewardMessage[]>([]);
+  const [currentPage, setCurrentPage] = useState("graph");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -101,8 +112,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     (event: AgentEvent) => {
       handleUpdateEvent(event);
 
-      if (event.type === "agent_message") {
-        const fromId = event.data.from_id as string | undefined;
+      if (event.type === "node_message") {
+        const fromId = event.agent_id;
         const toId = event.data.to_id as string | undefined;
         if (fromId && toId) {
           const msgId = `msg-${Date.now()}-${Math.random()}`;
@@ -140,6 +151,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           toolTimers.current.delete(agentId);
         }, TOOL_CALL_ANIMATION_MS);
         toolTimers.current.set(agentId, timer);
+      }
+
+      if (event.type === "steward_content") {
+        const content = event.data.content as string;
+        setStewardMessages((prev) => [
+          ...prev,
+          { content, timestamp: Date.now(), from: "steward" },
+        ]);
       }
 
       if (event.type === "history_entry_delta") {
@@ -317,6 +336,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       activeToolCalls,
       eventPanelVisible,
       toggleEventPanel,
+      stewardMessages,
+      currentPage,
+      setCurrentPage,
     }),
     [
       agents,
@@ -338,6 +360,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       activeToolCalls,
       eventPanelVisible,
       toggleEventPanel,
+      stewardMessages,
+      currentPage,
+      setCurrentPage,
     ],
   );
 

@@ -91,7 +91,7 @@ class TodoTool(Tool):
     def _emit_todo_event(agent: Agent) -> None:
         event_bus.emit(
             Event(
-                type=EventType.AGENT_STATE_CHANGED,
+                type=EventType.NODE_STATE_CHANGED,
                 agent_id=agent.uuid,
                 data={
                     "old_state": agent.state.value,

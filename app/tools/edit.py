@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import VIRTUAL_ROOT, resolve_path
+from app.sandbox import is_path_writable
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -21,18 +23,19 @@ class EditTool(Tool):
         "new_content replaces those lines exactly as given (include a trailing newline if needed). "
         "To insert without removing, set start_line and end_line to the same line number and "
         "provide new_content that includes that original line plus the inserted lines. "
-        "To delete lines, set new_content to an empty string."
+        "To delete lines, set new_content to an empty string. "
+        "If the file does not exist it will be created."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "path": {
                 "type": "string",
-                "description": f"Relative path within the repository or absolute path starting with {VIRTUAL_ROOT}",
+                "description": "Absolute path to the file to edit or create",
             },
             "start_line": {
                 "type": "integer",
-                "description": "First line to replace (1-indexed, inclusive).",
+                "description": "First line to replace (1-indexed, inclusive). Use 1 for a new file.",
             },
             "end_line": {
                 "type": "integer",
@@ -47,13 +50,12 @@ class EditTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        try:
-            real_path = resolve_path(agent, args["path"])
-        except PermissionError as e:
-            return json.dumps({"error": str(e)})
+        path_str = args["path"]
+        real_path = Path(path_str)
 
-        if not real_path.is_file():
-            return json.dumps({"error": f"File not found: {args['path']}"})
+        write_dirs = agent.config.write_dirs
+        if write_dirs and not is_path_writable(real_path, write_dirs):
+            return json.dumps({"error": f"Path not in write_dirs: {path_str}"})
 
         try:
             start_line = int(args["start_line"])
@@ -64,6 +66,10 @@ class EditTool(Tool):
                 return json.dumps({"error": "start_line must be >= 1"})
             if end_line < start_line:
                 return json.dumps({"error": "end_line must be >= start_line"})
+
+            if not real_path.exists():
+                os.makedirs(real_path.parent, exist_ok=True)
+                real_path.write_text("", encoding="utf-8")
 
             with open(real_path, encoding="utf-8") as f:
                 lines = f.readlines()
@@ -91,7 +97,7 @@ class EditTool(Tool):
 
             logger.debug(
                 "Edited file: {} (lines {}-{} replaced with {} lines)",
-                args["path"],
+                path_str,
                 start_line,
                 end_line,
                 len(replacement),
@@ -99,7 +105,7 @@ class EditTool(Tool):
             return json.dumps(
                 {
                     "status": "edited",
-                    "path": args["path"],
+                    "path": path_str,
                     "replaced_lines": f"{start_line}-{end_line}",
                     "new_line_count": len(new_lines),
                 }

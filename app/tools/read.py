@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import VIRTUAL_ROOT, resolve_path
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ class ReadTool(Tool):
         "properties": {
             "path": {
                 "type": "string",
-                "description": f"Relative path within the repository or absolute path starting with {VIRTUAL_ROOT}",
+                "description": "Absolute path to the file or directory to read",
             },
             "start_line": {
                 "type": "integer",
@@ -40,10 +40,8 @@ class ReadTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        try:
-            real_path = resolve_path(agent, args["path"])
-        except PermissionError as e:
-            return json.dumps({"error": str(e)})
+        path_str = args["path"]
+        real_path = Path(path_str)
 
         if real_path.is_dir():
             try:
@@ -54,9 +52,9 @@ class ReadTool(Tool):
                     size = full.stat().st_size if kind == "file" else None
                     entries.append({"name": entry, "type": kind, "size": size})
                 logger.debug(
-                    "Listed directory: {} ({} entries)", args["path"], len(entries)
+                    "Listed directory: {} ({} entries)", path_str, len(entries)
                 )
-                return json.dumps({"path": args["path"], "entries": entries})
+                return json.dumps({"path": path_str, "entries": entries})
             except Exception as e:
                 return json.dumps({"error": str(e)})
 
@@ -77,14 +75,14 @@ class ReadTool(Tool):
 
                 logger.debug(
                     "Read file: {} (lines {}-{} of {})",
-                    args["path"],
+                    path_str,
                     start,
                     end,
                     total_lines,
                 )
                 return json.dumps(
                     {
-                        "path": args["path"],
+                        "path": path_str,
                         "total_lines": total_lines,
                         "start_line": start,
                         "end_line": end,
@@ -94,4 +92,4 @@ class ReadTool(Tool):
             except Exception as e:
                 return json.dumps({"error": str(e)})
 
-        return json.dumps({"error": f"Not found: {args['path']}"})
+        return json.dumps({"error": f"Not found: {path_str}"})

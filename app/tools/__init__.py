@@ -39,43 +39,39 @@ class ToolRegistry:
         return self._tools.get(name)
 
     def get_tools_for_agent(self, agent: Agent) -> list[Tool]:
-        tools = list(self._tools.values())
-        if not agent.config.network_access:
-            tools = [t for t in tools if t.name != "fetch"]
-        return tools
+        allowed = set(agent.config.tools)
+        if not allowed:
+            return list(self._tools.values())
+        return [t for t in self._tools.values() if t.name in allowed]
 
     def get_tools_schema(self, agent: Agent) -> list[dict[str, Any]]:
         return [t.to_schema() for t in self.get_tools_for_agent(agent)]
 
 
 def build_tool_registry() -> ToolRegistry:
-    from app.tools.agents import ListAgentsTool
-    from app.tools.delete import DeleteTool
+    from app.tools.connect import ConnectTool
     from app.tools.edit import EditTool
     from app.tools.exec import ExecTool
     from app.tools.exit import ExitTool
     from app.tools.fetch import FetchTool
     from app.tools.idle import IdleTool
-    from app.tools.merge import MergeTool
+    from app.tools.list_connections import ListConnectionsTool
     from app.tools.read import ReadTool
     from app.tools.send import SendTool
     from app.tools.spawn import SpawnTool
     from app.tools.todo import TodoTool
-    from app.tools.write import WriteTool
 
     reg = ToolRegistry()
     for tool_cls in [
         SpawnTool,
         SendTool,
+        ConnectTool,
+        ListConnectionsTool,
         ReadTool,
-        WriteTool,
         EditTool,
-        DeleteTool,
         ExecTool,
         FetchTool,
-        MergeTool,
         TodoTool,
-        ListAgentsTool,
         IdleTool,
         ExitTool,
     ]:

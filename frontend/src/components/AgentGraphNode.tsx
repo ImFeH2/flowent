@@ -1,10 +1,15 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
-import { roleIcon, stateColor, stateBorder } from "@/lib/constants";
-import type { AgentState, Role } from "@/types";
+import {
+  nodeTypeIcon,
+  stateColor,
+  stateBorder,
+  nodeTypeBorder,
+} from "@/lib/constants";
+import type { AgentState, NodeType } from "@/types";
 
 interface AgentNodeData {
-  role: Role;
+  node_type: NodeType;
   state: AgentState;
   shortId: string;
   name: string | null;
@@ -14,19 +19,23 @@ interface AgentNodeData {
 }
 
 export function AgentGraphNode({ data }: NodeProps) {
-  const { role, state, shortId, name, selected, toolCall } =
+  const { node_type, state, shortId, name, selected, toolCall } =
     data as unknown as AgentNodeData;
-  const Icon = roleIcon[role];
+  const Icon = nodeTypeIcon[node_type];
 
   const isToolActive = !!toolCall;
+
+  const baseBorder = isToolActive
+    ? "border-amber-400/70 tool-call-pulse"
+    : node_type === "steward" || node_type === "conductor"
+      ? nodeTypeBorder[node_type]
+      : stateBorder[state];
 
   return (
     <div
       className={cn(
         "relative flex items-center gap-2 rounded-lg border bg-zinc-900 px-3 py-2 transition-colors",
-        isToolActive
-          ? "border-amber-400/70 tool-call-pulse"
-          : stateBorder[state],
+        baseBorder,
         selected
           ? "ring-2 ring-blue-500 border-blue-500/60"
           : !isToolActive && "hover:border-zinc-600",
@@ -38,10 +47,19 @@ export function AgentGraphNode({ data }: NodeProps) {
         position={Position.Top}
         className="!bg-zinc-600 !w-2 !h-2 !border-0"
       />
-      <Icon className="size-4 shrink-0 text-zinc-400" />
+      <Icon
+        className={cn(
+          "size-4 shrink-0",
+          node_type === "steward"
+            ? "text-amber-400"
+            : node_type === "conductor"
+              ? "text-purple-400"
+              : "text-zinc-400",
+        )}
+      />
       <div className="flex flex-col min-w-0">
         <span className="text-xs font-medium text-zinc-200 truncate">
-          {name ?? <span className="capitalize">{role}</span>}
+          {name ?? <span className="capitalize">{node_type}</span>}
         </span>
         <span className="text-[10px] text-zinc-500 font-mono">{shortId}</span>
       </div>

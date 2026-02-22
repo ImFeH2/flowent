@@ -1,10 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Zap, Sparkles, ChevronRight } from "lucide-react";
+import { X, Zap, Sparkles, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { fetchSettings, saveSettings } from "@/lib/api";
+import {
+  fetchSettings,
+  saveSettings,
+  fetchProviders,
+  fetchProviderModels,
+  type ModelOption,
+} from "@/lib/api";
+import type { Provider } from "@/types";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -42,8 +49,19 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<SettingTab>("general");
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(false);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
   const mouseDownTargetRef = useRef<EventTarget | null>(null);
   const mouseUpTargetRef = useRef<EventTarget | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      fetchProviders()
+        .then(setProviders)
+        .catch(() => toast.error("Failed to load providers"));
+    }
+  }, [open]);
 
   useEffect(() => {
     if (open && !settings) {
@@ -52,6 +70,25 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         .catch(() => toast.error("Failed to load settings"));
     }
   }, [open, settings]);
+
+  useEffect(() => {
+    if (settings?.model.active_provider_id) {
+      handleFetchModels(settings.model.active_provider_id);
+    }
+  }, [settings?.model.active_provider_id]);
+
+  const handleFetchModels = async (providerId: string) => {
+    if (!providerId) return;
+    setLoadingModels(true);
+    try {
+      const fetchedModels = await fetchProviderModels(providerId);
+      setModels(fetchedModels);
+    } catch {
+      toast.error("Failed to fetch models");
+    } finally {
+      setLoadingModels(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!settings) return;
@@ -193,9 +230,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   </p>
                   <div>
                     <label className="text-xs text-zinc-400 mb-1 block">
-                      Active Provider ID
+                      Active Provider
                     </label>
-                    <input
+                    <select
                       value={settings.model.active_provider_id}
                       onChange={(e) =>
                         setSettings({
@@ -203,31 +240,82 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                           model: {
                             ...settings.model,
                             active_provider_id: e.target.value,
+                            active_model: "",
                           },
                         })
                       }
-                      className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-zinc-500"
-                      placeholder="Provider UUID"
-                    />
+                      className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500"
+                    >
+                      <option value="">Select a provider</option>
+                      {providers.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.type})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="text-xs text-zinc-400 mb-1 block">
-                      Active Model
-                    </label>
-                    <input
-                      value={settings.model.active_model}
-                      onChange={(e) =>
-                        setSettings({
-                          ...settings,
-                          model: {
-                            ...settings.model,
-                            active_model: e.target.value,
-                          },
-                        })
-                      }
-                      className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-zinc-500"
-                      placeholder="model-id"
-                    />
+                    <div className="flex items-center gap-2 mb-1">
+                      <label className="text-xs text-zinc-400">
+                        Active Model
+                      </label>
+                      {settings.model.active_provider_id && (
+                        <button
+                          onClick={() =>
+                            handleFetchModels(settings.model.active_provider_id)
+                          }
+                          disabled={loadingModels}
+                          className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                          title="Refresh models"
+                        >
+                          <RefreshCw
+                            className={cn(
+                              "size-3",
+                              loadingModels && "animate-spin",
+                            )}
+                          />
+                        </button>
+                      )}
+                    </div>
+                    {models.length > 0 ? (
+                      <select
+                        value={settings.model.active_model}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            model: {
+                              ...settings.model,
+                              active_model: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500"
+                      >
+                        <option value="">Select a model</option>
+                        {models.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.id}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={settings.model.active_model}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            model: {
+                              ...settings.model,
+                              active_model: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm text-zinc-200 font-mono focus:outline-none focus:border-zinc-500"
+                        placeholder={
+                          loadingModels ? "Loading models..." : "model-id"
+                        }
+                      />
+                    )}
                   </div>
                 </div>
               )}

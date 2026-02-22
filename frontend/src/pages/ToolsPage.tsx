@@ -1,56 +1,23 @@
-const TOOLS = [
-  {
-    name: "spawn",
-    description:
-      "Create a new agent node with a specific role. Establishes a bidirectional connection.",
-  },
-  {
-    name: "send",
-    description: "Send a message to a connected node by UUID.",
-  },
-  {
-    name: "connect",
-    description:
-      "Establish a bidirectional connection between two nodes. Caller must be connected to at least one.",
-  },
-  {
-    name: "list_connections",
-    description: "List all nodes connected to the current node.",
-  },
-  {
-    name: "read",
-    description:
-      "Read a file with line numbers, or list a directory. Supports start_line/end_line range.",
-  },
-  {
-    name: "edit",
-    description:
-      "Replace a range of lines in a file with new content. Creates file if it does not exist.",
-  },
-  {
-    name: "exec",
-    description: "Execute a shell command in a sandboxed firejail environment.",
-  },
-  {
-    name: "fetch",
-    description: "Make an HTTP request to a URL and return the response body.",
-  },
-  {
-    name: "todo",
-    description: "Manage a task checklist. Actions: add, update, remove, list.",
-  },
-  {
-    name: "idle",
-    description:
-      "Enter idle state. Suspends execution until a new message arrives.",
-  },
-  {
-    name: "exit",
-    description: "Terminate this agent after completing all work.",
-  },
-];
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+
+interface ToolInfo {
+  name: string;
+  description: string;
+}
 
 export function ToolsPage() {
+  const [tools, setTools] = useState<ToolInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/tools")
+      .then((res) => res.json())
+      .then((data) => setTools(data.tools ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-zinc-950 p-6">
       <div className="mb-6">
@@ -61,19 +28,30 @@ export function ToolsPage() {
         </p>
       </div>
 
-      <div className="space-y-2">
-        {TOOLS.map((tool) => (
-          <div
-            key={tool.name}
-            className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3"
-          >
-            <code className="text-xs font-mono text-amber-400 bg-amber-400/10 px-2 py-1 rounded border border-amber-400/20 shrink-0">
-              {tool.name}
-            </code>
-            <p className="text-sm text-zinc-400">{tool.description}</p>
-          </div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="size-5 text-zinc-500 animate-spin" />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {tools.length === 0 && (
+            <p className="text-sm text-zinc-500 text-center py-8">
+              No tools registered.
+            </p>
+          )}
+          {tools.map((tool) => (
+            <div
+              key={tool.name}
+              className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3"
+            >
+              <code className="text-xs font-mono text-amber-400 bg-amber-400/10 px-2 py-1 rounded border border-amber-400/20 shrink-0">
+                {tool.name}
+              </code>
+              <p className="text-sm text-zinc-400">{tool.description}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -50,6 +50,7 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
     updateWindowPosition,
     updateWindowSize,
     selectAgent,
+    agents,
   } = useAgent();
   const { detail } = useAgentDetail(agentId);
   const [viewMode, setViewMode] = useState<"chat" | "history">("chat");
@@ -290,13 +291,26 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
                     {detail.connections.length > 0 && (
                       <DetailField label="Connections">
                         <div className="space-y-0.5">
-                          {detail.connections.map((id) => (
-                            <div key={id} className="text-[11px] text-zinc-400">
-                              <span className="font-mono text-zinc-500">
-                                {id.slice(0, 8)}
-                              </span>
-                            </div>
-                          ))}
+                          {detail.connections.map((id) => {
+                            const connNode = agents.get(id);
+                            const label =
+                              connNode?.name ??
+                              connNode?.node_type ??
+                              id.slice(0, 8);
+                            return (
+                              <div
+                                key={id}
+                                className="flex items-center gap-1.5 text-[11px] text-zinc-400"
+                              >
+                                <span className="text-zinc-300 truncate">
+                                  {label}
+                                </span>
+                                <span className="font-mono text-zinc-600 text-[10px]">
+                                  {id.slice(0, 8)}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </DetailField>
                     )}

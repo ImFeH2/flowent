@@ -5,6 +5,7 @@ import threading
 import time as _time
 import traceback
 import uuid as _uuid
+from functools import lru_cache
 from queue import Empty, Queue
 from typing import Any
 
@@ -33,9 +34,13 @@ from app.models import (
 )
 from app.prompts import get_system_prompt
 from app.providers.gateway import gateway
-from app.tools import build_tool_registry
 
-_tool_registry = build_tool_registry()
+
+@lru_cache(maxsize=1)
+def _get_tool_registry() -> Any:
+    from app.tools import build_tool_registry
+
+    return build_tool_registry()
 
 
 class Agent:
@@ -135,7 +140,7 @@ class Agent:
                 self._drain_messages()
                 self._inject_system_context()
 
-                tools_schema = _tool_registry.get_tools_schema(self)
+                tools_schema = _get_tool_registry().get_tools_schema(self)
                 messages = self._build_messages()
 
                 self._log.debug(
@@ -385,7 +390,7 @@ class Agent:
             json.dumps(arguments, ensure_ascii=False)[:200],
         )
 
-        tool = _tool_registry.get(name)
+        tool = _get_tool_registry().get(name)
         if tool is None:
             self._log.warning("Unknown tool: {}", name)
             error_msg = json.dumps({"error": f"Unknown tool: {name}"})

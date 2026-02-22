@@ -34,9 +34,9 @@ export function AgentGraphNode({ data }: NodeProps) {
       : stateBorder[state];
 
   const nodeColors = {
-    steward: "from-indigo-500/20 to-violet-500/10",
-    conductor: "from-violet-500/20 to-purple-500/10",
-    agent: "from-slate-500/10 to-slate-600/5",
+    steward: "from-cyan-500/18 to-slate-900/70",
+    conductor: "from-sky-500/16 to-slate-900/70",
+    agent: "from-slate-500/10 to-slate-900/65",
   };
 
   return (
@@ -45,14 +45,14 @@ export function AgentGraphNode({ data }: NodeProps) {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.175, 0.885, 0.32, 1.275] }}
       className={cn(
-        "relative flex min-w-[200px] items-center gap-3 rounded-xl border-2 px-4 py-3",
-        "bg-gradient-to-br shadow-2xl",
+        "relative flex min-w-[210px] items-center gap-3 rounded-xl border-2 px-4 py-3",
+        "bg-gradient-to-br shadow-[0_16px_45px_rgba(0,0,0,0.45)]",
         nodeColors[node_type],
         baseBorder,
         selected
-          ? "border-primary shadow-[0_0_30px_-5px_rgba(99,102,241,0.5)]"
-          : "border-border/60 hover:border-border",
-        isRunning && "shadow-[0_0_20px_-5px_rgba(34,197,94,0.3)]",
+          ? "border-primary shadow-[0_0_30px_-5px_rgba(56,189,248,0.42)]"
+          : "border-white/25 hover:border-white/45",
+        isRunning && "shadow-[0_0_20px_-5px_rgba(52,211,153,0.32)]",
         state === "terminated" && "opacity-40 grayscale",
       )}
     >
@@ -67,10 +67,10 @@ export function AgentGraphNode({ data }: NodeProps) {
           "flex size-10 shrink-0 items-center justify-center rounded-lg",
           "bg-gradient-to-br shadow-inner",
           node_type === "steward"
-            ? "from-indigo-500/30 to-indigo-600/20 text-indigo-300"
+            ? "from-cyan-500/30 to-cyan-700/15 text-cyan-200"
             : node_type === "conductor"
-              ? "from-violet-500/30 to-violet-600/20 text-violet-300"
-              : "from-slate-500/20 to-slate-600/10 text-slate-400",
+              ? "from-sky-500/30 to-sky-700/15 text-sky-200"
+              : "from-slate-500/20 to-slate-700/10 text-slate-300",
         )}
       >
         <Icon className="size-5" />
@@ -110,7 +110,7 @@ export function AgentGraphNode({ data }: NodeProps) {
           animate={{ opacity: 1, y: 0 }}
           className="absolute -bottom-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap"
         >
-          <span className="rounded-md border border-amber-500/30 bg-amber-950/80 px-2 py-1 text-[10px] font-mono text-amber-300 shadow-lg backdrop-blur-sm">
+          <span className="rounded-md border border-amber-500/35 bg-black/80 px-2 py-1 text-[10px] font-mono text-amber-300 shadow-lg backdrop-blur-sm">
             ⚡ {toolCall}
           </span>
         </motion.div>

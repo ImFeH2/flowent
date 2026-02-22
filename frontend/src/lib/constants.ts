@@ -36,7 +36,7 @@ export const stateBorder: Record<AgentState, string> = {
 };
 
 export const nodeTypeBorder: Record<NodeType, string> = {
-  steward: "border-indigo-300/80",
-  conductor: "border-violet-300/80",
+  steward: "border-cyan-300/80",
+  conductor: "border-sky-300/80",
   agent: "border-slate-300/80",
 };

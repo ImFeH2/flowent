@@ -1,4 +1,11 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bot,
@@ -21,7 +28,7 @@ import { stateBadgeColor } from "@/lib/constants";
 
 export function HomePage() {
   const { agents, connected, selectedAgentId, selectAgent } = useAgent();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
 
   const metrics = useMemo(() => {
     const states = Array.from(agents.values()).reduce(
@@ -39,73 +46,91 @@ export function HomePage() {
   }, [agents]);
 
   const selectedAgent = selectedAgentId ? agents.get(selectedAgentId) : null;
+  const panelVisible = panelOpen || !!selectedAgent;
+
+  const togglePanel = () => {
+    if (panelVisible) {
+      if (selectedAgentId) {
+        selectAgent(null);
+      }
+      setPanelOpen(false);
+      return;
+    }
+    setPanelOpen(true);
+  };
 
   return (
-    <div className="relative flex h-full">
-      <div className="relative flex-1">
-        <div className="absolute inset-0 overflow-hidden rounded-l-2xl bg-slate-950">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(99,102,241,0.12),transparent_50%),radial-gradient(ellipse_at_bottom_left,rgba(56,189,248,0.08),transparent_50%)]" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(15,23,42,0.5),transparent_70%)]" />
-          <AgentTree />
+    <div className="relative h-full overflow-hidden rounded-[1.65rem]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(71,85,105,0.35),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(8,47,73,0.35),transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,6,23,0.2),rgba(2,6,23,0.78))]" />
 
-          <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-wrap items-center gap-2">
-            <BadgeChip>
-              <Radio
-                className={cn(
-                  "size-3",
-                  connected ? "text-emerald-400" : "text-amber-400",
-                )}
-              />
-              {connected ? "Live" : "Reconnecting"}
-            </BadgeChip>
-            <BadgeChip>
-              <Sparkles className="size-3 text-primary" />
-              {metrics.total} nodes
-            </BadgeChip>
-            <BadgeChip>{metrics.running} running</BadgeChip>
-            <BadgeChip>{metrics.idle} idle</BadgeChip>
-          </div>
-
-          <AnimatePresence>
-            {!sidebarCollapsed && (
-              <motion.button
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                onClick={() => setSidebarCollapsed(true)}
-                className="absolute right-4 top-4 z-20 flex size-8 items-center justify-center rounded-lg border border-border/50 bg-card/80 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-accent"
-              >
-                <PanelRightClose className="size-4" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-          <AnimatePresence>
-            {sidebarCollapsed && (
-              <motion.button
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                onClick={() => setSidebarCollapsed(false)}
-                className="absolute right-4 top-4 z-20 flex size-8 items-center justify-center rounded-lg border border-border/50 bg-card/80 text-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-accent"
-              >
-                <PanelRightOpen className="size-4" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
+      <div className="absolute inset-0">
+        <AgentTree />
       </div>
 
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-5 pb-6 pt-5 sm:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-black/55 px-5 py-4 text-center shadow-[0_25px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-primary/80">
+            Workspace
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Autonomous Agent Command Room
+          </h2>
+          <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
+            Keep the graph in focus, inspect node details on demand, and
+            coordinate with Steward without leaving the canvas.
+          </p>
+        </motion.div>
+      </div>
+
+      <div className="absolute left-4 top-4 z-30 flex max-w-[70%] flex-wrap items-center gap-2 sm:left-16">
+        <BadgeChip>
+          <Radio
+            className={cn(
+              "size-3",
+              connected ? "text-emerald-400" : "text-amber-400",
+            )}
+          />
+          {connected ? "Live" : "Reconnecting"}
+        </BadgeChip>
+        <BadgeChip>
+          <Sparkles className="size-3 text-primary" />
+          {metrics.total} nodes
+        </BadgeChip>
+        <BadgeChip>{metrics.running} running</BadgeChip>
+        <BadgeChip>{metrics.idle} idle</BadgeChip>
+      </div>
+
+      <motion.button
+        initial={{ opacity: 0, x: 16 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3, delay: 0.15 }}
+        onClick={togglePanel}
+        className="absolute right-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-black/70 text-muted-foreground shadow-[0_10px_30px_rgba(0,0,0,0.55)] backdrop-blur-lg transition-colors hover:text-foreground"
+        title={panelVisible ? "Hide panel" : "Show panel"}
+      >
+        {panelVisible ? (
+          <PanelRightClose className="size-4" />
+        ) : (
+          <PanelRightOpen className="size-4" />
+        )}
+      </motion.button>
+
       <AnimatePresence>
-        {!sidebarCollapsed && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 380, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 35 }}
-            className="relative flex flex-col border-l border-border/60 bg-card/50"
+        {panelVisible && (
+          <motion.aside
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 30 }}
+            transition={{ type: "spring", stiffness: 320, damping: 30 }}
+            className="absolute bottom-4 right-4 top-16 z-30 w-[min(92vw,420px)] rounded-2xl border border-white/10 bg-black/70 shadow-[0_30px_120px_rgba(0,0,0,0.65)] backdrop-blur-xl"
           >
-            <div className="flex h-full w-[380px] flex-col">
+            <div className="flex h-full flex-col overflow-hidden rounded-2xl">
               {selectedAgent ? (
                 <AgentDetailPanel
                   agent={selectedAgent}
@@ -115,16 +140,16 @@ export function HomePage() {
                 <StewardChatPanel />
               )}
             </div>
-          </motion.div>
+          </motion.aside>
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-function BadgeChip({ children }: { children: React.ReactNode }) {
+function BadgeChip({ children }: { children: ReactNode }) {
   return (
-    <div className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border/50 bg-card/80 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-lg backdrop-blur-sm">
+    <div className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/60 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-[0_10px_30px_rgba(0,0,0,0.45)] backdrop-blur-lg">
       {children}
     </div>
   );
@@ -144,9 +169,9 @@ function AgentDetailPanel({
 }) {
   return (
     <>
-      <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
             {agent.node_type === "steward" ? (
               <Shield className="size-4 text-primary" />
             ) : agent.node_type === "conductor" ? (
@@ -164,43 +189,51 @@ function AgentDetailPanel({
         </div>
         <button
           onClick={onClose}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
         >
           <X className="size-4" />
         </button>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        <div className="space-y-2">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="rounded-xl border border-white/10 bg-black/45 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Status
           </p>
-          <Badge variant="outline" className={stateBadgeColor[agent.state]}>
-            {agent.state}
-          </Badge>
+          <div className="mt-2">
+            <Badge variant="outline" className={stateBadgeColor[agent.state]}>
+              {agent.state}
+            </Badge>
+          </div>
         </div>
 
-        <div className="space-y-2">
+        <div className="rounded-xl border border-white/10 bg-black/45 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Connections
           </p>
-          <p className="text-sm">{agent.connections.length} connected nodes</p>
+          <p className="mt-2 text-sm text-foreground">
+            {agent.connections.length} connected nodes
+          </p>
         </div>
 
-        <div className="space-y-2">
+        <div className="rounded-xl border border-white/10 bg-black/45 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Todos
           </p>
-          <div className="space-y-1">
+          <div className="mt-2 space-y-2">
             {agent.todos.length === 0 ? (
               <p className="text-sm text-muted-foreground">No todos</p>
             ) : (
-              agent.todos.slice(0, 5).map((todo) => (
-                <div key={todo.id} className="flex items-center gap-2 text-sm">
+              agent.todos.slice(0, 6).map((todo) => (
+                <div
+                  key={todo.id}
+                  className="flex items-center gap-2 text-sm text-foreground"
+                >
                   <span
-                    className={`size-2 rounded-full ${
-                      todo.done ? "bg-emerald-500" : "bg-amber-500"
-                    }`}
+                    className={cn(
+                      "size-2 rounded-full",
+                      todo.done ? "bg-emerald-500" : "bg-amber-500",
+                    )}
                   />
                   <span
                     className={
@@ -245,7 +278,7 @@ function StewardChatPanel() {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -254,8 +287,8 @@ function StewardChatPanel() {
 
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-border/50 px-4 py-3">
-        <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+      <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+        <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
           <Shield className="size-4 text-primary" />
         </div>
         <div className="flex-1">
@@ -268,8 +301,8 @@ function StewardChatPanel() {
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {stewardMessages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-accent">
+          <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-white/15 bg-black/45 p-4 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-white/10">
               <MessageSquare className="size-5 text-primary" />
             </div>
             <div className="space-y-1">
@@ -290,13 +323,13 @@ function StewardChatPanel() {
             {msg.from === "steward" && (
               <div className="flex max-w-[85%] items-start gap-2">
                 <Shield className="mt-1 size-4 shrink-0 text-primary" />
-                <div className="rounded-xl border border-border/50 bg-card/80 px-3 py-2 text-sm">
+                <div className="rounded-xl border border-white/10 bg-black/55 px-3 py-2 text-sm text-foreground">
                   <MarkdownContent content={msg.content} />
                 </div>
               </div>
             )}
             {msg.from === "human" && (
-              <div className="max-w-[85%] rounded-xl bg-primary px-3 py-2 text-sm text-primary-foreground">
+              <div className="max-w-[85%] rounded-xl bg-primary px-3 py-2 text-sm text-primary-foreground shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
                 {msg.content}
               </div>
             )}
@@ -305,7 +338,7 @@ function StewardChatPanel() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-border/50 p-3">
+      <div className="border-t border-white/10 p-3">
         <div className="flex items-end gap-2">
           <textarea
             value={input}
@@ -313,7 +346,7 @@ function StewardChatPanel() {
             onKeyDown={handleKeyDown}
             placeholder="Message the Steward..."
             rows={1}
-            className="min-h-[40px] flex-1 resize-none rounded-lg border border-border/50 bg-card/50 px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            className="min-h-[40px] flex-1 resize-none rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
           <button
             onClick={sendMessage}

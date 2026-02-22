@@ -42,8 +42,8 @@ function AnimatedMessageEdge(props: EdgeProps) {
         path={edgePath}
         style={{
           stroke: hasActiveMessage
-            ? "rgba(99,102,241,0.8)"
-            : "rgba(148,163,184,0.25)",
+            ? "rgba(56,189,248,0.82)"
+            : "rgba(148,163,184,0.22)",
           strokeWidth: hasActiveMessage ? 2.5 : 1.5,
         }}
       />
@@ -66,7 +66,7 @@ function AnimatedMessageEdge(props: EdgeProps) {
               repeatCount="indefinite"
             />
           </path>
-          <circle r="3" fill="#818cf8" filter="url(#glow)">
+          <circle r="3" fill="#38bdf8" filter="url(#glow)">
             <animateMotion
               dur="0.5s"
               repeatCount="indefinite"
@@ -150,8 +150,8 @@ export function AgentTree() {
             data: { active: isActive },
             style: {
               stroke: isActive
-                ? "rgba(99,102,241,0.8)"
-                : "rgba(148,163,184,0.25)",
+                ? "rgba(56,189,248,0.82)"
+                : "rgba(148,163,184,0.22)",
               strokeWidth: isActive ? 2.5 : 1.5,
             },
             animated: false,
@@ -268,7 +268,7 @@ export function AgentTree() {
             className="flex h-full items-center justify-center"
           >
             <div className="space-y-3 text-center">
-              <Network className="mx-auto size-8 text-primary/50" />
+              <Network className="mx-auto size-8 text-primary/65" />
               <p className="text-sm text-muted-foreground">
                 Loading agent graph...
               </p>
@@ -298,16 +298,16 @@ export function AgentTree() {
             maxZoom={1.8}
             className="bg-transparent"
           >
-            <Background color="rgba(148,163,184,0.15)" gap={28} size={1} />
+            <Background color="rgba(148,163,184,0.13)" gap={30} size={1} />
             <MiniMap
               zoomable
               pannable
-              className="!rounded-xl !border !border-border/50 !bg-card/80 !shadow-lg"
+              className="!rounded-xl !border !border-white/10 !bg-black/60 !shadow-[0_15px_35px_rgba(0,0,0,0.45)]"
               maskColor="rgba(0,0,0,0.4)"
-              nodeColor="rgba(99,102,241,0.8)"
+              nodeColor="rgba(56,189,248,0.82)"
             />
             <Controls
-              className="!overflow-hidden !rounded-xl !border !border-border/50 !bg-card/80 !shadow-lg"
+              className="!overflow-hidden !rounded-xl !border !border-white/10 !bg-black/60 !shadow-[0_15px_35px_rgba(0,0,0,0.45)]"
               showInteractive={false}
             />
             <svg>
@@ -319,9 +319,9 @@ export function AgentTree() {
                   x2="1"
                   y2="0"
                 >
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.2" />
-                  <stop offset="50%" stopColor="#818cf8" stopOpacity="1" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+                  <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.2" />
+                  <stop offset="50%" stopColor="#38bdf8" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.2" />
                 </linearGradient>
                 <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="3" result="blur" />
@@ -343,7 +343,7 @@ export function AgentTree() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 2, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="pointer-events-none fixed z-[100] rounded-xl border border-border/50 bg-card/90 px-3 py-2 shadow-xl backdrop-blur-md"
+            className="pointer-events-none fixed z-[100] rounded-xl border border-white/10 bg-black/85 px-3 py-2 shadow-xl backdrop-blur-md"
             style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
           >
             <div className="flex items-center gap-2">

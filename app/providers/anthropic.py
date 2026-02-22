@@ -12,6 +12,7 @@ from loguru import logger
 from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
+from app.providers.sse import iter_sse_json
 
 
 class AnthropicProvider(LLMProvider):
@@ -205,18 +206,7 @@ class AnthropicProvider(LLMProvider):
                     f"Response: {body}",
                 )
 
-            for line in response.iter_lines():
-                if not line or line.startswith(":"):
-                    continue
-                if not line.startswith("data: "):
-                    continue
-                data_str = line[6:]
-
-                try:
-                    event = json.loads(data_str)
-                except json.JSONDecodeError:
-                    continue
-
+            for event in iter_sse_json(response):
                 event_count += 1
                 event_type = event.get("type", "")
 

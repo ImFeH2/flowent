@@ -41,7 +41,7 @@ function AnimatedMessageEdge(props: EdgeProps) {
         path={edgePath}
         style={{
           stroke: hasActiveMessage
-            ? "rgba(129,161,255,0.62)"
+            ? "rgba(214,220,229,0.52)"
             : "rgba(148,163,184,0.18)",
           strokeWidth: hasActiveMessage ? 2.2 : 1.2,
         }}
@@ -65,7 +65,7 @@ function AnimatedMessageEdge(props: EdgeProps) {
               repeatCount="indefinite"
             />
           </path>
-          <circle r="2.6" fill="#8ba2ff">
+          <circle r="2.6" fill="#d4dae4">
             <animateMotion
               dur="0.5s"
               repeatCount="indefinite"
@@ -149,7 +149,7 @@ export function AgentGraph() {
             data: { active: isActive },
             style: {
               stroke: isActive
-                ? "rgba(129,161,255,0.62)"
+                ? "rgba(214,220,229,0.52)"
                 : "rgba(148,163,184,0.18)",
               strokeWidth: isActive ? 2.2 : 1.2,
             },
@@ -301,9 +301,9 @@ export function AgentGraph() {
             <MiniMap
               zoomable
               pannable
-              className="!rounded-md !border !border-white/10 !bg-[#101520] !shadow-[0_10px_24px_rgba(0,0,0,0.4)]"
-              maskColor="rgba(8,10,16,0.68)"
-              nodeColor="rgba(129,161,255,0.7)"
+              className="!rounded-md !border !border-white/10 !bg-[#101114] !shadow-[0_10px_24px_rgba(0,0,0,0.4)]"
+              maskColor="rgba(8,8,10,0.72)"
+              nodeColor="rgba(196,202,212,0.75)"
             />
             <svg aria-hidden="true" focusable="false">
               <defs>
@@ -314,9 +314,9 @@ export function AgentGraph() {
                   x2="1"
                   y2="0"
                 >
-                  <stop offset="0%" stopColor="#6a7de8" stopOpacity="0.18" />
-                  <stop offset="50%" stopColor="#8ba2ff" stopOpacity="0.95" />
-                  <stop offset="100%" stopColor="#6a7de8" stopOpacity="0.18" />
+                  <stop offset="0%" stopColor="#8f96a3" stopOpacity="0.2" />
+                  <stop offset="50%" stopColor="#d4dae4" stopOpacity="0.94" />
+                  <stop offset="100%" stopColor="#8f96a3" stopOpacity="0.2" />
                 </linearGradient>
               </defs>
             </svg>
@@ -331,7 +331,7 @@ export function AgentGraph() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 2, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="pointer-events-none fixed z-[100] rounded-md border border-white/10 bg-[#121722]/95 px-3 py-2 shadow-xl backdrop-blur-sm"
+            className="pointer-events-none fixed z-[100] rounded-md border border-white/10 bg-[#121316]/95 px-3 py-2 shadow-xl backdrop-blur-sm"
             style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
           >
             <div className="flex items-center gap-2">

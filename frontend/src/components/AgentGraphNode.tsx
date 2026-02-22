@@ -34,9 +34,9 @@ export function AgentGraphNode({ data }: NodeProps) {
       : stateBorder[state];
 
   const nodeColors = {
-    steward: "bg-[#151b28]",
-    conductor: "bg-[#161c2a]",
-    agent: "bg-[#131923]",
+    steward: "bg-[#151619]",
+    conductor: "bg-[#161719]",
+    agent: "bg-[#131417]",
   };
 
   return (
@@ -50,7 +50,7 @@ export function AgentGraphNode({ data }: NodeProps) {
         nodeColors[node_type],
         baseBorder,
         selected
-          ? "border-primary/80 shadow-[0_0_0_1px_rgba(139,162,255,0.32)]"
+          ? "border-primary/80 shadow-[0_0_0_1px_rgba(212,199,166,0.28)]"
           : "border-white/18 hover:border-white/30",
         isRunning && "shadow-[0_12px_28px_rgba(16,185,129,0.12)]",
         state === "terminated" && "opacity-40 grayscale",
@@ -66,10 +66,10 @@ export function AgentGraphNode({ data }: NodeProps) {
         className={cn(
           "flex size-9 shrink-0 items-center justify-center rounded-sm border border-white/10",
           node_type === "steward"
-            ? "bg-[#1a2334] text-[#9cb0ff]"
+            ? "bg-[#1e2024] text-[#cfd3db]"
             : node_type === "conductor"
-              ? "bg-[#1a2232] text-[#a7bcff]"
-              : "bg-[#1a202d] text-slate-300",
+              ? "bg-[#1f2124] text-[#d5dae2]"
+              : "bg-[#1a1c20] text-slate-300",
         )}
       >
         <Icon className="size-5" />

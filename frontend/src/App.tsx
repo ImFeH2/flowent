@@ -36,8 +36,8 @@ function AppContent() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(30,64,175,0.08),transparent_52%),radial-gradient(ellipse_at_bottom_right,rgba(15,23,42,0.35),transparent_58%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(9,10,16,0.18),rgba(5,6,10,0.92))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(120,120,130,0.08),transparent_52%),radial-gradient(ellipse_at_bottom_right,rgba(18,18,22,0.38),transparent_58%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(10,10,12,0.22),rgba(6,6,8,0.94))]" />
 
       {!isWorkspace && <Sidebar />}
 

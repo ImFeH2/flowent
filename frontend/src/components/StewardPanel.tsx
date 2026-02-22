@@ -16,10 +16,12 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const isFloating = variant === "floating";
   const isDocked = variant === "docked";
+  const messageCount = stewardMessages.length;
 
   useEffect(() => {
+    if (messageCount < 0) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [stewardMessages]);
+  }, [messageCount]);
 
   const sendMessage = async () => {
     const content = input.trim();
@@ -60,13 +62,13 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
           "flex items-center gap-2 border-b px-4 py-3",
           isFloating
             ? "border-white/15"
-            : "border-slate-200/80 bg-gradient-to-r from-white/80 to-sky-50/60",
+            : "border-slate-200/80 bg-gradient-to-r from-white/80 to-zinc-50/70",
         )}
       >
         <Shield
           className={cn(
             "size-4",
-            isFloating ? "text-amber-300" : "text-indigo-600",
+            isFloating ? "text-amber-300" : "text-zinc-600",
           )}
         />
         <span
@@ -98,7 +100,7 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
               <Sparkles
                 className={cn(
                   "mx-auto size-5",
-                  isFloating ? "text-sky-300" : "text-sky-500",
+                  isFloating ? "text-zinc-300" : "text-zinc-500",
                 )}
               />
               <p
@@ -123,7 +125,7 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
                 <Shield
                   className={cn(
                     "mt-1 size-4 shrink-0",
-                    isFloating ? "text-amber-300" : "text-indigo-500",
+                    isFloating ? "text-amber-300" : "text-zinc-500",
                   )}
                 />
                 <div
@@ -143,8 +145,8 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
                 className={cn(
                   "max-w-[80%] rounded-2xl border px-3 py-2 text-sm",
                   isFloating
-                    ? "border-sky-300/35 bg-sky-400/20 text-sky-100"
-                    : "border-sky-200 bg-sky-50 text-sky-800",
+                    ? "border-zinc-300/35 bg-zinc-400/20 text-zinc-100"
+                    : "border-zinc-200 bg-zinc-50 text-zinc-800",
                 )}
               >
                 {msg.content}
@@ -170,17 +172,18 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
           className={cn(
             "flex-1 resize-none rounded-2xl border px-3 py-2 text-sm transition-colors focus:outline-none",
             isFloating
-              ? "border-white/20 bg-slate-900/70 text-slate-100 placeholder:text-slate-400 focus:border-sky-300/60"
-              : "border-white/80 bg-white/90 text-slate-800 placeholder:text-slate-400 focus:border-sky-300",
+              ? "border-white/20 bg-slate-900/70 text-slate-100 placeholder:text-slate-400 focus:border-zinc-300/60"
+              : "border-white/80 bg-white/90 text-slate-800 placeholder:text-slate-400 focus:border-zinc-300",
           )}
         />
         <button
+          type="button"
           onClick={sendMessage}
           disabled={!input.trim() || sending}
           className={cn(
             "flex size-10 items-center justify-center rounded-2xl text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
             isFloating
-              ? "bg-sky-500 hover:bg-sky-400"
+              ? "bg-zinc-500 hover:bg-zinc-400"
               : "bg-slate-900 hover:bg-slate-700",
           )}
         >

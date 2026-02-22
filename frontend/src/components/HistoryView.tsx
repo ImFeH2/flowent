@@ -21,8 +21,11 @@ interface HistoryViewProps {
 export function HistoryView({ history }: HistoryViewProps) {
   return (
     <div className="space-y-1.5 p-3">
-      {history.map((entry, i) => (
-        <HistoryItem key={i} entry={entry} />
+      {history.map((entry) => (
+        <HistoryItem
+          key={`${entry.timestamp}-${entry.type}-${entry.tool_call_id ?? ""}`}
+          entry={entry}
+        />
       ))}
     </div>
   );
@@ -62,10 +65,10 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "ReceivedMessage":
       return (
-        <div className="group relative rounded border border-blue-500/20 bg-blue-500/5 px-2.5 py-1.5">
+        <div className="group relative rounded border border-zinc-500/25 bg-zinc-500/10 px-2.5 py-1.5">
           <div className="flex items-center gap-1.5 mb-0.5">
-            <MessageSquare className="size-3 text-blue-400" />
-            <span className="text-[10px] font-medium text-blue-400">
+            <MessageSquare className="size-3 text-zinc-300" />
+            <span className="text-[10px] font-medium text-zinc-300">
               From {entry.from_id ? entry.from_id.slice(0, 8) : "unknown"}
             </span>
             <span className="ml-auto">
@@ -74,7 +77,7 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
           </div>
           <MarkdownContent
             content={entry.content ?? ""}
-            className="text-xs text-blue-200"
+            className="text-xs text-zinc-200"
           />
         </div>
       );
@@ -210,6 +213,7 @@ function CollapsibleBlock({
   return (
     <div className={cn("rounded border", className)}>
       <button
+        type="button"
         onClick={toggle}
         className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-white/5 transition-colors"
       >

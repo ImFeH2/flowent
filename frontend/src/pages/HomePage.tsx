@@ -61,8 +61,8 @@ export function HomePage() {
 
   return (
     <div className="relative h-full overflow-hidden rounded-xl">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(59,130,246,0.06),transparent_48%),radial-gradient(ellipse_at_bottom_right,rgba(17,24,39,0.5),transparent_62%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(8,10,16,0.38),rgba(5,6,10,0.9))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(130,130,140,0.07),transparent_48%),radial-gradient(ellipse_at_bottom_right,rgba(16,16,18,0.56),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(9,9,11,0.42),rgba(6,6,8,0.92))]" />
 
       <div className="absolute inset-0">
         <AgentGraph />

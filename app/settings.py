@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -46,16 +47,21 @@ class Settings:
 
 
 _cached_settings: Settings | None = None
+_settings_lock = threading.Lock()
 
 
 def load_settings() -> Settings:
     global _cached_settings
-    if _cached_settings is not None:
-        return _cached_settings
+    with _settings_lock:
+        if _cached_settings is not None:
+            return _cached_settings
 
     if not _SETTINGS_FILE.exists():
-        _cached_settings = Settings()
-        return _cached_settings
+        loaded_settings = Settings()
+        with _settings_lock:
+            if _cached_settings is None:
+                _cached_settings = loaded_settings
+            return _cached_settings
 
     try:
         with open(_SETTINGS_FILE) as f:
@@ -75,21 +81,25 @@ def load_settings() -> Settings:
         roles_raw = data.get("roles", [])
         roles = [RoleConfig(**r) for r in roles_raw]
 
-        _cached_settings = Settings(
+        loaded_settings = Settings(
             event_log=event_log,
             model=model_settings,
             providers=providers,
             roles=roles,
         )
     except Exception:
-        _cached_settings = Settings()
+        loaded_settings = Settings()
 
-    return _cached_settings
+    with _settings_lock:
+        if _cached_settings is None:
+            _cached_settings = loaded_settings
+        return _cached_settings
 
 
 def save_settings(settings: Settings) -> None:
     global _cached_settings
-    _cached_settings = settings
+    with _settings_lock:
+        _cached_settings = settings
 
     with open(_SETTINGS_FILE, "w") as f:
         json.dump(asdict(settings), f, indent=2)

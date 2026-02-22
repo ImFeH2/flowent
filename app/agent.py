@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import threading
+import time as _time
+import traceback
+import uuid as _uuid
 from queue import Empty, Queue
 from typing import Any
 
@@ -29,6 +32,7 @@ from app.models import (
     ToolResultDelta,
 )
 from app.prompts import get_system_prompt
+from app.providers.gateway import gateway
 from app.tools import build_tool_registry
 
 _tool_registry = build_tool_registry()
@@ -40,8 +44,6 @@ class Agent:
         config: NodeConfig,
         uuid: str | None = None,
     ) -> None:
-        import uuid as _uuid
-
         self.uuid = uuid or str(_uuid.uuid4())
         self.config = config
         self.node_type = config.node_type
@@ -56,6 +58,7 @@ class Agent:
         self._thread: threading.Thread | None = None
         self._termination_reason: str = ""
         self._connections_lock = threading.Lock()
+        self._history_lock = threading.Lock()
         self._log = logger.bind(
             agent_id=self.uuid[:8], node_type=self.config.node_type.value
         )
@@ -68,6 +71,14 @@ class Agent:
     def is_connected_to(self, uuid: str) -> bool:
         with self._connections_lock:
             return uuid in self.connections
+
+    def get_connections_snapshot(self) -> list[str]:
+        with self._connections_lock:
+            return list(self.connections)
+
+    def get_history_snapshot(self) -> list[HistoryEntry]:
+        with self._history_lock:
+            return list(self.history)
 
     def start(self) -> None:
         self._thread = threading.Thread(
@@ -89,12 +100,15 @@ class Agent:
         )
 
     def _append_history(self, entry: HistoryEntry) -> None:
-        self.history.append(entry)
+        with self._history_lock:
+            self.history.append(entry)
         data = entry.serialize()
         self._log.debug(
             "History append: type={}, content_len={}",
             data.get("type"),
-            len(entry.content) if hasattr(entry, "content") and entry.content else 0,
+            len(getattr(entry, "content", None) or "")
+            if hasattr(entry, "content")
+            else 0,
         )
         event_bus.emit(
             Event(
@@ -119,6 +133,7 @@ class Agent:
         while not self._terminate.is_set():
             try:
                 self._drain_messages()
+                self._inject_system_context()
 
                 tools_schema = _tool_registry.get_tools_schema(self)
                 messages = self._build_messages()
@@ -146,8 +161,6 @@ class Agent:
                             data=delta.serialize(),
                         ),
                     )
-
-                from app.providers.gateway import gateway
 
                 response = gateway.chat(
                     messages=messages,
@@ -210,8 +223,6 @@ class Agent:
 
             except Exception as exc:
                 self._log.exception("Agent error")
-                import traceback
-
                 tb_str = traceback.format_exc()
                 self._append_history(
                     ErrorEntry(content=f"{type(exc).__name__}: {exc}\n\n{tb_str}"),
@@ -234,11 +245,32 @@ class Agent:
             ),
         )
 
+    def _inject_system_context(self) -> None:
+        if not self.todos:
+            return
+        lines = []
+        for t in self.todos:
+            mark = "[x]" if t.done else "[ ]"
+            lines.append(f"  {mark} {t.text}")
+        todo_text = "Current TODO list:\n" + "\n".join(lines)
+        with self._history_lock:
+            for i in range(len(self.history) - 1, -1, -1):
+                entry = self.history[i]
+                if isinstance(entry, SystemInjection) and entry.content.startswith(
+                    "Current TODO list:"
+                ):
+                    self.history.pop(i)
+                    break
+        self._append_history(SystemInjection(content=todo_text))
+
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = []
         pending_tool_calls: list[dict[str, Any]] = []
 
-        for entry in self.history:
+        with self._history_lock:
+            history_snapshot = list(self.history)
+
+        for entry in history_snapshot:
             if isinstance(entry, SystemEntry):
                 messages.append({"role": "system", "content": entry.content})
 
@@ -394,8 +426,6 @@ class Agent:
                 ),
             )
 
-        import time as _time
-
         t0 = _time.perf_counter()
         try:
             result = tool.execute(self, arguments, on_output=_on_tool_output)
@@ -423,29 +453,33 @@ class Agent:
         arguments: dict[str, Any],
         result: str,
     ) -> None:
-        for i in range(len(self.history) - 1, -1, -1):
-            entry = self.history[i]
-            if (
-                isinstance(entry, ToolCall)
-                and entry.tool_call_id == call_id
-                and entry.streaming
-            ):
-                final = ToolCall(
-                    tool_name=name,
-                    tool_call_id=call_id,
-                    arguments=arguments,
-                    result=result,
-                    streaming=False,
-                )
-                self.history[i] = final
-                event_bus.emit(
-                    Event(
-                        type=EventType.HISTORY_ENTRY_ADDED,
-                        agent_id=self.uuid,
-                        data=final.serialize(),
-                    ),
-                )
-                break
+        final: ToolCall | None = None
+        with self._history_lock:
+            for i in range(len(self.history) - 1, -1, -1):
+                entry = self.history[i]
+                if (
+                    isinstance(entry, ToolCall)
+                    and entry.tool_call_id == call_id
+                    and entry.streaming
+                ):
+                    final = ToolCall(
+                        tool_name=name,
+                        tool_call_id=call_id,
+                        arguments=arguments,
+                        result=result,
+                        streaming=False,
+                    )
+                    self.history[i] = final
+                    break
+
+        if final is not None:
+            event_bus.emit(
+                Event(
+                    type=EventType.HISTORY_ENTRY_ADDED,
+                    agent_id=self.uuid,
+                    data=final.serialize(),
+                ),
+            )
 
     def enqueue_message(self, msg: Message) -> None:
         self._message_queue.put(msg)

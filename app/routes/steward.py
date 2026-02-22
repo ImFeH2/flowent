@@ -24,7 +24,7 @@ async def get_steward() -> dict:
     return {
         "id": steward.uuid,
         "state": steward.state.value,
-        "connections": list(steward.connections),
+        "connections": steward.get_connections_snapshot(),
     }
 
 

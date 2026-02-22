@@ -19,7 +19,7 @@ async def list_nodes() -> dict:
                 "node_type": n.config.node_type.value,
                 "role_id": n.config.role_id,
                 "state": n.state.value,
-                "connections": list(n.connections),
+                "connections": n.get_connections_snapshot(),
                 "name": n.config.name,
                 "todos": [t.serialize() for t in n.todos],
             }
@@ -39,10 +39,10 @@ async def get_node(node_id: str) -> dict:
         "node_type": node.config.node_type.value,
         "role_id": node.config.role_id,
         "state": node.state.value,
-        "connections": list(node.connections),
+        "connections": node.get_connections_snapshot(),
         "name": node.config.name,
         "todos": [t.serialize() for t in node.todos],
-        "history": [entry.serialize() for entry in node.history],
+        "history": [entry.serialize() for entry in node.get_history_snapshot()],
     }
 
 

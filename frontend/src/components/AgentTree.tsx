@@ -1,6 +1,5 @@
 import { useMemo, useCallback, useState, type MouseEvent } from "react";
 import {
-  Controls,
   ReactFlow,
   Background,
   MiniMap,
@@ -298,19 +297,15 @@ export function AgentTree() {
             maxZoom={1.8}
             className="bg-transparent"
           >
-            <Background color="rgba(148,163,184,0.13)" gap={30} size={1} />
+            <Background color="rgba(90,90,96,0.18)" gap={30} size={1} />
             <MiniMap
               zoomable
               pannable
-              className="!rounded-xl !border !border-white/10 !bg-black/60 !shadow-[0_15px_35px_rgba(0,0,0,0.45)]"
-              maskColor="rgba(0,0,0,0.4)"
+              className="!rounded-lg !border !border-white/10 !bg-black/80 !shadow-[0_15px_35px_rgba(0,0,0,0.55)]"
+              maskColor="rgba(0,0,0,0.55)"
               nodeColor="rgba(56,189,248,0.82)"
             />
-            <Controls
-              className="!overflow-hidden !rounded-xl !border !border-white/10 !bg-black/60 !shadow-[0_15px_35px_rgba(0,0,0,0.45)]"
-              showInteractive={false}
-            />
-            <svg>
+            <svg aria-hidden="true" focusable="false">
               <defs>
                 <linearGradient
                   id="agent-edge-flow"
@@ -356,7 +351,7 @@ export function AgentTree() {
                 variant="outline"
                 className={`text-[10px] ${stateBadgeColor[tooltipAgent.state]}`}
               >
-                {tooltipAgent.state}
+                {tooltipAgent.state.toUpperCase()}
               </Badge>
             </div>
             <div className="mt-1 font-mono text-[10px] text-muted-foreground">

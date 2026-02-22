@@ -52,8 +52,8 @@ export function Sidebar({
         className,
       )}
     >
-      <div className="flex h-full flex-col rounded-[1.25rem] border border-white/10 bg-black/75 p-3 shadow-[0_25px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-        <div className="mb-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3.5">
+      <div className="flex h-full flex-col rounded-xl border border-white/10 bg-black/75 p-3 shadow-[0_25px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+        <div className="mb-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3.5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-primary/80">
@@ -64,8 +64,9 @@ export function Sidebar({
               </h1>
             </div>
             <button
+              type="button"
               onClick={toggleTheme}
-              className="flex size-8 items-center justify-center rounded-lg border border-white/10 bg-black/60 text-muted-foreground shadow-sm transition-all hover:bg-white/10 hover:text-foreground"
+              className="flex size-8 items-center justify-center rounded-md border border-white/10 bg-black/60 text-muted-foreground shadow-sm transition-all hover:bg-white/10 hover:text-foreground"
               title={
                 theme === "light"
                   ? "Switch to dark mode"
@@ -98,9 +99,10 @@ export function Sidebar({
           {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
             <button
               key={id}
+              type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200",
+                "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-200",
                 currentPage === id
                   ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
                   : "text-muted-foreground hover:bg-white/10 hover:text-foreground",
@@ -119,20 +121,20 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+            <div className="flex size-9 items-center justify-center rounded-md bg-primary/15 text-primary">
               <Bot className="size-4" />
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold">Live Agents</p>
               <p className="text-[11px] text-muted-foreground">
-                {agents.size} total · {runningCount} running
+                {agents.size} total · {runningCount} RUNNING
               </p>
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-black/50 px-2.5 py-2 text-[11px] text-muted-foreground">
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-white/10 bg-black/50 px-2.5 py-2 text-[11px] text-muted-foreground">
             <Sparkles className="size-3.5 text-primary" />
             <span>Click a node to view details</span>
           </div>

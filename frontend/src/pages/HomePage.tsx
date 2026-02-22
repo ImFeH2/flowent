@@ -61,31 +61,11 @@ export function HomePage() {
 
   return (
     <div className="relative h-full overflow-hidden rounded-[1.65rem]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(71,85,105,0.35),transparent_55%),radial-gradient(ellipse_at_bottom,rgba(8,47,73,0.35),transparent_60%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,6,23,0.2),rgba(2,6,23,0.78))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(63,63,70,0.26),transparent_56%),radial-gradient(ellipse_at_bottom,rgba(24,24,27,0.4),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,0.35),rgba(0,0,0,0.86))]" />
 
       <div className="absolute inset-0">
         <AgentTree />
-      </div>
-
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-5 pb-6 pt-5 sm:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-black/55 px-5 py-4 text-center shadow-[0_25px_70px_rgba(0,0,0,0.55)] backdrop-blur-xl"
-        >
-          <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-primary/80">
-            Workspace
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Autonomous Agent Command Room
-          </h2>
-          <p className="mt-2 text-xs text-muted-foreground sm:text-sm">
-            Keep the graph in focus, inspect node details on demand, and
-            coordinate with Steward without leaving the canvas.
-          </p>
-        </motion.div>
       </div>
 
       <div className="absolute left-4 top-4 z-30 flex max-w-[70%] flex-wrap items-center gap-2 sm:left-16">
@@ -102,11 +82,12 @@ export function HomePage() {
           <Sparkles className="size-3 text-primary" />
           {metrics.total} nodes
         </BadgeChip>
-        <BadgeChip>{metrics.running} running</BadgeChip>
-        <BadgeChip>{metrics.idle} idle</BadgeChip>
+        <BadgeChip>{metrics.running} RUNNING</BadgeChip>
+        <BadgeChip>{metrics.idle} IDLE</BadgeChip>
       </div>
 
       <motion.button
+        type="button"
         initial={{ opacity: 0, x: 16 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.3, delay: 0.15 }}
@@ -188,6 +169,7 @@ function AgentDetailPanel({
           </div>
         </div>
         <button
+          type="button"
           onClick={onClose}
           className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
         >
@@ -202,7 +184,7 @@ function AgentDetailPanel({
           </p>
           <div className="mt-2">
             <Badge variant="outline" className={stateBadgeColor[agent.state]}>
-              {agent.state}
+              {agent.state.toUpperCase()}
             </Badge>
           </div>
         </div>
@@ -260,7 +242,7 @@ function StewardChatPanel() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [stewardMessages]);
+  });
 
   const sendMessage = async () => {
     const content = input.trim();
@@ -349,6 +331,7 @@ function StewardChatPanel() {
             className="min-h-[40px] flex-1 resize-none rounded-lg border border-white/10 bg-black/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
           <button
+            type="button"
             onClick={sendMessage}
             disabled={!input.trim() || sending}
             className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -356,9 +339,6 @@ function StewardChatPanel() {
             <Send className="size-4" />
           </button>
         </div>
-        <p className="mt-2 text-center text-[10px] text-muted-foreground">
-          Press Enter to send
-        </p>
       </div>
     </>
   );

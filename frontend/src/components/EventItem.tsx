@@ -54,10 +54,8 @@ export function EventItem({ event }: { event: AgentEvent }) {
             &rarr; {String(event.data.new_state)}
           </span>
         )}
-        {"tool_name" in event.data && (
-          <span className="text-zinc-400 ml-1">
-            {String(event.data.tool_name)}
-          </span>
+        {"tool" in event.data && (
+          <span className="text-zinc-400 ml-1">{String(event.data.tool)}</span>
         )}
       </div>
       <span className="shrink-0 text-zinc-600">

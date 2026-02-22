@@ -53,6 +53,7 @@ interface AgentContextValue {
   eventPanelVisible: boolean;
   toggleEventPanel: () => void;
   stewardMessages: StewardMessage[];
+  sendStewardMessage: (content: string) => Promise<void>;
   currentPage: string;
   setCurrentPage: (page: string) => void;
 }
@@ -88,6 +89,24 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
+
+  const sendStewardMessage = useCallback(async (content: string) => {
+    setStewardMessages((prev) => [
+      ...prev,
+      { content, timestamp: Date.now(), from: "human" },
+    ]);
+
+    try {
+      await fetch("/api/steward/message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+    } catch (_) {
+      void _;
+    }
+  }, []);
+
   const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -337,6 +356,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       eventPanelVisible,
       toggleEventPanel,
       stewardMessages,
+      sendStewardMessage,
       currentPage,
       setCurrentPage,
     }),
@@ -361,6 +381,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       eventPanelVisible,
       toggleEventPanel,
       stewardMessages,
+      sendStewardMessage,
       currentPage,
       setCurrentPage,
     ],

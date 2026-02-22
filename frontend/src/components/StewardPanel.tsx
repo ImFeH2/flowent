@@ -4,7 +4,7 @@ import { useAgent } from "@/context/AgentContext";
 import { MarkdownContent } from "@/components/MarkdownContent";
 
 export function StewardPanel() {
-  const { stewardMessages } = useAgent();
+  const { stewardMessages, sendStewardMessage } = useAgent();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -21,11 +21,7 @@ export function StewardPanel() {
     setInput("");
 
     try {
-      await fetch("/api/steward/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
+      await sendStewardMessage(content);
     } catch (_) {
       void _;
     } finally {

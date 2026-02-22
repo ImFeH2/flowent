@@ -1,6 +1,5 @@
 import {
   Network,
-  Shield,
   Server,
   BookOpen,
   Wrench,
@@ -8,70 +7,70 @@ import {
   PanelRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAgent } from "@/context/AgentContext";
+import { useAgent, type PageId } from "@/context/AgentContext";
 
-const NAV_ITEMS = [
-  { id: "graph", icon: Network, label: "Agent Graph" },
-  { id: "steward", icon: Shield, label: "Steward Chat" },
+const NAV_ITEMS: Array<{ id: PageId; icon: typeof Network; label: string }> = [
+  { id: "graph", icon: Network, label: "Workspace" },
   { id: "providers", icon: Server, label: "Providers" },
   { id: "roles", icon: BookOpen, label: "Roles" },
   { id: "tools", icon: Wrench, label: "Tools" },
+  { id: "settings", icon: Settings, label: "Settings" },
 ];
 
 interface SidebarProps {
   eventPanelVisible: boolean;
   onToggleEventPanel: () => void;
-  onOpenSettings: () => void;
 }
 
 export function Sidebar({
   eventPanelVisible,
   onToggleEventPanel,
-  onOpenSettings,
 }: SidebarProps) {
   const { currentPage, setCurrentPage } = useAgent();
 
   return (
-    <div className="fixed left-0 top-0 h-screen w-12 bg-zinc-900 border-r border-zinc-800 flex flex-col items-center justify-between py-4 z-40">
-      <div className="flex flex-col gap-2">
+    <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-zinc-800 bg-zinc-900">
+      <div className="border-b border-zinc-800 px-4 py-5">
+        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+          Autopoe
+        </p>
+        <h1 className="mt-1 text-lg font-semibold text-zinc-100">
+          Control Center
+        </h1>
+      </div>
+
+      <nav className="flex-1 space-y-1 p-3">
         {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             onClick={() => setCurrentPage(id)}
             className={cn(
-              "size-9 flex items-center justify-center rounded-md transition-colors",
+              "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
               currentPage === id
                 ? "bg-zinc-700 text-zinc-100"
-                : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800",
+                : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
             )}
-            title={label}
           >
-            <Icon className="size-5" />
+            <Icon className="size-4 shrink-0" />
+            <span>{label}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
-      <div className="flex flex-col gap-2">
+      <div className="border-t border-zinc-800 p-3">
         <button
           onClick={onToggleEventPanel}
           className={cn(
-            "size-9 flex items-center justify-center rounded-md transition-colors",
+            "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
             eventPanelVisible
               ? "bg-zinc-700 text-zinc-100"
-              : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800",
+              : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100",
           )}
-          title={eventPanelVisible ? "Hide Events" : "Show Events"}
         >
-          <PanelRight className="size-5" />
-        </button>
-        <button
-          onClick={onOpenSettings}
-          className="size-9 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
-          title="Settings"
-        >
-          <Settings className="size-5" />
+          <PanelRight className="size-4 shrink-0" />
+          <span>{eventPanelVisible ? "Hide Event Log" : "Show Event Log"}</span>
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

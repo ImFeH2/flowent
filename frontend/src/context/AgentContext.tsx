@@ -31,6 +31,8 @@ export interface ActiveMessage {
   timestamp: number;
 }
 
+export type PageId = "graph" | "providers" | "roles" | "tools" | "settings";
+
 interface AgentContextValue {
   agents: Map<string, Node>;
   events: AgentEvent[];
@@ -54,8 +56,8 @@ interface AgentContextValue {
   toggleEventPanel: () => void;
   stewardMessages: StewardMessage[];
   sendStewardMessage: (content: string) => Promise<void>;
-  currentPage: string;
-  setCurrentPage: (page: string) => void;
+  currentPage: PageId;
+  setCurrentPage: (page: PageId) => void;
 }
 
 const AgentContext = createContext<AgentContextValue | null>(null);
@@ -85,7 +87,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   );
   const [eventPanelVisible, setEventPanelVisible] = useState(false);
   const [stewardMessages, setStewardMessages] = useState<StewardMessage[]>([]);
-  const [currentPage, setCurrentPage] = useState("graph");
+  const [currentPage, setCurrentPage] = useState<PageId>("graph");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );

@@ -2,12 +2,18 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Shield } from "lucide-react";
 import { useAgent } from "@/context/AgentContext";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { cn } from "@/lib/utils";
 
-export function StewardPanel() {
+interface StewardPanelProps {
+  variant?: "page" | "floating";
+}
+
+export function StewardPanel({ variant = "page" }: StewardPanelProps) {
   const { stewardMessages, sendStewardMessage } = useAgent();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const isFloating = variant === "floating";
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,13 +43,20 @@ export function StewardPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+    <div
+      className={cn(
+        "flex h-full flex-col",
+        isFloating
+          ? "overflow-hidden rounded-2xl border border-zinc-700/70 bg-zinc-900/90 shadow-2xl backdrop-blur-xl"
+          : "bg-zinc-950",
+      )}
+    >
+      <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
         <Shield className="size-4 text-amber-400" />
         <span className="text-sm font-medium text-zinc-200">Steward Chat</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {stewardMessages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-zinc-500">
@@ -74,7 +87,7 @@ export function StewardPanel() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex items-end gap-2 px-4 py-3 border-t border-zinc-800">
+      <div className="flex items-end gap-2 border-t border-zinc-800 px-4 py-3">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}

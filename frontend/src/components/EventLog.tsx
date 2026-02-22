@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAgent } from "@/context/AgentContext";
 
 export function EventLog() {
-  const { events, connected, eventPanelVisible } = useAgent();
+  const { events, connected, eventPanelVisible, currentPage } = useAgent();
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isAtBottom = useRef(true);
@@ -31,7 +31,12 @@ export function EventLog() {
   if (!eventPanelVisible) return null;
 
   return (
-    <div className="fixed right-4 top-4 bottom-4 w-80 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col overflow-hidden z-30 shadow-xl">
+    <div
+      className={cn(
+        "fixed top-4 bottom-4 w-80 rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl z-30 flex flex-col overflow-hidden",
+        currentPage === "graph" ? "right-[25.5rem]" : "right-4",
+      )}
+    >
       <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
         {connected ? (
           <Wifi className="size-4 text-zinc-400" />

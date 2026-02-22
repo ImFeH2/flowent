@@ -7,7 +7,6 @@ import {
 } from "react-resizable-panels";
 import {
   X,
-  Send,
   Wrench,
   ChevronDown,
   ChevronRight,
@@ -22,7 +21,7 @@ import { useAgent, type WindowState } from "@/context/AgentContext";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { HistoryView } from "@/components/HistoryView";
 import { nodeTypeIcon, stateBadgeColor } from "@/lib/constants";
-import { sendNodeMessage, terminateNode } from "@/lib/api";
+import { terminateNode } from "@/lib/api";
 
 type ChatItem =
   | { kind: "user"; content: string }
@@ -54,16 +53,9 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
   } = useAgent();
   const { detail } = useAgentDetail(agentId);
   const [viewMode, setViewMode] = useState<"chat" | "history">("chat");
-  const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const isAtBottom = useRef(true);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => textareaRef.current?.focus(), 50);
-    return () => clearTimeout(t);
-  }, []);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -87,33 +79,6 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [viewMode]);
-
-  const sendMsg = useCallback(() => {
-    const text = input.trim();
-    if (!text) return;
-    setInput("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-    sendNodeMessage(agentId, text);
-  }, [agentId, input]);
-
-  const onKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendMsg();
-      }
-    },
-    [sendMsg],
-  );
-
-  const onTextareaInput = useCallback(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-  }, []);
 
   const chatItems = useMemo(() => {
     if (!detail) return [];
@@ -216,6 +181,9 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
             </button>
           )}
           <div className="ml-auto flex items-center gap-1">
+            <span className="rounded bg-zinc-700/60 px-1.5 py-0.5 text-[10px] text-zinc-300">
+              Read-only
+            </span>
             <button
               onClick={() => setViewMode("chat")}
               className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
@@ -224,7 +192,7 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
                   : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
-              Chat
+              Timeline
             </button>
             <button
               onClick={() => setViewMode("history")}
@@ -341,25 +309,6 @@ export function AgentWindow({ agentId, windowState, zoom }: AgentWindowProps) {
                       )
                     )}
                   </div>
-                </div>
-                <div className="mx-2 mb-2 rounded-xl border border-zinc-700/40 bg-zinc-800/80 backdrop-blur-md shadow-lg shadow-black/30 flex gap-2 items-center px-3 py-2">
-                  <textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={onKeyDown}
-                    onInput={onTextareaInput}
-                    rows={1}
-                    placeholder="Send a message..."
-                    className="flex-1 resize-none bg-transparent border-none focus:outline-none text-xs text-zinc-100 placeholder-zinc-500 scrollbar-none"
-                    style={{ maxHeight: 200 }}
-                  />
-                  <button
-                    onClick={sendMsg}
-                    className="shrink-0 rounded-lg bg-zinc-700 p-1.5 text-zinc-300 hover:bg-zinc-600 hover:text-zinc-100 transition-colors"
-                  >
-                    <Send className="size-3.5" />
-                  </button>
                 </div>
               </div>
             </Panel>

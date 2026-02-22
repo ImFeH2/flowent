@@ -34,17 +34,88 @@ class GeminiProvider(LLMProvider):
     ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
         system_parts: list[str] = []
         contents: list[dict[str, Any]] = []
+        tool_call_names: dict[str, str] = {}
 
         for msg in messages:
-            role = msg["role"]
+            role = msg.get("role", "")
+            content = msg.get("content")
+
             if role == "system":
-                system_parts.append(msg["content"])
-            else:
-                gemini_role = "model" if role == "assistant" else "user"
+                if isinstance(content, str):
+                    if content:
+                        system_parts.append(content)
+                elif content is not None:
+                    system_parts.append(str(content))
+                continue
+
+            if role == "user":
                 contents.append(
                     {
-                        "role": gemini_role,
-                        "parts": [{"text": msg["content"]}],
+                        "role": "user",
+                        "parts": [{"text": content or ""}],
+                    },
+                )
+                continue
+
+            if role == "assistant":
+                parts: list[dict[str, Any]] = []
+
+                if content:
+                    parts.append({"text": content})
+
+                for tc in msg.get("tool_calls", []) or []:
+                    fn = tc.get("function", {})
+                    name = fn.get("name", "")
+                    call_id = tc.get("id", "")
+                    if call_id and name:
+                        tool_call_names[call_id] = name
+
+                    raw_args = fn.get("arguments", {})
+                    if isinstance(raw_args, str):
+                        try:
+                            args = json.loads(raw_args) if raw_args else {}
+                        except json.JSONDecodeError:
+                            args = {}
+                    elif isinstance(raw_args, dict):
+                        args = raw_args
+                    else:
+                        args = {}
+
+                    if not isinstance(args, dict):
+                        args = {}
+
+                    parts.append(
+                        {
+                            "functionCall": {
+                                "name": name,
+                                "args": args,
+                            }
+                        },
+                    )
+
+                if parts:
+                    contents.append(
+                        {
+                            "role": "model",
+                            "parts": parts,
+                        },
+                    )
+                continue
+
+            if role == "tool":
+                tool_call_id = msg.get("tool_call_id", "")
+                name = tool_call_names.get(tool_call_id, msg.get("name", ""))
+                contents.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "functionResponse": {
+                                    "name": name,
+                                    "response": {"content": content or ""},
+                                }
+                            }
+                        ],
                     },
                 )
 

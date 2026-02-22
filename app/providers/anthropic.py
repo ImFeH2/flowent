@@ -41,12 +41,90 @@ class AnthropicProvider(LLMProvider):
     ) -> tuple[str | None, list[dict[str, Any]]]:
         system_text: list[str] = []
         converted: list[dict[str, Any]] = []
+        pending_tool_results: list[dict[str, Any]] = []
+
+        def flush_tool_results() -> None:
+            if not pending_tool_results:
+                return
+            converted.append(
+                {
+                    "role": "user",
+                    "content": list(pending_tool_results),
+                }
+            )
+            pending_tool_results.clear()
 
         for msg in messages:
-            if msg["role"] == "system":
-                system_text.append(msg["content"])
-            else:
-                converted.append({"role": msg["role"], "content": msg["content"]})
+            role = msg.get("role")
+
+            if role == "system":
+                content = msg.get("content")
+                if content is not None:
+                    system_text.append(
+                        content if isinstance(content, str) else json.dumps(content),
+                    )
+                continue
+
+            if role == "tool":
+                content = msg.get("content")
+                if content is None:
+                    tool_content = ""
+                elif isinstance(content, str):
+                    tool_content = content
+                else:
+                    tool_content = json.dumps(content)
+
+                pending_tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": msg.get("tool_call_id", ""),
+                        "content": tool_content,
+                    }
+                )
+                continue
+
+            flush_tool_results()
+
+            if role == "assistant" and msg.get("tool_calls"):
+                content_blocks: list[dict[str, Any]] = []
+                content = msg.get("content")
+                if isinstance(content, str) and content:
+                    content_blocks.append({"type": "text", "text": content})
+
+                for tool_call in msg.get("tool_calls", []):
+                    fn = tool_call.get("function", {})
+                    raw_arguments = fn.get("arguments", "{}")
+
+                    if isinstance(raw_arguments, str):
+                        try:
+                            parsed_arguments = (
+                                json.loads(raw_arguments) if raw_arguments else {}
+                            )
+                        except json.JSONDecodeError:
+                            parsed_arguments = {}
+                    elif isinstance(raw_arguments, dict):
+                        parsed_arguments = raw_arguments
+                    else:
+                        parsed_arguments = {}
+
+                    if not isinstance(parsed_arguments, dict):
+                        parsed_arguments = {}
+
+                    content_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tool_call.get("id", ""),
+                            "name": fn.get("name", ""),
+                            "input": parsed_arguments,
+                        }
+                    )
+
+                converted.append({"role": "assistant", "content": content_blocks})
+                continue
+
+            converted.append({"role": role, "content": msg.get("content")})
+
+        flush_tool_results()
 
         system = "\n\n".join(system_text) if system_text else None
         return system, converted

@@ -22,7 +22,9 @@ export function AgentGraphNode({ data }: NodeProps) {
   const isToolActive = !!toolCall;
   const isRunning = state === "running";
 
-  const baseBorder = isToolActive ? "border-amber-500/80" : stateBorder[state];
+  const baseBorder = isToolActive
+    ? "border-graph-attention/70"
+    : stateBorder[state];
 
   return (
     <motion.div
@@ -35,8 +37,8 @@ export function AgentGraphNode({ data }: NodeProps) {
         "bg-graph-node-bg",
         baseBorder,
         selected
-          ? "ring-1 ring-primary/20 border-primary/80"
-          : "border-graph-node-border hover:border-foreground/20",
+          ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
+          : "border-graph-node-border hover:border-graph-node-border-hover",
         isRunning && "node-glow-active",
         state === "terminated" && "opacity-40 grayscale",
       )}
@@ -44,7 +46,7 @@ export function AgentGraphNode({ data }: NodeProps) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!size-2.5 !border !border-card !bg-muted-foreground"
+        className="!size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
       />
 
       <div className="flex size-9 shrink-0 items-center justify-center rounded-sm border border-graph-node-border bg-surface-3 text-foreground/80">
@@ -66,14 +68,14 @@ export function AgentGraphNode({ data }: NodeProps) {
             <span
               className={cn(
                 "absolute inline-flex size-full animate-ping rounded-full opacity-40",
-                isToolActive ? "bg-amber-400" : stateColor[state],
+                isToolActive ? "bg-graph-attention" : stateColor[state],
               )}
             />
           )}
           <span
             className={cn(
               "relative inline-flex size-3 rounded-full border border-card shadow-sm",
-              isToolActive ? "bg-amber-500" : stateColor[state],
+              isToolActive ? "bg-graph-attention" : stateColor[state],
             )}
           />
         </span>
@@ -85,7 +87,7 @@ export function AgentGraphNode({ data }: NodeProps) {
           animate={{ opacity: 1, y: 0 }}
           className="absolute -bottom-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap"
         >
-          <span className="rounded-sm border border-amber-500/35 bg-surface-2 px-2 py-1 text-[10px] font-mono text-amber-300 shadow-lg backdrop-blur-sm">
+          <span className="rounded-sm border border-graph-attention/30 bg-surface-2 px-2 py-1 text-[10px] font-mono text-graph-attention-text shadow-lg backdrop-blur-sm">
             {toolCall}
           </span>
         </motion.div>
@@ -94,7 +96,7 @@ export function AgentGraphNode({ data }: NodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!size-2.5 !border !border-card !bg-muted-foreground"
+        className="!size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
       />
     </motion.div>
   );

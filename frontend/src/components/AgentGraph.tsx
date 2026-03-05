@@ -354,15 +354,15 @@ export function AgentGraph() {
             zoomOnScroll
             minZoom={0.3}
             maxZoom={1.8}
-            className="bg-transparent"
+            className="bg-graph-bg"
           >
-            <Background color="var(--graph-edge)" gap={32} size={0.8} />
+            <Background color="var(--graph-grid)" gap={32} size={0.8} />
             <MiniMap
               zoomable
               pannable
-              className="!rounded-md !border !border-glass-border !bg-surface-1 !shadow-lg"
+              className="!rounded-md !border !border-glass-border !bg-graph-bg !shadow-lg"
               maskColor="var(--surface-overlay)"
-              nodeColor="var(--muted-foreground)"
+              nodeColor="var(--graph-edge-active)"
             />
             <svg aria-hidden="true" focusable="false">
               <defs>

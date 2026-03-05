@@ -11,6 +11,13 @@ import {
 import type { Provider } from "@/types";
 import { cn } from "@/lib/utils";
 import { providerTypeLabel } from "@/lib/providerTypes";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface UserSettings {
   model: {
@@ -149,27 +156,30 @@ export function SettingsPage() {
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Active Provider</label>
-                <select
+                <Select
                   value={settings.model.active_provider_id}
-                  onChange={(e) =>
+                  onValueChange={(value) =>
                     setSettings({
                       ...settings,
                       model: {
                         ...settings.model,
-                        active_provider_id: e.target.value,
+                        active_provider_id: value,
                         active_model: "",
                       },
                     })
                   }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
-                  <option value="">Select a provider</option>
-                  {providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({providerTypeLabel(p.type)})
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providers.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({providerTypeLabel(p.type)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {activeProvider && (
                   <p className="text-xs text-muted-foreground">
                     Using {activeProvider.name} ({activeProvider.base_url})
@@ -195,26 +205,29 @@ export function SettingsPage() {
                 </div>
 
                 {models.length > 0 ? (
-                  <select
+                  <Select
                     value={settings.model.active_model}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setSettings({
                         ...settings,
                         model: {
                           ...settings.model,
-                          active_model: e.target.value,
+                          active_model: value,
                         },
                       })
                     }
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
-                    <option value="">Select a model</option>
-                    {models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.id}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <input
                     type="text"

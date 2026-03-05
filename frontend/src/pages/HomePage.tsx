@@ -61,14 +61,13 @@ export function HomePage() {
 
   return (
     <div className="relative h-full overflow-hidden rounded-xl">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(130,130,140,0.07),transparent_48%),radial-gradient(ellipse_at_bottom_right,rgba(16,16,18,0.56),transparent_62%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(9,9,11,0.42),rgba(6,6,8,0.92))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_48%)] opacity-30" />
 
       <div className="absolute inset-0">
         <AgentGraph />
       </div>
 
-      <div className="absolute inset-x-0 top-0 z-30 border-b border-white/10 bg-[#0d1119]/82 px-5 py-2.5 backdrop-blur-sm sm:px-6">
+      <div className="absolute inset-x-0 top-0 z-30 border-b border-glass-border bg-surface-overlay px-5 py-2.5 backdrop-blur-sm sm:px-6">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-foreground/95">
@@ -80,7 +79,7 @@ export function HomePage() {
           </div>
           <div className="hidden items-center gap-2 text-[11px] text-muted-foreground sm:flex">
             <span>{metrics.total} nodes</span>
-            <span className="text-white/20">/</span>
+            <span className="text-muted-foreground/30">/</span>
             <span>{metrics.running} RUNNING</span>
           </div>
         </div>
@@ -95,13 +94,10 @@ export function HomePage() {
             )}
           />
           {connected ? "Live" : "Reconnecting"}
+          <span className="text-muted-foreground/50">·</span>
+          {metrics.total} nodes · {metrics.running} running · {metrics.idle}{" "}
+          idle
         </BadgeChip>
-        <BadgeChip>
-          <Sparkles className="size-3 text-primary" />
-          {metrics.total} nodes
-        </BadgeChip>
-        <BadgeChip>{metrics.running} RUNNING</BadgeChip>
-        <BadgeChip>{metrics.idle} IDLE</BadgeChip>
       </div>
 
       <motion.button
@@ -110,7 +106,7 @@ export function HomePage() {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.3, delay: 0.15 }}
         onClick={togglePanel}
-        className="absolute right-4 top-14 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-[#111520]/90 text-muted-foreground shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-sm transition-colors hover:bg-[#171b27] hover:text-foreground"
+        className="absolute right-4 top-14 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground"
         title={panelVisible ? "Hide panel" : "Show panel"}
       >
         {panelVisible ? (
@@ -120,24 +116,44 @@ export function HomePage() {
         )}
       </motion.button>
 
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {panelVisible && (
           <motion.aside
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 30 }}
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
-            className="absolute bottom-3 right-3 top-24 z-30 w-[min(92vw,420px)] rounded-lg border border-white/10 bg-[#0f131d]/92 shadow-[0_20px_70px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+            className="absolute bottom-3 right-3 top-24 z-30 w-[min(92vw,420px)] rounded-lg border border-glass-border bg-glass-bg shadow-[0_20px_70px_rgba(0,0,0,0.5)] backdrop-blur-sm"
           >
             <div className="flex h-full flex-col overflow-hidden rounded-lg">
-              {selectedAgent ? (
-                <AgentDetailPanel
-                  agent={selectedAgent}
-                  onClose={() => selectAgent(null)}
-                />
-              ) : (
-                <StewardChatPanel />
-              )}
+              <AnimatePresence mode="wait">
+                {selectedAgent ? (
+                  <motion.div
+                    key="detail"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex h-full flex-col"
+                  >
+                    <AgentDetailPanel
+                      agent={selectedAgent}
+                      onClose={() => selectAgent(null)}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="chat"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="flex h-full flex-col"
+                  >
+                    <StewardChatPanel />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.aside>
         )}
@@ -148,7 +164,7 @@ export function HomePage() {
 
 function BadgeChip({ children }: { children: ReactNode }) {
   return (
-    <div className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-white/10 bg-[#111621]/88 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+    <div className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-glass-border bg-surface-overlay px-2.5 py-1 text-[11px] font-medium text-foreground shadow-lg backdrop-blur-sm">
       {children}
     </div>
   );
@@ -168,7 +184,7 @@ function AgentDetailPanel({
 }) {
   return (
     <>
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="flex size-8 items-center justify-center rounded-md bg-primary/12">
             {agent.node_type === "steward" ? (
@@ -189,14 +205,14 @@ function AgentDetailPanel({
         <button
           type="button"
           onClick={onClose}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
         >
           <X className="size-4" />
         </button>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        <div className="rounded-lg border border-white/10 bg-[#141925] p-3">
+        <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Status
           </p>
@@ -207,7 +223,7 @@ function AgentDetailPanel({
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-[#141925] p-3">
+        <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Connections
           </p>
@@ -216,7 +232,7 @@ function AgentDetailPanel({
           </p>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-[#141925] p-3">
+        <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Todos
           </p>
@@ -289,7 +305,7 @@ function StewardChatPanel() {
 
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+      <div className="flex items-center gap-3 border-b border-glass-border px-4 py-3">
         <div className="flex size-8 items-center justify-center rounded-md bg-primary/12">
           <Shield className="size-4 text-primary" />
         </div>
@@ -303,8 +319,8 @@ function StewardChatPanel() {
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {stewardMessages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-lg border border-dashed border-white/15 bg-[#141925] p-4 text-center">
-            <div className="flex size-11 items-center justify-center rounded-md bg-white/10">
+          <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-lg border border-dashed border-glass-border bg-surface-2 p-4 text-center">
+            <div className="flex size-11 items-center justify-center rounded-md bg-surface-3">
               <MessageSquare className="size-5 text-primary" />
             </div>
             <div className="space-y-1">
@@ -325,13 +341,13 @@ function StewardChatPanel() {
             {msg.from === "steward" && (
               <div className="flex max-w-[85%] items-start gap-2">
                 <Shield className="mt-1 size-4 shrink-0 text-primary" />
-                <div className="rounded-md border border-white/10 bg-[#141925] px-3 py-2 text-sm text-foreground">
+                <div className="rounded-md border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground">
                   <MarkdownContent content={msg.content} />
                 </div>
               </div>
             )}
             {msg.from === "human" && (
-              <div className="max-w-[85%] rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground shadow-[0_8px_24px_rgba(0,0,0,0.28)]">
+              <div className="max-w-[85%] rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground shadow-lg">
                 {msg.content}
               </div>
             )}
@@ -340,7 +356,7 @@ function StewardChatPanel() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-glass-border p-3">
         <div className="flex items-end gap-2">
           <textarea
             value={input}
@@ -348,13 +364,13 @@ function StewardChatPanel() {
             onKeyDown={handleKeyDown}
             placeholder="Message the Steward..."
             rows={1}
-            className="min-h-[40px] flex-1 resize-none rounded-md border border-white/10 bg-[#141925] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            className="min-h-[40px] flex-1 resize-none rounded-md border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           />
           <button
             type="button"
             onClick={sendMessage}
             disabled={!input.trim() || sending}
-            className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-lg transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-lg transition-all active:scale-[0.98] hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Send className="size-4" />
           </button>

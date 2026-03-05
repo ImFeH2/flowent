@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  Search,
-  Wrench,
-} from "lucide-react";
+import { motion } from "motion/react";
+import { ChevronDown, ChevronRight, Search, Wrench } from "lucide-react";
 
 interface ToolInfo {
   name: string;
@@ -51,7 +46,7 @@ export function ToolsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Wrench className="size-5 text-primary" />
           <div>
@@ -66,25 +61,31 @@ export function ToolsPage() {
         </div>
       </div>
 
-      <div className="border-b border-border/50 px-6 py-3">
+      <div className="border-b border-border px-6 py-3">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tools..."
-            className="w-full rounded-lg border border-border/50 bg-card py-2 pl-10 pr-4 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full rounded-lg border border-border bg-card py-2 pl-10 pr-4 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
-          <div className="flex h-full items-center justify-center">
-            <Loader2 className="size-8 animate-spin text-primary/50" />
+          <div className="mx-auto max-w-3xl space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-14 rounded-xl skeleton-shimmer" />
+            ))}
           </div>
         ) : filteredTools.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex h-full flex-col items-center justify-center text-center"
+          >
             <div className="flex size-16 items-center justify-center rounded-2xl bg-accent">
               <Wrench className="size-8 text-primary/50" />
             </div>
@@ -92,15 +93,18 @@ export function ToolsPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Try adjusting your search query.
             </p>
-          </div>
+          </motion.div>
         ) : (
           <div className="mx-auto max-w-3xl space-y-3">
-            {filteredTools.map((tool) => {
+            {filteredTools.map((tool, i) => {
               const isExpanded = expanded.has(tool.name);
               return (
-                <div
+                <motion.div
                   key={tool.name}
-                  className="rounded-xl border border-border/50 bg-card overflow-hidden transition-all hover:border-border"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="rounded-xl border border-border bg-card overflow-hidden transition-all hover:border-foreground/15"
                 >
                   <button
                     onClick={() => toggle(tool.name)}
@@ -122,7 +126,7 @@ export function ToolsPage() {
                   </button>
 
                   {isExpanded && tool.parameters && (
-                    <div className="border-t border-border/50 bg-card/50 px-4 py-3">
+                    <div className="border-t border-border bg-card/50 px-4 py-3">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Parameters
                       </p>
@@ -131,7 +135,7 @@ export function ToolsPage() {
                       </pre>
                     </div>
                   )}
-                </div>
+                </motion.div>
               );
             })}
           </div>

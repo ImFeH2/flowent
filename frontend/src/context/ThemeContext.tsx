@@ -35,6 +35,7 @@ function getStoredTheme(): Theme | null {
 
 function applyTheme(theme: Theme) {
   localStorage.setItem(STORAGE_KEY, theme);
+  document.documentElement.style.colorScheme = theme;
   if (theme === "dark") {
     document.documentElement.classList.add("dark");
     document.documentElement.classList.remove("light");

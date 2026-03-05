@@ -15,7 +15,6 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isFloating = variant === "floating";
-  const isDocked = variant === "docked";
   const messageCount = stewardMessages.length;
 
   useEffect(() => {
@@ -51,32 +50,25 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
       className={cn(
         "flex h-full flex-col",
         isFloating
-          ? "overflow-hidden rounded-[1.5rem] border border-white/25 bg-slate-900/65 text-slate-100 shadow-2xl backdrop-blur-2xl"
-          : isDocked
-            ? "overflow-hidden rounded-3xl border border-white/70 bg-white/70 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur-xl"
-            : "overflow-hidden rounded-3xl border border-white/70 bg-white/70 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur-xl",
+          ? "overflow-hidden rounded-[1.5rem] border border-glass-border bg-glass-bg text-foreground shadow-2xl backdrop-blur-2xl"
+          : "overflow-hidden rounded-3xl border border-glass-border bg-surface-raised shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur-xl",
       )}
     >
       <div
         className={cn(
           "flex items-center gap-2 border-b px-4 py-3",
           isFloating
-            ? "border-white/15"
-            : "border-slate-200/80 bg-gradient-to-r from-white/80 to-zinc-50/70",
+            ? "border-glass-border"
+            : "border-glass-border bg-surface-2",
         )}
       >
         <Shield
           className={cn(
             "size-4",
-            isFloating ? "text-amber-300" : "text-zinc-600",
+            isFloating ? "text-amber-300" : "text-muted-foreground",
           )}
         />
-        <span
-          className={cn(
-            "text-sm font-semibold",
-            isFloating ? "text-slate-100" : "text-slate-800",
-          )}
-        >
+        <span className="text-sm font-semibold text-foreground">
           Steward Chat
         </span>
         <span
@@ -84,9 +76,7 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
             "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
             connected
               ? "bg-emerald-400/20 text-emerald-300"
-              : isFloating
-                ? "bg-amber-300/20 text-amber-200"
-                : "bg-amber-100 text-amber-700",
+              : "bg-amber-400/20 text-amber-300",
           )}
         >
           {connected ? "Live" : "Syncing"}
@@ -97,18 +87,8 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
         {stewardMessages.length === 0 && (
           <div className="flex h-full items-center justify-center">
             <div className="max-w-[260px] space-y-2 text-center">
-              <Sparkles
-                className={cn(
-                  "mx-auto size-5",
-                  isFloating ? "text-zinc-300" : "text-zinc-500",
-                )}
-              />
-              <p
-                className={cn(
-                  "text-sm",
-                  isFloating ? "text-slate-300" : "text-slate-500",
-                )}
-              >
+              <Sparkles className="mx-auto size-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
                 Ask the Steward to plan tasks, summarize progress, or coordinate
                 next steps.
               </p>
@@ -125,30 +105,16 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
                 <Shield
                   className={cn(
                     "mt-1 size-4 shrink-0",
-                    isFloating ? "text-amber-300" : "text-zinc-500",
+                    isFloating ? "text-amber-300" : "text-muted-foreground",
                   )}
                 />
-                <div
-                  className={cn(
-                    "rounded-2xl border px-3 py-2 text-sm",
-                    isFloating
-                      ? "border-white/15 bg-slate-800/70 text-slate-100"
-                      : "border-white/80 bg-white/85 text-slate-800",
-                  )}
-                >
+                <div className="rounded-2xl border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground">
                   <MarkdownContent content={msg.content} />
                 </div>
               </div>
             )}
             {msg.from === "human" && (
-              <div
-                className={cn(
-                  "max-w-[80%] rounded-2xl border px-3 py-2 text-sm",
-                  isFloating
-                    ? "border-zinc-300/35 bg-zinc-400/20 text-zinc-100"
-                    : "border-zinc-200 bg-zinc-50 text-zinc-800",
-                )}
-              >
+              <div className="max-w-[80%] rounded-2xl border border-glass-border bg-surface-3 px-3 py-2 text-sm text-foreground">
                 {msg.content}
               </div>
             )}
@@ -160,7 +126,7 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
       <div
         className={cn(
           "flex items-end gap-2 border-t px-4 py-3",
-          isFloating ? "border-white/15" : "border-slate-200/80",
+          "border-glass-border",
         )}
       >
         <textarea
@@ -169,23 +135,13 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
           onKeyDown={handleKeyDown}
           placeholder="Message the Steward... (Enter to send)"
           rows={2}
-          className={cn(
-            "flex-1 resize-none rounded-2xl border px-3 py-2 text-sm transition-colors focus:outline-none",
-            isFloating
-              ? "border-white/20 bg-slate-900/70 text-slate-100 placeholder:text-slate-400 focus:border-zinc-300/60"
-              : "border-white/80 bg-white/90 text-slate-800 placeholder:text-slate-400 focus:border-zinc-300",
-          )}
+          className="flex-1 resize-none rounded-2xl border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none"
         />
         <button
           type="button"
           onClick={sendMessage}
           disabled={!input.trim() || sending}
-          className={cn(
-            "flex size-10 items-center justify-center rounded-2xl text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-            isFloating
-              ? "bg-zinc-500 hover:bg-zinc-400"
-              : "bg-slate-900 hover:bg-slate-700",
-          )}
+          className="flex size-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Send className="size-4" />
         </button>

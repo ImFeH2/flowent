@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import {
   Check,
   ChevronRight,
@@ -148,8 +149,8 @@ export function ProvidersPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex w-[300px] flex-col border-r border-border/50 bg-card/30">
-        <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+      <div className="flex w-[300px] flex-col border-r border-border bg-card/30">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2">
             <Server className="size-4 text-primary" />
             <span className="font-semibold">Providers</span>
@@ -167,7 +168,7 @@ export function ProvidersPage() {
             </button>
             <button
               onClick={handleCreateNew}
-              className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-all active:scale-[0.98] hover:bg-primary/90"
               title="Add Provider"
             >
               <Plus className="size-3.5" />
@@ -177,11 +178,17 @@ export function ProvidersPage() {
 
         <div className="flex-1 overflow-y-auto p-2">
           {loading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              Loading...
+            <div className="space-y-2 py-4 px-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-14 rounded-lg skeleton-shimmer" />
+              ))}
             </div>
           ) : providers.length === 0 ? (
-            <div className="py-8 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="py-8 text-center"
+            >
               <p className="text-sm text-muted-foreground">No providers</p>
               <button
                 onClick={handleCreateNew}
@@ -189,12 +196,15 @@ export function ProvidersPage() {
               >
                 Add your first provider
               </button>
-            </div>
+            </motion.div>
           ) : (
             <div className="space-y-1">
-              {providers.map((provider) => (
-                <button
+              {providers.map((provider, i) => (
+                <motion.button
                   key={provider.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
                   onClick={() => handleSelect(provider)}
                   className={cn(
                     "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all",
@@ -223,7 +233,7 @@ export function ProvidersPage() {
                     </button>
                     <ChevronRight className="size-4 text-muted-foreground" />
                   </div>
-                </button>
+                </motion.button>
               ))}
             </div>
           )}
@@ -233,7 +243,7 @@ export function ProvidersPage() {
       <div className="flex-1 bg-card/20">
         {isCreating || selectedProvider ? (
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <div>
                 <h2 className="text-lg font-semibold">
                   {isCreating ? "New Provider" : selectedProvider?.name}
@@ -250,14 +260,14 @@ export function ProvidersPage() {
                     <button
                       onClick={handleCancel}
                       disabled={saving}
-                      className="rounded-md border border-border/50 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                      className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={() => void handleSave()}
                       disabled={saving}
-                      className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50"
+                      className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
                     >
                       <Check className="size-4" />
                       {saving ? "Saving..." : "Save"}
@@ -278,7 +288,7 @@ export function ProvidersPage() {
                       setDraft({ ...draft, name: e.target.value })
                     }
                     placeholder="e.g., OpenAI Production"
-                    className="w-full rounded-lg border border-border/50 bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
 
@@ -289,7 +299,7 @@ export function ProvidersPage() {
                     onChange={(e) =>
                       setDraft({ ...draft, type: e.target.value })
                     }
-                    className="w-full rounded-lg border border-border/50 bg-card px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     {providerTypeOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -315,7 +325,7 @@ export function ProvidersPage() {
                       setDraft({ ...draft, base_url: e.target.value })
                     }
                     placeholder="https://api.openai.com/v1"
-                    className="w-full rounded-lg border border-border/50 bg-card px-3 py-2 text-sm font-mono placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-mono transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
 
@@ -329,7 +339,7 @@ export function ProvidersPage() {
                         setDraft({ ...draft, api_key: e.target.value })
                       }
                       placeholder="sk-..."
-                      className="w-full rounded-lg border border-border/50 bg-card px-3 py-2 pr-10 text-sm font-mono placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      className="w-full rounded-lg border border-border bg-card px-3 py-2 pr-10 text-sm font-mono transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                     <button
                       type="button"
@@ -349,7 +359,7 @@ export function ProvidersPage() {
                 </div>
 
                 {!isCreating && selectedProvider && (
-                  <div className="pt-6 border-t border-border/50">
+                  <div className="pt-6 border-t border-border">
                     <button
                       onClick={() => handleDelete(selectedProvider.id)}
                       className="flex items-center gap-2 rounded-md border border-destructive/50 px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
@@ -363,7 +373,11 @@ export function ProvidersPage() {
             </div>
           </div>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex h-full flex-col items-center justify-center text-center"
+          >
             <div className="flex size-16 items-center justify-center rounded-2xl bg-accent">
               <Server className="size-8 text-primary/50" />
             </div>
@@ -374,12 +388,12 @@ export function ProvidersPage() {
             </p>
             <button
               onClick={handleCreateNew}
-              className="mt-4 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90"
+              className="mt-4 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90"
             >
               <Plus className="size-4" />
               Add Provider
             </button>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

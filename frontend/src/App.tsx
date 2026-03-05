@@ -36,8 +36,7 @@ function AppContent() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(120,120,130,0.08),transparent_52%),radial-gradient(ellipse_at_bottom_right,rgba(18,18,22,0.38),transparent_58%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(10,10,12,0.22),rgba(6,6,8,0.94))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_52%)] opacity-40" />
 
       {!isWorkspace && <Sidebar />}
 
@@ -54,7 +53,7 @@ function AppContent() {
           <button
             type="button"
             onClick={() => setWorkspaceSidebarOpen((prev) => !prev)}
-            className="absolute left-4 top-4 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-[#10131a]/88 text-muted-foreground shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-colors hover:bg-[#161a24] hover:text-foreground"
+            className="absolute left-4 top-4 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground"
             title={workspaceSidebarOpen ? "Hide navigation" : "Show navigation"}
           >
             {workspaceSidebarOpen ? (
@@ -92,14 +91,25 @@ function AppContent() {
       >
         <div
           className={cn(
-            "h-full overflow-hidden border shadow-2xl",
+            "h-full overflow-hidden rounded-xl border shadow-2xl",
             isWorkspace
-              ? "rounded-xl border-white/10 bg-[#0c0f16]/88 shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
-              : "rounded-xl border-white/10 bg-[#10131a]/78 shadow-[0_18px_60px_rgba(0,0,0,0.4)]",
+              ? "border-glass-border bg-glass-bg shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
+              : "border-glass-border bg-surface-overlay shadow-[0_18px_60px_rgba(0,0,0,0.4)]",
           )}
         >
           <ThemeAwareToaster />
-          {renderPage()}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentPage}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className="h-full"
+            >
+              {renderPage()}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>
@@ -114,7 +124,7 @@ function ThemeAwareToaster() {
       position="bottom-right"
       toastOptions={{
         className:
-          "rounded-md border border-border bg-[#121620] text-foreground shadow-xl",
+          "rounded-md border border-border bg-surface-2 text-foreground shadow-xl",
       }}
     />
   );

@@ -41,8 +41,8 @@ function AnimatedMessageEdge(props: EdgeProps) {
         path={edgePath}
         style={{
           stroke: hasActiveMessage
-            ? "rgba(214,220,229,0.52)"
-            : "rgba(148,163,184,0.18)",
+            ? "var(--graph-edge-active)"
+            : "var(--graph-edge)",
           strokeWidth: hasActiveMessage ? 2.2 : 1.2,
         }}
       />
@@ -65,11 +65,19 @@ function AnimatedMessageEdge(props: EdgeProps) {
               repeatCount="indefinite"
             />
           </path>
-          <circle r="2.6" fill="#d4dae4">
+          <circle r="2.6" fill="var(--graph-edge-active)">
             <animateMotion
               dur="0.5s"
               repeatCount="indefinite"
               path={edgePath}
+            />
+          </circle>
+          <circle r="2" fill="var(--graph-edge-active)" opacity="0.6">
+            <animateMotion
+              dur="0.5s"
+              repeatCount="indefinite"
+              path={edgePath}
+              begin="0.25s"
             />
           </circle>
         </>
@@ -147,12 +155,6 @@ export function AgentGraph() {
             target: connId,
             type: "animated",
             data: { active: isActive },
-            style: {
-              stroke: isActive
-                ? "rgba(214,220,229,0.52)"
-                : "rgba(148,163,184,0.18)",
-              strokeWidth: isActive ? 2.2 : 1.2,
-            },
             animated: false,
           });
         }
@@ -256,23 +258,15 @@ export function AgentGraph() {
     <div className="relative flex h-full flex-col">
       <div className="relative flex-1 overflow-hidden">
         {nodes.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0.5 }}
-            animate={{ opacity: 1 }}
-            transition={{
-              repeat: Infinity,
-              repeatType: "mirror",
-              duration: 1.2,
-            }}
-            className="flex h-full items-center justify-center"
-          >
+          <div className="flex h-full items-center justify-center">
             <div className="space-y-3 text-center">
               <Network className="mx-auto size-8 text-primary/65" />
+              <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
               <p className="text-sm text-muted-foreground">
                 Loading agent graph...
               </p>
             </div>
-          </motion.div>
+          </div>
         ) : (
           <ReactFlow
             nodes={nodes}
@@ -297,13 +291,13 @@ export function AgentGraph() {
             maxZoom={1.8}
             className="bg-transparent"
           >
-            <Background color="rgba(125,125,135,0.12)" gap={30} size={1} />
+            <Background color="var(--graph-edge)" gap={32} size={0.8} />
             <MiniMap
               zoomable
               pannable
-              className="!rounded-md !border !border-white/10 !bg-[#101114] !shadow-[0_10px_24px_rgba(0,0,0,0.4)]"
-              maskColor="rgba(8,8,10,0.72)"
-              nodeColor="rgba(196,202,212,0.75)"
+              className="!rounded-md !border !border-glass-border !bg-surface-1 !shadow-lg"
+              maskColor="var(--surface-overlay)"
+              nodeColor="var(--muted-foreground)"
             />
             <svg aria-hidden="true" focusable="false">
               <defs>
@@ -314,9 +308,21 @@ export function AgentGraph() {
                   x2="1"
                   y2="0"
                 >
-                  <stop offset="0%" stopColor="#8f96a3" stopOpacity="0.2" />
-                  <stop offset="50%" stopColor="#d4dae4" stopOpacity="0.94" />
-                  <stop offset="100%" stopColor="#8f96a3" stopOpacity="0.2" />
+                  <stop
+                    offset="0%"
+                    stopColor="var(--graph-edge)"
+                    stopOpacity="0.2"
+                  />
+                  <stop
+                    offset="50%"
+                    stopColor="var(--graph-edge-active)"
+                    stopOpacity="0.94"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--graph-edge)"
+                    stopOpacity="0.2"
+                  />
                 </linearGradient>
               </defs>
             </svg>
@@ -331,7 +337,7 @@ export function AgentGraph() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 2, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="pointer-events-none fixed z-[100] rounded-md border border-white/10 bg-[#121316]/95 px-3 py-2 shadow-xl backdrop-blur-sm"
+            className="pointer-events-none fixed z-[100] rounded-md border border-glass-border bg-glass-bg px-3 py-2 shadow-xl backdrop-blur-sm"
             style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
           >
             <div className="flex items-center gap-2">

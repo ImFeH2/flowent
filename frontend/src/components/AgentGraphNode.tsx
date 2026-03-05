@@ -1,12 +1,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import {
-  nodeTypeIcon,
-  stateColor,
-  stateBorder,
-  nodeTypeBorder,
-} from "@/lib/constants";
+import { nodeTypeIcon, stateColor, stateBorder } from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
 interface AgentNodeData {
@@ -27,17 +22,7 @@ export function AgentGraphNode({ data }: NodeProps) {
   const isToolActive = !!toolCall;
   const isRunning = state === "running";
 
-  const baseBorder = isToolActive
-    ? "border-amber-500/80"
-    : node_type === "steward" || node_type === "conductor"
-      ? nodeTypeBorder[node_type]
-      : stateBorder[state];
-
-  const nodeColors = {
-    steward: "bg-[#151619]",
-    conductor: "bg-[#161719]",
-    agent: "bg-[#131417]",
-  };
+  const baseBorder = isToolActive ? "border-amber-500/80" : stateBorder[state];
 
   return (
     <motion.div
@@ -47,12 +32,12 @@ export function AgentGraphNode({ data }: NodeProps) {
       className={cn(
         "relative flex min-w-[210px] items-center gap-3 rounded-md border px-4 py-3",
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
-        nodeColors[node_type],
+        "bg-graph-node-bg",
         baseBorder,
         selected
-          ? "border-primary/80 shadow-[0_0_0_1px_rgba(212,199,166,0.28)]"
-          : "border-white/18 hover:border-white/30",
-        isRunning && "shadow-[0_12px_28px_rgba(16,185,129,0.12)]",
+          ? "ring-1 ring-primary/20 border-primary/80"
+          : "border-graph-node-border hover:border-foreground/20",
+        isRunning && "node-glow-active",
         state === "terminated" && "opacity-40 grayscale",
       )}
     >
@@ -62,16 +47,7 @@ export function AgentGraphNode({ data }: NodeProps) {
         className="!size-2.5 !border !border-card !bg-muted-foreground"
       />
 
-      <div
-        className={cn(
-          "flex size-9 shrink-0 items-center justify-center rounded-sm border border-white/10",
-          node_type === "steward"
-            ? "bg-[#1e2024] text-[#cfd3db]"
-            : node_type === "conductor"
-              ? "bg-[#1f2124] text-[#d5dae2]"
-              : "bg-[#1a1c20] text-slate-300",
-        )}
-      >
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-sm border border-graph-node-border bg-surface-3 text-foreground/80">
         <Icon className="size-5" />
       </div>
 
@@ -109,8 +85,8 @@ export function AgentGraphNode({ data }: NodeProps) {
           animate={{ opacity: 1, y: 0 }}
           className="absolute -bottom-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap"
         >
-          <span className="rounded-sm border border-amber-500/35 bg-[#131924] px-2 py-1 text-[10px] font-mono text-amber-300 shadow-lg backdrop-blur-sm">
-            ⚡ {toolCall}
+          <span className="rounded-sm border border-amber-500/35 bg-surface-2 px-2 py-1 text-[10px] font-mono text-amber-300 shadow-lg backdrop-blur-sm">
+            {toolCall}
           </span>
         </motion.div>
       )}

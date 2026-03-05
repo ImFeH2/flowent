@@ -19,7 +19,7 @@ export function CopyButton({ text }: CopyButtonProps) {
   return (
     <button
       onClick={handleCopy}
-      className="rounded p-0.5 text-zinc-500 hover:text-zinc-300 opacity-0 group-hover:opacity-100 transition-all"
+      className="rounded p-0.5 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
       title="Copy"
     >
       {copied ? (

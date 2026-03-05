@@ -25,10 +25,10 @@ export function PageScaffold({
     <div className={cn("flex h-full flex-col p-6 md:p-8", className)}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[1.45rem] font-semibold tracking-[-0.02em] text-slate-900">
+          <h1 className="text-[1.45rem] font-semibold tracking-[-0.02em] text-foreground">
             {title}
           </h1>
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         {actions ? (
           <div className="flex items-center gap-2">{actions}</div>
@@ -43,7 +43,7 @@ export function SoftPanel({ children, className }: SoftPanelProps) {
   return (
     <section
       className={cn(
-        "rounded-3xl border border-white/70 bg-white/65 p-5 shadow-[0_20px_60px_-35px_rgba(30,41,59,0.4)] backdrop-blur-xl",
+        "rounded-3xl border border-glass-border bg-surface-raised p-5 shadow-lg backdrop-blur-xl ios-card-shadow",
         className,
       )}
     >

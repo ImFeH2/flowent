@@ -1,5 +1,5 @@
 import { Bot, Shield, Wand2 } from "lucide-react";
-import { type AgentState, type NodeType } from "@/types";
+import { type AgentState } from "@/types";
 
 export const nodeTypeIcon = {
   steward: Shield,
@@ -28,15 +28,9 @@ export const stateBadgeColor: Record<AgentState, string> = {
 };
 
 export const stateBorder: Record<AgentState, string> = {
-  running: "border-emerald-300/80",
-  idle: "border-zinc-300/80",
-  initializing: "border-amber-300/80",
-  error: "border-rose-300/80",
-  terminated: "border-slate-300/80",
-};
-
-export const nodeTypeBorder: Record<NodeType, string> = {
-  steward: "border-zinc-300/75",
-  conductor: "border-slate-300/75",
-  agent: "border-slate-300/80",
+  running: "border-emerald-400/60",
+  idle: "border-graph-node-border",
+  initializing: "border-amber-400/60",
+  error: "border-rose-400/60",
+  terminated: "border-graph-node-border",
 };

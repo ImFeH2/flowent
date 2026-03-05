@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { motion } from "motion/react";
 
 export interface ContextMenuItem {
   label: string;
@@ -38,14 +39,17 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   }, [onClose]);
 
   return (
-    <div
+    <motion.div
       ref={ref}
-      className="fixed z-[200] min-w-[160px] rounded-md border border-zinc-700 bg-zinc-800 py-1 shadow-xl"
+      initial={{ opacity: 0, scale: 0.96, y: -4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.12, ease: "easeOut" }}
+      className="fixed z-[200] min-w-[160px] rounded-md border border-glass-border bg-surface-raised py-1 shadow-xl backdrop-blur-sm"
       style={{ left: x, top: y }}
     >
       {items.map((item, i) =>
         item === "divider" ? (
-          <div key={i} className="my-1 border-t border-zinc-700" />
+          <div key={i} className="my-1 border-t border-glass-border" />
         ) : (
           <button
             key={i}
@@ -59,13 +63,13 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             className={`w-full px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               item.danger
                 ? "text-red-400 hover:bg-red-900/30"
-                : "text-zinc-200 hover:bg-zinc-700"
+                : "text-foreground hover:bg-surface-3"
             }`}
           >
             {item.label}
           </button>
         ),
       )}
-    </div>
+    </motion.div>
   );
 }

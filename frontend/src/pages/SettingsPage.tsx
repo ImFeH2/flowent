@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, Save, Settings } from "lucide-react";
+import { RefreshCw, Save, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchProviderModels,
@@ -111,11 +111,9 @@ export function SettingsPage() {
   if (loading || !settings) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="mx-auto size-8 animate-spin text-primary/50" />
-          <p className="mt-2 text-sm text-muted-foreground">
-            Loading settings...
-          </p>
+        <div className="space-y-3 text-center">
+          <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
+          <p className="text-sm text-muted-foreground">Loading settings...</p>
         </div>
       </div>
     );
@@ -123,7 +121,7 @@ export function SettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <Settings className="size-5 text-primary" />
           <div>
@@ -136,7 +134,7 @@ export function SettingsPage() {
         <button
           onClick={() => void handleSave()}
           disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
         >
           <Save className="size-4" />
           {saving ? "Saving..." : "Save Changes"}
@@ -145,7 +143,7 @@ export function SettingsPage() {
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-2xl space-y-6">
-          <div className="rounded-xl border border-border/50 bg-card p-6 shadow-lg">
+          <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
             <h2 className="mb-4 text-lg font-semibold">Model Configuration</h2>
 
             <div className="space-y-6">
@@ -163,7 +161,7 @@ export function SettingsPage() {
                       },
                     })
                   }
-                  className="w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 >
                   <option value="">Select a provider</option>
                   {providers.map((p) => (
@@ -208,7 +206,7 @@ export function SettingsPage() {
                         },
                       })
                     }
-                    className="w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="">Select a model</option>
                     {models.map((m) => (
@@ -235,14 +233,14 @@ export function SettingsPage() {
                         ? "Loading models..."
                         : "Enter model ID manually"
                     }
-                    className="w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+          <div className="rounded-xl border border-border bg-card/50 p-4">
             <h3 className="mb-2 text-sm font-semibold">About</h3>
             <p className="text-sm text-muted-foreground">
               Autopoe Agent Studio v0.1.0

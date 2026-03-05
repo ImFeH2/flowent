@@ -52,8 +52,8 @@ export function Sidebar({
         className,
       )}
     >
-      <div className="flex h-full flex-col rounded-lg border border-white/10 bg-[#0f131d]/94 p-3 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="mb-3 rounded-md border border-white/10 bg-[#151a25] px-4 py-3">
+      <div className="flex h-full flex-col rounded-lg border border-glass-border bg-glass-bg p-3 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+        <div className="mb-3 rounded-md border border-glass-border bg-surface-2 px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
@@ -66,7 +66,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex size-8 items-center justify-center rounded-md border border-white/10 bg-black/60 text-muted-foreground shadow-sm transition-all hover:bg-white/10 hover:text-foreground"
+              className="flex size-8 items-center justify-center rounded-md border border-glass-border bg-surface-1 text-muted-foreground shadow-sm transition-all hover:bg-surface-3 hover:text-foreground"
               title={
                 theme === "light"
                   ? "Switch to dark mode"
@@ -104,8 +104,8 @@ export function Sidebar({
               className={cn(
                 "group flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-all duration-200",
                 currentPage === id
-                  ? "border-white/12 bg-[#171c28] text-foreground"
-                  : "border-transparent text-muted-foreground hover:bg-[#151a25] hover:text-foreground",
+                  ? "border-glass-border bg-surface-3 text-foreground"
+                  : "border-transparent text-muted-foreground hover:bg-surface-2 hover:text-foreground",
               )}
             >
               <Icon
@@ -121,7 +121,7 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="mt-3 rounded-md border border-white/10 bg-[#151a25] p-3">
+        <div className="mt-3 rounded-md border border-glass-border bg-surface-2 p-3">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 items-center justify-center rounded-sm bg-primary/12 text-primary">
               <Bot className="size-4" />
@@ -134,7 +134,7 @@ export function Sidebar({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 rounded-sm border border-white/10 bg-[#0f141f] px-2.5 py-2 text-[11px] text-muted-foreground">
+          <div className="mt-3 flex items-center gap-2 rounded-sm border border-glass-border bg-surface-1 px-2.5 py-2 text-[11px] text-muted-foreground">
             <Sparkles className="size-3.5 text-primary" />
             <span>Click a node to view details</span>
           </div>

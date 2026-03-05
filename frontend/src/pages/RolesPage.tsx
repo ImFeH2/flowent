@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import {
   BookOpen,
   Check,
@@ -107,7 +108,7 @@ export function RolesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <div className="flex items-center gap-3">
           <BookOpen className="size-5 text-primary" />
           <div>
@@ -121,14 +122,14 @@ export function RolesPage() {
           <button
             onClick={() => void refreshRoles()}
             disabled={loading}
-            className="flex size-9 items-center justify-center rounded-lg border border-border/50 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             <RefreshCw className={cn("size-4", loading && "animate-spin")} />
           </button>
           <button
             onClick={handleCreate}
             disabled={isEditing}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
           >
             <Plus className="size-4" />
             New Role
@@ -139,7 +140,7 @@ export function RolesPage() {
       <div className="flex-1 overflow-y-auto p-6">
         {isEditing ? (
           <div className="mx-auto max-w-3xl">
-            <div className="rounded-xl border border-border/50 bg-card p-6 shadow-lg">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-xl font-semibold">
                   {editingId ? "Edit Role" : "Create Role"}
@@ -162,7 +163,7 @@ export function RolesPage() {
                       setDraft({ ...draft, name: e.target.value })
                     }
                     placeholder="e.g., Code Reviewer"
-                    className="w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
 
@@ -175,7 +176,7 @@ export function RolesPage() {
                     }
                     placeholder="You are a helpful assistant that..."
                     rows={12}
-                    className="w-full resize-y rounded-lg border border-border/50 bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                   <p className="text-xs text-muted-foreground">
                     This prompt defines how agents with this role will behave.
@@ -186,14 +187,14 @@ export function RolesPage() {
                   <button
                     onClick={handleCancel}
                     disabled={saving}
-                    className="rounded-lg border border-border/50 px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
+                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => void handleSave()}
                     disabled={saving}
-                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50"
+                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
                   >
                     <Check className="size-4" />
                     {saving ? "Saving..." : "Save Role"}
@@ -204,15 +205,17 @@ export function RolesPage() {
           </div>
         ) : loading ? (
           <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <RefreshCw className="mx-auto size-8 animate-spin text-primary/50" />
-              <p className="mt-2 text-sm text-muted-foreground">
-                Loading roles...
-              </p>
+            <div className="space-y-3 text-center">
+              <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
+              <p className="text-sm text-muted-foreground">Loading roles...</p>
             </div>
           </div>
         ) : roles.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex h-full flex-col items-center justify-center text-center"
+          >
             <div className="flex size-16 items-center justify-center rounded-2xl bg-accent">
               <BookOpen className="size-8 text-primary/50" />
             </div>
@@ -222,18 +225,21 @@ export function RolesPage() {
             </p>
             <button
               onClick={handleCreate}
-              className="mt-4 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90"
+              className="mt-4 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90"
             >
               <Plus className="size-4" />
               Create Role
             </button>
-          </div>
+          </motion.div>
         ) : (
           <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {roles.map((role) => (
-              <div
+            {roles.map((role, i) => (
+              <motion.div
                 key={role.id}
-                className="group relative rounded-xl border border-border/50 bg-card p-5 shadow-sm transition-all hover:border-border hover:shadow-md"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="group relative rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-foreground/15 hover:shadow-md"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -268,7 +274,7 @@ export function RolesPage() {
                     {role.system_prompt}
                   </p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}

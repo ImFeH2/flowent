@@ -47,14 +47,14 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "z-40 flex w-72 flex-col",
-        autoHide ? "h-full" : "fixed left-0 top-0 h-screen p-2.5",
+        "bg-sidebar text-sidebar-foreground border-sidebar-border z-40 flex w-72 flex-col border-r",
+        autoHide ? "h-full" : "fixed left-0 top-0 h-screen",
         className,
       )}
     >
-      <div className="flex h-full flex-col rounded-lg border border-glass-border bg-glass-bg p-3 shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="mb-3 rounded-md border border-glass-border bg-surface-2 px-4 py-3">
-          <div className="flex items-center justify-between">
+      <div className="flex h-full flex-col">
+        <div className="border-sidebar-border border-b px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
                 Autopoe
@@ -66,7 +66,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex size-8 items-center justify-center rounded-md border border-glass-border bg-surface-1 text-muted-foreground shadow-sm transition-all hover:bg-surface-3 hover:text-foreground"
+              className="hover:bg-sidebar-accent text-muted-foreground flex size-8 items-center justify-center rounded-md transition-colors hover:text-foreground"
               title={
                 theme === "light"
                   ? "Switch to dark mode"
@@ -91,21 +91,21 @@ export function Sidebar({
           </div>
         </div>
 
-        <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">
+        <div className="mt-4 mb-2 px-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">
           Workspace
         </div>
 
-        <nav className="flex-1 space-y-1 px-1">
+        <nav className="flex-1 space-y-1 px-3">
           {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
             <button
               key={id}
               type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-sm transition-all duration-200",
+                "hover:bg-sidebar-accent group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors",
                 currentPage === id
-                  ? "border-glass-border bg-surface-3 text-foreground"
-                  : "border-transparent text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+                  ? "bg-sidebar-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               <Icon
@@ -121,7 +121,7 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="mt-3 rounded-md border border-glass-border bg-surface-2 p-3">
+        <div className="border-sidebar-border border-t px-4 py-4">
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 items-center justify-center rounded-sm bg-primary/12 text-primary">
               <Bot className="size-4" />
@@ -134,7 +134,7 @@ export function Sidebar({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center gap-2 rounded-sm border border-glass-border bg-surface-1 px-2.5 py-2 text-[11px] text-muted-foreground">
+          <div className="bg-sidebar-accent mt-3 flex items-center gap-2 rounded-sm px-2.5 py-2 text-[11px] text-muted-foreground">
             <Sparkles className="size-3.5 text-primary" />
             <span>Click a node to view details</span>
           </div>

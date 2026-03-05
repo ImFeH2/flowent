@@ -26,6 +26,7 @@ import { Network } from "lucide-react";
 import { toast } from "sonner";
 import { AgentGraphNode } from "@/components/AgentGraphNode";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
+import { useTheme } from "@/context/ThemeContext";
 import { getLayoutedElements } from "@/lib/layout";
 import { useAgent } from "@/context/AgentContext";
 import { Badge } from "@/components/ui/badge";
@@ -111,6 +112,7 @@ interface ContextMenuState {
 }
 
 export function AgentGraph() {
+  const { theme } = useTheme();
   const {
     agents,
     selectedAgentId,
@@ -337,6 +339,7 @@ export function AgentGraph() {
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            colorMode={theme}
             onInit={setFlowInstance}
             onNodeClick={onNodeClick}
             onNodeMouseEnter={onNodeMouseEnter}

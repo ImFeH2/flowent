@@ -37,13 +37,11 @@ function AppContent() {
 
       <Sidebar />
 
-      <main className={cn("relative z-10 h-full p-2.5", "ml-72")}>
+      <main className={cn("relative z-10 h-full", "ml-72")}>
         <div
           className={cn(
-            "h-full overflow-hidden rounded-xl border shadow-2xl",
-            isWorkspace
-              ? "border-glass-border bg-glass-bg shadow-[0_24px_80px_rgba(0,0,0,0.55)]"
-              : "border-glass-border bg-surface-overlay shadow-[0_18px_60px_rgba(0,0,0,0.4)]",
+            "h-full overflow-hidden",
+            isWorkspace ? "bg-glass-bg" : "bg-surface-overlay",
           )}
         >
           <ThemeAwareToaster />

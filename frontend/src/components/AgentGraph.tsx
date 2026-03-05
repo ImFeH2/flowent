@@ -1,4 +1,11 @@
-import { useMemo, useCallback, useState, type MouseEvent } from "react";
+import {
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import {
   ReactFlow,
   Background,
@@ -8,6 +15,7 @@ import {
   type Node,
   type Edge,
   type EdgeProps,
+  type ReactFlowInstance,
   type NodeTypes,
   type EdgeTypes,
   type NodeMouseHandler,
@@ -112,6 +120,14 @@ export function AgentGraph() {
   } = useAgent();
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(
+    null,
+  );
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const [tooltipSize, setTooltipSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   const activeEdgeSet = useMemo(() => {
     const set = new Set<string>();
@@ -235,7 +251,6 @@ export function AgentGraph() {
       const node = agents.get(agentId);
       const isProtected =
         node?.node_type === "steward" || node?.node_type === "conductor";
-      items.push("divider");
       items.push({
         label: "Stop Agent",
         danger: true,
@@ -248,11 +263,60 @@ export function AgentGraph() {
           }
         },
       });
+    } else {
+      items.push({
+        label: "Fit View",
+        disabled: !flowInstance,
+        onClick: () => {
+          flowInstance?.fitView({ padding: 0.3, duration: 350 });
+        },
+      });
+      items.push({
+        label: "Clear Selection",
+        onClick: () => {
+          selectAgent(null);
+        },
+      });
     }
     return items;
-  }, [contextMenu, agents]);
+  }, [contextMenu, agents, flowInstance, selectAgent]);
 
   const tooltipAgent = tooltip ? agents.get(tooltip.agentId) : null;
+
+  useEffect(() => {
+    if (!tooltip || !tooltipAgent) return;
+    const raf = requestAnimationFrame(() => {
+      const el = tooltipRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setTooltipSize((prev) =>
+        prev &&
+        Math.abs(prev.width - rect.width) < 0.5 &&
+        Math.abs(prev.height - rect.height) < 0.5
+          ? prev
+          : { width: rect.width, height: rect.height },
+      );
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [
+    tooltip?.agentId,
+    tooltipAgent?.state,
+    tooltipAgent?.name,
+    tooltipAgent?.node_type,
+  ]);
+
+  const tooltipStyle = useMemo(() => {
+    if (!tooltip || typeof window === "undefined") return undefined;
+    const margin = 8;
+    const offset = 12;
+    const width = tooltipSize?.width ?? 240;
+    const height = tooltipSize?.height ?? 64;
+    const maxLeft = window.innerWidth - margin - width;
+    const maxTop = window.innerHeight - margin - height;
+    const left = Math.max(margin, Math.min(tooltip.x + offset, maxLeft));
+    const top = Math.max(margin, Math.min(tooltip.y + offset, maxTop));
+    return { left, top };
+  }, [tooltip, tooltipSize]);
 
   return (
     <div className="relative flex h-full flex-col">
@@ -273,6 +337,7 @@ export function AgentGraph() {
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
+            onInit={setFlowInstance}
             onNodeClick={onNodeClick}
             onNodeMouseEnter={onNodeMouseEnter}
             onNodeMouseMove={onNodeMouseMove}
@@ -333,12 +398,13 @@ export function AgentGraph() {
       <AnimatePresence>
         {tooltip && tooltipAgent ? (
           <motion.div
+            ref={tooltipRef}
             initial={{ opacity: 0, y: 4, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 2, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             className="pointer-events-none fixed z-[100] rounded-md border border-glass-border bg-glass-bg px-3 py-2 shadow-xl backdrop-blur-sm"
-            style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}
+            style={tooltipStyle}
           >
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium">

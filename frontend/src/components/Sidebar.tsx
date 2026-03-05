@@ -112,7 +112,7 @@ export function Sidebar({
                 className={cn(
                   "size-4 shrink-0",
                   currentPage === id
-                    ? "text-primary-foreground/80"
+                    ? "text-primary"
                     : "text-muted-foreground group-hover:text-foreground",
                 )}
               />

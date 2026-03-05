@@ -1,5 +1,5 @@
 import "@/styles/App.css";
-import { useState } from "react";
+import { useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Menu, X } from "lucide-react";
 import { Toaster } from "sonner";
@@ -19,6 +19,13 @@ function AppContent() {
   const isWorkspace = currentPage === "graph";
   const [workspaceSidebarOpen, setWorkspaceSidebarOpen] = useState(false);
 
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (!isWorkspace || workspaceSidebarOpen) return;
+    if (event.pointerType !== "mouse") return;
+    if (event.buttons !== 0) return;
+    if (event.clientX <= 12) setWorkspaceSidebarOpen(true);
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case "providers":
@@ -35,21 +42,16 @@ function AppContent() {
   };
 
   return (
-    <div className="relative h-screen overflow-hidden bg-background">
+    <div
+      className="relative h-screen overflow-hidden bg-background"
+      onPointerMove={handlePointerMove}
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_52%)] opacity-40" />
 
       {!isWorkspace && <Sidebar />}
 
       {isWorkspace && (
         <>
-          <button
-            type="button"
-            aria-label="Reveal navigation"
-            className="absolute inset-y-0 left-0 z-30 w-4"
-            onMouseEnter={() => setWorkspaceSidebarOpen(true)}
-            onFocus={() => setWorkspaceSidebarOpen(true)}
-          />
-
           <button
             type="button"
             onClick={() => setWorkspaceSidebarOpen((prev) => !prev)}
@@ -71,7 +73,7 @@ function AppContent() {
                 exit={{ x: -280, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 onMouseLeave={() => setWorkspaceSidebarOpen(false)}
-                className="absolute left-4 top-16 z-40 h-[calc(100%-1.75rem)]"
+                className="absolute left-4 top-16 bottom-4 z-40"
               >
                 <Sidebar
                   autoHide

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 
 export interface ContextMenuItem {
@@ -19,6 +19,24 @@ interface ContextMenuProps {
 
 export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState(() => ({ left: x, top: y }));
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const raf = requestAnimationFrame(() => {
+      const margin = 8;
+      const rect = el.getBoundingClientRect();
+      const maxLeft = window.innerWidth - margin - rect.width;
+      const maxTop = window.innerHeight - margin - rect.height;
+      const left = Math.max(margin, Math.min(x, maxLeft));
+      const top = Math.max(margin, Math.min(y, maxTop));
+      setPos((prev) =>
+        prev.left === left && prev.top === top ? prev : { left, top },
+      );
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [x, y, items.length]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -45,7 +63,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.12, ease: "easeOut" }}
       className="fixed z-[200] min-w-[160px] rounded-md border border-glass-border bg-surface-raised py-1 shadow-xl backdrop-blur-sm"
-      style={{ left: x, top: y }}
+      style={{ left: pos.left, top: pos.top }}
     >
       {items.map((item, i) =>
         item === "divider" ? (

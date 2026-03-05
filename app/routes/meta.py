@@ -12,10 +12,12 @@ async def health_check() -> dict:
 
 @router.get("/api/meta")
 async def get_meta() -> dict:
+    from app._version import __version__
     from app.providers.registry import ProviderType
 
     return {
         "provider_types": [pt.value for pt in ProviderType],
+        "version": __version__,
     }
 
 

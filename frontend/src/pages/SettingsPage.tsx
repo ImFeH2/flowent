@@ -30,6 +30,7 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [models, setModels] = useState<ModelOption[]>([]);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -59,6 +60,15 @@ export function SettingsPage() {
     return () => {
       mounted = false;
     };
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/meta")
+      .then((res) => res.json() as Promise<{ version?: string }>)
+      .then((data) => {
+        setAppVersion(typeof data.version === "string" ? data.version : null);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -256,7 +266,7 @@ export function SettingsPage() {
           <div className="rounded-xl border border-border bg-card/50 p-4">
             <h3 className="mb-2 text-sm font-semibold">About</h3>
             <p className="text-sm text-muted-foreground">
-              Autopoe Agent Studio v0.1.0
+              Autopoe Agent Studio v{appVersion ?? "—"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               A multi-agent collaboration framework.

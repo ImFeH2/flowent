@@ -67,7 +67,7 @@ export function HomePage() {
         <AgentGraph />
       </div>
 
-      <div className="absolute inset-x-0 top-0 z-30 border-b border-glass-border bg-surface-overlay py-2.5 pr-5 pl-16 backdrop-blur-sm sm:pr-6 sm:pl-16">
+      <div className="absolute inset-x-0 top-0 z-30 border-b border-glass-border bg-surface-overlay py-2.5 px-5 backdrop-blur-sm sm:px-6">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-foreground/95">

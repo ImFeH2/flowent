@@ -1,7 +1,5 @@
 import "@/styles/App.css";
-import { useState, type PointerEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Menu, X } from "lucide-react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgent } from "@/context/AgentContext";
@@ -17,14 +15,6 @@ import { cn } from "@/lib/utils";
 function AppContent() {
   const { currentPage } = useAgent();
   const isWorkspace = currentPage === "graph";
-  const [workspaceSidebarOpen, setWorkspaceSidebarOpen] = useState(false);
-
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!isWorkspace || workspaceSidebarOpen) return;
-    if (event.pointerType !== "mouse") return;
-    if (event.buttons !== 0) return;
-    if (event.clientX <= 12) setWorkspaceSidebarOpen(true);
-  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -42,55 +32,12 @@ function AppContent() {
   };
 
   return (
-    <div
-      className="relative h-screen overflow-hidden bg-background"
-      onPointerMove={handlePointerMove}
-    >
+    <div className="relative h-screen overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_52%)] opacity-40" />
 
-      {!isWorkspace && <Sidebar />}
+      <Sidebar />
 
-      {isWorkspace && (
-        <>
-          <button
-            type="button"
-            onClick={() => setWorkspaceSidebarOpen((prev) => !prev)}
-            className="absolute left-4 top-4 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground"
-            title={workspaceSidebarOpen ? "Hide navigation" : "Show navigation"}
-          >
-            {workspaceSidebarOpen ? (
-              <X className="size-4" />
-            ) : (
-              <Menu className="size-4" />
-            )}
-          </button>
-
-          <AnimatePresence>
-            {workspaceSidebarOpen && (
-              <motion.div
-                initial={{ x: -280, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -280, opacity: 0 }}
-                transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                onMouseLeave={() => setWorkspaceSidebarOpen(false)}
-                className="absolute left-4 top-16 bottom-4 z-40"
-              >
-                <Sidebar
-                  autoHide
-                  onNavigate={() => setWorkspaceSidebarOpen(false)}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
-      )}
-
-      <main
-        className={cn(
-          "relative z-10 h-full p-2.5",
-          isWorkspace ? "ml-0" : "ml-72",
-        )}
-      >
+      <main className={cn("relative z-10 h-full p-2.5", "ml-72")}>
         <div
           className={cn(
             "h-full overflow-hidden rounded-xl border shadow-2xl",

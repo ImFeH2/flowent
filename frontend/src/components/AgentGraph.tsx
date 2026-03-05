@@ -126,6 +126,7 @@ export function AgentGraph() {
     null,
   );
   const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const didInitViewport = useRef(false);
   const [tooltipSize, setTooltipSize] = useState<{
     width: number;
     height: number;
@@ -307,6 +308,47 @@ export function AgentGraph() {
     tooltipAgent?.node_type,
   ]);
 
+  useEffect(() => {
+    if (!flowInstance || nodes.length === 0) return;
+    if (didInitViewport.current) return;
+    didInitViewport.current = true;
+
+    const stewardNode = nodes.find((node) => {
+      const data = node.data as Record<string, unknown> | undefined;
+      return data?.node_type === "steward";
+    });
+
+    const raf = requestAnimationFrame(() => {
+      const applyViewport = async () => {
+        await flowInstance
+          .fitView({ padding: 0.3, maxZoom: 0.75, duration: 0 })
+          .catch(() => false);
+
+        const zoom = Math.min(flowInstance.getZoom(), 0.75);
+
+        if (!stewardNode) return;
+
+        const internal = flowInstance.getInternalNode(stewardNode.id);
+        const position =
+          internal?.internals.positionAbsolute ?? stewardNode.position;
+        const width = internal?.measured.width ?? 210;
+        const height = internal?.measured.height ?? 60;
+        flowInstance.setCenter(
+          position.x + width / 2,
+          position.y + height / 2,
+          {
+            zoom,
+            duration: 0,
+          },
+        );
+      };
+
+      void applyViewport();
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [flowInstance, nodes]);
+
   const tooltipStyle = useMemo(() => {
     if (!tooltip || typeof window === "undefined") return undefined;
     const margin = 8;
@@ -348,8 +390,6 @@ export function AgentGraph() {
             onPaneClick={onPaneClick}
             onPaneContextMenu={onPaneContextMenu}
             onNodeContextMenu={onNodeContextMenu}
-            fitView
-            fitViewOptions={{ padding: 0.3 }}
             proOptions={{ hideAttribution: true }}
             nodesDraggable={false}
             nodesConnectable={false}

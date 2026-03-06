@@ -33,11 +33,7 @@ export function AgentGraphNode({ data }: NodeProps) {
 
   const borderClass = selected
     ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
-    : cn(
-        baseBorder,
-        (state === "idle" || state === "terminated") &&
-          "hover:border-graph-node-border-hover",
-      );
+    : cn(baseBorder, "hover:border-graph-node-border-hover");
 
   return (
     <motion.div

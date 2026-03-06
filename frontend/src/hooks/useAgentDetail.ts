@@ -50,10 +50,10 @@ export function useAgentDetail(agentId: string | null) {
     const load = async () => {
       setLoading(true);
       setError(null);
-      clearAgentHistory(agentId);
       try {
         const data = await fetchNodeDetail(agentId, controller.signal);
         if (cancelled) return;
+        clearAgentHistory(agentId);
         setDetail(data);
         setFetchedAt(Date.now());
       } catch (err) {

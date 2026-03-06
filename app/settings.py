@@ -144,6 +144,7 @@ def load_settings() -> Settings:
 
 
 def save_settings(settings: Settings) -> None:
+    global _cached_settings
     temp_path: Path | None = None
     _SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
 

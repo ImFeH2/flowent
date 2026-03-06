@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
   Bot,
   MessageSquare,
@@ -100,67 +100,61 @@ export function HomePage() {
         </BadgeChip>
       </div>
 
-      <AnimatePresence>
-        {!panelVisible && (
-          <motion.button
-            type="button"
-            initial={{ opacity: 0, x: 16 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 16 }}
-            transition={{ duration: 0.2 }}
-            onClick={togglePanel}
-            className="absolute right-4 top-14 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground"
-            title="Show panel"
-            aria-label="Show panel"
-          >
-            <PanelRightOpen className="size-4" />
-          </motion.button>
-        )}
-      </AnimatePresence>
+      <LayoutGroup id="workspace-panel-toggle">
+        <AnimatePresence>
+          {!panelVisible && (
+            <PanelToggleButton
+              expanded={false}
+              onClick={togglePanel}
+              className="absolute right-4 top-14 z-40"
+            />
+          )}
+        </AnimatePresence>
 
-      <AnimatePresence mode="wait">
-        {panelVisible && (
-          <motion.aside
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 30 }}
-            transition={{ type: "spring", stiffness: 320, damping: 30 }}
-            className="absolute bottom-3 right-3 top-14 z-30 w-[min(92vw,420px)] rounded-lg border border-glass-border bg-glass-bg shadow-[0_20px_70px_rgba(0,0,0,0.5)] backdrop-blur-sm"
-          >
-            <div className="flex h-full flex-col overflow-hidden rounded-lg">
-              <AnimatePresence mode="wait">
-                {selectedAgent ? (
-                  <motion.div
-                    key="detail"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex h-full flex-col"
-                  >
-                    <AgentDetailPanel
-                      agent={selectedAgent}
-                      onClose={() => selectAgent(null)}
-                      onCollapse={togglePanel}
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="chat"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex h-full flex-col"
-                  >
-                    <StewardChatPanel onCollapse={togglePanel} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+        <AnimatePresence mode="wait">
+          {panelVisible && (
+            <motion.aside
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 30 }}
+              transition={{ type: "spring", stiffness: 320, damping: 30 }}
+              className="absolute bottom-3 right-3 top-14 z-30 w-[min(92vw,420px)] rounded-lg border border-glass-border bg-glass-bg shadow-[0_20px_70px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+            >
+              <div className="flex h-full flex-col overflow-hidden rounded-lg">
+                <AnimatePresence mode="wait">
+                  {selectedAgent ? (
+                    <motion.div
+                      key="detail"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex h-full flex-col"
+                    >
+                      <AgentDetailPanel
+                        agent={selectedAgent}
+                        onClose={() => selectAgent(null)}
+                        onCollapse={togglePanel}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="chat"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex h-full flex-col"
+                    >
+                      <StewardChatPanel onCollapse={togglePanel} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+      </LayoutGroup>
     </div>
   );
 }
@@ -208,9 +202,7 @@ function AgentDetailPanel({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <PanelActionButton title="Hide panel" onClick={onCollapse}>
-            <PanelRightClose className="size-4" />
-          </PanelActionButton>
+          <PanelToggleButton expanded onClick={onCollapse} />
           <PanelActionButton title="Close details" onClick={onClose}>
             <X className="size-4" />
           </PanelActionButton>
@@ -325,9 +317,7 @@ function StewardChatPanel({ onCollapse }: StewardChatPanelProps) {
             {connected ? "Online" : "Connecting..."}
           </p>
         </div>
-        <PanelActionButton title="Hide panel" onClick={onCollapse}>
-          <PanelRightClose className="size-4" />
-        </PanelActionButton>
+        <PanelToggleButton expanded onClick={onCollapse} />
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
@@ -397,6 +387,55 @@ interface PanelActionButtonProps {
   children: ReactNode;
   onClick: () => void;
   title: string;
+}
+
+interface PanelToggleButtonProps {
+  expanded: boolean;
+  onClick: () => void;
+  className?: string;
+}
+
+function PanelToggleButton({
+  expanded,
+  onClick,
+  className,
+}: PanelToggleButtonProps) {
+  const title = expanded ? "Hide panel" : "Show panel";
+
+  return (
+    <motion.button
+      layoutId="workspace-panel-toggle-button"
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      initial={{ opacity: 0, scale: 0.86 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.86 }}
+      transition={{ type: "spring", stiffness: 380, damping: 28 }}
+      className={cn(
+        "flex size-8 items-center justify-center rounded-md border border-glass-border bg-surface-overlay/90 text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground",
+        className,
+      )}
+    >
+      <AnimatePresence initial={false} mode="wait">
+        <motion.span
+          key={expanded ? "hide" : "show"}
+          initial={{ opacity: 0, rotate: expanded ? -90 : 90, scale: 0.82 }}
+          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+          exit={{ opacity: 0, rotate: expanded ? 90 : -90, scale: 0.82 }}
+          transition={{ duration: 0.16, ease: "easeOut" }}
+          className="flex"
+        >
+          {expanded ? (
+            <PanelRightClose className="size-4" />
+          ) : (
+            <PanelRightOpen className="size-4" />
+          )}
+        </motion.span>
+      </AnimatePresence>
+    </motion.button>
+  );
 }
 
 function PanelActionButton({

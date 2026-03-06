@@ -26,7 +26,7 @@ import { AgentGraphTooltip } from "@/components/AgentGraphTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import { useTheme } from "@/context/ThemeContext";
 import { getLayoutedElements } from "@/lib/layout";
-import { useAgent } from "@/context/AgentContext";
+import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 import { terminateNode } from "@/lib/api";
 
 const nodeTypes: NodeTypes = {
@@ -51,13 +51,8 @@ interface ContextMenuState {
 
 export function AgentGraph() {
   const { theme } = useTheme();
-  const {
-    agents,
-    selectedAgentId,
-    selectAgent,
-    activeMessages,
-    activeToolCalls,
-  } = useAgent();
+  const { agents, activeMessages, activeToolCalls } = useAgentRuntime();
+  const { selectedAgentId, selectAgent } = useAgentUI();
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(

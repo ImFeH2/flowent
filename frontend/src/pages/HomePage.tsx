@@ -10,7 +10,8 @@ import {
   X,
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
-import { useAgent } from "@/context/AgentContext";
+import type { Node } from "@/types";
+import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 import { cn } from "@/lib/utils";
 import {
   StewardChatComposer,
@@ -21,7 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
 
 export function HomePage() {
-  const { agents, connected, selectedAgentId, selectAgent } = useAgent();
+  const { agents, connected } = useAgentRuntime();
+  const { selectedAgentId, selectAgent } = useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
 
   const metrics = useMemo(() => {
@@ -166,12 +168,7 @@ function AgentDetailPanel({
   onClose,
   onCollapse,
 }: {
-  agent: NonNullable<ReturnType<typeof useAgent>["agents"]> extends Map<
-    string,
-    infer V
-  >
-    ? V
-    : never;
+  agent: Node;
   onClose: () => void;
   onCollapse: () => void;
 }) {

@@ -10,7 +10,11 @@ import {
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAgent, type PageId } from "@/context/AgentContext";
+import {
+  useAgentRuntime,
+  useAgentUI,
+  type PageId,
+} from "@/context/AgentContext";
 import { useTheme } from "@/context/ThemeContext";
 
 const NAV_ITEMS: Array<{ id: PageId; icon: typeof Network; label: string }> = [
@@ -32,7 +36,8 @@ export function Sidebar({
   className,
   onNavigate,
 }: SidebarProps) {
-  const { currentPage, setCurrentPage, connected, agents } = useAgent();
+  const { connected, agents } = useAgentRuntime();
+  const { currentPage, setCurrentPage } = useAgentUI();
   const { theme, toggleTheme } = useTheme();
 
   const runningCount = Array.from(agents.values()).filter(

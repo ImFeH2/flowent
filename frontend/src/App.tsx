@@ -2,7 +2,7 @@ import "@/styles/App.css";
 import { AnimatePresence, motion } from "motion/react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AgentProvider, useAgent } from "@/context/AgentContext";
+import { AgentProvider, useAgentUI } from "@/context/AgentContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { HomePage } from "@/pages/HomePage";
@@ -13,7 +13,7 @@ import { ToolsPage } from "@/pages/ToolsPage";
 import { cn } from "@/lib/utils";
 
 function AppContent() {
-  const { currentPage } = useAgent();
+  const { currentPage } = useAgentUI();
   const isWorkspace = currentPage === "graph";
 
   const renderPage = () => {

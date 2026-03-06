@@ -1,21 +1,21 @@
 import {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { useAgents } from "@/hooks/useAgents";
 import { sendStewardMessageRequest } from "@/lib/api";
+import { useAgents } from "@/hooks/useAgents";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import type {
-  Node,
   AgentEvent,
   HistoryEntry,
-  StreamingDelta,
+  Node,
   StewardMessage,
+  StreamingDelta,
 } from "@/types";
 
 export interface ActiveMessage {
@@ -27,26 +27,32 @@ export interface ActiveMessage {
 
 export type PageId = "graph" | "providers" | "roles" | "tools" | "settings";
 
-interface AgentContextValue {
+interface AgentRuntimeContextValue {
   agents: Map<string, Node>;
   events: AgentEvent[];
   connected: boolean;
-  selectedAgentId: string | null;
-  selectAgent: (id: string | null) => void;
-  hoveredAgentId: string | null;
-  setHoveredAgentId: (id: string | null) => void;
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
   streamingDeltas: Map<string, StreamingDelta[]>;
   activeMessages: ActiveMessage[];
   activeToolCalls: Map<string, string>;
+}
+
+interface AgentUIContextValue {
+  selectedAgentId: string | null;
+  selectAgent: (id: string | null) => void;
+  hoveredAgentId: string | null;
+  setHoveredAgentId: (id: string | null) => void;
   stewardMessages: StewardMessage[];
   sendStewardMessage: (content: string) => Promise<void>;
   currentPage: PageId;
   setCurrentPage: (page: PageId) => void;
 }
 
-const AgentContext = createContext<AgentContextValue | null>(null);
+const AgentRuntimeContext = createContext<AgentRuntimeContextValue | null>(
+  null,
+);
+const AgentUIContext = createContext<AgentUIContextValue | null>(null);
 
 const MESSAGE_ANIMATION_MS = 2000;
 const TOOL_CALL_ANIMATION_MS = 2000;
@@ -70,6 +76,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
+  const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
 
   const sendStewardMessage = useCallback(async (content: string) => {
     setStewardMessages((prev) => [
@@ -83,10 +92,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       void _;
     }
   }, []);
-
-  const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map(),
-  );
 
   const clearAgentHistory = useCallback((agentId: string) => {
     setAgentHistories((prev) => {
@@ -133,14 +138,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         const agentId = event.agent_id;
         const prev = toolTimers.current.get(agentId);
         if (prev) clearTimeout(prev);
-        setActiveToolCalls((p) => {
-          const next = new Map(p);
+        setActiveToolCalls((current) => {
+          const next = new Map(current);
           next.set(agentId, toolName);
           return next;
         });
         const timer = setTimeout(() => {
-          setActiveToolCalls((p) => {
-            const next = new Map(p);
+          setActiveToolCalls((current) => {
+            const next = new Map(current);
             next.delete(agentId);
             return next;
           });
@@ -250,51 +255,74 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setSelectedAgentId(id);
   }, []);
 
-  const value = useMemo(
+  const runtimeValue = useMemo(
     () => ({
       agents,
       events,
       connected,
-      selectedAgentId,
-      selectAgent,
-      hoveredAgentId,
-      setHoveredAgentId,
       agentHistories,
       clearAgentHistory,
       streamingDeltas,
       activeMessages,
       activeToolCalls,
+    }),
+    [
+      agents,
+      events,
+      connected,
+      agentHistories,
+      clearAgentHistory,
+      streamingDeltas,
+      activeMessages,
+      activeToolCalls,
+    ],
+  );
+
+  const uiValue = useMemo(
+    () => ({
+      selectedAgentId,
+      selectAgent,
+      hoveredAgentId,
+      setHoveredAgentId,
       stewardMessages,
       sendStewardMessage,
       currentPage,
       setCurrentPage,
     }),
     [
-      agents,
-      events,
-      connected,
       selectedAgentId,
       selectAgent,
       hoveredAgentId,
-      agentHistories,
-      clearAgentHistory,
-      streamingDeltas,
-      activeMessages,
-      activeToolCalls,
       stewardMessages,
       sendStewardMessage,
       currentPage,
-      setCurrentPage,
     ],
   );
 
   return (
-    <AgentContext.Provider value={value}>{children}</AgentContext.Provider>
+    <AgentRuntimeContext.Provider value={runtimeValue}>
+      <AgentUIContext.Provider value={uiValue}>
+        {children}
+      </AgentUIContext.Provider>
+    </AgentRuntimeContext.Provider>
   );
 }
 
-export function useAgent() {
-  const ctx = useContext(AgentContext);
-  if (!ctx) throw new Error("useAgent must be used within AgentProvider");
+export function useAgentRuntime() {
+  const ctx = useContext(AgentRuntimeContext);
+  if (!ctx)
+    throw new Error("useAgentRuntime must be used within AgentProvider");
   return ctx;
+}
+
+export function useAgentUI() {
+  const ctx = useContext(AgentUIContext);
+  if (!ctx) throw new Error("useAgentUI must be used within AgentProvider");
+  return ctx;
+}
+
+export function useAgent() {
+  const runtime = useAgentRuntime();
+  const ui = useAgentUI();
+  return useMemo(() => ({ ...runtime, ...ui }), [runtime, ui]);
 }

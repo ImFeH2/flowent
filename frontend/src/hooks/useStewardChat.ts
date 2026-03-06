@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
-import { useAgent } from "@/context/AgentContext";
+import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 
 export function useStewardChat() {
-  const { stewardMessages, sendStewardMessage, connected } = useAgent();
+  const { connected } = useAgentRuntime();
+  const { stewardMessages, sendStewardMessage } = useAgentUI();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);

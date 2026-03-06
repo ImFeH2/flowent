@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useAgent } from "@/context/AgentContext";
+import { useAgentRuntime } from "@/context/AgentContext";
 import { fetchNodeDetail } from "@/lib/api";
 import type { NodeDetail, HistoryEntry, StreamingDelta } from "@/types";
 
@@ -34,7 +34,7 @@ export function useAgentDetail(agentId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const { agentHistories, clearAgentHistory, streamingDeltas, agents } =
-    useAgent();
+    useAgentRuntime();
 
   useEffect(() => {
     if (!agentId) {
@@ -50,10 +50,10 @@ export function useAgentDetail(agentId: string | null) {
     const load = async () => {
       setLoading(true);
       setError(null);
+      clearAgentHistory(agentId);
       try {
         const data = await fetchNodeDetail(agentId, controller.signal);
         if (cancelled) return;
-        clearAgentHistory(agentId);
         setDetail(data);
         setFetchedAt(Date.now());
       } catch (err) {

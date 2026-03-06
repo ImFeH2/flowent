@@ -1,31 +1,44 @@
 import type { Node, NodeDetail } from "@/types";
+import { requestJson, requestVoid } from "./shared";
 
 export async function fetchNodes(): Promise<Node[]> {
-  const res = await fetch("/api/nodes");
-  const data = await res.json();
-  return data.nodes ?? [];
+  return requestJson<{ nodes?: Node[] }, Node[]>("/api/nodes", {
+    errorMessage: "Failed to fetch nodes",
+    fallback: [],
+    map: (data) => data?.nodes ?? [],
+  });
 }
 
 export async function fetchNodeDetail(
   nodeId: string,
 ): Promise<NodeDetail | null> {
-  const res = await fetch(`/api/nodes/${nodeId}`);
-  const data = await res.json();
-  if (data.error || !Array.isArray(data.history)) return null;
-  return data as NodeDetail;
+  return requestJson<NodeDetail, NodeDetail | null>(`/api/nodes/${nodeId}`, {
+    errorMessage: "Failed to fetch node detail",
+    fallback: null,
+    swallowHttpError: true,
+    map: (data) => {
+      if (!data || !Array.isArray(data.history)) {
+        return null;
+      }
+      return data;
+    },
+  });
 }
 
 export async function sendNodeMessage(
   nodeId: string,
   message: string,
 ): Promise<void> {
-  await fetch(`/api/nodes/${nodeId}/message`, {
+  await requestVoid(`/api/nodes/${nodeId}/message`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    body: { message },
+    errorMessage: "Failed to send node message",
   });
 }
 
 export async function terminateNode(nodeId: string): Promise<void> {
-  await fetch(`/api/nodes/${nodeId}/terminate`, { method: "POST" });
+  await requestVoid(`/api/nodes/${nodeId}/terminate`, {
+    method: "POST",
+    errorMessage: "Failed to terminate node",
+  });
 }

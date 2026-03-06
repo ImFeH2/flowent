@@ -1,39 +1,40 @@
 import type { Provider } from "@/types";
+import { requestJson, requestVoid } from "./shared";
 
 export async function fetchProviders(): Promise<Provider[]> {
-  const res = await fetch("/api/providers");
-  const data = await res.json();
-  return data.providers ?? [];
+  return requestJson<{ providers?: Provider[] }, Provider[]>("/api/providers", {
+    errorMessage: "Failed to fetch providers",
+    fallback: [],
+    map: (data) => data?.providers ?? [],
+  });
 }
 
 export async function createProvider(
   data: Omit<Provider, "id">,
 ): Promise<Provider> {
-  const res = await fetch("/api/providers", {
+  return requestJson<Provider>("/api/providers", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: data,
+    errorMessage: "Failed to create provider",
   });
-  if (!res.ok) throw new Error("Failed to create provider");
-  return res.json();
 }
 
 export async function updateProvider(
   id: string,
   updates: Partial<Omit<Provider, "id">>,
 ): Promise<Provider> {
-  const res = await fetch(`/api/providers/${id}`, {
+  return requestJson<Provider>(`/api/providers/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updates),
+    body: updates,
+    errorMessage: "Failed to update provider",
   });
-  if (!res.ok) throw new Error("Failed to update provider");
-  return res.json();
 }
 
 export async function deleteProvider(id: string): Promise<void> {
-  const res = await fetch(`/api/providers/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Failed to delete provider");
+  await requestVoid(`/api/providers/${id}`, {
+    method: "DELETE",
+    errorMessage: "Failed to delete provider",
+  });
 }
 
 export interface ModelOption {
@@ -43,11 +44,14 @@ export interface ModelOption {
 export async function fetchProviderModels(
   providerId: string,
 ): Promise<ModelOption[]> {
-  const res = await fetch("/api/providers/models", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider_id: providerId }),
-  });
-  const data = await res.json();
-  return data.models ?? [];
+  return requestJson<{ models?: ModelOption[] }, ModelOption[]>(
+    "/api/providers/models",
+    {
+      method: "POST",
+      body: { provider_id: providerId },
+      errorMessage: "Failed to fetch provider models",
+      fallback: [],
+      map: (data) => data?.models ?? [],
+    },
+  );
 }

@@ -10,90 +10,28 @@ import {
   ReactFlow,
   Background,
   MiniMap,
-  BaseEdge,
-  getStraightPath,
   type Node,
   type Edge,
-  type EdgeProps,
   type ReactFlowInstance,
   type NodeTypes,
   type EdgeTypes,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { AnimatePresence, motion } from "motion/react";
 import { Network } from "lucide-react";
 import { toast } from "sonner";
+import { AnimatedMessageEdge } from "@/components/AgentGraphEdge";
 import { AgentGraphNode } from "@/components/AgentGraphNode";
+import { AgentGraphTooltip } from "@/components/AgentGraphTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import { useTheme } from "@/context/ThemeContext";
 import { getLayoutedElements } from "@/lib/layout";
 import { useAgent } from "@/context/AgentContext";
-import { Badge } from "@/components/ui/badge";
-import { stateBadgeColor } from "@/lib/constants";
 import { terminateNode } from "@/lib/api";
 
 const nodeTypes: NodeTypes = {
   agent: AgentGraphNode,
 };
-
-function AnimatedMessageEdge(props: EdgeProps) {
-  const { sourceX, sourceY, targetX, targetY, id, data } = props;
-  const [edgePath] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-  const hasActiveMessage = !!(data as Record<string, unknown> | undefined)
-    ?.active;
-
-  return (
-    <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        style={{
-          stroke: hasActiveMessage
-            ? "var(--graph-edge-active)"
-            : "var(--graph-edge)",
-          strokeWidth: hasActiveMessage ? 2.2 : 1.2,
-        }}
-      />
-      {hasActiveMessage && (
-        <>
-          <path
-            d={edgePath}
-            fill="none"
-            stroke="url(#agent-edge-flow)"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeDasharray="8 6"
-            opacity="0.8"
-          >
-            <animate
-              attributeName="stroke-dashoffset"
-              from="14"
-              to="0"
-              dur="0.6s"
-              repeatCount="indefinite"
-            />
-          </path>
-          <circle r="2.6" fill="var(--graph-edge-active)">
-            <animateMotion
-              dur="0.5s"
-              repeatCount="indefinite"
-              path={edgePath}
-            />
-          </circle>
-          <circle r="2" fill="var(--graph-edge-active)" opacity="0.6">
-            <animateMotion
-              dur="0.5s"
-              repeatCount="indefinite"
-              path={edgePath}
-              begin="0.25s"
-            />
-          </circle>
-        </>
-      )}
-    </>
-  );
-}
 
 const edgeTypes: EdgeTypes = {
   animated: AnimatedMessageEdge,
@@ -438,36 +376,12 @@ export function AgentGraph() {
         )}
       </div>
 
-      <AnimatePresence>
-        {tooltip && tooltipAgent ? (
-          <motion.div
-            ref={tooltipRef}
-            initial={{ opacity: 0, y: 4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 2, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="pointer-events-none fixed z-[100] rounded-md border border-glass-border bg-glass-bg px-3 py-2 shadow-xl backdrop-blur-sm"
-            style={tooltipStyle}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium">
-                {tooltipAgent.name ?? (
-                  <span className="capitalize">{tooltipAgent.node_type}</span>
-                )}
-              </span>
-              <Badge
-                variant="outline"
-                className={`text-[10px] ${stateBadgeColor[tooltipAgent.state]}`}
-              >
-                {tooltipAgent.state.toUpperCase()}
-              </Badge>
-            </div>
-            <div className="mt-1 font-mono text-[10px] text-muted-foreground">
-              {tooltip.agentId.slice(0, 8)}
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+      <AgentGraphTooltip
+        agent={tooltipAgent ?? null}
+        agentId={tooltip?.agentId ?? null}
+        style={tooltipStyle}
+        tooltipRef={tooltipRef}
+      />
 
       {contextMenu && (
         <ContextMenu

@@ -1,12 +1,87 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import type { AgentEvent } from "@/types";
 
+const INITIAL_DELAY = 1000;
 const MAX_DELAY = 10000;
 
 interface UseWebSocketOptions {
   onDisplayEvent: (event: AgentEvent) => void;
   onUpdateEvent: (event: AgentEvent) => void;
+}
+
+interface SocketChannelConfig {
+  path: string;
+  onMessage: MutableRefObject<(event: AgentEvent) => void>;
+  setConnected: (connected: boolean) => void;
+}
+
+function createSocketChannel(
+  { path, onMessage, setConnected }: SocketChannelConfig,
+  isDisposed: () => boolean,
+) {
+  let retryDelay = INITIAL_DELAY;
+  let retryTimer: number | null = null;
+  let wasConnected = false;
+  let ws: WebSocket | null = null;
+
+  const clearRetryTimer = () => {
+    if (retryTimer !== null) {
+      window.clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  };
+
+  const connect = () => {
+    if (isDisposed()) return;
+
+    clearRetryTimer();
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(`${protocol}//${window.location.host}${path}`);
+
+    ws.onopen = () => {
+      setConnected(true);
+      retryDelay = INITIAL_DELAY;
+      if (wasConnected) {
+        toast.success(`Reconnected ${path}`);
+      }
+      wasConnected = true;
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const event: AgentEvent = JSON.parse(e.data);
+        onMessage.current(event);
+      } catch {
+        // ignore malformed events
+      }
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+      ws = null;
+      if (isDisposed()) return;
+      if (wasConnected) {
+        toast.error(`Connection lost ${path}, reconnecting...`);
+      }
+      const delay = retryDelay;
+      retryDelay = Math.min(delay * 2, MAX_DELAY);
+      retryTimer = window.setTimeout(connect, delay);
+    };
+
+    ws.onerror = () => {
+      ws?.close();
+    };
+  };
+
+  connect();
+
+  return () => {
+    clearRetryTimer();
+    setConnected(false);
+    ws?.close();
+    ws = null;
+  };
 }
 
 export function useWebSocket({
@@ -29,75 +104,30 @@ export function useWebSocket({
   useEffect(() => {
     let disposed = false;
 
-    function createConnection(
-      path: string,
-      onMessage: React.MutableRefObject<(event: AgentEvent) => void>,
-      setConnected: (v: boolean) => void,
-    ) {
-      const retryDelay = { current: 1000 };
-      const wasConnected = { current: false };
-      let ws: WebSocket;
-
-      const connect = () => {
-        if (disposed) return;
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        ws = new WebSocket(`${protocol}//${window.location.host}${path}`);
-
-        ws.onopen = () => {
-          setConnected(true);
-          retryDelay.current = 1000;
-          if (wasConnected.current) {
-            toast.success(`Reconnected ${path}`);
-          }
-          wasConnected.current = true;
-        };
-
-        ws.onmessage = (e) => {
-          try {
-            const event: AgentEvent = JSON.parse(e.data);
-            onMessage.current(event);
-          } catch {
-            // ignore
-          }
-        };
-
-        ws.onclose = () => {
-          setConnected(false);
-          if (disposed) return;
-          if (wasConnected.current) {
-            toast.error(`Connection lost ${path}, reconnecting...`);
-          }
-          const delay = retryDelay.current;
-          retryDelay.current = Math.min(delay * 2, MAX_DELAY);
-          setTimeout(connect, delay);
-        };
-
-        ws.onerror = () => {
-          ws.close();
-        };
-      };
-
-      connect();
-      return () => {
-        ws?.close();
-      };
-    }
-
-    const cleanupDisplay = createConnection(
-      "/ws/events",
-      onDisplayRef,
-      setDisplayConnected,
-    );
-    const cleanupUpdate = createConnection(
-      "/ws/updates",
-      onUpdateRef,
-      setUpdateConnected,
-    );
+    const cleanups = [
+      createSocketChannel(
+        {
+          path: "/ws/events",
+          onMessage: onDisplayRef,
+          setConnected: setDisplayConnected,
+        },
+        () => disposed,
+      ),
+      createSocketChannel(
+        {
+          path: "/ws/updates",
+          onMessage: onUpdateRef,
+          setConnected: setUpdateConnected,
+        },
+        () => disposed,
+      ),
+    ];
 
     return () => {
       disposed = true;
-      cleanupDisplay();
-      cleanupUpdate();
+      for (const cleanup of cleanups) {
+        cleanup();
+      }
     };
   }, []);
 

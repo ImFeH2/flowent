@@ -1,19 +1,10 @@
-import {
-  useMemo,
-  useState,
-  useRef,
-  useEffect,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
   Bot,
-  MessageSquare,
   PanelRightClose,
   PanelRightOpen,
   Radio,
-  Send,
   Shield,
   Sparkles,
   X,
@@ -21,8 +12,11 @@ import {
 import { AgentGraph } from "@/components/AgentGraph";
 import { useAgent } from "@/context/AgentContext";
 import { cn } from "@/lib/utils";
-import { MarkdownContent } from "@/components/MarkdownContent";
-import { toast } from "sonner";
+import {
+  StewardChatComposer,
+  StewardChatMessages,
+} from "@/components/StewardChatContent";
+import { useStewardChat } from "@/hooks/useStewardChat";
 import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
 
@@ -271,39 +265,16 @@ interface StewardChatPanelProps {
 }
 
 function StewardChatPanel({ onCollapse }: StewardChatPanelProps) {
-  const { stewardMessages, sendStewardMessage, connected } = useAgent();
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const messageCount = stewardMessages.length;
-
-  useEffect(() => {
-    if (messageCount < 0) return;
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messageCount]);
-
-  const sendMessage = async () => {
-    const content = input.trim();
-    if (!content || sending) return;
-
-    setSending(true);
-    setInput("");
-
-    try {
-      await sendStewardMessage(content);
-    } catch {
-      toast.error("Failed to send message");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  const {
+    bottomRef,
+    connected,
+    handleKeyDown,
+    input,
+    sending,
+    sendMessage,
+    setInput,
+    stewardMessages,
+  } = useStewardChat();
 
   return (
     <>
@@ -320,65 +291,20 @@ function StewardChatPanel({ onCollapse }: StewardChatPanelProps) {
         <PanelToggleButton expanded onClick={onCollapse} />
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {stewardMessages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-lg border border-dashed border-glass-border bg-surface-2 p-4 text-center">
-            <div className="flex size-11 items-center justify-center rounded-md bg-surface-3">
-              <MessageSquare className="size-5 text-primary" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Start a conversation</p>
-              <p className="max-w-[200px] text-[11px] text-muted-foreground">
-                Ask the Steward to plan tasks, summarize progress, or coordinate
-                next steps.
-              </p>
-            </div>
-          </div>
-        )}
+      <StewardChatMessages
+        bottomRef={bottomRef}
+        messages={stewardMessages}
+        variant="workspace"
+      />
 
-        {stewardMessages.map((msg, i) => (
-          <div
-            key={`${msg.timestamp}-${i}`}
-            className={`flex ${msg.from === "human" ? "justify-end" : "justify-start"}`}
-          >
-            {msg.from === "steward" && (
-              <div className="flex max-w-[85%] items-start gap-2">
-                <Shield className="mt-1 size-4 shrink-0 text-primary" />
-                <div className="rounded-md border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground">
-                  <MarkdownContent content={msg.content} />
-                </div>
-              </div>
-            )}
-            {msg.from === "human" && (
-              <div className="max-w-[85%] rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground shadow-lg">
-                {msg.content}
-              </div>
-            )}
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      <div className="border-t border-glass-border p-3">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Message the Steward..."
-            rows={1}
-            className="min-h-[40px] flex-1 resize-none rounded-md border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={sendMessage}
-            disabled={!input.trim() || sending}
-            className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-lg transition-all active:scale-[0.98] hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Send className="size-4" />
-          </button>
-        </div>
-      </div>
+      <StewardChatComposer
+        disabled={!input.trim() || sending}
+        input={input}
+        onChange={setInput}
+        onKeyDown={handleKeyDown}
+        onSend={() => void sendMessage()}
+        variant="workspace"
+      />
     </>
   );
 }

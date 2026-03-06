@@ -121,69 +121,6 @@
   }
 }
 
-[data-agent-state="running"] {
-  --agent-pointer-color: var(--graph-status-running);
-}
-
-[data-agent-state="idle"] {
-  --agent-pointer-color: var(--graph-status-idle);
-}
-
-[data-agent-state="initializing"] {
-  --agent-pointer-color: var(--graph-status-initializing);
-}
-
-[data-agent-state="error"] {
-  --agent-pointer-color: var(--graph-status-error);
-}
-
-[data-agent-state="terminated"] {
-  --agent-pointer-color: var(--graph-status-terminated);
-}
-
-.agent-pointer-light {
-  position: absolute;
-  inset: -2px;
-  pointer-events: none;
-  padding: 2px;
-  border-radius: inherit;
-  background: conic-gradient(
-      from -22deg,
-      transparent 0deg 304deg,
-      color-mix(in srgb, var(--agent-pointer-color) 18%, transparent) 320deg,
-      color-mix(in srgb, var(--agent-pointer-color) 58%, transparent) 336deg,
-      color-mix(in srgb, var(--agent-pointer-color) 94%, white 12%) 348deg,
-      color-mix(in srgb, var(--agent-pointer-color) 54%, transparent) 356deg,
-      transparent 360deg
-    )
-    border-box;
-  opacity: calc(0.06 + var(--pointer-strength, 0.4) * 0.86);
-  transform: rotate(var(--pointer-angle, 0deg));
-  transform-origin: center;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  box-shadow:
-    var(--pointer-shadow-x, 0px) var(--pointer-shadow-y, 0px) 16px -12px
-      color-mix(
-        in srgb,
-        var(--agent-pointer-color) calc(8% + var(--pointer-strength, 0.4) * 26%),
-        transparent
-      ),
-    calc(var(--pointer-shadow-x, 0px) * 0.35)
-      calc(var(--pointer-shadow-y, 0px) * 0.35) 26px -20px
-      color-mix(
-        in srgb,
-        var(--agent-pointer-color) calc(3% + var(--pointer-strength, 0.4) * 10%),
-        transparent
-      );
-}
-
 .agent-state-ring {
   position: absolute;
   inset: -1px;

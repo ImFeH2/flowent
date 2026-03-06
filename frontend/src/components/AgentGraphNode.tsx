@@ -1,6 +1,5 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   nodeTypeIcon,
@@ -20,53 +19,10 @@ interface AgentNodeData {
   [key: string]: unknown;
 }
 
-type PointerSubscriber = (x: number, y: number) => void;
-
-const pointerSubscribers = new Set<PointerSubscriber>();
-let pointerTrackingActive = false;
-let latestPointer = { x: 0, y: 0 };
-
-function notifyPointerSubscribers(x: number, y: number) {
-  latestPointer = { x, y };
-  for (const subscriber of pointerSubscribers) {
-    subscriber(x, y);
-  }
-}
-
-function handleWindowPointerMove(event: PointerEvent) {
-  notifyPointerSubscribers(event.clientX, event.clientY);
-}
-
-function subscribeToPointerPosition(subscriber: PointerSubscriber) {
-  if (typeof window === "undefined") {
-    return () => undefined;
-  }
-
-  if (!pointerTrackingActive) {
-    window.addEventListener("pointermove", handleWindowPointerMove, {
-      passive: true,
-    });
-    pointerTrackingActive = true;
-    notifyPointerSubscribers(window.innerWidth / 2, window.innerHeight / 2);
-  }
-
-  pointerSubscribers.add(subscriber);
-  subscriber(latestPointer.x, latestPointer.y);
-
-  return () => {
-    pointerSubscribers.delete(subscriber);
-    if (pointerTrackingActive && pointerSubscribers.size === 0) {
-      window.removeEventListener("pointermove", handleWindowPointerMove);
-      pointerTrackingActive = false;
-    }
-  };
-}
-
 export function AgentGraphNode({ data }: NodeProps) {
   const { node_type, state, shortId, name, selected, toolCall } =
     data as unknown as AgentNodeData;
   const Icon = nodeTypeIcon[node_type];
-  const nodeRef = useRef<HTMLDivElement>(null);
 
   const isToolActive = !!toolCall;
   const isRunning = state === "running";
@@ -83,57 +39,8 @@ export function AgentGraphNode({ data }: NodeProps) {
           "hover:border-graph-node-border-hover",
       );
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const nodeElement = nodeRef.current;
-    if (!nodeElement) return;
-
-    let frameId = 0;
-
-    const updatePointerLight = (pointerX: number, pointerY: number) => {
-      cancelAnimationFrame(frameId);
-      frameId = window.requestAnimationFrame(() => {
-        const rect = nodeElement.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        const dx = pointerX - centerX;
-        const dy = pointerY - centerY;
-        const angle = Math.atan2(dy, dx);
-        const distance = Math.hypot(dx, dy);
-        const maxDistance =
-          Math.max(window.innerWidth, window.innerHeight) * 0.9;
-        const strength = Math.max(0.18, 1 - distance / maxDistance);
-        const glowX = rect.width / 2 + Math.cos(angle) * rect.width * 0.34;
-        const glowY = rect.height / 2 + Math.sin(angle) * rect.height * 0.42;
-
-        nodeElement.style.setProperty(
-          "--pointer-angle",
-          `${angle * (180 / Math.PI) + 90}deg`,
-        );
-        nodeElement.style.setProperty("--pointer-glow-x", `${glowX}px`);
-        nodeElement.style.setProperty("--pointer-glow-y", `${glowY}px`);
-        nodeElement.style.setProperty("--pointer-shadow-x", `${dx * 0.03}px`);
-        nodeElement.style.setProperty("--pointer-shadow-y", `${dy * 0.03}px`);
-        nodeElement.style.setProperty(
-          "--pointer-strength",
-          strength.toFixed(3),
-        );
-      });
-    };
-
-    const unsubscribe = subscribeToPointerPosition(updatePointerLight);
-
-    return () => {
-      cancelAnimationFrame(frameId);
-      unsubscribe();
-    };
-  }, []);
-
   return (
     <motion.div
-      ref={nodeRef}
-      data-agent-state={state}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
@@ -149,7 +56,6 @@ export function AgentGraphNode({ data }: NodeProps) {
         aria-hidden="true"
         className={cn("agent-state-ring", stateRing[state])}
       />
-      <div aria-hidden="true" className="agent-pointer-light" />
 
       <Handle
         type="target"

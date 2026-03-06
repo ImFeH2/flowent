@@ -75,23 +75,49 @@ class SpawnTool(Tool):
         )
 
         child = AgentClass(uuid=agent_uuid, config=config)
-        registry.register(child)
-
-        agent.add_connection(agent_uuid)
-        child.add_connection(agent.uuid)
-
-        event_bus.emit(
-            Event(
-                type=EventType.NODE_CONNECTED,
-                agent_id=agent.uuid,
-                data={"a": agent.uuid, "b": agent_uuid},
-            )
-        )
-
-        child.start()
-
         msg = Message(from_id=agent.uuid, to_id=agent_uuid, content=task_prompt)
-        child.enqueue_message(msg)
+
+        registered = False
+        connected = False
+        started = False
+
+        try:
+            child.enqueue_message(msg)
+
+            agent.add_connection(agent_uuid)
+            child.add_connection(agent.uuid)
+            connected = True
+
+            registry.register(child)
+            registered = True
+
+            child.start()
+            started = True
+
+            event_bus.emit(
+                Event(
+                    type=EventType.NODE_CONNECTED,
+                    agent_id=agent.uuid,
+                    data={"a": agent.uuid, "b": agent_uuid},
+                )
+            )
+        except Exception as exc:
+            logger.exception(
+                "Failed to spawn agent {} (role={}) by {}",
+                agent_uuid[:8],
+                role_id,
+                agent.uuid[:8],
+            )
+
+            if started:
+                child.terminate_and_wait(timeout=5.0)
+            if registered:
+                registry.unregister(agent_uuid)
+            if connected:
+                agent.remove_connection(agent_uuid)
+                child.remove_connection(agent.uuid)
+
+            return json.dumps({"error": f"Failed to spawn agent: {exc}"})
 
         logger.info(
             "Spawned agent {} (role={}) by {}",

@@ -73,6 +73,11 @@ class Agent:
             if other_uuid not in self.connections:
                 self.connections.append(other_uuid)
 
+    def remove_connection(self, other_uuid: str) -> None:
+        with self._connections_lock:
+            if other_uuid in self.connections:
+                self.connections.remove(other_uuid)
+
     def is_connected_to(self, uuid: str) -> bool:
         with self._connections_lock:
             return uuid in self.connections

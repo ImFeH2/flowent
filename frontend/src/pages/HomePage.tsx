@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
+import { HistoryView } from "@/components/HistoryView";
 import type { Node } from "@/types";
 import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ import {
   StewardChatMessages,
 } from "@/components/StewardChatContent";
 import { useStewardChat } from "@/hooks/useStewardChat";
+import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
 
@@ -172,6 +174,12 @@ function AgentDetailPanel({
   onClose: () => void;
   onCollapse: () => void;
 }) {
+  const { detail, error, loading } = useAgentDetail(agent.id);
+  const detailState = detail?.state ?? agent.state;
+  const detailConnections = detail?.connections ?? agent.connections;
+  const detailTodos = detail?.todos ?? agent.todos;
+  const detailHistory = detail?.history ?? [];
+
   return (
     <>
       <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
@@ -200,55 +208,89 @@ function AgentDetailPanel({
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Status
-          </p>
-          <div className="mt-2">
-            <Badge variant="outline" className={stateBadgeColor[agent.state]}>
-              {agent.state.toUpperCase()}
-            </Badge>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Connections
-          </p>
-          <p className="mt-2 text-sm text-foreground">
-            {agent.connections.length} connected nodes
-          </p>
-        </div>
-
-        <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Todos
-          </p>
-          <div className="mt-2 space-y-2">
-            {agent.todos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No todos</p>
-            ) : (
-              agent.todos.slice(0, 6).map((todo) => (
-                <div
-                  key={todo.id}
-                  className="flex items-center gap-2 text-sm text-foreground"
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Status
+              </p>
+              <div className="mt-2">
+                <Badge
+                  variant="outline"
+                  className={stateBadgeColor[detailState]}
                 >
-                  <span
-                    className={cn(
-                      "size-2 rounded-full",
-                      todo.done ? "bg-emerald-500" : "bg-amber-500",
-                    )}
-                  />
-                  <span
-                    className={
-                      todo.done ? "line-through text-muted-foreground" : ""
-                    }
+                  {detailState.toUpperCase()}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Connections
+              </p>
+              <p className="mt-2 text-sm text-foreground">
+                {detailConnections.length} connected nodes
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Todos
+            </p>
+            <div className="mt-2 space-y-2">
+              {detailTodos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No todos</p>
+              ) : (
+                detailTodos.slice(0, 6).map((todo) => (
+                  <div
+                    key={todo.id}
+                    className="flex items-center gap-2 text-sm text-foreground"
                   >
-                    {todo.text}
-                  </span>
-                </div>
-              ))
+                    <span
+                      className={cn(
+                        "size-2 rounded-full",
+                        todo.done ? "bg-emerald-500" : "bg-amber-500",
+                      )}
+                    />
+                    <span
+                      className={
+                        todo.done ? "line-through text-muted-foreground" : ""
+                      }
+                    >
+                      {todo.text}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border border-glass-border bg-surface-2">
+            <div className="border-b border-glass-border px-3 py-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                History
+              </p>
+            </div>
+
+            {loading ? (
+              <div className="space-y-2 p-3">
+                {[...Array(4)].map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-12 rounded-md skeleton-shimmer"
+                  />
+                ))}
+              </div>
+            ) : error ? (
+              <div className="p-3 text-sm text-destructive">{error}</div>
+            ) : detailHistory.length === 0 ? (
+              <div className="p-3 text-sm text-muted-foreground">
+                No history yet.
+              </div>
+            ) : (
+              <HistoryView history={detailHistory} />
             )}
           </div>
         </div>

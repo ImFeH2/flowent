@@ -1,5 +1,6 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   nodeTypeIcon,
@@ -23,6 +24,41 @@ export function AgentGraphNode({ data }: NodeProps) {
   const { node_type, state, shortId, name, selected, toolCall } =
     data as unknown as AgentNodeData;
   const Icon = nodeTypeIcon[node_type];
+  const nodeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!nodeRef.current) return;
+      const rect = nodeRef.current.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const dx = e.clientX - centerX;
+      const dy = e.clientY - centerY;
+
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const maxDistance = 400; // Effect radius
+
+      const intensity = Math.max(0, 1 - distance / maxDistance);
+      // Angle in degrees, where top is 0
+      const angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+
+      nodeRef.current.style.setProperty("--mouse-angle", `${angle}deg`);
+      nodeRef.current.style.setProperty(
+        "--mouse-intensity",
+        intensity.toString(),
+      );
+    };
+
+    // Initialize with a default slightly-off angle so it looks nice before movement
+    if (nodeRef.current) {
+      nodeRef.current.style.setProperty("--mouse-angle", "135deg");
+      nodeRef.current.style.setProperty("--mouse-intensity", "0");
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
 
   const isToolActive = !!toolCall;
   const isRunning = state === "running";
@@ -37,6 +73,7 @@ export function AgentGraphNode({ data }: NodeProps) {
 
   return (
     <motion.div
+      ref={nodeRef}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.22, ease: "easeOut" }}

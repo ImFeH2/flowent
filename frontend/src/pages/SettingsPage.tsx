@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, Save, Settings } from "lucide-react";
+import { RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
   fetchAppMeta,
@@ -9,9 +9,7 @@ import {
   saveSettings,
   type ModelOption,
 } from "@/lib/api";
-import type { Provider } from "@/types";
-import { cn } from "@/lib/utils";
-import { providerTypeLabel } from "@/lib/providerTypes";
+import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import {
   Select,
   SelectContent,
@@ -19,6 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { providerTypeLabel } from "@/lib/providerTypes";
+import { cn } from "@/lib/utils";
+import type { Provider } from "@/types";
 
 interface UserSettings {
   model: {
@@ -137,17 +138,10 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <Settings className="size-5 text-primary" />
-          <div>
-            <h1 className="text-lg font-semibold">Settings</h1>
-            <p className="text-sm text-muted-foreground">
-              Configure your AI model preferences
-            </p>
-          </div>
-        </div>
+    <PageScaffold
+      title="Settings"
+      description="Configure your AI model preferences"
+      actions={
         <button
           onClick={() => void handleSave()}
           disabled={saving}
@@ -156,124 +150,120 @@ export function SettingsPage() {
           <Save className="size-4" />
           {saving ? "Saving..." : "Save Changes"}
         </button>
-      </div>
+      }
+    >
+      <div className="mx-auto max-w-2xl space-y-6">
+        <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
+          <h2 className="mb-4 text-lg font-semibold">Model Configuration</h2>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto max-w-2xl space-y-6">
-          <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
-            <h2 className="mb-4 text-lg font-semibold">Model Configuration</h2>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Active Provider</label>
+              <Select
+                value={settings.model.active_provider_id}
+                onValueChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    model: {
+                      ...settings.model,
+                      active_provider_id: value,
+                      active_model: "",
+                    },
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {providers.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} ({providerTypeLabel(p.type)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {activeProvider && (
+                <p className="text-xs text-muted-foreground">
+                  Using {activeProvider.name} ({activeProvider.base_url})
+                </p>
+              )}
+            </div>
 
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Active Provider</label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Model</label>
+                <button
+                  onClick={refreshModels}
+                  disabled={!settings.model.active_provider_id || loadingModels}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={cn("size-3", loadingModels && "animate-spin")}
+                  />
+                  Refresh
+                </button>
+              </div>
+
+              {models.length > 0 ? (
                 <Select
-                  value={settings.model.active_provider_id}
+                  value={settings.model.active_model}
                   onValueChange={(value) =>
                     setSettings({
                       ...settings,
                       model: {
                         ...settings.model,
-                        active_provider_id: value,
-                        active_model: "",
+                        active_model: value,
                       },
                     })
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a provider" />
+                    <SelectValue placeholder="Select a model" />
                   </SelectTrigger>
                   <SelectContent>
-                    {providers.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} ({providerTypeLabel(p.type)})
+                    {models.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.id}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {activeProvider && (
-                  <p className="text-xs text-muted-foreground">
-                    Using {activeProvider.name} ({activeProvider.base_url})
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Model</label>
-                  <button
-                    onClick={refreshModels}
-                    disabled={
-                      !settings.model.active_provider_id || loadingModels
-                    }
-                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-                  >
-                    <RefreshCw
-                      className={cn("size-3", loadingModels && "animate-spin")}
-                    />
-                    Refresh
-                  </button>
-                </div>
-
-                {models.length > 0 ? (
-                  <Select
-                    value={settings.model.active_model}
-                    onValueChange={(value) =>
-                      setSettings({
-                        ...settings,
-                        model: {
-                          ...settings.model,
-                          active_model: value,
-                        },
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {models.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <input
-                    type="text"
-                    value={settings.model.active_model}
-                    onChange={(e) =>
-                      setSettings({
-                        ...settings,
-                        model: {
-                          ...settings.model,
-                          active_model: e.target.value,
-                        },
-                      })
-                    }
-                    placeholder={
-                      loadingModels
-                        ? "Loading models..."
-                        : "Enter model ID manually"
-                    }
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  />
-                )}
-              </div>
+              ) : (
+                <input
+                  type="text"
+                  value={settings.model.active_model}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      model: {
+                        ...settings.model,
+                        active_model: e.target.value,
+                      },
+                    })
+                  }
+                  placeholder={
+                    loadingModels
+                      ? "Loading models..."
+                      : "Enter model ID manually"
+                  }
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              )}
             </div>
           </div>
+        </SoftPanel>
 
-          <div className="rounded-xl border border-border bg-card/50 p-4">
-            <h3 className="mb-2 text-sm font-semibold">About</h3>
-            <p className="text-sm text-muted-foreground">
-              Autopoe Agent Studio v{appVersion ?? "—"}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              A multi-agent collaboration framework.
-            </p>
-          </div>
-        </div>
+        <SoftPanel className="rounded-xl border-border bg-card/50 p-4">
+          <h3 className="mb-2 text-sm font-semibold">About</h3>
+          <p className="text-sm text-muted-foreground">
+            Autopoe Agent Studio v{appVersion ?? "—"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A multi-agent collaboration framework.
+          </p>
+        </SoftPanel>
       </div>
-    </div>
+    </PageScaffold>
   );
 }

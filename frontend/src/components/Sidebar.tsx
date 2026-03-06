@@ -47,7 +47,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "bg-sidebar text-sidebar-foreground border-sidebar-border z-40 flex w-72 flex-col border-r",
+        "bg-sidebar text-sidebar-foreground border-sidebar-border z-40 flex w-64 flex-col border-r",
         autoHide ? "h-full" : "fixed left-0 top-0 h-screen",
         className,
       )}

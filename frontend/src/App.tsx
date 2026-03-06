@@ -37,7 +37,7 @@ function AppContent() {
 
       <Sidebar />
 
-      <main className={cn("relative z-10 h-full", "ml-72")}>
+      <main className={cn("relative z-10 h-full", "ml-64")}>
         <div
           className={cn(
             "h-full overflow-hidden",

@@ -234,12 +234,7 @@ export function AgentGraph() {
       );
     });
     return () => cancelAnimationFrame(raf);
-  }, [
-    tooltip?.agentId,
-    tooltipAgent?.state,
-    tooltipAgent?.name,
-    tooltipAgent?.node_type,
-  ]);
+  }, [tooltip, tooltipAgent]);
 
   useEffect(() => {
     if (!flowInstance || nodes.length === 0) return;

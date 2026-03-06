@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   Check,
@@ -41,7 +41,7 @@ export function ProvidersPage() {
 
   const selectedProvider = providers.find((p) => p.id === selectedId);
 
-  const refreshProviders = async () => {
+  const refreshProviders = useCallback(async () => {
     setLoading(true);
     try {
       const items = await fetchProviders();
@@ -55,11 +55,11 @@ export function ProvidersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedId]);
 
   useEffect(() => {
     void refreshProviders();
-  }, []);
+  }, [refreshProviders]);
 
   const handleSelect = (provider: Provider) => {
     setSelectedId(provider.id);

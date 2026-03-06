@@ -100,21 +100,23 @@ export function HomePage() {
         </BadgeChip>
       </div>
 
-      <motion.button
-        type="button"
-        initial={{ opacity: 0, x: 16 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.3, delay: 0.15 }}
-        onClick={togglePanel}
-        className="absolute right-4 top-14 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground"
-        title={panelVisible ? "Hide panel" : "Show panel"}
-      >
-        {panelVisible ? (
-          <PanelRightClose className="size-4" />
-        ) : (
-          <PanelRightOpen className="size-4" />
+      <AnimatePresence>
+        {!panelVisible && (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 16 }}
+            transition={{ duration: 0.2 }}
+            onClick={togglePanel}
+            className="absolute right-4 top-14 z-40 flex h-9 w-9 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground"
+            title="Show panel"
+            aria-label="Show panel"
+          >
+            <PanelRightOpen className="size-4" />
+          </motion.button>
         )}
-      </motion.button>
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {panelVisible && (
@@ -123,7 +125,7 @@ export function HomePage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 30 }}
             transition={{ type: "spring", stiffness: 320, damping: 30 }}
-            className="absolute bottom-3 right-3 top-24 z-30 w-[min(92vw,420px)] rounded-lg border border-glass-border bg-glass-bg shadow-[0_20px_70px_rgba(0,0,0,0.5)] backdrop-blur-sm"
+            className="absolute bottom-3 right-3 top-14 z-30 w-[min(92vw,420px)] rounded-lg border border-glass-border bg-glass-bg shadow-[0_20px_70px_rgba(0,0,0,0.5)] backdrop-blur-sm"
           >
             <div className="flex h-full flex-col overflow-hidden rounded-lg">
               <AnimatePresence mode="wait">
@@ -139,6 +141,7 @@ export function HomePage() {
                     <AgentDetailPanel
                       agent={selectedAgent}
                       onClose={() => selectAgent(null)}
+                      onCollapse={togglePanel}
                     />
                   </motion.div>
                 ) : (
@@ -150,7 +153,7 @@ export function HomePage() {
                     transition={{ duration: 0.15 }}
                     className="flex h-full flex-col"
                   >
-                    <StewardChatPanel />
+                    <StewardChatPanel onCollapse={togglePanel} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -173,6 +176,7 @@ function BadgeChip({ children }: { children: ReactNode }) {
 function AgentDetailPanel({
   agent,
   onClose,
+  onCollapse,
 }: {
   agent: NonNullable<ReturnType<typeof useAgent>["agents"]> extends Map<
     string,
@@ -181,6 +185,7 @@ function AgentDetailPanel({
     ? V
     : never;
   onClose: () => void;
+  onCollapse: () => void;
 }) {
   return (
     <>
@@ -202,13 +207,14 @@ function AgentDetailPanel({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <PanelActionButton title="Hide panel" onClick={onCollapse}>
+            <PanelRightClose className="size-4" />
+          </PanelActionButton>
+          <PanelActionButton title="Close details" onClick={onClose}>
+            <X className="size-4" />
+          </PanelActionButton>
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
@@ -268,7 +274,11 @@ function AgentDetailPanel({
   );
 }
 
-function StewardChatPanel() {
+interface StewardChatPanelProps {
+  onCollapse: () => void;
+}
+
+function StewardChatPanel({ onCollapse }: StewardChatPanelProps) {
   const { stewardMessages, sendStewardMessage, connected } = useAgent();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -315,6 +325,9 @@ function StewardChatPanel() {
             {connected ? "Online" : "Connecting..."}
           </p>
         </div>
+        <PanelActionButton title="Hide panel" onClick={onCollapse}>
+          <PanelRightClose className="size-4" />
+        </PanelActionButton>
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
@@ -377,5 +390,29 @@ function StewardChatPanel() {
         </div>
       </div>
     </>
+  );
+}
+
+interface PanelActionButtonProps {
+  children: ReactNode;
+  onClick: () => void;
+  title: string;
+}
+
+function PanelActionButton({
+  children,
+  onClick,
+  title,
+}: PanelActionButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+    >
+      {children}
+    </button>
   );
 }

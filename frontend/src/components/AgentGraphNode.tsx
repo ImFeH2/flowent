@@ -1,7 +1,12 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import { nodeTypeIcon, stateColor, stateBorder } from "@/lib/constants";
+import {
+  nodeTypeIcon,
+  stateBorder,
+  stateColor,
+  stateRing,
+} from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
 interface AgentNodeData {
@@ -26,34 +31,43 @@ export function AgentGraphNode({ data }: NodeProps) {
     ? "border-graph-attention/70"
     : stateBorder[state];
 
+  const borderClass = selected
+    ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
+    : cn(
+        baseBorder,
+        (state === "idle" || state === "terminated") &&
+          "hover:border-graph-node-border-hover",
+      );
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
       className={cn(
-        "relative flex min-w-[210px] items-center gap-3 rounded-md border px-4 py-3",
+        "relative isolate flex min-w-[210px] items-center gap-3 overflow-visible rounded-md border px-4 py-3",
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
         "bg-graph-node-bg",
-        baseBorder,
-        selected
-          ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
-          : "border-graph-node-border hover:border-graph-node-border-hover",
-        isRunning && "node-glow-active",
+        borderClass,
         state === "terminated" && "opacity-40 grayscale",
       )}
     >
+      <div
+        aria-hidden="true"
+        className={cn("agent-state-ring", stateRing[state])}
+      />
+
       <Handle
         type="target"
         position={Position.Top}
-        className="!size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className="!z-10 !size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
       />
 
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-sm border border-graph-node-border bg-surface-3 text-foreground/80">
+      <div className="relative z-10 flex size-9 shrink-0 items-center justify-center rounded-sm border border-graph-node-border bg-surface-3 text-foreground/80">
         <Icon className="size-5" />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <span className="truncate text-sm font-semibold text-foreground">
           {name ?? <span className="capitalize">{node_type}</span>}
         </span>
@@ -62,7 +76,7 @@ export function AgentGraphNode({ data }: NodeProps) {
         </span>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="relative z-10 flex items-center gap-2">
         <span className="relative flex size-3">
           {(isRunning || isToolActive) && (
             <span
@@ -85,7 +99,7 @@ export function AgentGraphNode({ data }: NodeProps) {
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap"
+          className="absolute -bottom-7 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap"
         >
           <span className="rounded-sm border border-graph-attention/30 bg-surface-2 px-2 py-1 text-[10px] font-mono text-graph-attention-text shadow-lg backdrop-blur-sm">
             {toolCall}
@@ -96,7 +110,7 @@ export function AgentGraphNode({ data }: NodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className="!z-10 !size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
       />
     </motion.div>
   );

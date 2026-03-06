@@ -27,6 +27,14 @@ export const stateBadgeColor: Record<AgentState, string> = {
     "bg-graph-status-terminated/10 text-graph-status-terminated border-graph-status-terminated/20",
 };
 
+export const stateRing: Record<AgentState, string> = {
+  running: "agent-state-ring-running",
+  idle: "agent-state-ring-idle",
+  initializing: "agent-state-ring-initializing",
+  error: "agent-state-ring-error",
+  terminated: "agent-state-ring-terminated",
+};
+
 export const stateBorder: Record<AgentState, string> = {
   running: "border-graph-status-running/60",
   idle: "border-graph-node-border",

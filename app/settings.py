@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+
+from loguru import logger
 
 WORKING_DIR = Path(os.getcwd())
 _SETTINGS_FILE = WORKING_DIR / "settings.json"
@@ -49,6 +52,68 @@ _cached_settings: Settings | None = None
 _settings_lock = threading.Lock()
 
 
+def _build_settings(data: dict[str, object]) -> Settings:
+    event_log_data = data.get("event_log", {})
+    if not isinstance(event_log_data, dict):
+        event_log_data = {}
+    event_log = EventLogSettings(**event_log_data)
+
+    model_data = data.get("model", {})
+    if not isinstance(model_data, dict):
+        model_data = {}
+    model_settings = ModelSettings(
+        active_provider_id=str(model_data.get("active_provider_id", "")),
+        active_model=str(model_data.get("active_model", "")),
+    )
+
+    providers_raw = data.get("providers", [])
+    if not isinstance(providers_raw, list):
+        providers_raw = []
+    providers = []
+    for provider in providers_raw:
+        if not isinstance(provider, dict):
+            continue
+        providers.append(
+            ProviderConfig(
+                id=str(provider.get("id", "")),
+                name=str(provider.get("name", "")),
+                type=str(provider.get("type", "openai_compatible")),
+                base_url=str(provider.get("base_url", "")),
+                api_key=str(provider.get("api_key", "")),
+            )
+        )
+
+    roles_raw = data.get("roles", [])
+    if not isinstance(roles_raw, list):
+        roles_raw = []
+    roles = []
+    for role in roles_raw:
+        if not isinstance(role, dict):
+            continue
+        roles.append(
+            RoleConfig(
+                id=str(role.get("id", "")),
+                name=str(role.get("name", "")),
+                system_prompt=str(role.get("system_prompt", "")),
+            )
+        )
+
+    return Settings(
+        event_log=event_log,
+        model=model_settings,
+        providers=providers,
+        roles=roles,
+    )
+
+
+def _read_settings_file() -> Settings:
+    with _SETTINGS_FILE.open(encoding="utf-8") as settings_file:
+        data = json.load(settings_file)
+    if not isinstance(data, dict):
+        raise ValueError("settings file must contain a JSON object")
+    return _build_settings(data)
+
+
 def load_settings() -> Settings:
     global _cached_settings
     with _settings_lock:
@@ -63,42 +128,13 @@ def load_settings() -> Settings:
             return _cached_settings
 
     try:
-        with open(_SETTINGS_FILE) as f:
-            data = json.load(f)
-
-        event_log = EventLogSettings(**data.get("event_log", {}))
-
-        model_data = data.get("model", {})
-        model_settings = ModelSettings(
-            active_provider_id=model_data.get("active_provider_id", ""),
-            active_model=model_data.get("active_model", ""),
+        loaded_settings = _read_settings_file()
+    except Exception as exc:
+        logger.warning(
+            "Failed to load settings from {}: {}. Falling back to defaults.",
+            _SETTINGS_FILE,
+            exc,
         )
-
-        providers_raw = data.get("providers", [])
-        providers = []
-        for p in providers_raw:
-            if not isinstance(p, dict):
-                continue
-            providers.append(
-                ProviderConfig(
-                    id=str(p.get("id", "")),
-                    name=str(p.get("name", "")),
-                    type=str(p.get("type", "openai_compatible")),
-                    base_url=str(p.get("base_url", "")),
-                    api_key=str(p.get("api_key", "")),
-                )
-            )
-
-        roles_raw = data.get("roles", [])
-        roles = [RoleConfig(**r) for r in roles_raw]
-
-        loaded_settings = Settings(
-            event_log=event_log,
-            model=model_settings,
-            providers=providers,
-            roles=roles,
-        )
-    except Exception:
         loaded_settings = Settings()
 
     with _settings_lock:
@@ -108,12 +144,31 @@ def load_settings() -> Settings:
 
 
 def save_settings(settings: Settings) -> None:
-    global _cached_settings
+    temp_path: Path | None = None
+    _SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=_SETTINGS_FILE.parent,
+            prefix=f"{_SETTINGS_FILE.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            json.dump(asdict(settings), temp_file, indent=2)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+
+        os.replace(temp_path, _SETTINGS_FILE)
+    except Exception:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+        raise
+
     with _settings_lock:
         _cached_settings = settings
-
-    with open(_SETTINGS_FILE, "w") as f:
-        json.dump(asdict(settings), f, indent=2)
 
 
 def get_settings() -> Settings:

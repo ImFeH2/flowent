@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronDown, ChevronRight, Search, Wrench } from "lucide-react";
-
-interface ToolInfo {
-  name: string;
-  description: string;
-  parameters?: Record<string, unknown>;
-}
+import { fetchTools, type ToolInfo } from "@/lib/api";
 
 export function ToolsPage() {
   const [tools, setTools] = useState<ToolInfo[]>([]);
@@ -15,9 +10,8 @@ export function ToolsPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetch("/api/tools")
-      .then((res) => res.json())
-      .then((data) => setTools(data.tools ?? []))
+    fetchTools()
+      .then((items) => setTools(items))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

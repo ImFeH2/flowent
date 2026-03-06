@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAgents } from "@/hooks/useAgents";
+import { sendStewardMessageRequest } from "@/lib/api";
 import type {
   Node,
   AgentEvent,
@@ -77,11 +78,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     ]);
 
     try {
-      await fetch("/api/steward/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
+      await sendStewardMessageRequest(content);
     } catch (_) {
       void _;
     }

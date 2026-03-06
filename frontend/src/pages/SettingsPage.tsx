@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Save, Settings } from "lucide-react";
 import { toast } from "sonner";
 import {
+  fetchAppMeta,
   fetchProviderModels,
   fetchProviders,
   fetchSettings,
@@ -63,8 +64,7 @@ export function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/meta")
-      .then((res) => res.json() as Promise<{ version?: string }>)
+    fetchAppMeta()
       .then((data) => {
         setAppVersion(typeof data.version === "string" ? data.version : null);
       })

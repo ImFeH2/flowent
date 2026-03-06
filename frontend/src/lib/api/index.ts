@@ -14,3 +14,5 @@ export {
   type ModelOption,
 } from "./providers";
 export { fetchSettings, saveSettings } from "./settings";
+export { fetchAppMeta, fetchTools, type ToolInfo } from "./meta";
+export { sendStewardMessageRequest } from "./steward";

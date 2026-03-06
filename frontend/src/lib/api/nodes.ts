@@ -11,10 +11,12 @@ export async function fetchNodes(): Promise<Node[]> {
 
 export async function fetchNodeDetail(
   nodeId: string,
+  signal?: AbortSignal,
 ): Promise<NodeDetail | null> {
   return requestJson<NodeDetail, NodeDetail | null>(`/api/nodes/${nodeId}`, {
     errorMessage: "Failed to fetch node detail",
     fallback: null,
+    signal,
     swallowHttpError: true,
     map: (data) => {
       if (!data || !Array.isArray(data.history)) {

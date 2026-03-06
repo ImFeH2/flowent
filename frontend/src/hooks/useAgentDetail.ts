@@ -31,33 +31,49 @@ function reduceDeltas(deltas: StreamingDelta[]) {
 export function useAgentDetail(agentId: string | null) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const { agentHistories, clearAgentHistory, streamingDeltas, agents } =
     useAgent();
 
   useEffect(() => {
-    if (!agentId) return;
+    if (!agentId) {
+      setDetail(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
 
+    const controller = new AbortController();
     let cancelled = false;
 
     const load = async () => {
       setLoading(true);
+      setError(null);
       clearAgentHistory(agentId);
       try {
-        const data = await fetchNodeDetail(agentId);
+        const data = await fetchNodeDetail(agentId, controller.signal);
         if (cancelled) return;
-        clearAgentHistory(agentId);
         setDetail(data);
         setFetchedAt(Date.now());
+      } catch (err) {
+        if (cancelled || controller.signal.aborted) return;
+        setDetail(null);
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch node detail",
+        );
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    load();
+    void load();
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [agentId, clearAgentHistory]);
 
@@ -116,5 +132,5 @@ export function useAgentDetail(agentId: string | null) {
     return merged;
   }, [detail, agentId, agentHistories, streamingDeltas, agents, fetchedAt]);
 
-  return { detail: merged, loading, fetchedAt };
+  return { detail: merged, loading, error, fetchedAt };
 }

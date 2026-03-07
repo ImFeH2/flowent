@@ -19,6 +19,7 @@ class SpawnTool(Tool):
         "Create a new agent node with a specific role. "
         "This is a low-cost delegation mechanism: you may create specialized agents whenever parallelism or task handoff would help. "
         "If the work is outside your role, expertise, or ownership, spawning a better-suited agent should usually be your first move. "
+        "Once you determine that spawning is the better path, do it directly instead of asking the Human for permission, unless the spawn would enable destructive work, material extra cost, or elevated permissions. "
         "The agent is created, connected to the spawner, and the task_prompt is sent as the first message."
     )
     parameters: ClassVar[dict[str, Any]] = {

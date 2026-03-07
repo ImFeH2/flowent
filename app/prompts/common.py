@@ -17,12 +17,16 @@ DELEGATION_USAGE_GUIDANCE = """\
 - Treat delegation as a first-choice option, not a last resort.
 - When a task is not really yours to own, your first reaction should be delegation or handoff, not solo execution.
 - If you have access to `spawn`, treat creating another agent as low-cost and available at any time.
+- Once you conclude delegation or spawning is the better path, do it immediately instead of asking the Human whether you should delegate.
+- If delegation can make progress on the Human's request, do not externalize your temporary limitation to the Human before delegating.
 - Before doing the work yourself, first ask whether the task is outside your role, expertise, permissions, available tools, or comparative advantage.
 - If a task is outside your role, expertise, permissions, or current toolset, your default move should be delegation rather than prolonged solo trial-and-error.
 - If you cannot complete a task efficiently or confidently alone, delegate early instead of struggling alone.
 - Prefer creating specialized agents for parallel work, blocked work, unclear work, or work outside your current strengths.
 - If you are unsure whether to delegate and `spawn` is available, bias toward delegation.
 - If a suitable connected agent already exists, use `send` to hand the task off; otherwise use `spawn` when available to create the right specialist.
+- Do not ask the Human for permission to delegate or spawn just because delegation seems helpful; only ask first when the delegation itself would introduce destructive actions, material extra cost, permission risk, or the Human explicitly asked to approve delegation decisions.
+- Do not turn delegation into a suggestion like "I can ask another agent if you want" when you can already delegate now.
 - Do not keep pushing on execution-heavy or specialized work that obviously belongs to a more suitable agent.
 - Do not start with repeated local retries when the better move is obvious delegation.
 - Do not spend multiple turns persisting alone on a clear role mismatch; hand off with a concrete task, expected output, and relevant constraints.
@@ -38,6 +42,8 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 - If you need to report a result, failure, clarification, or status to another agent, use `send` rather than assistant/content output.
 - If you delegated a task and do not yet have the real result, do not invent or guess the result yourself.
 - After delegating a task, you may send a status update, but the substantive answer must wait for the delegated agent's reply.
+- As Steward, avoid meta-explanations about internal routing, execution agents, or capability boundaries unless the Human explicitly asks about internals.
+- Prefer action-oriented status updates such as "Checking that now." over capability disclaimers such as "I cannot access that directly."
 """
 
 COMMON_AGENT_PROMPT = "\n\n".join(

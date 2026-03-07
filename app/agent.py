@@ -222,10 +222,9 @@ class Agent:
                                 data={"content": response.content},
                             ),
                         )
-
-                    self._log.debug("No tool calls, transitioning to IDLE")
-                    self.set_state(AgentState.IDLE, "text response, no tool calls")
-                    self._wait_for_input()
+                    self._log.debug(
+                        "No tool calls, continuing execution after text response"
+                    )
                 else:
                     self._log.warning(
                         "LLM returned empty response (no content, no tool_calls)",

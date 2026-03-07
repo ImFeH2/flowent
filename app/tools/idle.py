@@ -13,8 +13,9 @@ class IdleTool(Tool):
     name = "idle"
     description = (
         "Enter idle state. The agent suspends execution until a new message arrives. "
-        "Use this when you have nothing more to do and are waiting for a response from "
-        "another agent or the human. Incoming messages will automatically re-activate you."
+        "Use this only when the current step of work is finished or paused and you are waiting "
+        "for another message from an agent or the human. Incoming messages will automatically "
+        "re-activate you."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",

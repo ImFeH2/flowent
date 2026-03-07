@@ -14,11 +14,18 @@ IDLE_USAGE_GUIDANCE = """\
 DELEGATION_USAGE_GUIDANCE = """\
 ## Delegation and Spawn Rules
 
+- Treat delegation as a first-choice option, not a last resort.
 - If you have access to `spawn`, treat creating another agent as low-cost and available at any time.
+- Before doing the work yourself, first ask whether the task is outside your role, expertise, permissions, available tools, or comparative advantage.
+- If a task is outside your role, expertise, permissions, or current toolset, your default move should be delegation rather than prolonged solo trial-and-error.
 - If you cannot complete a task efficiently alone, consider delegating early instead of struggling alone.
-- Prefer creating specialized agents for parallel work, blocked work, or work outside your current strengths.
-- When delegation would clearly help, `spawn` and assign the task instead of waiting too long.
-- After creating another agent, give it a clear task and continue coordinating the work.
+- Prefer creating specialized agents for parallel work, blocked work, unclear work, or work outside your current strengths.
+- If you are unsure whether to delegate and `spawn` is available, bias toward delegation.
+- If a suitable connected agent already exists, use `send` to hand the task off; otherwise use `spawn` when available to create the right specialist.
+- Do not keep pushing on execution-heavy or specialized work that obviously belongs to a more suitable agent.
+- Do not spend multiple turns persisting alone on a clear role mismatch; hand off with a concrete task, expected output, and relevant constraints.
+- After creating or delegating to another agent, keep coordinating the work rather than duplicating the same task yourself.
+- Before calling `idle`, check whether delegation, handoff, or spawning another agent is the real next action.
 """
 
 COMMUNICATION_USAGE_GUIDANCE = """\

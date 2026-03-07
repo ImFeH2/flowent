@@ -37,3 +37,23 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 - If you delegated a task and do not yet have the real result, do not invent or guess the result yourself.
 - After delegating a task, you may send a status update, but the substantive answer must wait for the delegated agent's reply.
 """
+
+COMMON_AGENT_PROMPT = "\n\n".join(
+    [
+        IDLE_USAGE_GUIDANCE.strip(),
+        DELEGATION_USAGE_GUIDANCE.strip(),
+        COMMUNICATION_USAGE_GUIDANCE.strip(),
+    ]
+)
+
+DEFAULT_AGENT_ROLE_PROMPT = (
+    "You are a helpful agent. Complete the assigned task when it fits your role, "
+    "and otherwise delegate or hand it off early to the right agent before reporting results back."
+)
+
+
+def compose_system_prompt(role_prompt: str) -> str:
+    role_specific_prompt = role_prompt.strip()
+    if not role_specific_prompt:
+        return COMMON_AGENT_PROMPT
+    return f"{COMMON_AGENT_PROMPT}\n\n{role_specific_prompt}".strip()

@@ -1,28 +1,24 @@
 from __future__ import annotations
 
 from app.models import NodeConfig, NodeType
-from app.prompts.common import (
-    COMMUNICATION_USAGE_GUIDANCE,
-    DELEGATION_USAGE_GUIDANCE,
-    IDLE_USAGE_GUIDANCE,
-)
+from app.prompts.common import DEFAULT_AGENT_ROLE_PROMPT, compose_system_prompt
 from app.prompts.conductor import CONDUCTOR_PROMPT
 from app.prompts.steward import STEWARD_PROMPT
 
 
 def get_system_prompt(config: NodeConfig) -> str:
     if config.node_type == NodeType.STEWARD:
-        prompt = STEWARD_PROMPT.strip()
+        prompt = STEWARD_PROMPT
     elif config.node_type == NodeType.CONDUCTOR:
-        prompt = CONDUCTOR_PROMPT.strip()
+        prompt = CONDUCTOR_PROMPT
     else:
         from app.settings import find_role, get_settings
 
-        settings = get_settings()
-        prompt = "You are a helpful agent. Complete the assigned task and report results back."
+        prompt = DEFAULT_AGENT_ROLE_PROMPT
         if config.role_id:
+            settings = get_settings()
             role = find_role(settings, config.role_id)
             if role:
-                prompt = role.system_prompt.strip()
+                prompt = role.system_prompt
 
-    return f"{IDLE_USAGE_GUIDANCE.strip()}\n\n{DELEGATION_USAGE_GUIDANCE.strip()}\n\n{COMMUNICATION_USAGE_GUIDANCE.strip()}\n\n{prompt}".strip()
+    return compose_system_prompt(prompt)

@@ -129,8 +129,7 @@ class Agent:
         )
 
     def _run(self) -> None:
-        system_prompt = get_system_prompt(self.config)
-        self._append_history(SystemEntry(content=system_prompt))
+        self._append_history(SystemEntry(content=get_system_prompt(self.config)))
 
         self.set_state(AgentState.IDLE, "initialized, awaiting first message")
         self._log.info("Agent started, waiting for first message")
@@ -142,6 +141,7 @@ class Agent:
 
         while not self._terminate.is_set():
             try:
+                self._sync_system_prompt_entry()
                 self._drain_messages()
                 self._inject_system_context()
 
@@ -255,6 +255,16 @@ class Agent:
             ),
         )
 
+    def _sync_system_prompt_entry(self) -> None:
+        system_prompt = get_system_prompt(self.config)
+        with self._history_lock:
+            for entry in self.history:
+                if isinstance(entry, SystemEntry):
+                    entry.content = system_prompt
+                    break
+            else:
+                self.history.insert(0, SystemEntry(content=system_prompt))
+
     def _inject_system_context(self) -> None:
         if not self.todos:
             return
@@ -274,7 +284,9 @@ class Agent:
         self._append_history(SystemInjection(content=todo_text))
 
     def _build_messages(self) -> list[dict[str, Any]]:
-        messages: list[dict[str, Any]] = []
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": get_system_prompt(self.config)}
+        ]
         pending_tool_calls: list[dict[str, Any]] = []
 
         with self._history_lock:
@@ -282,7 +294,7 @@ class Agent:
 
         for entry in history_snapshot:
             if isinstance(entry, SystemEntry):
-                messages.append({"role": "system", "content": entry.content})
+                continue
 
             elif isinstance(entry, ReceivedMessage):
                 self._flush_tool_calls(messages, pending_tool_calls)

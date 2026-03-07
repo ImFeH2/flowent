@@ -17,6 +17,7 @@ class SpawnTool(Tool):
     name = "spawn"
     description = (
         "Create a new agent node with a specific role. "
+        "This is a low-cost delegation mechanism: you may create specialized agents whenever parallelism or task handoff would help. "
         "The agent is created, connected to the spawner, and the task_prompt is sent as the first message."
     )
     parameters: ClassVar[dict[str, Any]] = {

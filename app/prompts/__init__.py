@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from app.models import NodeConfig, NodeType
-from app.prompts.common import IDLE_USAGE_GUIDANCE
+from app.prompts.common import (
+    COMMUNICATION_USAGE_GUIDANCE,
+    DELEGATION_USAGE_GUIDANCE,
+    IDLE_USAGE_GUIDANCE,
+)
 from app.prompts.conductor import CONDUCTOR_PROMPT
 from app.prompts.steward import STEWARD_PROMPT
 
@@ -21,4 +25,4 @@ def get_system_prompt(config: NodeConfig) -> str:
             if role:
                 prompt = role.system_prompt.strip()
 
-    return f"{IDLE_USAGE_GUIDANCE.strip()}\\n\\n{prompt}".strip()
+    return f"{IDLE_USAGE_GUIDANCE.strip()}\n\n{DELEGATION_USAGE_GUIDANCE.strip()}\n\n{COMMUNICATION_USAGE_GUIDANCE.strip()}\n\n{prompt}".strip()

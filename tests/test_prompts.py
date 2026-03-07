@@ -18,16 +18,27 @@ def test_compose_system_prompt_appends_role_prompt():
 def test_get_system_prompt_for_steward_uses_common_prefix():
     prompt = get_system_prompt(NodeConfig(node_type=NodeType.STEWARD))
 
-    assert prompt == f"{COMMON_AGENT_PROMPT}\n\n{STEWARD_PROMPT}"
+    assert prompt == f"{COMMON_AGENT_PROMPT}\n\n{STEWARD_PROMPT.strip()}"
 
 
 def test_get_system_prompt_for_conductor_uses_common_prefix():
     prompt = get_system_prompt(NodeConfig(node_type=NodeType.CONDUCTOR))
 
-    assert prompt == f"{COMMON_AGENT_PROMPT}\n\n{CONDUCTOR_PROMPT}"
+    assert prompt == f"{COMMON_AGENT_PROMPT}\n\n{CONDUCTOR_PROMPT.strip()}"
 
 
 def test_get_system_prompt_for_default_agent_uses_common_prefix():
     prompt = get_system_prompt(NodeConfig(node_type=NodeType.AGENT))
 
     assert prompt == f"{COMMON_AGENT_PROMPT}\n\n{DEFAULT_AGENT_ROLE_PROMPT}"
+
+
+def test_common_prompt_requires_immediate_delegation_on_clear_mismatch():
+    assert (
+        "your first reaction should be delegation or handoff, not solo execution"
+        in COMMON_AGENT_PROMPT
+    )
+    assert (
+        "Do not start with repeated local retries when the better move is obvious delegation."
+        in COMMON_AGENT_PROMPT
+    )

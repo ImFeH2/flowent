@@ -1,13 +1,31 @@
-import { BaseEdge, getStraightPath, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
 
 export function AnimatedMessageEdge(props: EdgeProps) {
-  const { sourceX, sourceY, targetX, targetY, id, data } = props;
-  const [edgePath] = getStraightPath({ sourceX, sourceY, targetX, targetY });
-  const [reversePath] = getStraightPath({
+  const {
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    id,
+    data,
+  } = props;
+  const [edgePath] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  const [reversePath] = getBezierPath({
     sourceX: targetX,
     sourceY: targetY,
+    sourcePosition: targetPosition,
     targetX: sourceX,
     targetY: sourceY,
+    targetPosition: sourcePosition,
   });
   const edgeData = (data as Record<string, unknown> | undefined) ?? {};
   const hasActiveMessage = !!edgeData.active;

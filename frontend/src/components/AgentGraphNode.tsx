@@ -79,7 +79,7 @@ export function AgentGraphNode({ data }: NodeProps) {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
       className={cn(
-        "relative isolate flex min-w-[210px] items-center gap-3 overflow-visible rounded-md border px-4 py-3",
+        "relative isolate flex min-w-[210px] max-w-[260px] items-center gap-3 overflow-visible rounded-md border px-4 py-3",
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
         "bg-graph-node-bg",
         borderClass,
@@ -106,7 +106,10 @@ export function AgentGraphNode({ data }: NodeProps) {
           {name ?? <span className="capitalize">{node_type}</span>}
         </span>
         {latestTodo ? (
-          <span className="truncate text-[10px] text-muted-foreground">
+          <span
+            className="truncate text-[10px] text-muted-foreground"
+            title={latestTodo}
+          >
             {latestTodo}
           </span>
         ) : null}

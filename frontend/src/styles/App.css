@@ -125,9 +125,9 @@
   position: absolute;
   inset: -1.5px;
   border-radius: inherit;
-  padding: 1.5px;
+  border: 1.5px solid transparent;
   -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0) padding-box,
     linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -138,11 +138,14 @@
 .agent-loading-border::before {
   content: "";
   position: absolute;
-  inset: -50%;
+  inset: -100%;
   background: conic-gradient(
     from 0deg,
-    transparent 70%,
-    var(--graph-status-running) 100%
+    transparent 0deg,
+    color-mix(in srgb, var(--graph-status-running) 10%, transparent) 90deg,
+    color-mix(in srgb, var(--graph-status-running) 40%, transparent) 180deg,
+    color-mix(in srgb, var(--graph-status-running) 80%, transparent) 270deg,
+    var(--graph-status-running) 360deg
   );
   animation: agent-loading-spin 2s linear infinite;
 }

@@ -31,6 +31,31 @@ export function HistoryView({ history }: HistoryViewProps) {
   );
 }
 
+function formatJsonOutput(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return value;
+    }
+
+    try {
+      return JSON.stringify(JSON.parse(trimmed), null, 2);
+    } catch {
+      return value;
+    }
+  }
+
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 function StreamingText({
   text,
   streaming,
@@ -118,6 +143,8 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "ToolCall": {
       const isSendMessage = entry.tool_name === "send";
+      const formattedArguments = formatJsonOutput(entry.arguments);
+      const formattedResult = formatJsonOutput(entry.result);
       if (isSendMessage) {
         const toId = entry.arguments?.to as string | undefined;
         const content = entry.arguments?.content as string | undefined;
@@ -152,7 +179,7 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
                 Arguments
               </div>
               <pre className="text-[11px] text-teal-200/80 whitespace-pre-wrap break-words">
-                {JSON.stringify(entry.arguments, null, 2)}
+                {formattedArguments}
               </pre>
             </div>
             {entry.result && (
@@ -162,7 +189,7 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
                 </div>
                 <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
                   <StreamingText
-                    text={entry.result}
+                    text={formattedResult}
                     streaming={entry.streaming}
                   />
                 </pre>

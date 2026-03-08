@@ -142,10 +142,10 @@
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    color-mix(in srgb, var(--graph-status-running) 10%, transparent) 90deg,
-    color-mix(in srgb, var(--graph-status-running) 40%, transparent) 180deg,
-    color-mix(in srgb, var(--graph-status-running) 80%, transparent) 270deg,
-    var(--graph-status-running) 360deg
+    transparent 180deg,
+    color-mix(in srgb, var(--graph-status-running) 10%, transparent) 220deg,
+    color-mix(in srgb, var(--graph-status-running) 60%, transparent) 300deg,
+    color-mix(in srgb, var(--graph-status-running) 100%, white 40%) 360deg
   );
   animation: agent-loading-spin 2s linear infinite;
 }

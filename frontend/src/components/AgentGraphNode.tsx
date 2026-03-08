@@ -111,7 +111,7 @@ export function AgentGraphNode({ data }: NodeProps) {
         <div
           title={latestTodo ?? undefined}
           className={cn(
-            "flex shrink-0 items-center justify-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider min-w-[72px]",
+            "relative flex shrink-0 items-center justify-start gap-1.5 rounded-full border py-0.5 pr-2 pl-1.5 text-[10px] font-medium uppercase tracking-wider min-w-[72px]",
             stateBadgeColor[state],
           )}
         >
@@ -126,12 +126,14 @@ export function AgentGraphNode({ data }: NodeProps) {
             )}
             <span
               className={cn(
-                "relative inline-flex size-2 rounded-full",
+                "relative inline-flex size-2 rounded-full shrink-0",
                 isToolActive ? "bg-graph-attention" : stateColor[state],
               )}
             />
           </span>
-          <span>{isToolActive ? "Active" : state}</span>
+          <span className="flex-1 text-center truncate">
+            {isToolActive ? "Active" : state}
+          </span>
         </div>
       </div>
 

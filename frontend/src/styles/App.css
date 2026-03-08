@@ -138,24 +138,26 @@
 .agent-loading-border::before {
   content: "";
   position: absolute;
-  inset: -100%;
+  inset: -50%;
   background: conic-gradient(
     from 0deg,
-    transparent 0deg,
-    transparent 180deg,
-    color-mix(in srgb, var(--graph-status-running) 10%, transparent) 220deg,
-    color-mix(in srgb, var(--graph-status-running) 60%, transparent) 300deg,
-    color-mix(in srgb, var(--graph-status-running) 100%, white 40%) 360deg
+    transparent 0%,
+    color-mix(in srgb, var(--graph-status-running) 5%, transparent) 20%,
+    color-mix(in srgb, var(--graph-status-running) 20%, transparent) 50%,
+    color-mix(in srgb, var(--graph-status-running) 60%, transparent) 80%,
+    var(--graph-status-running) 100%
   );
-  animation: agent-loading-spin 2s linear infinite;
+  animation: agent-loading-spin 1.5s linear infinite;
+  transform-origin: center;
+  will-change: transform;
 }
 
 @keyframes agent-loading-spin {
   0% {
-    transform: rotate(0deg);
+    transform: translateZ(0) rotate(0deg);
   }
   100% {
-    transform: rotate(360deg);
+    transform: translateZ(0) rotate(360deg);
   }
 }
 

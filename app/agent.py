@@ -60,6 +60,7 @@ class Agent:
         self._message_queue: Queue[Message] = Queue()
         self._terminate = threading.Event()
         self._idle_requested: bool = False
+        self._idle_state_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._termination_reason: str = ""
         self._connections_lock = threading.Lock()
@@ -89,6 +90,11 @@ class Agent:
     def get_history_snapshot(self) -> list[HistoryEntry]:
         with self._history_lock:
             return list(self.history)
+
+    def wait_until_idle(self, timeout: float | None = None) -> bool:
+        if self.state == AgentState.IDLE:
+            return True
+        return self._idle_state_event.wait(timeout=timeout)
 
     def start(self) -> None:
         self._thread = threading.Thread(
@@ -521,6 +527,10 @@ class Agent:
     def set_state(self, state: AgentState, reason: str = "") -> None:
         old = self.state
         self.state = state
+        if state == AgentState.IDLE:
+            self._idle_state_event.set()
+        else:
+            self._idle_state_event.clear()
         if old != state:
             self._log.debug(
                 "State: {} -> {}{}",

@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.models import Event, EventType, Message, NodeConfig, NodeType
+from app.models import Event, EventType, NodeConfig, NodeType
 from app.tools import Tool
+from app.tools.send import send_message
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -20,7 +21,7 @@ class SpawnTool(Tool):
         "This is a low-cost delegation mechanism: you may create specialized agents whenever parallelism or task handoff would help. "
         "If the work is outside your role, expertise, or ownership, spawning a better-suited agent should usually be your first move. "
         "Once you determine that spawning is the better path, do it directly instead of asking the Human for permission, unless the spawn would enable destructive work, material extra cost, or elevated permissions. "
-        "The agent is created, connected to the spawner, and the task_prompt is sent as the first message."
+        "The agent is created, connected to the spawner, and task_prompt is sent as the first message after the new agent reaches idle."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -48,7 +49,7 @@ class SpawnTool(Tool):
                 "description": "List of directories the agent can write to",
             },
         },
-        "required": ["role_id", "task_prompt"],
+        "required": ["role_id"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -58,7 +59,7 @@ class SpawnTool(Tool):
         from app.settings import find_role, get_settings
 
         role_id = args["role_id"]
-        task_prompt = args["task_prompt"]
+        task_prompt = args.get("task_prompt")
         name = args.get("name")
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
@@ -78,15 +79,12 @@ class SpawnTool(Tool):
         )
 
         child = AgentClass(uuid=agent_uuid, config=config)
-        msg = Message(from_id=agent.uuid, to_id=agent_uuid, content=task_prompt)
 
         registered = False
         connected = False
         started = False
 
         try:
-            child.enqueue_message(msg)
-
             agent.add_connection(agent_uuid)
             child.add_connection(agent.uuid)
             connected = True
@@ -104,6 +102,15 @@ class SpawnTool(Tool):
                     data={"a": agent.uuid, "b": agent_uuid},
                 )
             )
+
+            if isinstance(task_prompt, str) and task_prompt != "":
+                if not child.wait_until_idle(timeout=5.0):
+                    raise TimeoutError(
+                        "Spawned agent did not reach idle before task delivery"
+                    )
+                payload = send_message(agent, agent_uuid, task_prompt)
+                if "error" in payload:
+                    raise RuntimeError(str(payload["error"]))
         except Exception as exc:
             logger.exception(
                 "Failed to spawn agent {} (role={}) by {}",

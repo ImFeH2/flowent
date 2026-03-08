@@ -23,6 +23,8 @@ import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
 
+const floatingPanelToggleClass = "absolute right-7 top-[4.25rem] z-40";
+
 export function HomePage() {
   const { agents, connected } = useAgentRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
@@ -104,7 +106,7 @@ export function HomePage() {
             <PanelToggleButton
               expanded={false}
               onClick={togglePanel}
-              className="absolute right-4 top-14 z-40"
+              className={floatingPanelToggleClass}
             />
           )}
         </AnimatePresence>
@@ -369,15 +371,19 @@ function PanelToggleButton({
 
   return (
     <motion.button
+      layout
       layoutId="workspace-panel-toggle-button"
       type="button"
       onClick={onClick}
       title={title}
       aria-label={title}
-      initial={{ opacity: 0, scale: 0.86 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.86 }}
-      transition={{ type: "spring", stiffness: 380, damping: 28 }}
+      initial={false}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{
+        layout: { type: "spring", stiffness: 420, damping: 34 },
+        opacity: { duration: 0.16, ease: "easeOut" },
+      }}
       className={cn(
         "flex size-8 items-center justify-center rounded-md border border-glass-border bg-surface-overlay/90 text-muted-foreground shadow-lg backdrop-blur-sm transition-colors hover:bg-surface-3 hover:text-foreground",
         className,

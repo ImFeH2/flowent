@@ -9,6 +9,7 @@ from typing import Any
 class EventType(StrEnum):
     NODE_CREATED = "node_created"
     NODE_STATE_CHANGED = "node_state_changed"
+    NODE_TODOS_CHANGED = "node_todos_changed"
     NODE_MESSAGE = "node_message"
     NODE_TERMINATED = "node_terminated"
     NODE_CONNECTED = "node_connected"
@@ -21,6 +22,7 @@ class EventType(StrEnum):
 DISPLAY_EVENTS: set[EventType] = {
     EventType.NODE_CREATED,
     EventType.NODE_STATE_CHANGED,
+    EventType.NODE_TODOS_CHANGED,
     EventType.NODE_MESSAGE,
     EventType.NODE_TERMINATED,
     EventType.NODE_CONNECTED,

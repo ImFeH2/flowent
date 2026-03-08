@@ -10,6 +10,7 @@ export type AgentState =
 export type DisplayEventType =
   | "node_created"
   | "node_state_changed"
+  | "node_todos_changed"
   | "node_message"
   | "node_terminated"
   | "node_connected"

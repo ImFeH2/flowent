@@ -47,7 +47,10 @@ export function useAgents() {
         });
         return next;
       });
-    } else if (event.type === "node_state_changed") {
+    } else if (
+      event.type === "node_state_changed" ||
+      event.type === "node_todos_changed"
+    ) {
       setAgents((prev) => {
         const node = prev.get(event.agent_id);
         if (!node) return prev;
@@ -55,7 +58,10 @@ export function useAgents() {
         const todos = event.data.todos as Node["todos"] | undefined;
         next.set(event.agent_id, {
           ...node,
-          state: event.data.new_state as Node["state"],
+          state:
+            event.type === "node_state_changed"
+              ? (event.data.new_state as Node["state"])
+              : node.state,
           todos: todos ?? node.todos,
         });
         return next;

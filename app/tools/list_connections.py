@@ -19,24 +19,4 @@ class ListConnectionsTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app.registry import registry
-
-        result = []
-        with agent._connections_lock:
-            connection_ids = list(agent.connections)
-
-        for cid in connection_ids:
-            node = registry.get(cid)
-            if node is None:
-                continue
-            result.append(
-                {
-                    "uuid": node.uuid,
-                    "node_type": node.config.node_type.value,
-                    "role_id": node.config.role_id,
-                    "name": node.config.name,
-                    "state": node.state.value,
-                }
-            )
-
-        return json.dumps({"connections": result})
+        return json.dumps({"connections": agent.get_connections_info()})

@@ -42,11 +42,12 @@ class TodoTool(Tool):
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         action = args["action"]
+        current_todos = agent.get_todos_snapshot()
 
         if action == "list":
             return json.dumps(
                 {
-                    "todos": [t.serialize() for t in agent.todos],
+                    "todos": [t.serialize() for t in current_todos],
                 }
             )
 
@@ -54,9 +55,9 @@ class TodoTool(Tool):
             text = args.get("text", "")
             if not text:
                 return json.dumps({"error": "text is required for add"})
-            next_id = max((t.id for t in agent.todos), default=0) + 1
+            next_id = max((t.id for t in current_todos), default=0) + 1
             item = TodoItem(id=next_id, text=text)
-            agent.todos.append(item)
+            agent.set_todos([*current_todos, item])
             self._emit_todo_event(agent)
             return json.dumps({"status": "added", "id": next_id})
 
@@ -64,23 +65,29 @@ class TodoTool(Tool):
             item_id = args.get("id")
             if item_id is None:
                 return json.dumps({"error": "id is required for update"})
-            for item in agent.todos:
+            updated_todos = []
+            found = False
+            for item in current_todos:
                 if item.id == item_id:
+                    found = True
                     if "text" in args:
                         item.text = args["text"]
                     if "done" in args:
                         item.done = args["done"]
-                    self._emit_todo_event(agent)
-                    return json.dumps({"status": "updated", "id": item_id})
+                updated_todos.append(item)
+            if found:
+                agent.set_todos(updated_todos)
+                self._emit_todo_event(agent)
+                return json.dumps({"status": "updated", "id": item_id})
             return json.dumps({"error": f"Todo item {item_id} not found"})
 
         if action == "remove":
             item_id = args.get("id")
             if item_id is None:
                 return json.dumps({"error": "id is required for remove"})
-            before_len = len(agent.todos)
-            agent.todos = [t for t in agent.todos if t.id != item_id]
-            if len(agent.todos) < before_len:
+            next_todos = [t for t in current_todos if t.id != item_id]
+            if len(next_todos) < len(current_todos):
+                agent.set_todos(next_todos)
                 self._emit_todo_event(agent)
                 return json.dumps({"status": "removed", "id": item_id})
             return json.dumps({"error": f"Todo item {item_id} not found"})
@@ -94,7 +101,7 @@ class TodoTool(Tool):
                 type=EventType.NODE_TODOS_CHANGED,
                 agent_id=agent.uuid,
                 data={
-                    "todos": [t.serialize() for t in agent.todos],
+                    "todos": [t.serialize() for t in agent.get_todos_snapshot()],
                 },
             ),
         )

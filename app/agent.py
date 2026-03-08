@@ -65,6 +65,7 @@ class Agent:
         self._termination_reason: str = ""
         self._connections_lock = threading.Lock()
         self._history_lock = threading.Lock()
+        self._todos_lock = threading.Lock()
         self._log = logger.bind(
             agent_id=self.uuid[:8], node_type=self.config.node_type.value
         )
@@ -90,6 +91,41 @@ class Agent:
     def get_history_snapshot(self) -> list[HistoryEntry]:
         with self._history_lock:
             return list(self.history)
+
+    def get_todos_snapshot(self) -> list[TodoItem]:
+        with self._todos_lock:
+            return [TodoItem(id=t.id, text=t.text, done=t.done) for t in self.todos]
+
+    def set_todos(self, todos: list[TodoItem]) -> None:
+        with self._todos_lock:
+            self.todos = [TodoItem(id=t.id, text=t.text, done=t.done) for t in todos]
+
+    def request_idle(self) -> None:
+        self.set_state(AgentState.IDLE)
+        self._idle_requested = True
+
+    def get_connections_info(self) -> list[dict[str, Any]]:
+        from app.registry import registry
+
+        result: list[dict[str, Any]] = []
+        with self._connections_lock:
+            connection_ids = list(self.connections)
+
+        for cid in connection_ids:
+            node = registry.get(cid)
+            if node is None:
+                continue
+            result.append(
+                {
+                    "uuid": node.uuid,
+                    "node_type": node.config.node_type.value,
+                    "role_id": node.config.role_id,
+                    "name": node.config.name,
+                    "state": node.state.value,
+                }
+            )
+
+        return result
 
     def wait_until_idle(self, timeout: float | None = None) -> bool:
         if self.state == AgentState.IDLE:
@@ -271,10 +307,11 @@ class Agent:
                 self.history.insert(0, SystemEntry(content=system_prompt))
 
     def _inject_system_context(self) -> None:
-        if not self.todos:
+        todos = self.get_todos_snapshot()
+        if not todos:
             return
         lines = []
-        for t in self.todos:
+        for t in todos:
             mark = "[x]" if t.done else "[ ]"
             lines.append(f"  {mark} {t.text}")
         todo_text = "Current TODO list:\n" + "\n".join(lines)
@@ -545,7 +582,7 @@ class Agent:
                     data={
                         "old_state": old.value,
                         "new_state": state.value,
-                        "todos": [t.serialize() for t in self.todos],
+                        "todos": [t.serialize() for t in self.get_todos_snapshot()],
                     },
                 ),
             )

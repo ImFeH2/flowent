@@ -22,8 +22,5 @@ class IdleTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app.models import AgentState
-
-        agent.set_state(AgentState.IDLE)
-        agent._idle_requested = True
+        agent.request_idle()
         return json.dumps({"status": "idle"})

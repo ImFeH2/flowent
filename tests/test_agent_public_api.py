@@ -29,7 +29,7 @@ def test_list_connections_tool_uses_agent_public_api(monkeypatch):
         {
             "uuid": "agent-b",
             "node_type": "agent",
-            "role_id": "worker",
+            "role_name": "Worker",
             "name": "Worker",
             "state": "idle",
         }
@@ -46,7 +46,7 @@ def test_agent_get_connections_info_returns_connected_node_metadata():
     registry.reset()
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
     peer = Agent(
-        NodeConfig(node_type=NodeType.AGENT, role_id="worker", name="Worker"),
+        NodeConfig(node_type=NodeType.AGENT, role_name="Worker", name="Worker"),
         uuid="agent-b",
     )
     registry.register(agent)
@@ -58,7 +58,7 @@ def test_agent_get_connections_info_returns_connected_node_metadata():
             {
                 "uuid": "agent-b",
                 "node_type": "agent",
-                "role_id": "worker",
+                "role_name": "Worker",
                 "name": "Worker",
                 "state": "initializing",
             }

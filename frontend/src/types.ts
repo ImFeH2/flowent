@@ -38,7 +38,7 @@ export interface Node {
   connections: string[];
   name: string | null;
   todos: TodoItem[];
-  role_id: string | null;
+  role_name: string | null;
 }
 
 export interface AgentEvent {
@@ -81,7 +81,7 @@ export interface NodeDetail {
   state: AgentState;
   name: string | null;
   connections: string[];
-  role_id: string | null;
+  role_name: string | null;
   todos: TodoItem[];
   history: HistoryEntry[];
 }
@@ -92,7 +92,6 @@ export type StreamingDelta =
   | { type: "ToolResultDelta"; tool_call_id: string; text: string };
 
 export interface Role {
-  id: string;
   name: string;
   system_prompt: string;
 }

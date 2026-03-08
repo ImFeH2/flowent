@@ -29,7 +29,6 @@ class ProviderConfig:
 
 @dataclass
 class RoleConfig:
-    id: str
     name: str
     system_prompt: str
 
@@ -52,7 +51,9 @@ _cached_settings: Settings | None = None
 _settings_lock = threading.Lock()
 
 
-def _build_settings(data: dict[str, object]) -> Settings:
+def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
+    migrated = False
+
     event_log_data = data.get("event_log", {})
     if not isinstance(event_log_data, dict):
         event_log_data = {}
@@ -90,23 +91,30 @@ def _build_settings(data: dict[str, object]) -> Settings:
     for role in roles_raw:
         if not isinstance(role, dict):
             continue
+        role_name = str(role.get("name", ""))
+        if "id" in role:
+            migrated = True
+            if not role_name:
+                role_name = str(role.get("id", ""))
         roles.append(
             RoleConfig(
-                id=str(role.get("id", "")),
-                name=str(role.get("name", "")),
+                name=role_name,
                 system_prompt=str(role.get("system_prompt", "")),
             )
         )
 
-    return Settings(
-        event_log=event_log,
-        model=model_settings,
-        providers=providers,
-        roles=roles,
+    return (
+        Settings(
+            event_log=event_log,
+            model=model_settings,
+            providers=providers,
+            roles=roles,
+        ),
+        migrated,
     )
 
 
-def _read_settings_file() -> Settings:
+def _read_settings_file() -> tuple[Settings, bool]:
     with _SETTINGS_FILE.open(encoding="utf-8") as settings_file:
         data = json.load(settings_file)
     if not isinstance(data, dict):
@@ -128,7 +136,7 @@ def load_settings() -> Settings:
             return _cached_settings
 
     try:
-        loaded_settings = _read_settings_file()
+        loaded_settings, migrated = _read_settings_file()
     except Exception as exc:
         logger.warning(
             "Failed to load settings from {}: {}. Falling back to defaults.",
@@ -136,6 +144,17 @@ def load_settings() -> Settings:
             exc,
         )
         loaded_settings = Settings()
+        migrated = False
+
+    if migrated:
+        try:
+            save_settings(loaded_settings)
+        except Exception as exc:
+            logger.warning(
+                "Failed to persist migrated settings to {}: {}",
+                _SETTINGS_FILE,
+                exc,
+            )
 
     with _settings_lock:
         if _cached_settings is None:
@@ -183,8 +202,8 @@ def find_provider(settings: Settings, provider_id: str) -> ProviderConfig | None
     return None
 
 
-def find_role(settings: Settings, role_id: str) -> RoleConfig | None:
+def find_role(settings: Settings, role_name: str) -> RoleConfig | None:
     for r in settings.roles:
-        if r.id == role_id:
+        if r.name == role_name:
             return r
     return None

@@ -52,7 +52,7 @@ class Agent:
         self.uuid = uuid or str(_uuid.uuid4())
         self.config = config
         self.node_type = config.node_type
-        self.role_id = config.role_id
+        self.role_name = config.role_name
         self.state = AgentState.INITIALIZING
         self.todos: list[TodoItem] = []
         self.connections: list[str] = []
@@ -119,7 +119,7 @@ class Agent:
                 {
                     "uuid": node.uuid,
                     "node_type": node.config.node_type.value,
-                    "role_id": node.config.role_id,
+                    "role_name": node.config.role_name,
                     "name": node.config.name,
                     "state": node.state.value,
                 }
@@ -145,7 +145,7 @@ class Agent:
                 agent_id=self.uuid,
                 data={
                     "node_type": self.config.node_type.value,
-                    "role_id": self.config.role_id,
+                    "role_name": self.config.role_name,
                     "name": self.config.name,
                 },
             ),

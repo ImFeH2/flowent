@@ -17,7 +17,7 @@ async def list_nodes() -> dict:
             {
                 "id": n.uuid,
                 "node_type": n.config.node_type.value,
-                "role_id": n.config.role_id,
+                "role_name": n.config.role_name,
                 "state": n.state.value,
                 "connections": n.get_connections_snapshot(),
                 "name": n.config.name,
@@ -37,7 +37,7 @@ async def get_node(node_id: str) -> dict:
     return {
         "id": node.uuid,
         "node_type": node.config.node_type.value,
-        "role_id": node.config.role_id,
+        "role_name": node.config.role_name,
         "state": node.state.value,
         "connections": node.get_connections_snapshot(),
         "name": node.config.name,

@@ -21,18 +21,18 @@ export async function createRole(
 }
 
 export async function updateRole(
-  id: string,
-  updates: Partial<Omit<Role, "id">>,
+  name: string,
+  updates: Partial<Role>,
 ): Promise<Role> {
-  return requestJson<Role>(`/api/roles/${id}`, {
+  return requestJson<Role>(`/api/roles/${encodeURIComponent(name)}`, {
     method: "PUT",
     body: updates,
     errorMessage: "Failed to update role",
   });
 }
 
-export async function deleteRole(id: string): Promise<void> {
-  await requestVoid(`/api/roles/${id}`, {
+export async function deleteRole(name: string): Promise<void> {
+  await requestVoid(`/api/roles/${encodeURIComponent(name)}`, {
     method: "DELETE",
     errorMessage: "Failed to delete role",
   });

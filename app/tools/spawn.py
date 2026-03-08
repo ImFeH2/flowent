@@ -26,9 +26,9 @@ class SpawnTool(Tool):
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
-            "role_id": {
+            "role_name": {
                 "type": "string",
-                "description": "ID of the Role to assign to the new agent",
+                "description": "Name of the Role to assign to the new agent",
             },
             "task_prompt": {
                 "type": "string",
@@ -49,7 +49,7 @@ class SpawnTool(Tool):
                 "description": "List of directories the agent can write to",
             },
         },
-        "required": ["role_id"],
+        "required": ["role_name"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -58,21 +58,21 @@ class SpawnTool(Tool):
         from app.registry import registry
         from app.settings import find_role, get_settings
 
-        role_id = args["role_id"]
+        role_name = args["role_name"]
         task_prompt = args.get("task_prompt")
         name = args.get("name")
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
 
         settings = get_settings()
-        role_cfg = find_role(settings, role_id)
+        role_cfg = find_role(settings, role_name)
         if role_cfg is None:
-            return json.dumps({"error": f"Role '{role_id}' not found"})
+            return json.dumps({"error": f"Role '{role_name}' not found"})
 
         agent_uuid = str(uuid.uuid4())
         config = NodeConfig(
             node_type=NodeType.AGENT,
-            role_id=role_id,
+            role_name=role_name,
             name=name,
             tools=tools,
             write_dirs=write_dirs,
@@ -115,7 +115,7 @@ class SpawnTool(Tool):
             logger.exception(
                 "Failed to spawn agent {} (role={}) by {}",
                 agent_uuid[:8],
-                role_id,
+                role_name,
                 agent.uuid[:8],
             )
 
@@ -132,8 +132,8 @@ class SpawnTool(Tool):
         logger.info(
             "Spawned agent {} (role={}) by {}",
             agent_uuid[:8],
-            role_id,
+            role_name,
             agent.uuid[:8],
         )
 
-        return json.dumps({"agent_id": agent_uuid, "role_id": role_id})
+        return json.dumps({"agent_id": agent_uuid, "role_name": role_name})

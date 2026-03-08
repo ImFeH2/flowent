@@ -31,7 +31,7 @@ export function useAgents() {
     if (event.type === "node_created") {
       const data = event.data as unknown as {
         node_type: Node["node_type"];
-        role_id?: string | null;
+        role_name?: string | null;
         name?: string | null;
       };
       setAgents((prev) => {
@@ -39,7 +39,7 @@ export function useAgents() {
         next.set(event.agent_id, {
           id: event.agent_id,
           node_type: data.node_type,
-          role_id: data.role_id ?? null,
+          role_name: data.role_name ?? null,
           state: "initializing",
           connections: [],
           name: data.name ?? null,

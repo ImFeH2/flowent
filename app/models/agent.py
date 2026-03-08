@@ -21,7 +21,7 @@ class AgentState(StrEnum):
 @dataclass
 class NodeConfig:
     node_type: NodeType
-    role_id: str | None = None
+    role_name: str | None = None
     name: str | None = None
     tools: list[str] = field(default_factory=list)
     write_dirs: list[str] = field(default_factory=list)

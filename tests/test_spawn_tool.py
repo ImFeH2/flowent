@@ -25,9 +25,7 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
 
     monkeypatch.setattr(
         "app.settings.get_settings",
-        lambda: Settings(
-            roles=[RoleConfig(id="worker", name="Worker", system_prompt="...")]
-        ),
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
     )
 
     call_order: list[object] = []
@@ -55,12 +53,12 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
     result = json.loads(
         SpawnTool().execute(
             parent,
-            {"role_id": "worker", "task_prompt": "handle this task"},
+            {"role_name": "Worker", "task_prompt": "handle this task"},
         )
     )
 
     child_id = result["agent_id"]
-    assert result == {"agent_id": child_id, "role_id": "worker"}
+    assert result == {"agent_id": child_id, "role_name": "Worker"}
     assert call_order == [
         ("start", child_id),
         ("wait_until_idle", child_id, 5.0),
@@ -81,9 +79,7 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
 
     monkeypatch.setattr(
         "app.settings.get_settings",
-        lambda: Settings(
-            roles=[RoleConfig(id="worker", name="Worker", system_prompt="...")]
-        ),
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
     )
 
     monkeypatch.setattr(Agent, "start", lambda self: None)
@@ -101,11 +97,11 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
         ),
     )
 
-    args = {"role_id": "worker"}
+    args = {"role_name": "Worker"}
     if task_prompt is not None:
         args["task_prompt"] = task_prompt
 
     result = json.loads(SpawnTool().execute(parent, args))
 
-    assert result["role_id"] == "worker"
+    assert result["role_name"] == "Worker"
     assert isinstance(result["agent_id"], str)

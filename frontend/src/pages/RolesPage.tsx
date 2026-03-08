@@ -15,7 +15,7 @@ import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types";
 
-type RoleDraft = Omit<Role, "id">;
+type RoleDraft = Role;
 
 const emptyDraft = (): RoleDraft => ({
   name: "",
@@ -25,7 +25,7 @@ const emptyDraft = (): RoleDraft => ({
 export function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
@@ -48,24 +48,26 @@ export function RolesPage() {
 
   const handleCreate = () => {
     setIsCreating(true);
-    setEditingId(null);
+    setEditingName(null);
     setDraft(emptyDraft());
   };
 
   const handleEdit = (role: Role) => {
-    setEditingId(role.id);
+    setEditingName(role.name);
     setIsCreating(false);
     setDraft({ name: role.name, system_prompt: role.system_prompt });
   };
 
   const handleCancel = () => {
     setIsCreating(false);
-    setEditingId(null);
+    setEditingName(null);
     setDraft(emptyDraft());
   };
 
   const handleSave = async () => {
-    if (!draft.name.trim()) {
+    const nextName = draft.name.trim();
+
+    if (!nextName) {
       toast.error("Role name is required");
       return;
     }
@@ -74,38 +76,60 @@ export function RolesPage() {
       return;
     }
 
+    const nameExists = roles.some(
+      (role) => role.name === nextName && role.name !== editingName,
+    );
+    if (nameExists) {
+      toast.error("Role name already exists");
+      return;
+    }
+
     setSaving(true);
     try {
-      if (editingId) {
-        const updated = await updateRole(editingId, draft);
-        setRoles((prev) => prev.map((r) => (r.id === editingId ? updated : r)));
+      const nextDraft = {
+        name: nextName,
+        system_prompt: draft.system_prompt,
+      };
+
+      if (editingName) {
+        const updated = await updateRole(editingName, nextDraft);
+        setRoles((prev) =>
+          prev.map((role) => (role.name === editingName ? updated : role)),
+        );
         toast.success("Role updated");
       } else {
-        const created = await createRole(draft.name, draft.system_prompt);
+        const created = await createRole(
+          nextDraft.name,
+          nextDraft.system_prompt,
+        );
         setRoles((prev) => [created, ...prev]);
         toast.success("Role created");
       }
       handleCancel();
-    } catch {
-      toast.error("Failed to save role");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save role",
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (name: string) => {
     if (!confirm("Are you sure you want to delete this role?")) return;
     try {
-      await deleteRole(id);
-      setRoles((prev) => prev.filter((r) => r.id !== id));
-      if (editingId === id) handleCancel();
+      await deleteRole(name);
+      setRoles((prev) => prev.filter((role) => role.name !== name));
+      if (editingName === name) handleCancel();
       toast.success("Role deleted");
-    } catch {
-      toast.error("Failed to delete role");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete role",
+      );
     }
   };
 
-  const isEditing = Boolean(isCreating || editingId);
+  const isEditing = Boolean(isCreating || editingName);
 
   if (loading && !isEditing) {
     return (
@@ -147,7 +171,7 @@ export function RolesPage() {
           <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-semibold">
-                {editingId ? "Edit Role" : "Create Role"}
+                {editingName ? "Edit Role" : "Create Role"}
               </h2>
               <button
                 onClick={handleCancel}
@@ -230,7 +254,7 @@ export function RolesPage() {
         <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {roles.map((role, i) => (
             <motion.div
-              key={role.id}
+              key={role.name}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
@@ -243,9 +267,6 @@ export function RolesPage() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="truncate font-semibold">{role.name}</h3>
-                    <p className="font-mono text-[10px] text-muted-foreground">
-                      {role.id.slice(0, 8)}
-                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -256,7 +277,7 @@ export function RolesPage() {
                     <Edit2 className="size-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDelete(role.id)}
+                    onClick={() => handleDelete(role.name)}
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 className="size-3.5" />

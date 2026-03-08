@@ -15,9 +15,9 @@ def get_system_prompt(config: NodeConfig) -> str:
         from app.settings import find_role, get_settings
 
         prompt = DEFAULT_AGENT_ROLE_PROMPT
-        if config.role_id:
+        if config.role_name:
             settings = get_settings()
-            role = find_role(settings, config.role_id)
+            role = find_role(settings, config.role_name)
             if role:
                 prompt = role.system_prompt
 

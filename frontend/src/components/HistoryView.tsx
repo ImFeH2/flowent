@@ -31,29 +31,67 @@ export function HistoryView({ history }: HistoryViewProps) {
   );
 }
 
-function formatJsonOutput(value: unknown): string {
+function formatJsonOutput(value: unknown): string | null {
   if (value === null || value === undefined) {
-    return "";
+    return null;
   }
 
   if (typeof value === "string") {
     const trimmed = value.trim();
-    if (!trimmed) {
-      return value;
+    if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
+      return null;
     }
 
     try {
       return JSON.stringify(JSON.parse(trimmed), null, 2);
     } catch {
-      return value;
+      return null;
     }
   }
 
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
   }
+
+  return null;
+}
+
+function MarkdownOrJsonBlock({
+  content,
+  markdownClassName,
+  preClassName,
+  streaming,
+}: {
+  content: string | null | undefined;
+  markdownClassName?: string;
+  preClassName?: string;
+  streaming?: boolean;
+}) {
+  const formattedJson = formatJsonOutput(content);
+
+  if (formattedJson) {
+    return (
+      <pre
+        className={cn(
+          "text-[11px] whitespace-pre-wrap break-words",
+          preClassName,
+        )}
+      >
+        <StreamingText text={formattedJson} streaming={streaming} />
+      </pre>
+    );
+  }
+
+  return (
+    <>
+      <MarkdownContent content={content ?? ""} className={markdownClassName} />
+      {streaming && <span className="streaming-cursor" />}
+    </>
+  );
 }
 
 function StreamingText({
@@ -82,9 +120,11 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
           className="border-border/50 bg-surface-1/30"
           defaultOpen={false}
         >
-          <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
-            {entry.content}
-          </pre>
+          <MarkdownOrJsonBlock
+            content={entry.content}
+            markdownClassName="text-xs text-muted-foreground"
+            preClassName="text-muted-foreground leading-relaxed"
+          />
         </CollapsibleBlock>
       );
 
@@ -115,9 +155,12 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
           className="border-amber-500/20 bg-amber-500/5"
           defaultOpen={entry.streaming ?? false}
         >
-          <p className="text-[11px] text-amber-200/80 whitespace-pre-wrap break-words leading-relaxed">
-            <StreamingText text={entry.content} streaming={entry.streaming} />
-          </p>
+          <MarkdownOrJsonBlock
+            content={entry.content}
+            streaming={entry.streaming}
+            markdownClassName="text-xs text-amber-200/80"
+            preClassName="text-amber-200/80 leading-relaxed"
+          />
         </CollapsibleBlock>
       );
 
@@ -143,7 +186,7 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "ToolCall": {
       const isSendMessage = entry.tool_name === "send";
-      const formattedArguments = formatJsonOutput(entry.arguments);
+      const formattedArguments = formatJsonOutput(entry.arguments) ?? "";
       const formattedResult = formatJsonOutput(entry.result);
       if (isSendMessage) {
         const toId = entry.arguments?.to as string | undefined;
@@ -187,12 +230,12 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
                 <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
                   Result
                 </div>
-                <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap break-words">
-                  <StreamingText
-                    text={formattedResult}
-                    streaming={entry.streaming}
-                  />
-                </pre>
+                <MarkdownOrJsonBlock
+                  content={formattedResult ?? entry.result}
+                  streaming={entry.streaming}
+                  markdownClassName="text-xs text-muted-foreground"
+                  preClassName="text-muted-foreground"
+                />
               </div>
             )}
           </div>

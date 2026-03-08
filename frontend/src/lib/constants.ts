@@ -37,7 +37,7 @@ export const stateRing: Record<AgentState, string> = {
 
 export const nodeTypeIconStyle: Record<NodeType, string> = {
   steward:
-    "rounded-full border-graph-steward/40 bg-graph-steward/10 text-graph-steward",
+    "rounded-sm border-graph-steward/40 bg-graph-steward/10 text-graph-steward",
   conductor:
     "rounded-sm border-graph-conductor/40 bg-graph-conductor/10 text-graph-conductor",
   agent: "rounded-sm border-graph-node-border bg-surface-3 text-foreground/80",

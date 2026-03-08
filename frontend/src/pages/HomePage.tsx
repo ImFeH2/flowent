@@ -67,31 +67,11 @@ export function HomePage() {
           <AgentGraph />
         </div>
 
-        <div className="absolute inset-x-0 top-0 z-30 border-b border-glass-border bg-surface-overlay px-5 py-2.5 backdrop-blur-sm sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground/95">
-                Agent Workspace
-              </p>
-              <p className="truncate text-[11px] text-muted-foreground">
-                Focused graph view with details panel
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="hidden items-center gap-2 text-[11px] text-muted-foreground sm:flex">
-                <span>{metrics.total} nodes</span>
-                <span className="text-muted-foreground/30">/</span>
-                <span>{metrics.running} RUNNING</span>
-              </div>
-              <PanelToggleButton
-                expanded={panelVisible}
-                onClick={togglePanel}
-              />
-            </div>
-          </div>
+        <div className="absolute right-5 top-5 z-30 sm:right-6 sm:top-6">
+          <PanelToggleButton expanded={panelVisible} onClick={togglePanel} />
         </div>
 
-        <div className="absolute left-4 top-14 z-30 flex max-w-[75%] flex-wrap items-center gap-2 sm:left-6">
+        <div className="absolute left-5 top-5 z-30 flex max-w-[75%] flex-wrap items-center gap-2 sm:left-6 sm:top-6">
           <BadgeChip>
             <Radio
               className={cn(
@@ -363,7 +343,7 @@ function PanelToggleButton({
       title={title}
       aria-label={title}
       className={cn(
-        "flex size-8 items-center justify-center rounded-md border border-glass-border bg-surface-overlay/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-all hover:bg-surface-3 hover:text-foreground",
+        "pointer-events-auto flex size-8 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-all hover:bg-surface-3 hover:text-foreground",
         className,
       )}
     >

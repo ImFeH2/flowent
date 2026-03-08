@@ -19,6 +19,13 @@ repos:
         language: system
         types: [python]
 
+      - id: pytest
+        name: Backend Test (pytest)
+        entry: uv run pytest tests/ -q
+        language: system
+        types: [python]
+        pass_filenames: false
+
       - id: frontend-format
         name: Frontend Format (Prettier)
         entry: bash -c 'cd frontend && pnpm format'

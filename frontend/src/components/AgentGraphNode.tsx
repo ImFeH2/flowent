@@ -7,6 +7,7 @@ import {
   stateBorder,
   stateColor,
   stateRing,
+  stateBadgeColor,
 } from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
@@ -116,22 +117,30 @@ export function AgentGraphNode({ data }: NodeProps) {
       </div>
 
       <div className="relative z-10 flex items-center gap-2">
-        <span className="relative flex size-3">
-          {(isRunning || isToolActive) && (
+        <div
+          className={cn(
+            "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+            stateBadgeColor[state],
+          )}
+        >
+          <span className="relative flex size-2">
+            {(isRunning || isToolActive) && (
+              <span
+                className={cn(
+                  "absolute inline-flex size-full animate-ping rounded-full opacity-60",
+                  isToolActive ? "bg-graph-attention" : stateColor[state],
+                )}
+              />
+            )}
             <span
               className={cn(
-                "absolute inline-flex size-full animate-ping rounded-full opacity-40",
+                "relative inline-flex size-2 rounded-full",
                 isToolActive ? "bg-graph-attention" : stateColor[state],
               )}
             />
-          )}
-          <span
-            className={cn(
-              "relative inline-flex size-3 rounded-full border border-card shadow-sm",
-              isToolActive ? "bg-graph-attention" : stateColor[state],
-            )}
-          />
-        </span>
+          </span>
+          {isToolActive ? "Active" : state}
+        </div>
       </div>
 
       {isToolActive && (

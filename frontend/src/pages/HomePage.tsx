@@ -23,8 +23,6 @@ import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
 
-const floatingPanelToggleClass = "absolute right-7 top-[4.25rem] z-40";
-
 export function HomePage() {
   const { agents, connected } = useAgentRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
@@ -100,23 +98,18 @@ export function HomePage() {
         </BadgeChip>
       </div>
 
-      <AnimatePresence>
-        {!panelVisible && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, x: 20 }}
-            animate={{ opacity: 1, scale: 1, x: 0 }}
-            exit={{ opacity: 0, scale: 0.9, x: 20 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={floatingPanelToggleClass}
-          >
-            <PanelToggleButton
-              expanded={false}
-              onClick={togglePanel}
-              className="shadow-md border-glass-border/50 bg-glass-bg/90 hover:bg-surface-3/90"
-            />
-          </motion.div>
+      <div
+        className={cn(
+          "absolute top-14 z-40 transition-all duration-200 ease-out",
+          panelVisible ? "right-[min(92vw,420px)] mr-4" : "right-4",
         )}
-      </AnimatePresence>
+      >
+        <PanelToggleButton
+          expanded={panelVisible}
+          onClick={togglePanel}
+          className="shadow-md border-glass-border/50 bg-glass-bg/90 hover:bg-surface-3/90"
+        />
+      </div>
 
       <AnimatePresence mode="wait">
         {panelVisible && (
@@ -141,8 +134,7 @@ export function HomePage() {
                     <AgentDetailPanel
                       agent={selectedAgent}
                       onClose={() => selectAgent(null)}
-                      onCollapse={togglePanel}
-                    />
+                    />{" "}
                   </motion.div>
                 ) : (
                   <motion.div
@@ -153,7 +145,7 @@ export function HomePage() {
                     transition={{ duration: 0.15 }}
                     className="flex h-full flex-col"
                   >
-                    <StewardChatPanel onCollapse={togglePanel} />
+                    <StewardChatPanel />{" "}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -176,11 +168,9 @@ function BadgeChip({ children }: { children: ReactNode }) {
 function AgentDetailPanel({
   agent,
   onClose,
-  onCollapse,
 }: {
   agent: Node;
   onClose: () => void;
-  onCollapse: () => void;
 }) {
   const { detail, error, loading } = useAgentDetail(agent.id);
   const detailState = detail?.state ?? agent.state;
@@ -209,7 +199,6 @@ function AgentDetailPanel({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <PanelToggleButton expanded onClick={onCollapse} />
           <PanelActionButton title="Close details" onClick={onClose}>
             <X className="size-4" />
           </PanelActionButton>
@@ -307,11 +296,7 @@ function AgentDetailPanel({
   );
 }
 
-interface StewardChatPanelProps {
-  onCollapse: () => void;
-}
-
-function StewardChatPanel({ onCollapse }: StewardChatPanelProps) {
+function StewardChatPanel() {
   const {
     bottomRef,
     connected,
@@ -335,7 +320,6 @@ function StewardChatPanel({ onCollapse }: StewardChatPanelProps) {
             {connected ? "Online" : "Connecting..."}
           </p>
         </div>
-        <PanelToggleButton expanded onClick={onCollapse} />
       </div>
 
       <StewardChatMessages

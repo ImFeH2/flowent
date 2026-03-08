@@ -58,69 +58,66 @@ export function HomePage() {
   };
 
   return (
-    <div className="relative h-full overflow-hidden rounded-xl">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_48%)] opacity-30" />
+    <div className="relative flex h-full overflow-hidden rounded-xl bg-surface-1">
+      {/* Main Graph Area */}
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_48%)] opacity-30 z-0" />
 
-      <div className="absolute inset-0">
-        <AgentGraph />
-      </div>
+        <div className="relative flex-1">
+          <AgentGraph />
+        </div>
 
-      <div className="absolute inset-x-0 top-0 z-30 border-b border-glass-border bg-surface-overlay py-2.5 px-5 backdrop-blur-sm sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground/95">
-              Agent Workspace
-            </p>
-            <p className="truncate text-[11px] text-muted-foreground">
-              Focused graph view with floating details panel
-            </p>
+        <div className="absolute inset-x-0 top-0 z-30 border-b border-glass-border bg-surface-overlay px-5 py-2.5 backdrop-blur-sm sm:px-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground/95">
+                Agent Workspace
+              </p>
+              <p className="truncate text-[11px] text-muted-foreground">
+                Focused graph view with details panel
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="hidden items-center gap-2 text-[11px] text-muted-foreground sm:flex">
+                <span>{metrics.total} nodes</span>
+                <span className="text-muted-foreground/30">/</span>
+                <span>{metrics.running} RUNNING</span>
+              </div>
+              <PanelToggleButton
+                expanded={panelVisible}
+                onClick={togglePanel}
+              />
+            </div>
           </div>
-          <div className="hidden items-center gap-2 text-[11px] text-muted-foreground sm:flex">
-            <span>{metrics.total} nodes</span>
-            <span className="text-muted-foreground/30">/</span>
-            <span>{metrics.running} RUNNING</span>
-          </div>
+        </div>
+
+        <div className="absolute left-4 top-14 z-30 flex max-w-[75%] flex-wrap items-center gap-2 sm:left-6">
+          <BadgeChip>
+            <Radio
+              className={cn(
+                "size-3",
+                connected ? "text-emerald-400" : "text-amber-400",
+              )}
+            />
+            {connected ? "Live" : "Reconnecting"}
+            <span className="text-muted-foreground/50">·</span>
+            {metrics.total} nodes · {metrics.running} running · {metrics.idle}{" "}
+            idle
+          </BadgeChip>
         </div>
       </div>
 
-      <div className="absolute left-4 top-14 z-30 flex max-w-[75%] flex-wrap items-center gap-2 sm:left-6">
-        <BadgeChip>
-          <Radio
-            className={cn(
-              "size-3",
-              connected ? "text-emerald-400" : "text-amber-400",
-            )}
-          />
-          {connected ? "Live" : "Reconnecting"}
-          <span className="text-muted-foreground/50">·</span>
-          {metrics.total} nodes · {metrics.running} running · {metrics.idle}{" "}
-          idle
-        </BadgeChip>
-      </div>
-
-      <div
-        className={cn(
-          "absolute top-14 z-40 transition-all duration-200 ease-out",
-          panelVisible ? "right-[min(92vw,420px)] mr-4" : "right-4",
-        )}
-      >
-        <PanelToggleButton
-          expanded={panelVisible}
-          onClick={togglePanel}
-          className="shadow-md border-glass-border/50 bg-glass-bg/90 hover:bg-surface-3/90"
-        />
-      </div>
-
-      <AnimatePresence mode="wait">
+      {/* Side Panel Area */}
+      <AnimatePresence initial={false}>
         {panelVisible && (
           <motion.aside
-            initial={{ opacity: 0, x: 20, scale: 0.98 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.98 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute bottom-3 right-3 top-14 z-30 w-[min(92vw,420px)] rounded-lg border border-glass-border bg-glass-bg shadow-2xl backdrop-blur-md"
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 380, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="z-20 shrink-0 border-l border-border bg-surface-2"
           >
-            <div className="flex h-full flex-col overflow-hidden rounded-lg">
+            <div className="flex h-full w-[380px] flex-col overflow-hidden">
               <AnimatePresence mode="wait">
                 {selectedAgent ? (
                   <motion.div
@@ -134,7 +131,7 @@ export function HomePage() {
                     <AgentDetailPanel
                       agent={selectedAgent}
                       onClose={() => selectAgent(null)}
-                    />{" "}
+                    />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -145,7 +142,7 @@ export function HomePage() {
                     transition={{ duration: 0.15 }}
                     className="flex h-full flex-col"
                   >
-                    <StewardChatPanel />{" "}
+                    <StewardChatPanel />
                   </motion.div>
                 )}
               </AnimatePresence>

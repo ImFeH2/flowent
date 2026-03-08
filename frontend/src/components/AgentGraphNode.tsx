@@ -91,6 +91,7 @@ export function AgentGraphNode({ data }: NodeProps) {
         aria-hidden="true"
         className={cn("agent-state-ring", stateRing[state])}
       />
+      {isRunning && <div aria-hidden="true" className="agent-loading-border" />}
 
       <Handle
         type="target"

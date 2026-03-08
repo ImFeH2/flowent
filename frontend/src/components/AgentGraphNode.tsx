@@ -103,28 +103,19 @@ export function AgentGraphNode({ data }: NodeProps) {
         <Icon className="size-5" />
       </div>
 
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+      <div className="relative z-10 flex min-w-0 flex-1 items-center justify-between gap-3">
         <span className="truncate text-sm font-semibold text-foreground">
           {name ?? <span className="capitalize">{node_type}</span>}
         </span>
-        {latestTodo ? (
-          <span
-            className="truncate text-[10px] text-muted-foreground"
-            title={latestTodo}
-          >
-            {latestTodo}
-          </span>
-        ) : null}
-      </div>
 
-      <div className="relative z-10 flex items-center gap-2">
         <div
+          title={latestTodo ?? undefined}
           className={cn(
-            "flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+            "flex shrink-0 items-center justify-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider min-w-[72px]",
             stateBadgeColor[state],
           )}
         >
-          <span className="relative flex size-2">
+          <span className="relative flex size-2 shrink-0">
             {(isRunning || isToolActive) && (
               <span
                 className={cn(
@@ -140,7 +131,7 @@ export function AgentGraphNode({ data }: NodeProps) {
               )}
             />
           </span>
-          {isToolActive ? "Active" : state}
+          <span>{isToolActive ? "Active" : state}</span>
         </div>
       </div>
 

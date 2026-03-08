@@ -11,6 +11,11 @@ SYSTEM_NODE_TIMEOUT = 5.0
 def bootstrap_runtime() -> None:
     from app.agent import Agent
     from app.models import Event, EventType, NodeConfig, NodeType
+    from app.settings import ensure_builtin_roles, get_settings, save_settings
+
+    settings = get_settings()
+    if ensure_builtin_roles(settings):
+        save_settings(settings)
 
     steward = Agent(
         NodeConfig(

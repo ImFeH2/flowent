@@ -76,3 +76,14 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
         [("Researcher", "investigate"), ("Reviewer", "review")],
         [("Reviewer", "review")],
     ]
+
+
+def test_delete_builtin_role_returns_error(client: TestClient, monkeypatch):
+    settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+
+    response = client.delete("/api/roles/Worker")
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Cannot delete built-in role 'Worker'"}

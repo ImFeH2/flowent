@@ -112,6 +112,18 @@ def test_update_role_rejects_duplicate_name(monkeypatch):
     assert excinfo.value.detail == "Role 'Architect' already exists"
 
 
+def test_update_role_rejects_renaming_builtin_role(monkeypatch):
+    settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(update_role("Worker", UpdateRoleRequest(name="Helper")))
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Cannot rename built-in role 'Worker'"
+
+
 def test_delete_role_uses_name_path_parameter(monkeypatch):
     settings = Settings(
         roles=[
@@ -134,3 +146,15 @@ def test_delete_role_uses_name_path_parameter(monkeypatch):
         RoleConfig(name="Architect", system_prompt="Design systems")
     ]
     assert saved == [["Architect"]]
+
+
+def test_delete_role_rejects_builtin_role(monkeypatch):
+    settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(delete_role("Worker"))
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Cannot delete built-in role 'Worker'"

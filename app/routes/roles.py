@@ -3,7 +3,12 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.settings import RoleConfig, get_settings, save_settings
+from app.settings import (
+    RoleConfig,
+    get_settings,
+    is_builtin_role_name,
+    save_settings,
+)
 
 router = APIRouter()
 
@@ -52,6 +57,11 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
                 next_name = req.name.strip()
                 if not next_name:
                     raise HTTPException(status_code=400, detail="Role name is required")
+                if is_builtin_role_name(role_name) and next_name != role_name:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot rename built-in role '{role_name}'",
+                    )
                 if any(
                     role.name == next_name and role.name != role_name
                     for role in settings.roles
@@ -70,6 +80,12 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
 
 @router.delete("/api/roles/{role_name:path}")
 async def delete_role(role_name: str) -> dict:
+    if is_builtin_role_name(role_name):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete built-in role '{role_name}'",
+        )
+
     settings = get_settings()
     before = len(settings.roles)
     settings.roles = [r for r in settings.roles if r.name != role_name]

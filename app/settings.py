@@ -11,6 +11,13 @@ from loguru import logger
 
 WORKING_DIR = Path(os.getcwd())
 _SETTINGS_FILE = WORKING_DIR / "settings.json"
+WORKER_ROLE_NAME = "Worker"
+WORKER_ROLE_SYSTEM_PROMPT = (
+    "You are a general-purpose worker. Follow the assigned task_prompt, use the "
+    "tools you were given to complete the task, and report back clearly. You do "
+    "not have any special domain expertise beyond careful execution."
+)
+BUILTIN_ROLE_NAMES = frozenset({WORKER_ROLE_NAME})
 
 
 @dataclass
@@ -207,3 +214,24 @@ def find_role(settings: Settings, role_name: str) -> RoleConfig | None:
         if r.name == role_name:
             return r
     return None
+
+
+def build_worker_role() -> RoleConfig:
+    return RoleConfig(
+        name=WORKER_ROLE_NAME,
+        system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
+    )
+
+
+def ensure_builtin_roles(settings: Settings) -> bool:
+    changed = False
+
+    if find_role(settings, WORKER_ROLE_NAME) is None:
+        settings.roles.append(build_worker_role())
+        changed = True
+
+    return changed
+
+
+def is_builtin_role_name(role_name: str) -> bool:
+    return role_name in BUILTIN_ROLE_NAMES

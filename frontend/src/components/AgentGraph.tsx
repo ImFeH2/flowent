@@ -64,13 +64,23 @@ export function AgentGraph() {
     height: number;
   } | null>(null);
 
-  const activeEdgeSet = useMemo(() => {
-    const set = new Set<string>();
+  const activeEdgeMessages = useMemo(() => {
+    const map = new Map<
+      string,
+      { fromId: string; toId: string; timestamp: number }
+    >();
     for (const msg of activeMessages) {
-      set.add(`${msg.fromId}-${msg.toId}`);
-      set.add(`${msg.toId}-${msg.fromId}`);
+      const edgeId = [msg.fromId, msg.toId].sort().join("-");
+      const current = map.get(edgeId);
+      if (!current || current.timestamp <= msg.timestamp) {
+        map.set(edgeId, {
+          fromId: msg.fromId,
+          toId: msg.toId,
+          timestamp: msg.timestamp,
+        });
+      }
     }
-    return set;
+    return map;
   }, [activeMessages]);
 
   const { nodes, edges } = useMemo(() => {
@@ -98,15 +108,20 @@ export function AgentGraph() {
         const edgeId = [id, connId].sort().join("-");
         if (!edgeSet.has(edgeId)) {
           edgeSet.add(edgeId);
-          const isActive =
-            activeEdgeSet.has(`${id}-${connId}`) ||
-            activeEdgeSet.has(`${connId}-${id}`);
+          const activeMessage = activeEdgeMessages.get(edgeId);
           rawEdges.push({
             id: edgeId,
             source: id,
             target: connId,
             type: "animated",
-            data: { active: isActive },
+            data: {
+              active: !!activeMessage,
+              flowDirection: activeMessage
+                ? activeMessage.fromId === id && activeMessage.toId === connId
+                  ? "forward"
+                  : "reverse"
+                : null,
+            },
             animated: false,
           });
         }
@@ -118,7 +133,7 @@ export function AgentGraph() {
     }
 
     return getLayoutedElements(rawNodes, rawEdges);
-  }, [agents, selectedAgentId, activeToolCalls, activeEdgeSet]);
+  }, [agents, selectedAgentId, activeToolCalls, activeEdgeMessages]);
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
@@ -353,6 +368,31 @@ export function AgentGraph() {
                     stopOpacity="0.2"
                   />
                 </linearGradient>
+                <radialGradient id="agent-edge-pulse" cx="50%" cy="50%" r="50%">
+                  <stop
+                    offset="0%"
+                    stopColor="var(--graph-edge-active)"
+                    stopOpacity="1"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="var(--graph-edge-active)"
+                    stopOpacity="0.2"
+                  />
+                </radialGradient>
+                <filter
+                  id="agent-edge-glow"
+                  x="-50%"
+                  y="-50%"
+                  width="200%"
+                  height="200%"
+                >
+                  <feGaussianBlur stdDeviation="2.6" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
             </svg>
           </ReactFlow>

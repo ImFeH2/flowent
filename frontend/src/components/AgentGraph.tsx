@@ -9,7 +9,6 @@ import {
 import {
   ReactFlow,
   Background,
-  MiniMap,
   type Node,
   type Edge,
   type ReactFlowInstance,
@@ -328,13 +327,6 @@ export function AgentGraph() {
             className="bg-graph-bg"
           >
             <Background color="var(--graph-grid)" gap={32} size={0.8} />
-            <MiniMap
-              zoomable
-              pannable
-              className="!rounded-md !border !border-glass-border !bg-graph-bg !shadow-lg"
-              maskColor="var(--surface-overlay)"
-              nodeColor="var(--graph-edge-active)"
-            />
             <svg aria-hidden="true" focusable="false">
               <defs>
                 <linearGradient

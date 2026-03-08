@@ -7,7 +7,6 @@ import {
   stateBorder,
   stateColor,
   stateRing,
-  stateBadgeColor,
 } from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
@@ -104,35 +103,32 @@ export function AgentGraphNode({ data }: NodeProps) {
       </div>
 
       <div className="relative z-10 flex min-w-0 flex-1 items-center justify-between gap-3">
-        <span className="truncate text-sm font-semibold text-foreground">
+        <span
+          className="truncate text-sm font-semibold text-foreground"
+          title={latestTodo ?? undefined}
+        >
           {name ?? <span className="capitalize">{node_type}</span>}
         </span>
 
         <div
-          title={latestTodo ?? undefined}
-          className={cn(
-            "relative flex shrink-0 items-center justify-start gap-1.5 rounded-full border py-0.5 pr-2 pl-1.5 text-[10px] font-medium uppercase tracking-wider min-w-[72px]",
-            stateBadgeColor[state],
-          )}
+          className="relative flex items-center pr-1"
+          title={isToolActive ? "Active" : state}
         >
-          <span className="relative flex size-2 shrink-0">
+          <span className="relative flex size-3">
             {(isRunning || isToolActive) && (
               <span
                 className={cn(
-                  "absolute inline-flex size-full animate-ping rounded-full opacity-60",
+                  "absolute inline-flex size-full animate-ping rounded-full opacity-40",
                   isToolActive ? "bg-graph-attention" : stateColor[state],
                 )}
               />
             )}
             <span
               className={cn(
-                "relative inline-flex size-2 rounded-full shrink-0",
+                "relative inline-flex size-3 rounded-full border border-card shadow-sm",
                 isToolActive ? "bg-graph-attention" : stateColor[state],
               )}
             />
-          </span>
-          <span className="flex-1 text-center truncate">
-            {isToolActive ? "Active" : state}
           </span>
         </div>
       </div>

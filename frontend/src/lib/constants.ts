@@ -1,5 +1,5 @@
 import { Bot, Shield, Wand2 } from "lucide-react";
-import { type AgentState } from "@/types";
+import { type AgentState, type NodeType } from "@/types";
 
 export const nodeTypeIcon = {
   steward: Shield,
@@ -33,6 +33,14 @@ export const stateRing: Record<AgentState, string> = {
   initializing: "agent-state-ring-initializing",
   error: "agent-state-ring-error",
   terminated: "agent-state-ring-terminated",
+};
+
+export const nodeTypeIconStyle: Record<NodeType, string> = {
+  steward:
+    "rounded-full border-graph-steward/40 bg-graph-steward/10 text-graph-steward",
+  conductor:
+    "rounded-sm border-graph-conductor/40 bg-graph-conductor/10 text-graph-conductor",
+  agent: "rounded-sm border-graph-node-border bg-surface-3 text-foreground/80",
 };
 
 export const stateBorder: Record<AgentState, string> = {

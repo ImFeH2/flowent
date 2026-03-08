@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   nodeTypeIcon,
+  nodeTypeIconStyle,
   stateBorder,
   stateColor,
   stateRing,
@@ -75,22 +76,35 @@ export function AgentGraphNode({ data }: NodeProps) {
   return (
     <motion.div
       ref={nodeRef}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
+      initial={{ opacity: 0, scale: 0.92, filter: "blur(6px) grayscale(0%)" }}
+      animate={{
+        opacity: state === "terminated" ? 0.4 : 1,
+        scale: 1,
+        filter:
+          state === "terminated"
+            ? "blur(0px) grayscale(100%)"
+            : "blur(0px) grayscale(0%)",
+      }}
+      transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
       className={cn(
         "relative isolate flex min-w-[210px] max-w-[260px] items-center gap-3 overflow-visible rounded-md border px-4 py-3",
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
         "bg-graph-node-bg",
+        "transition-[border-color] duration-300",
         borderClass,
-        state === "terminated" && "opacity-40 grayscale",
       )}
     >
       <div
         aria-hidden="true"
         className={cn("agent-state-ring", stateRing[state])}
       />
-      {isRunning && <div aria-hidden="true" className="agent-loading-border" />}
+      <div
+        aria-hidden="true"
+        className={cn(
+          "agent-loading-border",
+          isRunning && "agent-loading-border-active",
+        )}
+      />
 
       <Handle
         type="target"
@@ -98,7 +112,12 @@ export function AgentGraphNode({ data }: NodeProps) {
         className="!z-10 !size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
       />
 
-      <div className="relative z-10 flex size-9 shrink-0 items-center justify-center rounded-sm border border-graph-node-border bg-surface-3 text-foreground/80">
+      <div
+        className={cn(
+          "relative z-10 flex size-9 shrink-0 items-center justify-center border",
+          nodeTypeIconStyle[node_type],
+        )}
+      >
         <Icon className="size-5" />
       </div>
 

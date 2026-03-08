@@ -3,8 +3,10 @@ import json
 from app.agent import Agent
 from app.models import NodeConfig, NodeType, TodoItem
 from app.registry import registry
+from app.settings import RoleConfig, Settings
 from app.tools.idle import IdleTool
 from app.tools.list_connections import ListConnectionsTool
+from app.tools.list_roles import ListRolesTool
 from app.tools.todo import TodoTool
 
 
@@ -65,6 +67,27 @@ def test_agent_get_connections_info_returns_connected_node_metadata():
         ]
     finally:
         registry.reset()
+
+
+def test_list_roles_tool_returns_registered_roles(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.CONDUCTOR, tools=["list_roles"]))
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(name="Worker", system_prompt="Do work."),
+                RoleConfig(name="Reviewer", system_prompt="Review code."),
+            ]
+        ),
+    )
+
+    result = json.loads(ListRolesTool().execute(agent, {}))
+
+    assert result == [
+        {"name": "Worker", "system_prompt": "Do work."},
+        {"name": "Reviewer", "system_prompt": "Review code."},
+    ]
 
 
 def test_todo_tool_writes_via_set_todos(monkeypatch):

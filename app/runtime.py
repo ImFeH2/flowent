@@ -32,6 +32,7 @@ def bootstrap_runtime() -> None:
                 "idle",
                 "todo",
                 "list_connections",
+                "list_roles",
                 "exit",
             ],
         ),

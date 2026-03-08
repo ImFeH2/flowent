@@ -56,6 +56,7 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.fetch import FetchTool
     from app.tools.idle import IdleTool
     from app.tools.list_connections import ListConnectionsTool
+    from app.tools.list_roles import ListRolesTool
     from app.tools.read import ReadTool
     from app.tools.send import SendTool
     from app.tools.spawn import SpawnTool
@@ -67,6 +68,7 @@ def build_tool_registry() -> ToolRegistry:
         SendTool,
         ConnectTool,
         ListConnectionsTool,
+        ListRolesTool,
         ReadTool,
         EditTool,
         ExecTool,

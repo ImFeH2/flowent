@@ -88,6 +88,7 @@ export function AgentGraph() {
           state: agent.state,
           shortId: id.slice(0, 8),
           name: agent.name,
+          latestTodo: agent.todos[agent.todos.length - 1]?.text ?? null,
           selected: id === selectedAgentId,
           toolCall: activeToolCalls.get(id) ?? null,
         },

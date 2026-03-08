@@ -15,13 +15,14 @@ interface AgentNodeData {
   state: AgentState;
   shortId: string;
   name: string | null;
+  latestTodo: string | null;
   selected: boolean;
   toolCall: string | null;
   [key: string]: unknown;
 }
 
 export function AgentGraphNode({ data }: NodeProps) {
-  const { node_type, state, shortId, name, selected, toolCall } =
+  const { node_type, state, name, latestTodo, selected, toolCall } =
     data as unknown as AgentNodeData;
   const Icon = nodeTypeIcon[node_type];
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -104,9 +105,11 @@ export function AgentGraphNode({ data }: NodeProps) {
         <span className="truncate text-sm font-semibold text-foreground">
           {name ?? <span className="capitalize">{node_type}</span>}
         </span>
-        <span className="font-mono text-[10px] text-muted-foreground">
-          {shortId}
-        </span>
+        {latestTodo ? (
+          <span className="truncate text-[10px] text-muted-foreground">
+            {latestTodo}
+          </span>
+        ) : null}
       </div>
 
       <div className="relative z-10 flex items-center gap-2">

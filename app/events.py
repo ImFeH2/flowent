@@ -94,7 +94,7 @@ class EventBus:
             )
 
     def emit(self, event: Event) -> None:
-        if self._loop is None:
+        if self._loop is None or self._loop.is_closed():
             logger.warning("EventBus loop not set, dropping event: {}", event.type)
             return
         asyncio.run_coroutine_threadsafe(self._broadcast(event), self._loop)

@@ -121,6 +121,32 @@
   }
 }
 
+.agent-loading-border {
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.agent-loading-border::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 70%,
+    var(--graph-status-running) 100%
+  );
+  animation: agent-loading-spin 2s linear infinite;
+}
+
 @keyframes agent-loading-spin {
   0% {
     transform: rotate(0deg);
@@ -128,26 +154,6 @@
   100% {
     transform: rotate(360deg);
   }
-}
-
-.agent-loading-border {
-  position: absolute;
-  inset: -1.5px;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from 0deg,
-    transparent 60%,
-    var(--graph-status-running) 100%
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: agent-loading-spin 2s linear infinite;
-  pointer-events: none;
-  opacity: 0.8;
 }
 
 .agent-state-ring {

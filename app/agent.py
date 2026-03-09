@@ -186,86 +186,109 @@ class Agent:
         )
 
     def _run(self) -> None:
-        self._append_history(SystemEntry(content=get_system_prompt(self.config)))
+        with logger.contextualize(
+            agent_id=self.uuid[:8],
+            node_type=self.config.node_type.value,
+        ):
+            self._append_history(SystemEntry(content=get_system_prompt(self.config)))
 
-        self.set_state(AgentState.IDLE, "initialized, awaiting first message")
-        self._log.info("Agent started, waiting for first message")
-        self._wait_for_input()
+            self.set_state(AgentState.IDLE, "initialized, awaiting first message")
+            self._log.info("Agent started, waiting for first message")
+            self._wait_for_input()
 
-        if self._terminate.is_set():
-            self._finalize_termination("terminated before first message")
-            return
+            if self._terminate.is_set():
+                self._finalize_termination("terminated before first message")
+                return
 
-        while not self._terminate.is_set():
-            try:
-                self._sync_system_prompt_entry()
-                self._drain_messages()
-                self._inject_system_context()
+            while not self._terminate.is_set():
+                try:
+                    self._sync_system_prompt_entry()
+                    self._drain_messages()
+                    self._inject_system_context()
 
-                tools_schema = _get_tool_registry().get_tools_schema(self)
-                messages = self._build_messages()
+                    tools_schema = _get_tool_registry().get_tools_schema(self)
+                    messages = self._build_messages()
 
-                self._log.debug(
-                    "LLM request: messages={}, tools={}, history_len={}",
-                    len(messages),
-                    len(tools_schema) if tools_schema else 0,
-                    len(self.history),
-                )
-                saw_steward_content_chunk = False
-
-                def _on_llm_chunk(chunk_type: str, text: str) -> None:
-                    nonlocal saw_steward_content_chunk
-                    delta: ContentDelta | ThinkingDelta
-                    if chunk_type == "content":
-                        delta = ContentDelta(text=text)
-                        if self.node_type == NodeType.STEWARD:
-                            saw_steward_content_chunk = True
-                            event_bus.emit(
-                                Event(
-                                    type=EventType.STEWARD_CONTENT,
-                                    agent_id=self.uuid,
-                                    data={"content": text},
-                                ),
-                            )
-                    elif chunk_type == "thinking":
-                        delta = ThinkingDelta(text=text)
-                    else:
-                        return
-
-                    event_bus.emit(
-                        Event(
-                            type=EventType.HISTORY_ENTRY_DELTA,
-                            agent_id=self.uuid,
-                            data=delta.serialize(),
-                        ),
-                    )
-
-                response = gateway.chat(
-                    messages=messages,
-                    tools=tools_schema or None,
-                    on_chunk=_on_llm_chunk,
-                )
-
-                self._log.debug(
-                    "LLM response: content_len={}, thinking_len={}, tool_calls={}",
-                    len(response.content) if response.content else 0,
-                    len(response.thinking) if response.thinking else 0,
-                    [tc.name for tc in response.tool_calls]
-                    if response.tool_calls
-                    else None,
-                )
-
-                if response.thinking:
-                    self._append_history(
-                        AssistantThinking(content=response.thinking),
-                    )
-
-                if response.tool_calls:
                     self._log.debug(
-                        "Processing {} tool call(s)",
-                        len(response.tool_calls),
+                        "LLM request: messages={}, tools={}, history_len={}",
+                        len(messages),
+                        len(tools_schema) if tools_schema else 0,
+                        len(self.history),
                     )
-                    if response.content:
+                    saw_steward_content_chunk = False
+
+                    def _on_llm_chunk(chunk_type: str, text: str) -> None:
+                        nonlocal saw_steward_content_chunk
+                        delta: ContentDelta | ThinkingDelta
+                        if chunk_type == "content":
+                            delta = ContentDelta(text=text)
+                            if self.node_type == NodeType.STEWARD:
+                                saw_steward_content_chunk = True
+                                event_bus.emit(
+                                    Event(
+                                        type=EventType.STEWARD_CONTENT,
+                                        agent_id=self.uuid,
+                                        data={"content": text},
+                                    ),
+                                )
+                        elif chunk_type == "thinking":
+                            delta = ThinkingDelta(text=text)
+                        else:
+                            return
+
+                        event_bus.emit(
+                            Event(
+                                type=EventType.HISTORY_ENTRY_DELTA,
+                                agent_id=self.uuid,
+                                data=delta.serialize(),
+                            ),
+                        )
+
+                    response = gateway.chat(
+                        messages=messages,
+                        tools=tools_schema or None,
+                        on_chunk=_on_llm_chunk,
+                    )
+
+                    self._log.debug(
+                        "LLM response: content_len={}, thinking_len={}, tool_calls={}",
+                        len(response.content) if response.content else 0,
+                        len(response.thinking) if response.thinking else 0,
+                        [tc.name for tc in response.tool_calls]
+                        if response.tool_calls
+                        else None,
+                    )
+
+                    if response.thinking:
+                        self._append_history(
+                            AssistantThinking(content=response.thinking),
+                        )
+
+                    if response.tool_calls:
+                        self._log.debug(
+                            "Processing {} tool call(s)",
+                            len(response.tool_calls),
+                        )
+                        if response.content:
+                            if (
+                                self.node_type == NodeType.STEWARD
+                                and not saw_steward_content_chunk
+                            ):
+                                event_bus.emit(
+                                    Event(
+                                        type=EventType.STEWARD_CONTENT,
+                                        agent_id=self.uuid,
+                                        data={"content": response.content},
+                                    ),
+                                )
+                            self._append_history(
+                                AssistantText(content=response.content),
+                            )
+                        for tc in response.tool_calls:
+                            self._handle_tool_call(tc.name, tc.arguments, tc.id)
+                            if self._terminate.is_set():
+                                break
+                    elif response.content:
                         if (
                             self.node_type == NodeType.STEWARD
                             and not saw_steward_content_chunk
@@ -277,47 +300,28 @@ class Agent:
                                     data={"content": response.content},
                                 ),
                             )
-                        self._append_history(
-                            AssistantText(content=response.content),
+                        entry = AssistantText(content=response.content)
+                        self._append_history(entry)
+                        self._log.debug(
+                            "No tool calls, continuing execution after text response"
                         )
-                    for tc in response.tool_calls:
-                        self._handle_tool_call(tc.name, tc.arguments, tc.id)
-                        if self._terminate.is_set():
-                            break
-                elif response.content:
-                    if (
-                        self.node_type == NodeType.STEWARD
-                        and not saw_steward_content_chunk
-                    ):
-                        event_bus.emit(
-                            Event(
-                                type=EventType.STEWARD_CONTENT,
-                                agent_id=self.uuid,
-                                data={"content": response.content},
-                            ),
+                    else:
+                        self._log.warning(
+                            "LLM returned empty response (no content, no tool_calls)",
                         )
-                    entry = AssistantText(content=response.content)
-                    self._append_history(entry)
-                    self._log.debug(
-                        "No tool calls, continuing execution after text response"
-                    )
-                else:
-                    self._log.warning(
-                        "LLM returned empty response (no content, no tool_calls)",
-                    )
 
-            except Exception as exc:
-                self._log.exception("Agent error")
-                tb_str = traceback.format_exc()
-                self._append_history(
-                    ErrorEntry(content=f"{type(exc).__name__}: {exc}\n\n{tb_str}"),
-                )
-                self.set_state(AgentState.ERROR, f"{type(exc).__name__}: {exc}")
-                self._wait_for_input()
-                if self._terminate.is_set():
-                    break
+                except Exception as exc:
+                    self._log.exception("Agent error")
+                    tb_str = traceback.format_exc()
+                    self._append_history(
+                        ErrorEntry(content=f"{type(exc).__name__}: {exc}\n\n{tb_str}"),
+                    )
+                    self.set_state(AgentState.ERROR, f"{type(exc).__name__}: {exc}")
+                    self._wait_for_input()
+                    if self._terminate.is_set():
+                        break
 
-        self._finalize_termination(self._termination_reason or "finished")
+            self._finalize_termination(self._termination_reason or "finished")
 
     def _sync_system_prompt_entry(self) -> None:
         system_prompt = get_system_prompt(self.config)

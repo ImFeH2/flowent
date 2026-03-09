@@ -1,6 +1,8 @@
 import json
 import threading
 
+from loguru import logger
+
 from app.agent import Agent
 from app.events import event_bus
 from app.models import (
@@ -265,3 +267,39 @@ def test_idle_tool_returns_message_as_tool_result_in_current_round(monkeypatch):
         == json.dumps({"from": "human", "content": "wake up now"})
         for msg in second_round
     )
+
+
+def test_agent_contextualizes_plain_loguru_calls(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["exit"]), uuid="agent-z")
+    captured: list[tuple[str, str | None]] = []
+    sink_id = logger.add(
+        lambda message: captured.append(
+            (message.record["message"], message.record["extra"].get("agent_id"))
+        )
+    )
+
+    def fake_wait_for_input() -> None:
+        agent._append_history(ReceivedMessage(content="do the task", from_id="tester"))
+        agent.set_state(AgentState.RUNNING, "received message from tester")
+
+    def fake_chat(messages, tools=None, on_chunk=None):
+        logger.info("plain log inside agent")
+        return LLMResponse(
+            tool_calls=[
+                ToolCallResult(
+                    id="call-exit",
+                    name="exit",
+                    arguments={"reason": "done"},
+                )
+            ]
+        )
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    try:
+        agent._run()
+    finally:
+        logger.remove(sink_id)
+
+    assert ("plain log inside agent", "agent-z") in captured

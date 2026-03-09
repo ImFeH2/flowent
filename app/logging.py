@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import sys
+import time
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from loguru import logger
 
@@ -11,46 +13,117 @@ if TYPE_CHECKING:
 
 from app.config import Config
 
+RuntimeMode = Literal["dev", "release"]
 
-def _stderr_format(record: Record) -> str:
-    agent_id = record["extra"].get("agent_id", "")
-    role = record["extra"].get("role", "")
-    agent_part = f" | agent:{agent_id} | {role}" if agent_id else ""
-    return (
-        "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-        "<level>{level: <8}</level> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>"
-        f"{agent_part}"
-        " | <level>{message}</level>\n{exception}"
+CONSOLE_FORMAT = (
+    "<green>{time:HH:mm:ss.SSS}</green> | "
+    "<level>{level: <8}</level> | "
+    "<cyan>{extra[source]}</cyan>{extra[agent_suffix]} | "
+    "<level>{message}</level>\n{exception}"
+)
+
+FILE_FORMAT = (
+    "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
+    "{level: <8} | "
+    "{extra[source]}{extra[agent_suffix]} | "
+    "{message}\n{exception}"
+)
+
+
+def detect_runtime_mode(
+    argv: Sequence[str] | None = None,
+    config: Config | None = None,
+) -> RuntimeMode:
+    args = list(sys.argv if argv is None else argv)
+    executable = Path(args[0]).name.lower() if args else ""
+    command = args[1] if len(args) > 1 else ""
+
+    if "fastapi" in executable and command == "dev":
+        return "dev"
+    if "fastapi" in executable and command == "run":
+        return "release"
+    if command == "dev":
+        return "dev"
+    if command == "run":
+        return "release"
+    if "--reload" in args:
+        return "dev"
+    if config is not None and config.DEBUG:
+        return "dev"
+    return "release"
+
+
+def _patch_record(record: Record) -> None:
+    agent_id = record["extra"].get("agent_id")
+    record["extra"]["agent_suffix"] = f" | agent:{agent_id}" if agent_id else ""
+    record["extra"]["source"] = (
+        f"{record['name']}:{record['function']}:{record['line']}"
     )
 
 
-def setup_logging(config: Config | None = None) -> None:
+def _get_log_dir(runtime_dir: Path | None = None) -> Path:
+    base_dir = Path.cwd() if runtime_dir is None else runtime_dir
+    return base_dir / "logs"
+
+
+def _allocate_log_file(log_dir: Path) -> Path:
+    timestamp = time.time_ns() // 1_000_000
+    log_path = log_dir / f"{timestamp}.log"
+    while log_path.exists():
+        timestamp += 1
+        log_path = log_dir / f"{timestamp}.log"
+    return log_path
+
+
+def _sort_key(path: Path) -> tuple[int, int, str]:
+    try:
+        timestamp = int(path.stem)
+    except ValueError:
+        timestamp = -1
+    return (timestamp, path.stat().st_mtime_ns, path.name)
+
+
+def prune_old_logs(log_dir: Path, keep: int = 10) -> None:
+    log_files = [path for path in log_dir.iterdir() if path.is_file()]
+    log_files.sort(key=_sort_key, reverse=True)
+    for path in log_files[keep:]:
+        path.unlink(missing_ok=True)
+
+
+def setup_logging(
+    config: Config | None = None,
+    *,
+    argv: Sequence[str] | None = None,
+    runtime_dir: Path | None = None,
+) -> None:
     if config is None:
         config = Config()
 
-    level = "DEBUG" if config.DEBUG else config.LOG_LEVEL.upper()
+    mode = detect_runtime_mode(argv=argv, config=config)
+    console_level = "DEBUG" if mode == "dev" else "INFO"
 
     logger.remove()
+    logger.configure(patcher=_patch_record)
+
+    log_dir = _get_log_dir(runtime_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = _allocate_log_file(log_dir)
+    log_path.touch()
+    prune_old_logs(log_dir)
 
     logger.add(
         sys.stderr,
-        format=_stderr_format,
-        level=level,
+        format=CONSOLE_FORMAT,
+        level=console_level,
         colorize=True,
         backtrace=True,
-        diagnose=config.DEBUG,
+        diagnose=mode == "dev",
     )
 
-    log_dir = Path(config.LOG_DIR)
-    log_dir.mkdir(parents=True, exist_ok=True)
-
     logger.add(
-        str(log_dir / "autopoe.log"),
-        format="{message}",
-        level=level,
-        rotation="10 MB",
-        retention=5,
-        compression="gz",
-        serialize=True,
+        log_path,
+        format=FILE_FORMAT,
+        level="TRACE",
+        backtrace=True,
+        diagnose=mode == "dev",
     )

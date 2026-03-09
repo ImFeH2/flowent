@@ -22,11 +22,24 @@ import { useStewardChat } from "@/hooks/useStewardChat";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { Badge } from "@/components/ui/badge";
 import { stateBadgeColor } from "@/lib/constants";
+import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
+import { PanelResizer } from "@/components/PanelResizer";
 
 export function HomePage() {
   const { agents, connected } = useAgentRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
+  const [panelWidth, setPanelWidth] = usePanelWidth(
+    "workspace-panel-width",
+    380,
+    280,
+    600,
+  );
+  const { isDragging, startDrag } = usePanelDrag(
+    panelWidth,
+    setPanelWidth,
+    "left",
+  );
 
   const metrics = useMemo(() => {
     const states = Array.from(agents.values()).reduce(
@@ -92,12 +105,20 @@ export function HomePage() {
         {panelVisible && (
           <motion.aside
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 380, opacity: 1 }}
+            animate={{ width: panelWidth, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="z-20 shrink-0 border-l border-border bg-surface-2"
+            className="z-20 shrink-0 border-l border-border bg-surface-2 relative"
           >
-            <div className="flex h-full w-[380px] flex-col overflow-hidden">
+            <PanelResizer
+              position="left"
+              isDragging={isDragging}
+              onMouseDown={startDrag}
+            />
+            <div
+              className="flex h-full flex-col overflow-hidden"
+              style={{ width: `${panelWidth}px` }}
+            >
               <AnimatePresence mode="wait">
                 {selectedAgent ? (
                   <motion.div

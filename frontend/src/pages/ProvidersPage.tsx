@@ -20,6 +20,8 @@ import {
 import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
 import type { Provider } from "@/types";
 import { cn } from "@/lib/utils";
+import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
+import { PanelResizer } from "@/components/PanelResizer";
 
 type ProviderDraft = Omit<Provider, "id">;
 
@@ -38,6 +40,17 @@ export function ProvidersPage() {
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [panelWidth, setPanelWidth] = usePanelWidth(
+    "providers-panel-width",
+    300,
+    200,
+    500,
+  );
+  const { isDragging, startDrag } = usePanelDrag(
+    panelWidth,
+    setPanelWidth,
+    "right",
+  );
 
   const selectedProvider = providers.find((p) => p.id === selectedId);
 
@@ -149,13 +162,16 @@ export function ProvidersPage() {
 
   return (
     <div className="flex h-full">
-      <div className="flex w-[300px] flex-col border-r border-border bg-card/30">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Server className="size-4 text-primary" />
-            <span className="font-semibold">Providers</span>
+      <div
+        style={{ width: `${panelWidth}px` }}
+        className="flex shrink-0 relative flex-col border-r border-border bg-card/30"
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Server className="size-4 shrink-0 text-primary" />
+            <span className="font-semibold truncate">Providers</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => void refreshProviders()}
               disabled={loading}
@@ -176,7 +192,7 @@ export function ProvidersPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto p-2 min-h-0">
           {loading ? (
             <div className="space-y-2 py-4 px-2">
               {[...Array(3)].map((_, i) => (
@@ -217,11 +233,11 @@ export function ProvidersPage() {
                     <p className="truncate text-sm font-medium">
                       {provider.name}
                     </p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="truncate text-[11px] text-muted-foreground">
                       {providerTypeLabel(provider.type)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -238,9 +254,14 @@ export function ProvidersPage() {
             </div>
           )}
         </div>
+        <PanelResizer
+          position="right"
+          isDragging={isDragging}
+          onMouseDown={startDrag}
+        />
       </div>
 
-      <div className="flex-1 bg-card/20">
+      <div className="flex-1 bg-card/20 min-w-0 overflow-hidden">
         {isCreating || selectedProvider ? (
           <div className="flex h-full flex-col">
             <div className="flex items-center justify-between border-b border-border px-6 py-4">

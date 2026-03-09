@@ -11,10 +11,17 @@ import { RolesPage } from "@/pages/RolesPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { ToolsPage } from "@/pages/ToolsPage";
 import { cn } from "@/lib/utils";
+import { usePanelWidth } from "@/hooks/usePanelDrag";
 
 function AppContent() {
   const { currentPage } = useAgentUI();
   const isWorkspace = currentPage === "graph";
+  const [sidebarWidth, setSidebarWidth] = usePanelWidth(
+    "sidebar-width",
+    256,
+    180,
+    400,
+  );
 
   const renderPage = () => {
     switch (currentPage) {
@@ -35,9 +42,12 @@ function AppContent() {
     <div className="relative h-screen overflow-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_52%)] opacity-40" />
 
-      <Sidebar />
+      <Sidebar width={sidebarWidth} onWidthChange={setSidebarWidth} />
 
-      <main className={cn("relative z-10 h-full", "ml-64")}>
+      <main
+        className={cn("relative z-10 h-full")}
+        style={{ marginLeft: `${sidebarWidth}px` }}
+      >
         <div
           className={cn(
             "h-full overflow-hidden",

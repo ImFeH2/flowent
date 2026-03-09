@@ -6,6 +6,7 @@ from app.agent import Agent
 from app.models import AgentState, NodeConfig, NodeType
 from app.registry import registry
 from app.settings import RoleConfig, Settings
+from app.tools import MINIMUM_TOOLS
 from app.tools.spawn import SpawnTool
 
 
@@ -25,7 +26,16 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
 
     monkeypatch.setattr(
         "app.settings.get_settings",
-        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="...",
+                    required_tools=["read"],
+                    excluded_tools=["fetch"],
+                )
+            ]
+        ),
     )
 
     call_order: list[object] = []
@@ -56,13 +66,16 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
             {
                 "role_name": "Worker",
                 "task_prompt": "handle this task",
-                "tools": ["send"],
+                "tools": ["fetch", "edit"],
             },
         )
     )
 
     child_id = result["agent_id"]
     assert result == {"agent_id": child_id, "role_name": "Worker"}
+    child = registry.get(child_id)
+    assert child is not None
+    assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert call_order == [
         ("start", child_id),
         ("wait_until_idle", child_id, 5.0),
@@ -83,7 +96,15 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
 
     monkeypatch.setattr(
         "app.settings.get_settings",
-        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="...",
+                    required_tools=["read"],
+                )
+            ]
+        ),
     )
 
     monkeypatch.setattr(Agent, "start", lambda self: None)
@@ -101,7 +122,7 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
         ),
     )
 
-    args = {"role_name": "Worker", "tools": ["send"]}
+    args = {"role_name": "Worker"}
     if task_prompt is not None:
         args["task_prompt"] = task_prompt
 
@@ -109,9 +130,12 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
 
     assert result["role_name"] == "Worker"
     assert isinstance(result["agent_id"], str)
+    child = registry.get(result["agent_id"])
+    assert child is not None
+    assert child.config.tools == [*MINIMUM_TOOLS, "read"]
 
 
-def test_spawn_requires_explicit_tools(monkeypatch):
+def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
     parent = Agent(
         NodeConfig(node_type=NodeType.CONDUCTOR, tools=["spawn", "send"]),
         uuid="parent",
@@ -120,9 +144,21 @@ def test_spawn_requires_explicit_tools(monkeypatch):
 
     monkeypatch.setattr(
         "app.settings.get_settings",
-        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="...",
+                    required_tools=["exec"],
+                    excluded_tools=["send", "connect"],
+                )
+            ]
+        ),
     )
 
     result = json.loads(SpawnTool().execute(parent, {"role_name": "Worker"}))
 
-    assert result == {"error": "tools is required"}
+    assert result["role_name"] == "Worker"
+    child = registry.get(result["agent_id"])
+    assert child is not None
+    assert child.config.tools == [*MINIMUM_TOOLS, "exec"]

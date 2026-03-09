@@ -16,7 +16,14 @@ from app.settings import RoleConfig, Settings
 
 def test_list_roles_returns_name_and_system_prompt(monkeypatch):
     settings = Settings(
-        roles=[RoleConfig(name="Reviewer", system_prompt="Review code carefully")]
+        roles=[
+            RoleConfig(
+                name="Reviewer",
+                system_prompt="Review code carefully",
+                required_tools=["read"],
+                excluded_tools=["fetch"],
+            )
+        ]
     )
 
     monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
@@ -24,7 +31,14 @@ def test_list_roles_returns_name_and_system_prompt(monkeypatch):
     result = asyncio.run(list_roles())
 
     assert result == {
-        "roles": [{"name": "Reviewer", "system_prompt": "Review code carefully"}]
+        "roles": [
+            {
+                "name": "Reviewer",
+                "system_prompt": "Review code carefully",
+                "required_tools": ["read"],
+                "excluded_tools": ["fetch"],
+            }
+        ]
     }
 
 
@@ -40,13 +54,26 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
 
     result = asyncio.run(
         create_role(
-            CreateRoleRequest(name="Reviewer", system_prompt="Review code carefully")
+            CreateRoleRequest(
+                name="Reviewer",
+                system_prompt="Review code carefully",
+                required_tools=["read"],
+            )
         )
     )
 
-    assert result == {"name": "Reviewer", "system_prompt": "Review code carefully"}
+    assert result == {
+        "name": "Reviewer",
+        "system_prompt": "Review code carefully",
+        "required_tools": ["read"],
+        "excluded_tools": [],
+    }
     assert settings.roles == [
-        RoleConfig(name="Reviewer", system_prompt="Review code carefully")
+        RoleConfig(
+            name="Reviewer",
+            system_prompt="Review code carefully",
+            required_tools=["read"],
+        )
     ]
     assert saved == [["Reviewer"]]
 
@@ -71,7 +98,13 @@ def test_create_role_rejects_duplicate_name(monkeypatch):
 
 def test_update_role_uses_name_path_parameter(monkeypatch):
     settings = Settings(
-        roles=[RoleConfig(name="Reviewer", system_prompt="Review code carefully")]
+        roles=[
+            RoleConfig(
+                name="Reviewer",
+                system_prompt="Review code carefully",
+                required_tools=["read"],
+            )
+        ]
     )
     saved: list[list[str]] = []
 
@@ -84,13 +117,27 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
     result = asyncio.run(
         update_role(
             "Reviewer",
-            UpdateRoleRequest(name="Architect", system_prompt="Design systems"),
+            UpdateRoleRequest(
+                name="Architect",
+                system_prompt="Design systems",
+                excluded_tools=["fetch"],
+            ),
         )
     )
 
-    assert result == {"name": "Architect", "system_prompt": "Design systems"}
+    assert result == {
+        "name": "Architect",
+        "system_prompt": "Design systems",
+        "required_tools": ["read"],
+        "excluded_tools": ["fetch"],
+    }
     assert settings.roles == [
-        RoleConfig(name="Architect", system_prompt="Design systems")
+        RoleConfig(
+            name="Architect",
+            system_prompt="Design systems",
+            required_tools=["read"],
+            excluded_tools=["fetch"],
+        )
     ]
     assert saved == [["Architect"]]
 
@@ -158,3 +205,24 @@ def test_delete_role_rejects_builtin_role(monkeypatch):
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "Cannot delete built-in role 'Worker'"
+
+
+def test_create_role_rejects_overlapping_required_and_excluded_tools(monkeypatch):
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: Settings())
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            create_role(
+                CreateRoleRequest(
+                    name="Reviewer",
+                    system_prompt="Review code carefully",
+                    required_tools=["read"],
+                    excluded_tools=["read"],
+                )
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert (
+        excinfo.value.detail == "required_tools and excluded_tools cannot overlap: read"
+    )

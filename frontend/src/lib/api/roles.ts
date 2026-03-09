@@ -9,13 +9,10 @@ export async function fetchRoles(): Promise<Role[]> {
   });
 }
 
-export async function createRole(
-  name: string,
-  system_prompt: string,
-): Promise<Role> {
+export async function createRole(role: Role): Promise<Role> {
   return requestJson<Role>("/api/roles", {
     method: "POST",
-    body: { name, system_prompt },
+    body: role,
     errorMessage: "Failed to create role",
   });
 }

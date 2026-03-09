@@ -18,6 +18,7 @@ WORKER_ROLE_SYSTEM_PROMPT = (
     "not have any special domain expertise beyond careful execution."
 )
 BUILTIN_ROLE_NAMES = frozenset({WORKER_ROLE_NAME})
+WORKER_ROLE_REQUIRED_TOOLS = ["read", "exec"]
 
 
 @dataclass
@@ -38,6 +39,8 @@ class ProviderConfig:
 class RoleConfig:
     name: str
     system_prompt: str
+    required_tools: list[str] = field(default_factory=list)
+    excluded_tools: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -57,6 +60,38 @@ class Settings:
 
 _cached_settings: Settings | None = None
 _settings_lock = threading.Lock()
+
+
+def normalize_tool_names(tool_names: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for tool_name in tool_names:
+        name = tool_name.strip()
+        if not name or name in seen:
+            continue
+        normalized.append(name)
+        seen.add(name)
+    return normalized
+
+
+def validate_role_tool_config(
+    required_tools: list[str],
+    excluded_tools: list[str],
+) -> None:
+    overlap = sorted(set(required_tools) & set(excluded_tools))
+    if overlap:
+        raise ValueError(
+            "required_tools and excluded_tools cannot overlap: " + ", ".join(overlap)
+        )
+
+
+def serialize_role(role: RoleConfig) -> dict[str, object]:
+    return {
+        "name": role.name,
+        "system_prompt": role.system_prompt,
+        "required_tools": list(role.required_tools),
+        "excluded_tools": list(role.excluded_tools),
+    }
 
 
 def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
@@ -105,10 +140,22 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
             migrated = True
             if not role_name:
                 role_name = str(role.get("id", ""))
+        required_tools_raw = role.get("required_tools", [])
+        if not isinstance(required_tools_raw, list):
+            required_tools_raw = []
+        excluded_tools_raw = role.get("excluded_tools", [])
+        if not isinstance(excluded_tools_raw, list):
+            excluded_tools_raw = []
         roles.append(
             RoleConfig(
                 name=role_name,
                 system_prompt=str(role.get("system_prompt", "")),
+                required_tools=normalize_tool_names(
+                    [name for name in required_tools_raw if isinstance(name, str)]
+                ),
+                excluded_tools=normalize_tool_names(
+                    [name for name in excluded_tools_raw if isinstance(name, str)]
+                ),
             )
         )
 
@@ -223,6 +270,8 @@ def build_worker_role() -> RoleConfig:
     return RoleConfig(
         name=WORKER_ROLE_NAME,
         system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
+        required_tools=list(WORKER_ROLE_REQUIRED_TOOLS),
+        excluded_tools=[],
     )
 
 

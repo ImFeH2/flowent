@@ -8,6 +8,14 @@ if TYPE_CHECKING:
 
     from app.agent import Agent
 
+MINIMUM_TOOLS = (
+    "send",
+    "idle",
+    "todo",
+    "list_connections",
+    "exit",
+)
+
 
 class Tool(ABC):
     name: str
@@ -39,7 +47,7 @@ class ToolRegistry:
         return self._tools.get(name)
 
     def get_tools_for_agent(self, agent: Agent) -> list[Tool]:
-        allowed = set(agent.config.tools)
+        allowed = set(agent.config.tools) | set(MINIMUM_TOOLS)
         return [t for t in self._tools.values() if t.name in allowed]
 
     def get_tools_schema(self, agent: Agent) -> list[dict[str, Any]]:

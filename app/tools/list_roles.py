@@ -19,12 +19,7 @@ class ListRolesTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app.settings import get_settings
+        from app.settings import get_settings, serialize_role
 
         settings = get_settings()
-        return json.dumps(
-            [
-                {"name": role.name, "system_prompt": role.system_prompt}
-                for role in settings.roles
-            ]
-        )
+        return json.dumps([serialize_role(role) for role in settings.roles])

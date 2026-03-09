@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from loguru import logger
 
 from app.models import Event, EventType, NodeConfig, NodeType
-from app.tools import Tool
+from app.tools import MINIMUM_TOOLS, Tool
 from app.tools.send import send_message
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ class SpawnTool(Tool):
             "tools": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "List of tool names to give the agent",
+                "description": "Optional list of additional tool names to give the agent",
             },
             "write_dirs": {
                 "type": "array",
@@ -49,7 +49,7 @@ class SpawnTool(Tool):
                 "description": "List of directories the agent can write to",
             },
         },
-        "required": ["role_name", "tools"],
+        "required": ["role_name"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -61,9 +61,7 @@ class SpawnTool(Tool):
         role_name = args["role_name"]
         task_prompt = args.get("task_prompt")
         name = args.get("name")
-        if "tools" not in args:
-            return json.dumps({"error": "tools is required"})
-        tools = args["tools"]
+        tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
 
         if not isinstance(tools, list) or not all(
@@ -76,12 +74,24 @@ class SpawnTool(Tool):
         if role_cfg is None:
             return json.dumps({"error": f"Role '{role_name}' not found"})
 
+        final_tools: list[str] = []
+        seen_tools: set[str] = set()
+        excluded_tools = set(role_cfg.excluded_tools)
+
+        for tool_name in [*MINIMUM_TOOLS, *role_cfg.required_tools, *tools]:
+            if tool_name in seen_tools:
+                continue
+            if tool_name in excluded_tools and tool_name not in MINIMUM_TOOLS:
+                continue
+            final_tools.append(tool_name)
+            seen_tools.add(tool_name)
+
         agent_uuid = str(uuid.uuid4())
         config = NodeConfig(
             node_type=NodeType.AGENT,
             role_name=role_name,
             name=name,
-            tools=tools,
+            tools=final_tools,
             write_dirs=write_dirs,
         )
 

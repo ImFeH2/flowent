@@ -20,7 +20,7 @@ def bootstrap_runtime() -> None:
     steward = Agent(
         NodeConfig(
             node_type=NodeType.STEWARD,
-            tools=["send", "idle", "todo", "list_connections", "exit"],
+            tools=[],
         ),
         uuid="steward",
     )
@@ -33,12 +33,7 @@ def bootstrap_runtime() -> None:
             tools=[
                 "spawn",
                 "connect",
-                "send",
-                "idle",
-                "todo",
-                "list_connections",
                 "list_roles",
-                "exit",
             ],
         ),
         uuid="conductor",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   BookOpen,
@@ -10,31 +10,59 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { createRole, deleteRole, fetchRoles, updateRole } from "@/lib/api";
+import {
+  createRole,
+  deleteRole,
+  fetchRoles,
+  fetchTools,
+  updateRole,
+  type ToolInfo,
+} from "@/lib/api";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types";
 
 type RoleDraft = Role;
+type ToolState = "allowed" | "required" | "excluded";
+
+const MINIMUM_TOOLS = new Set([
+  "send",
+  "idle",
+  "todo",
+  "list_connections",
+  "exit",
+]);
 
 const emptyDraft = (): RoleDraft => ({
   name: "",
   system_prompt: "",
+  required_tools: [],
+  excluded_tools: [],
 });
 
 export function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
+  const [tools, setTools] = useState<ToolInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingName, setEditingName] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
 
+  const configurableTools = useMemo(
+    () => tools.filter((tool) => !MINIMUM_TOOLS.has(tool.name)),
+    [tools],
+  );
+
   const refreshRoles = async () => {
     setLoading(true);
     try {
-      const items = await fetchRoles();
-      setRoles(items);
+      const [roleItems, toolItems] = await Promise.all([
+        fetchRoles(),
+        fetchTools(),
+      ]);
+      setRoles(roleItems);
+      setTools(toolItems);
     } catch {
       toast.error("Failed to load roles");
     } finally {
@@ -55,7 +83,12 @@ export function RolesPage() {
   const handleEdit = (role: Role) => {
     setEditingName(role.name);
     setIsCreating(false);
-    setDraft({ name: role.name, system_prompt: role.system_prompt });
+    setDraft({
+      name: role.name,
+      system_prompt: role.system_prompt,
+      required_tools: [...role.required_tools],
+      excluded_tools: [...role.excluded_tools],
+    });
   };
 
   const handleCancel = () => {
@@ -89,6 +122,8 @@ export function RolesPage() {
       const nextDraft = {
         name: nextName,
         system_prompt: draft.system_prompt,
+        required_tools: draft.required_tools,
+        excluded_tools: draft.excluded_tools,
       };
 
       if (editingName) {
@@ -98,10 +133,7 @@ export function RolesPage() {
         );
         toast.success("Role updated");
       } else {
-        const created = await createRole(
-          nextDraft.name,
-          nextDraft.system_prompt,
-        );
+        const created = await createRole(nextDraft);
         setRoles((prev) => [created, ...prev]);
         toast.success("Role created");
       }
@@ -130,6 +162,52 @@ export function RolesPage() {
   };
 
   const isEditing = Boolean(isCreating || editingName);
+
+  const getToolState = (toolName: string): ToolState => {
+    if (draft.required_tools.includes(toolName)) return "required";
+    if (draft.excluded_tools.includes(toolName)) return "excluded";
+    return "allowed";
+  };
+
+  const cycleToolState = (toolName: string) => {
+    setDraft((current) => {
+      const currentState = current.required_tools.includes(toolName)
+        ? "required"
+        : current.excluded_tools.includes(toolName)
+          ? "excluded"
+          : "allowed";
+
+      if (currentState === "allowed") {
+        return {
+          ...current,
+          required_tools: [...current.required_tools, toolName],
+          excluded_tools: current.excluded_tools.filter(
+            (name) => name !== toolName,
+          ),
+        };
+      }
+
+      if (currentState === "required") {
+        return {
+          ...current,
+          required_tools: current.required_tools.filter(
+            (name) => name !== toolName,
+          ),
+          excluded_tools: [...current.excluded_tools, toolName],
+        };
+      }
+
+      return {
+        ...current,
+        required_tools: current.required_tools.filter(
+          (name) => name !== toolName,
+        ),
+        excluded_tools: current.excluded_tools.filter(
+          (name) => name !== toolName,
+        ),
+      };
+    });
+  };
 
   if (loading && !isEditing) {
     return (
@@ -207,6 +285,54 @@ export function RolesPage() {
                 <p className="text-xs text-muted-foreground">
                   This prompt defines how agents with this role will behave.
                 </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium">Tool Configuration</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Minimum tools are injected by the framework. Configure the
+                    remaining tools as Allowed, Required, or Excluded.
+                  </p>
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-border bg-background">
+                  {configurableTools.map((tool) => {
+                    const state = getToolState(tool.name);
+                    return (
+                      <div
+                        key={tool.name}
+                        className="flex items-center justify-between gap-4 border-b border-border/70 px-4 py-3 last:border-b-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-mono text-sm">{tool.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {tool.description}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => cycleToolState(tool.name)}
+                          className={cn(
+                            "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                            state === "required" &&
+                              "border-emerald-500/40 bg-emerald-500/10 text-emerald-600",
+                            state === "excluded" &&
+                              "border-red-500/40 bg-red-500/10 text-red-600",
+                            state === "allowed" &&
+                              "border-border bg-card text-muted-foreground",
+                          )}
+                        >
+                          {state === "allowed"
+                            ? "Allowed"
+                            : state === "required"
+                              ? "Required"
+                              : "Excluded"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4">
@@ -290,6 +416,28 @@ export function RolesPage() {
                   {role.system_prompt}
                 </p>
               </div>
+
+              {(role.required_tools.length > 0 ||
+                role.excluded_tools.length > 0) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {role.required_tools.map((toolName) => (
+                    <span
+                      key={`required-${role.name}-${toolName}`}
+                      className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600"
+                    >
+                      {toolName}
+                    </span>
+                  ))}
+                  {role.excluded_tools.map((toolName) => (
+                    <span
+                      key={`excluded-${role.name}-${toolName}`}
+                      className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-600"
+                    >
+                      {toolName}
+                    </span>
+                  ))}
+                </div>
+              )}
             </motion.div>
           ))}
         </div>

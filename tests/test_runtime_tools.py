@@ -4,7 +4,12 @@ import app.settings as settings_module
 from app.agent import Agent
 from app.registry import registry
 from app.runtime import bootstrap_runtime
-from app.settings import WORKER_ROLE_NAME, WORKER_ROLE_SYSTEM_PROMPT, RoleConfig
+from app.settings import (
+    WORKER_ROLE_NAME,
+    WORKER_ROLE_REQUIRED_TOOLS,
+    WORKER_ROLE_SYSTEM_PROMPT,
+    RoleConfig,
+)
 
 
 def test_bootstrap_runtime_adds_list_roles_to_conductor(monkeypatch):
@@ -50,6 +55,7 @@ def test_bootstrap_runtime_creates_builtin_worker_role(monkeypatch, tmp_path):
             RoleConfig(
                 name=WORKER_ROLE_NAME,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
+                required_tools=WORKER_ROLE_REQUIRED_TOOLS,
             )
         ]
 

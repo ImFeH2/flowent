@@ -116,8 +116,16 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
         "app.settings.get_settings",
         lambda: Settings(
             roles=[
-                RoleConfig(name="Worker", system_prompt="Do work."),
-                RoleConfig(name="Reviewer", system_prompt="Review code."),
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="Do work.",
+                    required_tools=["read", "exec"],
+                ),
+                RoleConfig(
+                    name="Reviewer",
+                    system_prompt="Review code.",
+                    excluded_tools=["fetch"],
+                ),
             ]
         ),
     )
@@ -125,8 +133,18 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
     result = json.loads(ListRolesTool().execute(agent, {}))
 
     assert result == [
-        {"name": "Worker", "system_prompt": "Do work."},
-        {"name": "Reviewer", "system_prompt": "Review code."},
+        {
+            "name": "Worker",
+            "system_prompt": "Do work.",
+            "required_tools": ["read", "exec"],
+            "excluded_tools": [],
+        },
+        {
+            "name": "Reviewer",
+            "system_prompt": "Review code.",
+            "required_tools": [],
+            "excluded_tools": ["fetch"],
+        },
     ]
 
 

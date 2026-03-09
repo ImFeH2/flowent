@@ -36,7 +36,11 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
     settings = Settings(
         roles=[
             RoleConfig(name="Writer", system_prompt="draft"),
-            RoleConfig(name="Reviewer", system_prompt="review"),
+            RoleConfig(
+                name="Reviewer",
+                system_prompt="review",
+                excluded_tools=["fetch"],
+            ),
         ]
     )
     saved: list[list[tuple[str, str]]] = []
@@ -63,6 +67,8 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
     assert update.json() == {
         "name": "Researcher",
         "system_prompt": "investigate",
+        "required_tools": [],
+        "excluded_tools": [],
     }
 
     delete = client.delete("/api/roles/Researcher")
@@ -87,3 +93,25 @@ def test_delete_builtin_role_returns_error(client: TestClient, monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Cannot delete built-in role 'Worker'"}
+
+
+def test_create_role_rejects_overlapping_required_and_excluded_tools(
+    client: TestClient,
+    monkeypatch,
+):
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: Settings())
+
+    response = client.post(
+        "/api/roles",
+        json={
+            "name": "Writer",
+            "system_prompt": "another prompt",
+            "required_tools": ["read"],
+            "excluded_tools": ["read"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "required_tools and excluded_tools cannot overlap: read"
+    }

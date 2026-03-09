@@ -196,11 +196,22 @@ class Agent:
                     len(tools_schema) if tools_schema else 0,
                     len(self.history),
                 )
+                saw_steward_content_chunk = False
 
                 def _on_llm_chunk(chunk_type: str, text: str) -> None:
+                    nonlocal saw_steward_content_chunk
                     delta: ContentDelta | ThinkingDelta
                     if chunk_type == "content":
                         delta = ContentDelta(text=text)
+                        if self.node_type == NodeType.STEWARD:
+                            saw_steward_content_chunk = True
+                            event_bus.emit(
+                                Event(
+                                    type=EventType.STEWARD_CONTENT,
+                                    agent_id=self.uuid,
+                                    data={"content": text},
+                                ),
+                            )
                     elif chunk_type == "thinking":
                         delta = ThinkingDelta(text=text)
                     else:
@@ -240,6 +251,17 @@ class Agent:
                         len(response.tool_calls),
                     )
                     if response.content:
+                        if (
+                            self.node_type == NodeType.STEWARD
+                            and not saw_steward_content_chunk
+                        ):
+                            event_bus.emit(
+                                Event(
+                                    type=EventType.STEWARD_CONTENT,
+                                    agent_id=self.uuid,
+                                    data={"content": response.content},
+                                ),
+                            )
                         self._append_history(
                             AssistantText(content=response.content),
                         )
@@ -253,10 +275,10 @@ class Agent:
                             self._log.debug("Idle requested, waiting for input")
                             self._wait_for_input()
                 elif response.content:
-                    entry = AssistantText(content=response.content)
-                    self._append_history(entry)
-
-                    if self.node_type == NodeType.STEWARD:
+                    if (
+                        self.node_type == NodeType.STEWARD
+                        and not saw_steward_content_chunk
+                    ):
                         event_bus.emit(
                             Event(
                                 type=EventType.STEWARD_CONTENT,
@@ -264,6 +286,8 @@ class Agent:
                                 data={"content": response.content},
                             ),
                         )
+                    entry = AssistantText(content=response.content)
+                    self._append_history(entry)
                     self._log.debug(
                         "No tool calls, continuing execution after text response"
                     )

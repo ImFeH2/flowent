@@ -79,8 +79,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
+  const stewardStreamingRef = useRef(false);
 
   const sendStewardMessage = useCallback(async (content: string) => {
+    stewardStreamingRef.current = false;
     setStewardMessages((prev) => [
       ...prev,
       { content, timestamp: Date.now(), from: "human" },
@@ -156,10 +158,23 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
       if (event.type === "steward_content") {
         const content = event.data.content as string;
-        setStewardMessages((prev) => [
-          ...prev,
-          { content, timestamp: Date.now(), from: "steward" },
-        ]);
+        setStewardMessages((prev) => {
+          if (
+            stewardStreamingRef.current &&
+            prev.length > 0 &&
+            prev[prev.length - 1]?.from === "steward"
+          ) {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            next[next.length - 1] = {
+              ...last,
+              content: `${last.content}${content}`,
+            };
+            return next;
+          }
+          return [...prev, { content, timestamp: Date.now(), from: "steward" }];
+        });
+        stewardStreamingRef.current = true;
       }
 
       if (event.type === "history_entry_delta") {
@@ -174,6 +189,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
       if (event.type === "history_entry_added") {
         const entry = event.data as unknown as HistoryEntry;
+
+        if (event.agent_id === "steward" && entry.type === "AssistantText") {
+          stewardStreamingRef.current = false;
+        }
 
         if (
           entry.type === "AssistantText" ||

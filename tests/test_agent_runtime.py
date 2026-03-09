@@ -137,3 +137,49 @@ def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
         and "No active provider configured" in entry.content
         for entry in agent.get_history_snapshot()
     )
+
+
+def test_steward_content_streams_even_when_response_has_tool_calls(monkeypatch):
+    registry.reset()
+    steward = Agent(
+        NodeConfig(node_type=NodeType.STEWARD, tools=["exit"]),
+        uuid="steward",
+    )
+    registry.register(steward)
+    events = []
+
+    def fake_wait_for_input() -> None:
+        steward._append_history(
+            ReceivedMessage(content="report progress", from_id="human")
+        )
+        steward.set_state(AgentState.RUNNING, "received message from human")
+
+    def fake_chat(messages, tools=None, on_chunk=None):
+        if on_chunk is not None:
+            on_chunk("content", "Working on it")
+        return LLMResponse(
+            content="Working on it",
+            tool_calls=[
+                ToolCallResult(
+                    id="call-send",
+                    name="send",
+                    arguments={"to": "agent-b", "content": "done"},
+                )
+            ],
+        )
+
+    monkeypatch.setattr(steward, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr(
+        steward,
+        "_handle_tool_call",
+        lambda name, arguments, call_id: steward.request_termination("done"),
+    )
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    steward._run()
+
+    steward_events = [
+        event for event in events if event.type == EventType.STEWARD_CONTENT
+    ]
+    assert [event.data for event in steward_events] == [{"content": "Working on it"}]

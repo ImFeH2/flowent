@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.tools import Tool
@@ -22,5 +21,4 @@ class IdleTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        agent.request_idle()
-        return json.dumps({"status": "idle"})
+        return agent.request_idle()

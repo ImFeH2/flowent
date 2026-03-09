@@ -1,3 +1,6 @@
+import json
+import threading
+
 from app.agent import Agent
 from app.events import event_bus
 from app.models import (
@@ -6,6 +9,7 @@ from app.models import (
     ErrorEntry,
     EventType,
     LLMResponse,
+    Message,
     NodeConfig,
     NodeType,
     ReceivedMessage,
@@ -183,3 +187,81 @@ def test_steward_content_streams_even_when_response_has_tool_calls(monkeypatch):
         event for event in events if event.type == EventType.STEWARD_CONTENT
     ]
     assert [event.data for event in steward_events] == [{"content": "Working on it"}]
+
+
+def test_idle_tool_returns_message_as_tool_result_in_current_round(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle", "exit"]))
+    wait_calls = 0
+    llm_messages: list[list[dict]] = []
+    responses = iter(
+        [
+            LLMResponse(
+                tool_calls=[
+                    ToolCallResult(
+                        id="call-idle",
+                        name="idle",
+                        arguments={},
+                    )
+                ]
+            ),
+            LLMResponse(
+                tool_calls=[
+                    ToolCallResult(
+                        id="call-exit",
+                        name="exit",
+                        arguments={"reason": "done"},
+                    )
+                ]
+            ),
+        ]
+    )
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        agent._append_history(
+            ReceivedMessage(content="start waiting", from_id="tester")
+        )
+        agent.set_state(AgentState.RUNNING, "received message from tester")
+
+    def fake_chat(messages, tools=None, on_chunk=None):
+        llm_messages.append(messages)
+        if len(llm_messages) == 1:
+            timer = threading.Timer(
+                0.01,
+                lambda: agent.enqueue_message(
+                    Message(
+                        from_id="human",
+                        to_id=agent.uuid,
+                        content="wake up now",
+                    )
+                ),
+            )
+            timer.start()
+        return next(responses)
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    agent._run()
+
+    assert wait_calls == 1
+    assert agent.state == AgentState.TERMINATED
+    second_round = llm_messages[1]
+    assert any(
+        msg.get("role") == "tool"
+        and msg.get("content")
+        == json.dumps(
+            {
+                "reason": "message",
+                "message": {"from": "human", "content": "wake up now"},
+            }
+        )
+        for msg in second_round
+    )
+    assert not any(
+        msg.get("role") == "user"
+        and msg.get("content")
+        == json.dumps({"from": "human", "content": "wake up now"})
+        for msg in second_round
+    )

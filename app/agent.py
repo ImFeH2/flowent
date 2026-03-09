@@ -5,6 +5,7 @@ import threading
 import time as _time
 import traceback
 import uuid as _uuid
+from dataclasses import dataclass
 from functools import lru_cache
 from queue import Empty, Queue
 from typing import Any
@@ -43,6 +44,13 @@ def _get_tool_registry() -> Any:
     return build_tool_registry()
 
 
+@dataclass
+class WakeSignal:
+    reason: str
+    payload: dict[str, Any]
+    resume_reason: str = ""
+
+
 class Agent:
     def __init__(
         self,
@@ -59,8 +67,9 @@ class Agent:
         self.history: list[HistoryEntry] = []
         self._message_queue: Queue[Message] = Queue()
         self._terminate = threading.Event()
-        self._idle_requested: bool = False
         self._idle_state_event = threading.Event()
+        self._wake_queue: Queue[WakeSignal] = Queue()
+        self._wake_waiting = threading.Event()
         self._thread: threading.Thread | None = None
         self._termination_reason: str = ""
         self._connections_lock = threading.Lock()
@@ -100,9 +109,15 @@ class Agent:
         with self._todos_lock:
             self.todos = [TodoItem(id=t.id, text=t.text, done=t.done) for t in todos]
 
-    def request_idle(self) -> None:
+    def request_idle(self) -> str:
         self.set_state(AgentState.IDLE)
-        self._idle_requested = True
+        signal = self._wait_for_wakeup()
+        if signal.reason != "termination":
+            self.set_state(
+                AgentState.RUNNING,
+                signal.resume_reason or f"woke due to {signal.reason}",
+            )
+        return json.dumps(signal.payload)
 
     def get_connections_info(self) -> list[dict[str, Any]]:
         from app.registry import registry
@@ -267,13 +282,8 @@ class Agent:
                         )
                     for tc in response.tool_calls:
                         self._handle_tool_call(tc.name, tc.arguments, tc.id)
-                        if self._terminate.is_set() or self._idle_requested:
+                        if self._terminate.is_set():
                             break
-                    if self._idle_requested:
-                        self._idle_requested = False
-                        if not self._terminate.is_set():
-                            self._log.debug("Idle requested, waiting for input")
-                            self._wait_for_input()
                 elif response.content:
                     if (
                         self.node_type == NodeType.STEWARD
@@ -437,17 +447,66 @@ class Agent:
             )
 
     def _wait_for_input(self) -> None:
-        while not self._terminate.is_set():
-            msg = self.try_get_message(timeout=2.0)
-            if msg:
-                self._append_history(
-                    ReceivedMessage(content=msg.content, from_id=msg.from_id),
-                )
-                self.set_state(
-                    AgentState.RUNNING,
-                    f"received message from {msg.from_id}",
-                )
-                return
+        signal = self._wait_for_wakeup()
+        if signal.reason != "message":
+            return
+
+        message = signal.payload["message"]
+        self._append_history(
+            ReceivedMessage(
+                content=message["content"],
+                from_id=message["from"],
+            ),
+        )
+        self.set_state(
+            AgentState.RUNNING,
+            signal.resume_reason,
+        )
+
+    def _wait_for_wakeup(self) -> WakeSignal:
+        pending_message = self._consume_pending_message()
+        if pending_message is not None:
+            return pending_message
+
+        self._wake_waiting.set()
+        try:
+            while not self._terminate.is_set():
+                try:
+                    signal = self._wake_queue.get(timeout=2.0)
+                except Empty:
+                    pending_message = self._consume_pending_message()
+                    if pending_message is not None:
+                        return pending_message
+                    continue
+
+                if signal.reason == "message":
+                    pending_message = self._consume_pending_message()
+                    if pending_message is not None:
+                        return pending_message
+                    continue
+
+                return signal
+
+            return WakeSignal(
+                reason="termination",
+                payload={"reason": "termination"},
+                resume_reason="termination requested",
+            )
+        finally:
+            self._wake_waiting.clear()
+
+    def _consume_pending_message(self) -> WakeSignal | None:
+        msg = self.try_get_message(timeout=0)
+        if msg is None:
+            return None
+        return WakeSignal(
+            reason="message",
+            payload={
+                "reason": "message",
+                "message": {"from": msg.from_id, "content": msg.content},
+            },
+            resume_reason=f"received message from {msg.from_id}",
+        )
 
     def _handle_tool_call(
         self,
@@ -560,6 +619,8 @@ class Agent:
 
     def enqueue_message(self, msg: Message) -> None:
         self._message_queue.put(msg)
+        if self._wake_waiting.is_set():
+            self._wake_queue.put(WakeSignal(reason="message", payload={}))
 
     def try_get_message(self, timeout: float = 0) -> Message | None:
         try:
@@ -603,6 +664,14 @@ class Agent:
     def request_termination(self, reason: str = "") -> None:
         self._termination_reason = reason
         self._terminate.set()
+        if self._wake_waiting.is_set():
+            self._wake_queue.put(
+                WakeSignal(
+                    reason="termination",
+                    payload={"reason": "termination"},
+                    resume_reason="termination requested",
+                )
+            )
 
     def terminate_and_wait(self, timeout: float = 10.0) -> None:
         self.request_termination("shutdown")

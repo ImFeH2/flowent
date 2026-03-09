@@ -1,7 +1,8 @@
 import json
+import threading
 
 from app.agent import Agent
-from app.models import NodeConfig, NodeType, TodoItem
+from app.models import Message, NodeConfig, NodeType, TodoItem
 from app.registry import registry
 from app.settings import RoleConfig, Settings
 from app.tools.idle import IdleTool
@@ -14,12 +15,51 @@ def test_idle_tool_uses_request_idle(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle"]))
     called = []
 
-    monkeypatch.setattr(agent, "request_idle", lambda: called.append("idle"))
+    monkeypatch.setattr(
+        agent,
+        "request_idle",
+        lambda: (
+            called.append("idle")
+            or json.dumps(
+                {
+                    "reason": "message",
+                    "message": {"from": "tester", "content": "hello"},
+                }
+            )
+        ),
+    )
 
     result = json.loads(IdleTool().execute(agent, {}))
 
-    assert result == {"status": "idle"}
+    assert result == {
+        "reason": "message",
+        "message": {"from": "tester", "content": "hello"},
+    }
     assert called == ["idle"]
+
+
+def test_idle_tool_blocks_until_message_and_returns_tool_payload():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle"]), uuid="agent-a")
+    result: list[dict[str, object]] = []
+
+    thread = threading.Thread(
+        target=lambda: result.append(json.loads(IdleTool().execute(agent, {}))),
+        daemon=True,
+    )
+    thread.start()
+
+    agent.enqueue_message(
+        Message(from_id="tester", to_id=agent.uuid, content="hello from queue")
+    )
+    thread.join(timeout=1.0)
+
+    assert not thread.is_alive()
+    assert result == [
+        {
+            "reason": "message",
+            "message": {"from": "tester", "content": "hello from queue"},
+        }
+    ]
 
 
 def test_list_connections_tool_uses_agent_public_api(monkeypatch):

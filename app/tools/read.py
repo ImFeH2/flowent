@@ -68,7 +68,7 @@ class ReadTool(Tool):
                 end = min(total_lines, int(args.get("end_line", total_lines)))
 
                 selected = lines[start - 1 : end]
-                width = len(str(total_lines))
+                width = max(6, len(str(total_lines)))
                 numbered = "".join(
                     f"{start + i:{width}d}\t{line}" for i, line in enumerate(selected)
                 )

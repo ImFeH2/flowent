@@ -17,13 +17,10 @@ if TYPE_CHECKING:
 class EditTool(Tool):
     name = "edit"
     description = (
-        "Replace a range of lines in a file with new content. "
+        "Apply one or more line-based edits to a file in order. "
         "Use the read tool first to get the exact line numbers. "
-        "start_line and end_line are 1-indexed and inclusive. "
+        "Each edit uses 1-indexed inclusive start_line and end_line. "
         "new_content replaces those lines exactly as given (include a trailing newline if needed). "
-        "To insert without removing, set start_line and end_line to the same line number and "
-        "provide new_content that includes that original line plus the inserted lines. "
-        "To delete lines, set new_content to an empty string. "
         "If the file does not exist it will be created."
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -33,20 +30,30 @@ class EditTool(Tool):
                 "type": "string",
                 "description": "Absolute path to the file to edit or create",
             },
-            "start_line": {
-                "type": "integer",
-                "description": "First line to replace (1-indexed, inclusive). Use 1 for a new file.",
-            },
-            "end_line": {
-                "type": "integer",
-                "description": "Last line to replace (1-indexed, inclusive).",
-            },
-            "new_content": {
-                "type": "string",
-                "description": "Replacement text for the specified line range. Use an empty string to delete lines.",
+            "edits": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "start_line": {
+                            "type": "integer",
+                            "description": "First line to replace (1-indexed, inclusive). Use 1 for a new file.",
+                        },
+                        "end_line": {
+                            "type": "integer",
+                            "description": "Last line to replace (1-indexed, inclusive).",
+                        },
+                        "new_content": {
+                            "type": "string",
+                            "description": "Replacement text for the specified line range. Use an empty string to delete lines.",
+                        },
+                    },
+                    "required": ["start_line", "end_line", "new_content"],
+                },
+                "description": "Edits to apply in order. Later line numbers are based on the file state after earlier edits.",
             },
         },
-        "required": ["path", "start_line", "end_line", "new_content"],
+        "required": ["path", "edits"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -60,14 +67,9 @@ class EditTool(Tool):
             return json.dumps({"error": f"Path not in write_dirs: {path_str}"})
 
         try:
-            start_line = int(args["start_line"])
-            end_line = int(args["end_line"])
-            new_content: str = args["new_content"]
-
-            if start_line < 1:
-                return json.dumps({"error": "start_line must be >= 1"})
-            if end_line < start_line:
-                return json.dumps({"error": "end_line must be >= start_line"})
+            edits = args["edits"]
+            if not isinstance(edits, list):
+                return json.dumps({"error": "edits must be an array"})
 
             if not real_path.exists():
                 os.makedirs(real_path.parent, exist_ok=True)
@@ -76,40 +78,60 @@ class EditTool(Tool):
             with open(real_path, encoding="utf-8") as f:
                 lines = f.readlines()
 
-            total_lines = len(lines)
-            if start_line > total_lines + 1:
-                return json.dumps(
+            applied_edits: list[dict[str, int | str]] = []
+            for raw_edit in edits:
+                if not isinstance(raw_edit, dict):
+                    return json.dumps({"error": "each edit must be an object"})
+
+                start_line = int(raw_edit["start_line"])
+                end_line = int(raw_edit["end_line"])
+                new_content: str = raw_edit["new_content"]
+
+                if start_line < 1:
+                    return json.dumps({"error": "start_line must be >= 1"})
+                if end_line < start_line:
+                    return json.dumps({"error": "end_line must be >= start_line"})
+
+                total_lines = len(lines)
+                if start_line > total_lines + 1:
+                    return json.dumps(
+                        {
+                            "error": f"start_line {start_line} exceeds file length {total_lines}"
+                        }
+                    )
+
+                current_end_line = min(end_line, total_lines)
+
+                replacement = []
+                if new_content:
+                    replacement = new_content.splitlines(keepends=True)
+                    if replacement and not replacement[-1].endswith("\n"):
+                        replacement[-1] += "\n"
+
+                lines = lines[: start_line - 1] + replacement + lines[current_end_line:]
+                applied_edits.append(
                     {
-                        "error": f"start_line {start_line} exceeds file length {total_lines}"
+                        "start_line": start_line,
+                        "end_line": current_end_line,
+                        "replacement_line_count": len(replacement),
                     }
                 )
 
-            end_line = min(end_line, total_lines)
-
-            replacement = []
-            if new_content:
-                replacement = new_content.splitlines(keepends=True)
-                if replacement and not replacement[-1].endswith("\n"):
-                    replacement[-1] += "\n"
-
-            new_lines = lines[: start_line - 1] + replacement + lines[end_line:]
-
             with open(real_path, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
+                f.writelines(lines)
 
             logger.debug(
-                "Edited file: {} (lines {}-{} replaced with {} lines)",
+                "Edited file: {} ({} edit(s), new_line_count={})",
                 path_str,
-                start_line,
-                end_line,
-                len(replacement),
+                len(applied_edits),
+                len(lines),
             )
             return json.dumps(
                 {
                     "status": "edited",
                     "path": path_str,
-                    "replaced_lines": f"{start_line}-{end_line}",
-                    "new_line_count": len(new_lines),
+                    "applied_edits": applied_edits,
+                    "new_line_count": len(lines),
                 }
             )
         except Exception as e:

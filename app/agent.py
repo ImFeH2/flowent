@@ -178,7 +178,7 @@ class Agent:
         self._wait_for_input()
 
         if self._terminate.is_set():
-            self.set_state(AgentState.TERMINATED, "terminated before first message")
+            self._finalize_termination("terminated before first message")
             return
 
         while not self._terminate.is_set():
@@ -283,18 +283,7 @@ class Agent:
                 if self._terminate.is_set():
                     break
 
-        self.set_state(AgentState.TERMINATED, self._termination_reason or "finished")
-        self._log.info(
-            "Agent terminated (reason: {})",
-            self._termination_reason or "finished",
-        )
-        event_bus.emit(
-            Event(
-                type=EventType.NODE_TERMINATED,
-                agent_id=self.uuid,
-                data={"reason": self._termination_reason or "finished"},
-            ),
-        )
+        self._finalize_termination(self._termination_reason or "finished")
 
     def _sync_system_prompt_entry(self) -> None:
         system_prompt = get_system_prompt(self.config)
@@ -595,3 +584,17 @@ class Agent:
         self.request_termination("shutdown")
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
+
+    def _finalize_termination(self, reason: str) -> None:
+        from app.registry import registry
+
+        self.set_state(AgentState.TERMINATED, reason)
+        self._log.info("Agent terminated (reason: {})", reason)
+        event_bus.emit(
+            Event(
+                type=EventType.NODE_TERMINATED,
+                agent_id=self.uuid,
+                data={"reason": reason},
+            ),
+        )
+        registry.unregister(self.uuid)

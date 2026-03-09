@@ -25,7 +25,13 @@ export interface ActiveMessage {
   timestamp: number;
 }
 
-export type PageId = "graph" | "providers" | "roles" | "tools" | "settings";
+export type PageId =
+  | "graph"
+  | "providers"
+  | "roles"
+  | "prompts"
+  | "tools"
+  | "settings";
 
 interface AgentRuntimeContextValue {
   agents: Map<string, Node>;

@@ -3,6 +3,7 @@ import {
   Bot,
   Moon,
   Network,
+  ScrollText,
   Server,
   Settings,
   Sparkles,
@@ -23,6 +24,7 @@ const NAV_ITEMS: Array<{ id: PageId; icon: typeof Network; label: string }> = [
   { id: "graph", icon: Network, label: "Workspace" },
   { id: "providers", icon: Server, label: "Providers" },
   { id: "roles", icon: BookOpen, label: "Roles" },
+  { id: "prompts", icon: ScrollText, label: "Prompts" },
   { id: "tools", icon: Wrench, label: "Tools" },
   { id: "settings", icon: Settings, label: "Settings" },
 ];

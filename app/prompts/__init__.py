@@ -7,18 +7,24 @@ from app.prompts.steward import STEWARD_PROMPT
 
 
 def get_system_prompt(config: NodeConfig) -> str:
+    from app.settings import get_settings
+
+    settings = get_settings()
+
     if config.node_type == NodeType.STEWARD:
         prompt = STEWARD_PROMPT
     elif config.node_type == NodeType.CONDUCTOR:
         prompt = CONDUCTOR_PROMPT
     else:
-        from app.settings import find_role, get_settings
+        from app.settings import find_role
 
         prompt = DEFAULT_AGENT_ROLE_PROMPT
         if config.role_name:
-            settings = get_settings()
             role = find_role(settings, config.role_name)
             if role:
                 prompt = role.system_prompt
 
-    return compose_system_prompt(prompt)
+    return compose_system_prompt(
+        prompt,
+        custom_prompt=settings.custom_prompt,
+    )

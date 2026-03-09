@@ -8,6 +8,7 @@ export {
   fetchProviderModels,
   type ModelOption,
 } from "./providers";
+export { fetchPromptSettings, savePromptSettings } from "./prompts";
 export { fetchSettings, saveSettings } from "./settings";
 export { fetchAppMeta, fetchTools, type ToolInfo } from "./meta";
 export { sendStewardMessageRequest } from "./steward";

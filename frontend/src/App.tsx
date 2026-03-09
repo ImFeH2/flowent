@@ -7,6 +7,7 @@ import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { HomePage } from "@/pages/HomePage";
 import { ProvidersPage } from "@/pages/ProvidersPage";
+import { PromptsPage } from "@/pages/PromptsPage";
 import { RolesPage } from "@/pages/RolesPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { ToolsPage } from "@/pages/ToolsPage";
@@ -29,6 +30,8 @@ function AppContent() {
         return <ProvidersPage />;
       case "roles":
         return <RolesPage />;
+      case "prompts":
+        return <PromptsPage />;
       case "tools":
         return <ToolsPage />;
       case "settings":

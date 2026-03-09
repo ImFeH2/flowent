@@ -50,6 +50,7 @@ class ModelSettings:
 class Settings:
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
     model: ModelSettings = field(default_factory=ModelSettings)
+    custom_prompt: str = ""
     providers: list[ProviderConfig] = field(default_factory=list)
     roles: list[RoleConfig] = field(default_factory=list)
 
@@ -73,6 +74,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         active_provider_id=str(model_data.get("active_provider_id", "")),
         active_model=str(model_data.get("active_model", "")),
     )
+    custom_prompt = str(data.get("custom_prompt", ""))
 
     providers_raw = data.get("providers", [])
     if not isinstance(providers_raw, list):
@@ -114,6 +116,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         Settings(
             event_log=event_log,
             model=model_settings,
+            custom_prompt=custom_prompt,
             providers=providers,
             roles=roles,
         ),

@@ -60,8 +60,15 @@ DEFAULT_AGENT_ROLE_PROMPT = (
 )
 
 
-def compose_system_prompt(role_prompt: str) -> str:
+def compose_system_prompt(
+    role_prompt: str,
+    custom_prompt: str = "",
+) -> str:
+    custom_prompt_text = custom_prompt.strip()
     role_specific_prompt = role_prompt.strip()
-    if not role_specific_prompt:
-        return COMMON_AGENT_PROMPT
-    return f"{COMMON_AGENT_PROMPT}\n\n{role_specific_prompt}".strip()
+    parts = [COMMON_AGENT_PROMPT]
+    if custom_prompt_text:
+        parts.append(custom_prompt_text)
+    if role_specific_prompt:
+        parts.append(role_specific_prompt)
+    return "\n\n".join(parts).strip()

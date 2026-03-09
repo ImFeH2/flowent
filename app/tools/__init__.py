@@ -40,8 +40,6 @@ class ToolRegistry:
 
     def get_tools_for_agent(self, agent: Agent) -> list[Tool]:
         allowed = set(agent.config.tools)
-        if not allowed:
-            return list(self._tools.values())
         return [t for t in self._tools.values() if t.name in allowed]
 
     def get_tools_schema(self, agent: Agent) -> list[dict[str, Any]]:

@@ -53,7 +53,11 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
     result = json.loads(
         SpawnTool().execute(
             parent,
-            {"role_name": "Worker", "task_prompt": "handle this task"},
+            {
+                "role_name": "Worker",
+                "task_prompt": "handle this task",
+                "tools": ["send"],
+            },
         )
     )
 
@@ -97,7 +101,7 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
         ),
     )
 
-    args = {"role_name": "Worker"}
+    args = {"role_name": "Worker", "tools": ["send"]}
     if task_prompt is not None:
         args["task_prompt"] = task_prompt
 
@@ -105,3 +109,20 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
 
     assert result["role_name"] == "Worker"
     assert isinstance(result["agent_id"], str)
+
+
+def test_spawn_requires_explicit_tools(monkeypatch):
+    parent = Agent(
+        NodeConfig(node_type=NodeType.CONDUCTOR, tools=["spawn", "send"]),
+        uuid="parent",
+    )
+    registry.register(parent)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
+    )
+
+    result = json.loads(SpawnTool().execute(parent, {"role_name": "Worker"}))
+
+    assert result == {"error": "tools is required"}

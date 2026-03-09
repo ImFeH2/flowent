@@ -49,7 +49,7 @@ class SpawnTool(Tool):
                 "description": "List of directories the agent can write to",
             },
         },
-        "required": ["role_name"],
+        "required": ["role_name", "tools"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -61,8 +61,15 @@ class SpawnTool(Tool):
         role_name = args["role_name"]
         task_prompt = args.get("task_prompt")
         name = args.get("name")
-        tools = args.get("tools", [])
+        if "tools" not in args:
+            return json.dumps({"error": "tools is required"})
+        tools = args["tools"]
         write_dirs = args.get("write_dirs", [])
+
+        if not isinstance(tools, list) or not all(
+            isinstance(tool_name, str) for tool_name in tools
+        ):
+            return json.dumps({"error": "tools must be an array of strings"})
 
         settings = get_settings()
         role_cfg = find_role(settings, role_name)

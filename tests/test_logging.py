@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -37,7 +38,9 @@ def test_setup_logging_creates_timestamped_file_and_prunes_old_logs(
     assert len(log_files) == 10
     assert "1.log" not in log_files
     assert "2.log" not in log_files
-    assert any(path.endswith(".log") and path[:-4].isdigit() for path in log_files)
+    assert any(
+        re.fullmatch(r"\d{4}-\d{2}-\d{2}_\d{6}_\d+\.log", path) for path in log_files
+    )
 
 
 def test_setup_logging_writes_source_and_agent_id_to_file(tmp_path: Path) -> None:
@@ -52,6 +55,7 @@ def test_setup_logging_writes_source_and_agent_id_to_file(tmp_path: Path) -> Non
     assert "hello file log" in content
     assert "agent:agent-123" in content
     assert "test_setup_logging_writes_source_and_agent_id_to_file" in content
+    assert "hello file log\n\n" not in content
 
 
 def test_setup_logging_sets_console_level_from_runtime_mode(
@@ -69,4 +73,5 @@ def test_setup_logging_sets_console_level_from_runtime_mode(
 
     assert "hidden release debug" not in release_output
     assert "visible release info" in release_output
+    assert "visible release info\n\n" not in release_output
     assert "visible dev debug" in dev_output

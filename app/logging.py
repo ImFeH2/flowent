@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import time
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -19,14 +20,14 @@ CONSOLE_FORMAT = (
     "<green>{time:HH:mm:ss.SSS}</green> | "
     "<level>{level: <8}</level> | "
     "<cyan>{extra[source]}</cyan>{extra[agent_suffix]} | "
-    "<level>{message}</level>\n{exception}"
+    "<level>{message}</level>{exception}"
 )
 
 FILE_FORMAT = (
     "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
     "{level: <8} | "
     "{extra[source]}{extra[agent_suffix]} | "
-    "{message}\n{exception}"
+    "{message}{exception}"
 )
 
 
@@ -68,18 +69,23 @@ def _get_log_dir(runtime_dir: Path | None = None) -> Path:
 
 def _allocate_log_file(log_dir: Path) -> Path:
     timestamp = time.time_ns() // 1_000_000
-    log_path = log_dir / f"{timestamp}.log"
+    prefix = datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d_%H%M%S")
+    log_path = log_dir / f"{prefix}_{timestamp}.log"
     while log_path.exists():
         timestamp += 1
-        log_path = log_dir / f"{timestamp}.log"
+        prefix = datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d_%H%M%S")
+        log_path = log_dir / f"{prefix}_{timestamp}.log"
     return log_path
 
 
 def _sort_key(path: Path) -> tuple[int, int, str]:
     try:
-        timestamp = int(path.stem)
+        timestamp = int(path.stem.rsplit("_", 1)[-1])
     except ValueError:
-        timestamp = -1
+        try:
+            timestamp = int(path.stem)
+        except ValueError:
+            timestamp = -1
     return (timestamp, path.stat().st_mtime_ns, path.name)
 
 

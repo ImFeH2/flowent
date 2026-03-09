@@ -12,18 +12,26 @@ def test_todo_tool_emits_node_todos_changed(monkeypatch):
 
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
-    result = json.loads(TodoTool().execute(agent, {"action": "add", "text": "step 1"}))
+    result = json.loads(TodoTool().execute(agent, {"todos": ["step 1"]}))
 
-    assert result == {"status": "added", "id": 1}
+    assert result == {"todos": ["step 1"]}
     assert len(events) == 1
     assert events[0].type == EventType.NODE_TODOS_CHANGED
     assert events[0].data == {
         "todos": [
             {
-                "id": 1,
                 "text": "step 1",
-                "done": False,
                 "type": "TodoItem",
             }
         ]
     }
+
+
+def test_todo_tool_overwrites_and_clears_existing_items():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["todo"]))
+
+    TodoTool().execute(agent, {"todos": ["step 1", "step 2"]})
+    result = json.loads(TodoTool().execute(agent, {"todos": []}))
+
+    assert result == {"todos": []}
+    assert agent.get_todos_snapshot() == []

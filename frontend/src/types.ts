@@ -25,9 +25,7 @@ export type UpdateEventType =
 export type EventType = UpdateEventType;
 
 export interface TodoItem {
-  id: number;
   text: string;
-  done: boolean;
   type: string;
 }
 

@@ -103,11 +103,11 @@ class Agent:
 
     def get_todos_snapshot(self) -> list[TodoItem]:
         with self._todos_lock:
-            return [TodoItem(id=t.id, text=t.text, done=t.done) for t in self.todos]
+            return [TodoItem(text=t.text) for t in self.todos]
 
     def set_todos(self, todos: list[TodoItem]) -> None:
         with self._todos_lock:
-            self.todos = [TodoItem(id=t.id, text=t.text, done=t.done) for t in todos]
+            self.todos = [TodoItem(text=t.text) for t in todos]
 
     def request_idle(self) -> str:
         self.set_state(AgentState.IDLE)
@@ -335,8 +335,7 @@ class Agent:
             return
         lines = []
         for t in todos:
-            mark = "[x]" if t.done else "[ ]"
-            lines.append(f"  {mark} {t.text}")
+            lines.append(f"  - {t.text}")
         todo_text = "Current TODO list:\n" + "\n".join(lines)
         with self._history_lock:
             for i in range(len(self.history) - 1, -1, -1):

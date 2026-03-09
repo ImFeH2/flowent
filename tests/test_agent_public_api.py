@@ -140,10 +140,8 @@ def test_todo_tool_writes_via_set_todos(monkeypatch):
 
     monkeypatch.setattr(agent, "set_todos", fake_set_todos)
 
-    result = json.loads(TodoTool().execute(agent, {"action": "add", "text": "step 1"}))
+    result = json.loads(TodoTool().execute(agent, {"todos": ["step 1", "step 2"]}))
 
-    assert result == {"status": "added", "id": 1}
+    assert result == {"todos": ["step 1", "step 2"]}
     assert len(applied) == 1
-    assert [(item.id, item.text, item.done) for item in applied[0]] == [
-        (1, "step 1", False)
-    ]
+    assert [item.text for item in applied[0]] == ["step 1", "step 2"]

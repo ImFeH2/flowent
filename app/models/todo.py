@@ -7,6 +7,4 @@ from app.models.base import Serializable
 
 @dataclass
 class TodoItem(Serializable):
-    id: int
     text: str
-    done: bool = False

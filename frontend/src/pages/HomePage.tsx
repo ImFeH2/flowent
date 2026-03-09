@@ -219,22 +219,11 @@ function AgentDetailPanel({
               ) : (
                 detailTodos.slice(0, 6).map((todo) => (
                   <div
-                    key={todo.id}
+                    key={todo.text}
                     className="flex items-center gap-2 text-sm text-foreground"
                   >
-                    <span
-                      className={cn(
-                        "size-2 rounded-full",
-                        todo.done ? "bg-emerald-500" : "bg-amber-500",
-                      )}
-                    />
-                    <span
-                      className={
-                        todo.done ? "line-through text-muted-foreground" : ""
-                      }
-                    >
-                      {todo.text}
-                    </span>
+                    <span className="size-2 rounded-full bg-amber-500" />
+                    <span>{todo.text}</span>
                   </div>
                 ))
               )}

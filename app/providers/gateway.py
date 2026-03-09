@@ -54,34 +54,22 @@ class ProviderGateway:
         ms = settings.model
         cfg = find_provider(settings, ms.active_provider_id)
 
-        if cfg:
-            provider_type = cfg.type
-            base_url = cfg.base_url
-            api_key = cfg.api_key
-            model = ms.active_model
-            provider_name = cfg.name
-            cache_key = (
-                cfg.id,
-                provider_type,
-                base_url,
-                api_key,
-                provider_name,
-                model,
-            )
-        else:
-            provider_type = "openai_compatible"
-            base_url = "https://openrouter.ai/api/v1"
-            api_key = ""
-            model = ms.active_model
-            provider_name = "OpenRouter"
-            cache_key = (
-                "__default__",
-                provider_type,
-                base_url,
-                api_key,
-                provider_name,
-                model,
-            )
+        if cfg is None:
+            raise RuntimeError("No active provider configured")
+
+        provider_type = cfg.type
+        base_url = cfg.base_url
+        api_key = cfg.api_key
+        model = ms.active_model
+        provider_name = cfg.name
+        cache_key = (
+            cfg.id,
+            provider_type,
+            base_url,
+            api_key,
+            provider_name,
+            model,
+        )
 
         with self._lock:
             if cache_key in self._cache:

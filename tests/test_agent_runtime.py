@@ -3,6 +3,7 @@ from app.events import event_bus
 from app.models import (
     AgentState,
     AssistantText,
+    ErrorEntry,
     EventType,
     LLMResponse,
     NodeConfig,
@@ -102,3 +103,37 @@ def test_agent_unregisters_from_registry_after_exit_tool(monkeypatch):
         EventType.NODE_TERMINATED,
     ]
     assert events[-1].data == {"reason": "done"}
+
+
+def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["exit"]), uuid="agent-y")
+    wait_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            agent._append_history(
+                ReceivedMessage(content="do the task", from_id="tester")
+            )
+            agent.set_state(AgentState.RUNNING, "received message from tester")
+            return
+        agent.request_termination("stop")
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr(
+        "app.agent.gateway.chat",
+        lambda messages, tools=None, on_chunk=None: (_ for _ in ()).throw(
+            RuntimeError("No active provider configured")
+        ),
+    )
+
+    agent._run()
+
+    assert wait_calls == 2
+    assert agent.state == AgentState.TERMINATED
+    assert any(
+        isinstance(entry, ErrorEntry)
+        and "No active provider configured" in entry.content
+        for entry in agent.get_history_snapshot()
+    )

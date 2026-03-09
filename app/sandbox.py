@@ -21,9 +21,10 @@ def build_firejail_cmd(
         "--quiet",
         "--seccomp",
         "--read-only=/",
-        "--read-write=/tmp",
     ]
-    for d in write_dirs:
-        cmd.append(f"--read-write={d}")
+    if write_dirs:
+        for d in write_dirs:
+            cmd.append(f"--read-write={d}")
+        cmd.append("--read-write=/tmp")
     cmd.extend([f"--timeout={timeout_formatted}", "bash", "-c", command])
     return cmd

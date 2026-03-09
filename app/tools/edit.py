@@ -54,7 +54,9 @@ class EditTool(Tool):
         real_path = Path(path_str)
 
         write_dirs = agent.config.write_dirs
-        if write_dirs and not is_path_writable(real_path, write_dirs):
+        if not write_dirs:
+            return json.dumps({"error": "Write access is disabled for this agent"})
+        if not is_path_writable(real_path, write_dirs):
             return json.dumps({"error": f"Path not in write_dirs: {path_str}"})
 
         try:

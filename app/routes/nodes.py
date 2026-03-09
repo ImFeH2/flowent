@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
-from app.models import Message
 from app.registry import registry
 
 router = APIRouter()
@@ -44,21 +42,6 @@ async def get_node(node_id: str) -> dict:
         "todos": [t.serialize() for t in node.todos],
         "history": [entry.serialize() for entry in node.get_history_snapshot()],
     }
-
-
-class NodeMessageRequest(BaseModel):
-    message: str
-
-
-@router.post("/api/nodes/{node_id}/message")
-async def send_node_message(node_id: str, req: NodeMessageRequest) -> dict:
-    node = registry.get(node_id)
-    if node is None:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    msg = Message(from_id="human", to_id=node_id, content=req.message)
-    node.enqueue_message(msg)
-    return {"status": "sent"}
 
 
 @router.post("/api/nodes/{node_id}/terminate")

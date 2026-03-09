@@ -27,17 +27,6 @@ export async function fetchNodeDetail(
   });
 }
 
-export async function sendNodeMessage(
-  nodeId: string,
-  message: string,
-): Promise<void> {
-  await requestVoid(`/api/nodes/${nodeId}/message`, {
-    method: "POST",
-    body: { message },
-    errorMessage: "Failed to send node message",
-  });
-}
-
 export async function terminateNode(nodeId: string): Promise<void> {
   await requestVoid(`/api/nodes/${nodeId}/terminate`, {
     method: "POST",

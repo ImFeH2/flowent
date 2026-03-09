@@ -1,9 +1,4 @@
-export {
-  fetchNodes,
-  fetchNodeDetail,
-  sendNodeMessage,
-  terminateNode,
-} from "./nodes";
+export { fetchNodes, fetchNodeDetail, terminateNode } from "./nodes";
 export { fetchRoles, createRole, updateRole, deleteRole } from "./roles";
 export {
   fetchProviders,

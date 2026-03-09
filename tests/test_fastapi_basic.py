@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.routes.nodes import router as nodes_router
+
 
 @pytest.fixture
 def client():
@@ -31,3 +33,10 @@ def test_get_agent_not_found(client: TestClient):
 
     assert response.status_code == 404
     assert "Node not found" in response.json()["detail"]
+
+
+def test_direct_node_message_api_is_not_available(client: TestClient):
+    assert not any(
+        getattr(route, "path", None) == "/api/nodes/{node_id}/message"
+        for route in nodes_router.routes
+    )

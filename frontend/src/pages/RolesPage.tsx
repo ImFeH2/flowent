@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import type { Role } from "@/types";
 
 type RoleDraft = Omit<Role, "is_builtin">;
-type ToolState = "allowed" | "required" | "excluded";
+type ToolState = "allowed" | "included" | "excluded";
 
 const MINIMUM_TOOLS = new Set([
   "send",
@@ -36,7 +36,7 @@ const MINIMUM_TOOLS = new Set([
 const emptyDraft = (): RoleDraft => ({
   name: "",
   system_prompt: "",
-  required_tools: [],
+  included_tools: [],
   excluded_tools: [],
 });
 
@@ -86,7 +86,7 @@ export function RolesPage() {
     setDraft({
       name: role.name,
       system_prompt: role.system_prompt,
-      required_tools: [...role.required_tools],
+      included_tools: [...role.included_tools],
       excluded_tools: [...role.excluded_tools],
     });
   };
@@ -122,7 +122,7 @@ export function RolesPage() {
       const nextDraft = {
         name: nextName,
         system_prompt: draft.system_prompt,
-        required_tools: draft.required_tools,
+        included_tools: draft.included_tools,
         excluded_tools: draft.excluded_tools,
       };
 
@@ -164,15 +164,15 @@ export function RolesPage() {
   const isEditing = Boolean(isCreating || editingName);
 
   const getToolState = (toolName: string): ToolState => {
-    if (draft.required_tools.includes(toolName)) return "required";
+    if (draft.included_tools.includes(toolName)) return "included";
     if (draft.excluded_tools.includes(toolName)) return "excluded";
     return "allowed";
   };
 
   const cycleToolState = (toolName: string) => {
     setDraft((current) => {
-      const currentState = current.required_tools.includes(toolName)
-        ? "required"
+      const currentState = current.included_tools.includes(toolName)
+        ? "included"
         : current.excluded_tools.includes(toolName)
           ? "excluded"
           : "allowed";
@@ -180,17 +180,17 @@ export function RolesPage() {
       if (currentState === "allowed") {
         return {
           ...current,
-          required_tools: [...current.required_tools, toolName],
+          included_tools: [...current.included_tools, toolName],
           excluded_tools: current.excluded_tools.filter(
             (name) => name !== toolName,
           ),
         };
       }
 
-      if (currentState === "required") {
+      if (currentState === "included") {
         return {
           ...current,
-          required_tools: current.required_tools.filter(
+          included_tools: current.included_tools.filter(
             (name) => name !== toolName,
           ),
           excluded_tools: [...current.excluded_tools, toolName],
@@ -199,7 +199,7 @@ export function RolesPage() {
 
       return {
         ...current,
-        required_tools: current.required_tools.filter(
+        included_tools: current.included_tools.filter(
           (name) => name !== toolName,
         ),
         excluded_tools: current.excluded_tools.filter(
@@ -292,7 +292,7 @@ export function RolesPage() {
                   <h3 className="text-sm font-medium">Tool Configuration</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Minimum tools are injected by the framework. Configure the
-                    remaining tools as Allowed, Required, or Excluded.
+                    remaining tools as Allowed, Included, or Excluded.
                   </p>
                 </div>
 
@@ -315,7 +315,7 @@ export function RolesPage() {
                           onClick={() => cycleToolState(tool.name)}
                           className={cn(
                             "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                            state === "required" &&
+                            state === "included" &&
                               "border-emerald-500/40 bg-emerald-500/10 text-emerald-600",
                             state === "excluded" &&
                               "border-red-500/40 bg-red-500/10 text-red-600",
@@ -325,8 +325,8 @@ export function RolesPage() {
                         >
                           {state === "allowed"
                             ? "Allowed"
-                            : state === "required"
-                              ? "Required"
+                            : state === "included"
+                              ? "Included"
                               : "Excluded"}
                         </button>
                       </div>
@@ -426,12 +426,12 @@ export function RolesPage() {
                 </p>
               </div>
 
-              {(role.required_tools.length > 0 ||
+              {(role.included_tools.length > 0 ||
                 role.excluded_tools.length > 0) && (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {role.required_tools.map((toolName) => (
+                  {role.included_tools.map((toolName) => (
                     <span
-                      key={`required-${role.name}-${toolName}`}
+                      key={`included-${role.name}-${toolName}`}
                       className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600"
                     >
                       {toolName}

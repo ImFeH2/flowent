@@ -92,7 +92,7 @@ export type StreamingDelta =
 export interface Role {
   name: string;
   system_prompt: string;
-  required_tools: string[];
+  included_tools: string[];
   excluded_tools: string[];
   is_builtin: boolean;
 }

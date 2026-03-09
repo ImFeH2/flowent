@@ -8,6 +8,7 @@ from app.settings import RoleConfig, Settings
 from app.tools.idle import IdleTool
 from app.tools.list_connections import ListConnectionsTool
 from app.tools.list_roles import ListRolesTool
+from app.tools.list_tools import ListToolsTool
 from app.tools.todo import TodoTool
 
 
@@ -119,7 +120,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 RoleConfig(
                     name="Worker",
                     system_prompt="Do work.",
-                    required_tools=["read", "exec"],
+                    included_tools=["read", "exec"],
                 ),
                 RoleConfig(
                     name="Reviewer",
@@ -136,18 +137,71 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
         {
             "name": "Worker",
             "system_prompt": "Do work.",
-            "required_tools": ["read", "exec"],
-            "excluded_tools": [],
-            "is_builtin": True,
+            "builtin_tools": [
+                "send",
+                "idle",
+                "todo",
+                "list_connections",
+                "exit",
+                "read",
+                "exec",
+            ],
+            "optional_tools": [
+                "edit",
+                "fetch",
+                "spawn",
+                "connect",
+                "list_roles",
+                "list_tools",
+            ],
         },
         {
             "name": "Reviewer",
             "system_prompt": "Review code.",
-            "required_tools": [],
-            "excluded_tools": ["fetch"],
-            "is_builtin": False,
+            "builtin_tools": [
+                "send",
+                "idle",
+                "todo",
+                "list_connections",
+                "exit",
+            ],
+            "optional_tools": [
+                "read",
+                "edit",
+                "exec",
+                "spawn",
+                "connect",
+                "list_roles",
+                "list_tools",
+            ],
         },
     ]
+
+
+def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
+    agent = Agent(NodeConfig(node_type=NodeType.CONDUCTOR, tools=["list_tools"]))
+
+    result = json.loads(ListToolsTool().execute(agent, {}))
+
+    assert {item["name"] for item in result} == {
+        "send",
+        "idle",
+        "todo",
+        "list_connections",
+        "exit",
+        "read",
+        "edit",
+        "exec",
+        "fetch",
+        "spawn",
+        "connect",
+        "list_roles",
+        "list_tools",
+    }
+    assert all(set(item) == {"name", "description"} for item in result)
+    assert all(
+        isinstance(item["description"], str) and item["description"] for item in result
+    )
 
 
 def test_todo_tool_writes_via_set_todos(monkeypatch):

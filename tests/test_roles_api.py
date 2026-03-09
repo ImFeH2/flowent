@@ -67,7 +67,7 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
     assert update.json() == {
         "name": "Researcher",
         "system_prompt": "investigate",
-        "required_tools": [],
+        "included_tools": [],
         "excluded_tools": [],
         "is_builtin": False,
     }
@@ -96,7 +96,7 @@ def test_delete_builtin_role_returns_error(client: TestClient, monkeypatch):
     assert response.json() == {"detail": "Cannot delete built-in role 'Worker'"}
 
 
-def test_create_role_rejects_overlapping_required_and_excluded_tools(
+def test_create_role_rejects_overlapping_included_and_excluded_tools(
     client: TestClient,
     monkeypatch,
 ):
@@ -107,12 +107,12 @@ def test_create_role_rejects_overlapping_required_and_excluded_tools(
         json={
             "name": "Writer",
             "system_prompt": "another prompt",
-            "required_tools": ["read"],
+            "included_tools": ["read"],
             "excluded_tools": ["read"],
         },
     )
 
     assert response.status_code == 400
     assert response.json() == {
-        "detail": "required_tools and excluded_tools cannot overlap: read"
+        "detail": "included_tools and excluded_tools cannot overlap: read"
     }

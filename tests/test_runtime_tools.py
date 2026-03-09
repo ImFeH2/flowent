@@ -5,14 +5,14 @@ from app.agent import Agent
 from app.registry import registry
 from app.runtime import bootstrap_runtime
 from app.settings import (
+    WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_NAME,
-    WORKER_ROLE_REQUIRED_TOOLS,
     WORKER_ROLE_SYSTEM_PROMPT,
     RoleConfig,
 )
 
 
-def test_bootstrap_runtime_adds_list_roles_to_conductor(monkeypatch):
+def test_bootstrap_runtime_adds_list_roles_and_list_tools_to_conductor(monkeypatch):
     registry.reset()
     monkeypatch.setattr(Agent, "start", lambda self: None)
 
@@ -23,6 +23,7 @@ def test_bootstrap_runtime_adds_list_roles_to_conductor(monkeypatch):
 
         assert conductor is not None
         assert "list_roles" in conductor.config.tools
+        assert "list_tools" in conductor.config.tools
     finally:
         registry.reset()
 
@@ -55,7 +56,7 @@ def test_bootstrap_runtime_creates_builtin_worker_role(monkeypatch, tmp_path):
             RoleConfig(
                 name=WORKER_ROLE_NAME,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
-                required_tools=WORKER_ROLE_REQUIRED_TOOLS,
+                included_tools=WORKER_ROLE_INCLUDED_TOOLS,
             )
         ]
 
@@ -63,7 +64,7 @@ def test_bootstrap_runtime_creates_builtin_worker_role(monkeypatch, tmp_path):
         registry.reset()
 
 
-def test_bootstrap_runtime_keeps_existing_worker_role(monkeypatch, tmp_path):
+def test_bootstrap_runtime_reconciles_existing_worker_role(monkeypatch, tmp_path):
     registry.reset()
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
@@ -76,6 +77,8 @@ def test_bootstrap_runtime_keeps_existing_worker_role(monkeypatch, tmp_path):
                     {
                         "name": WORKER_ROLE_NAME,
                         "system_prompt": "Custom worker prompt.",
+                        "included_tools": [],
+                        "excluded_tools": ["fetch"],
                     }
                 ],
             }
@@ -95,7 +98,8 @@ def test_bootstrap_runtime_keeps_existing_worker_role(monkeypatch, tmp_path):
         assert settings.roles == [
             RoleConfig(
                 name=WORKER_ROLE_NAME,
-                system_prompt="Custom worker prompt.",
+                system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
+                included_tools=WORKER_ROLE_INCLUDED_TOOLS,
             )
         ]
     finally:

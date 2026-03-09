@@ -27,7 +27,7 @@ async def list_tools() -> dict:
 
     registry = build_tool_registry()
     tools = []
-    for tool in registry._tools.values():
+    for tool in registry.list_tools():
         tools.append(
             {
                 "name": tool.name,

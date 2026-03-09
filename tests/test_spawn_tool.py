@@ -31,7 +31,7 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
                 RoleConfig(
                     name="Worker",
                     system_prompt="...",
-                    required_tools=["read"],
+                    included_tools=["read"],
                     excluded_tools=["fetch"],
                 )
             ]
@@ -101,7 +101,7 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
                 RoleConfig(
                     name="Worker",
                     system_prompt="...",
-                    required_tools=["read"],
+                    included_tools=["read"],
                 )
             ]
         ),
@@ -149,7 +149,7 @@ def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
                 RoleConfig(
                     name="Worker",
                     system_prompt="...",
-                    required_tools=["exec"],
+                    included_tools=["exec"],
                     excluded_tools=["send", "connect"],
                 )
             ]

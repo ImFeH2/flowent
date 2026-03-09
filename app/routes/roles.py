@@ -19,26 +19,26 @@ router = APIRouter()
 class CreateRoleRequest(BaseModel):
     name: str
     system_prompt: str
-    required_tools: list[str] = Field(default_factory=list)
+    included_tools: list[str] = Field(default_factory=list)
     excluded_tools: list[str] = Field(default_factory=list)
 
 
 class UpdateRoleRequest(BaseModel):
     name: str | None = None
     system_prompt: str | None = None
-    required_tools: list[str] | None = None
+    included_tools: list[str] | None = None
     excluded_tools: list[str] | None = None
 
 
 def _resolve_role_tool_config(
     current: RoleConfig | None,
-    required_tools: list[str] | None,
+    included_tools: list[str] | None,
     excluded_tools: list[str] | None,
 ) -> tuple[list[str], list[str]]:
-    next_required = normalize_tool_names(
-        required_tools
-        if required_tools is not None
-        else current.required_tools
+    next_included = normalize_tool_names(
+        included_tools
+        if included_tools is not None
+        else current.included_tools
         if current
         else []
     )
@@ -50,10 +50,10 @@ def _resolve_role_tool_config(
         else []
     )
     try:
-        validate_role_tool_config(next_required, next_excluded)
+        validate_role_tool_config(next_included, next_excluded)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return next_required, next_excluded
+    return next_included, next_excluded
 
 
 @router.get("/api/roles")
@@ -70,16 +70,16 @@ async def create_role(req: CreateRoleRequest) -> dict:
         raise HTTPException(status_code=400, detail="Role name is required")
     if any(role.name == name for role in settings.roles):
         raise HTTPException(status_code=409, detail=f"Role '{name}' already exists")
-    required_tools, excluded_tools = _resolve_role_tool_config(
+    included_tools, excluded_tools = _resolve_role_tool_config(
         None,
-        req.required_tools,
+        req.included_tools,
         req.excluded_tools,
     )
 
     role = RoleConfig(
         name=name,
         system_prompt=req.system_prompt,
-        required_tools=required_tools,
+        included_tools=included_tools,
         excluded_tools=excluded_tools,
     )
     settings.roles.append(role)
@@ -92,9 +92,9 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
     settings = get_settings()
     for r in settings.roles:
         if r.name == role_name:
-            required_tools, excluded_tools = _resolve_role_tool_config(
+            included_tools, excluded_tools = _resolve_role_tool_config(
                 r,
-                req.required_tools,
+                req.included_tools,
                 req.excluded_tools,
             )
             if req.name is not None:
@@ -117,7 +117,7 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
                 r.name = next_name
             if req.system_prompt is not None:
                 r.system_prompt = req.system_prompt
-            r.required_tools = required_tools
+            r.included_tools = included_tools
             r.excluded_tools = excluded_tools
             save_settings(settings)
             return serialize_role(r)

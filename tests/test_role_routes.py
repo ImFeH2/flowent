@@ -20,12 +20,12 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             RoleConfig(
                 name="Worker",
                 system_prompt="Do work.",
-                required_tools=["read", "exec"],
+                included_tools=["read", "exec"],
             ),
             RoleConfig(
                 name="Reviewer",
                 system_prompt="Review code carefully",
-                required_tools=["read"],
+                included_tools=["read"],
                 excluded_tools=["fetch"],
             ),
         ]
@@ -40,14 +40,14 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             {
                 "name": "Worker",
                 "system_prompt": "Do work.",
-                "required_tools": ["read", "exec"],
+                "included_tools": ["read", "exec"],
                 "excluded_tools": [],
                 "is_builtin": True,
             },
             {
                 "name": "Reviewer",
                 "system_prompt": "Review code carefully",
-                "required_tools": ["read"],
+                "included_tools": ["read"],
                 "excluded_tools": ["fetch"],
                 "is_builtin": False,
             },
@@ -70,7 +70,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
             CreateRoleRequest(
                 name="Reviewer",
                 system_prompt="Review code carefully",
-                required_tools=["read"],
+                included_tools=["read"],
             )
         )
     )
@@ -78,7 +78,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
     assert result == {
         "name": "Reviewer",
         "system_prompt": "Review code carefully",
-        "required_tools": ["read"],
+        "included_tools": ["read"],
         "excluded_tools": [],
         "is_builtin": False,
     }
@@ -86,7 +86,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
         RoleConfig(
             name="Reviewer",
             system_prompt="Review code carefully",
-            required_tools=["read"],
+            included_tools=["read"],
         )
     ]
     assert saved == [["Reviewer"]]
@@ -116,7 +116,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
             RoleConfig(
                 name="Reviewer",
                 system_prompt="Review code carefully",
-                required_tools=["read"],
+                included_tools=["read"],
             )
         ]
     )
@@ -142,7 +142,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
     assert result == {
         "name": "Architect",
         "system_prompt": "Design systems",
-        "required_tools": ["read"],
+        "included_tools": ["read"],
         "excluded_tools": ["fetch"],
         "is_builtin": False,
     }
@@ -150,7 +150,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
         RoleConfig(
             name="Architect",
             system_prompt="Design systems",
-            required_tools=["read"],
+            included_tools=["read"],
             excluded_tools=["fetch"],
         )
     ]
@@ -222,7 +222,7 @@ def test_delete_role_rejects_builtin_role(monkeypatch):
     assert excinfo.value.detail == "Cannot delete built-in role 'Worker'"
 
 
-def test_create_role_rejects_overlapping_required_and_excluded_tools(monkeypatch):
+def test_create_role_rejects_overlapping_included_and_excluded_tools(monkeypatch):
     monkeypatch.setattr("app.routes.roles.get_settings", lambda: Settings())
 
     with pytest.raises(HTTPException) as excinfo:
@@ -231,7 +231,7 @@ def test_create_role_rejects_overlapping_required_and_excluded_tools(monkeypatch
                 CreateRoleRequest(
                     name="Reviewer",
                     system_prompt="Review code carefully",
-                    required_tools=["read"],
+                    included_tools=["read"],
                     excluded_tools=["read"],
                 )
             )
@@ -239,5 +239,5 @@ def test_create_role_rejects_overlapping_required_and_excluded_tools(monkeypatch
 
     assert excinfo.value.status_code == 400
     assert (
-        excinfo.value.detail == "required_tools and excluded_tools cannot overlap: read"
+        excinfo.value.detail == "included_tools and excluded_tools cannot overlap: read"
     )

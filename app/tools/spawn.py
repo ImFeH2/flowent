@@ -78,7 +78,7 @@ class SpawnTool(Tool):
         seen_tools: set[str] = set()
         excluded_tools = set(role_cfg.excluded_tools)
 
-        for tool_name in [*MINIMUM_TOOLS, *role_cfg.required_tools, *tools]:
+        for tool_name in [*MINIMUM_TOOLS, *role_cfg.included_tools, *tools]:
             if tool_name in seen_tools:
                 continue
             if tool_name in excluded_tools and tool_name not in MINIMUM_TOOLS:

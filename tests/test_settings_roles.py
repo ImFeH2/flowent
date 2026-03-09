@@ -1,7 +1,13 @@
 import json
 
 import app.settings as settings_module
-from app.settings import RoleConfig
+from app.settings import (
+    WORKER_ROLE_INCLUDED_TOOLS,
+    WORKER_ROLE_NAME,
+    WORKER_ROLE_SYSTEM_PROMPT,
+    RoleConfig,
+    Settings,
+)
 
 
 def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
@@ -17,6 +23,7 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
                         "id": "legacy-worker",
                         "name": "Worker",
                         "system_prompt": "Do work.",
+                        "required_tools": ["read"],
                     }
                 ],
             }
@@ -29,14 +36,20 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
 
     loaded = settings_module.load_settings()
 
-    assert loaded.roles == [RoleConfig(name="Worker", system_prompt="Do work.")]
+    assert loaded.roles == [
+        RoleConfig(
+            name="Worker",
+            system_prompt="Do work.",
+            included_tools=["read"],
+        )
+    ]
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
     assert persisted["roles"] == [
         {
             "name": "Worker",
             "system_prompt": "Do work.",
-            "required_tools": [],
+            "included_tools": ["read"],
             "excluded_tools": [],
         }
     ]
@@ -77,7 +90,7 @@ def test_load_settings_parses_role_tool_configuration(monkeypatch, tmp_path):
                     {
                         "name": "Reviewer",
                         "system_prompt": "Review carefully.",
-                        "required_tools": ["read", "exec"],
+                        "included_tools": ["read", "exec"],
                         "excluded_tools": ["fetch"],
                     }
                 ],
@@ -95,7 +108,32 @@ def test_load_settings_parses_role_tool_configuration(monkeypatch, tmp_path):
         RoleConfig(
             name="Reviewer",
             system_prompt="Review carefully.",
-            required_tools=["read", "exec"],
+            included_tools=["read", "exec"],
             excluded_tools=["fetch"],
+        )
+    ]
+
+
+def test_ensure_builtin_roles_repairs_worker_drift():
+    settings = Settings(
+        roles=[
+            RoleConfig(
+                name=WORKER_ROLE_NAME,
+                system_prompt="Outdated prompt.",
+                included_tools=[],
+                excluded_tools=["fetch"],
+            )
+        ]
+    )
+
+    changed = settings_module.ensure_builtin_roles(settings)
+
+    assert changed is True
+    assert settings.roles == [
+        RoleConfig(
+            name=WORKER_ROLE_NAME,
+            system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
+            included_tools=WORKER_ROLE_INCLUDED_TOOLS,
+            excluded_tools=[],
         )
     ]

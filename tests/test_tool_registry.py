@@ -10,9 +10,9 @@ def test_empty_tools_list_grants_minimum_tools():
 
     assert [tool.name for tool in tools] == [
         "send",
-        "list_connections",
-        "todo",
         "idle",
+        "todo",
+        "list_connections",
         "exit",
     ]
 
@@ -24,8 +24,8 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
 
     assert [tool.name for tool in tools] == [
         "send",
-        "list_connections",
-        "todo",
         "idle",
+        "todo",
+        "list_connections",
         "exit",
     ]

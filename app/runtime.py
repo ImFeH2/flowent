@@ -34,6 +34,7 @@ def bootstrap_runtime() -> None:
                 "spawn",
                 "connect",
                 "list_roles",
+                "list_tools",
             ],
         ),
         uuid="conductor",

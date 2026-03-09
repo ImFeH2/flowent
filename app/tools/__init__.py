@@ -46,9 +46,12 @@ class ToolRegistry:
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
+    def list_tools(self) -> list[Tool]:
+        return list(self._tools.values())
+
     def get_tools_for_agent(self, agent: Agent) -> list[Tool]:
         allowed = set(agent.config.tools) | set(MINIMUM_TOOLS)
-        return [t for t in self._tools.values() if t.name in allowed]
+        return [t for t in self.list_tools() if t.name in allowed]
 
     def get_tools_schema(self, agent: Agent) -> list[dict[str, Any]]:
         return [t.to_schema() for t in self.get_tools_for_agent(agent)]
@@ -63,6 +66,7 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.idle import IdleTool
     from app.tools.list_connections import ListConnectionsTool
     from app.tools.list_roles import ListRolesTool
+    from app.tools.list_tools import ListToolsTool
     from app.tools.read import ReadTool
     from app.tools.send import SendTool
     from app.tools.spawn import SpawnTool
@@ -70,18 +74,19 @@ def build_tool_registry() -> ToolRegistry:
 
     reg = ToolRegistry()
     for tool_cls in [
-        SpawnTool,
         SendTool,
-        ConnectTool,
+        IdleTool,
+        TodoTool,
         ListConnectionsTool,
-        ListRolesTool,
+        ExitTool,
         ReadTool,
         EditTool,
         ExecTool,
         FetchTool,
-        TodoTool,
-        IdleTool,
-        ExitTool,
+        SpawnTool,
+        ConnectTool,
+        ListRolesTool,
+        ListToolsTool,
     ]:
         reg.register(tool_cls())  # type: ignore[abstract]
     return reg

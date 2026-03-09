@@ -1,7 +1,12 @@
 import type { Role } from "@/types";
 import { requestJson, requestVoid } from "./shared";
 
-type RolePayload = Omit<Role, "is_builtin">;
+type RolePayload = {
+  name: string;
+  system_prompt: string;
+  included_tools: string[];
+  excluded_tools: string[];
+};
 
 export async function fetchRoles(): Promise<Role[]> {
   return requestJson<{ roles?: Role[] }, Role[]>("/api/roles", {

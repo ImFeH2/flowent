@@ -91,6 +91,7 @@ def serialize_role(role: RoleConfig) -> dict[str, object]:
         "system_prompt": role.system_prompt,
         "required_tools": list(role.required_tools),
         "excluded_tools": list(role.excluded_tools),
+        "is_builtin": is_builtin_role_name(role.name),
     }
 
 

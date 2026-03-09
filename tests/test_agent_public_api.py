@@ -138,12 +138,14 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             "system_prompt": "Do work.",
             "required_tools": ["read", "exec"],
             "excluded_tools": [],
+            "is_builtin": True,
         },
         {
             "name": "Reviewer",
             "system_prompt": "Review code.",
             "required_tools": [],
             "excluded_tools": ["fetch"],
+            "is_builtin": False,
         },
     ]
 

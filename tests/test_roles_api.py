@@ -69,6 +69,7 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
         "system_prompt": "investigate",
         "required_tools": [],
         "excluded_tools": [],
+        "is_builtin": False,
     }
 
     delete = client.delete("/api/roles/Researcher")

@@ -22,7 +22,7 @@ import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types";
 
-type RoleDraft = Role;
+type RoleDraft = Omit<Role, "is_builtin">;
 type ToolState = "allowed" | "required" | "excluded";
 
 const MINIMUM_TOOLS = new Set([
@@ -392,23 +392,32 @@ export function RolesPage() {
                     <BookOpen className="size-5 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="truncate font-semibold">{role.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate font-semibold">{role.name}</h3>
+                      {role.is_builtin && (
+                        <span className="shrink-0 text-[11px] font-medium tracking-[0.08em] text-muted-foreground/75">
+                          Built-in
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button
-                    onClick={() => handleEdit(role)}
-                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <Edit2 className="size-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(role.name)}
-                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </div>
+                {!role.is_builtin && (
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      onClick={() => handleEdit(role)}
+                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Edit2 className="size-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(role.name)}
+                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4">

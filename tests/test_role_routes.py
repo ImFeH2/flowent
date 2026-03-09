@@ -14,15 +14,20 @@ from app.routes.roles import (
 from app.settings import RoleConfig, Settings
 
 
-def test_list_roles_returns_name_and_system_prompt(monkeypatch):
+def test_list_roles_returns_is_builtin_flags(monkeypatch):
     settings = Settings(
         roles=[
+            RoleConfig(
+                name="Worker",
+                system_prompt="Do work.",
+                required_tools=["read", "exec"],
+            ),
             RoleConfig(
                 name="Reviewer",
                 system_prompt="Review code carefully",
                 required_tools=["read"],
                 excluded_tools=["fetch"],
-            )
+            ),
         ]
     )
 
@@ -33,11 +38,19 @@ def test_list_roles_returns_name_and_system_prompt(monkeypatch):
     assert result == {
         "roles": [
             {
+                "name": "Worker",
+                "system_prompt": "Do work.",
+                "required_tools": ["read", "exec"],
+                "excluded_tools": [],
+                "is_builtin": True,
+            },
+            {
                 "name": "Reviewer",
                 "system_prompt": "Review code carefully",
                 "required_tools": ["read"],
                 "excluded_tools": ["fetch"],
-            }
+                "is_builtin": False,
+            },
         ]
     }
 
@@ -67,6 +80,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
         "system_prompt": "Review code carefully",
         "required_tools": ["read"],
         "excluded_tools": [],
+        "is_builtin": False,
     }
     assert settings.roles == [
         RoleConfig(
@@ -130,6 +144,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
         "system_prompt": "Design systems",
         "required_tools": ["read"],
         "excluded_tools": ["fetch"],
+        "is_builtin": False,
     }
     assert settings.roles == [
         RoleConfig(

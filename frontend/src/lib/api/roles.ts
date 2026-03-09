@@ -1,6 +1,8 @@
 import type { Role } from "@/types";
 import { requestJson, requestVoid } from "./shared";
 
+type RolePayload = Omit<Role, "is_builtin">;
+
 export async function fetchRoles(): Promise<Role[]> {
   return requestJson<{ roles?: Role[] }, Role[]>("/api/roles", {
     errorMessage: "Failed to fetch roles",
@@ -9,7 +11,7 @@ export async function fetchRoles(): Promise<Role[]> {
   });
 }
 
-export async function createRole(role: Role): Promise<Role> {
+export async function createRole(role: RolePayload): Promise<Role> {
   return requestJson<Role>("/api/roles", {
     method: "POST",
     body: role,
@@ -19,7 +21,7 @@ export async function createRole(role: Role): Promise<Role> {
 
 export async function updateRole(
   name: string,
-  updates: Partial<Role>,
+  updates: Partial<RolePayload>,
 ): Promise<Role> {
   return requestJson<Role>(`/api/roles/${encodeURIComponent(name)}`, {
     method: "PUT",

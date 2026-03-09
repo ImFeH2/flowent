@@ -94,6 +94,7 @@ export interface Role {
   system_prompt: string;
   required_tools: string[];
   excluded_tools: string[];
+  is_builtin: boolean;
 }
 
 export interface Provider {

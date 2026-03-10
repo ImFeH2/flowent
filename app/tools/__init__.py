@@ -23,7 +23,9 @@ class Tool(ABC):
     parameters: ClassVar[dict[str, Any]]
 
     @abstractmethod
-    def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str: ...
+    def execute(
+        self, agent: Agent, args: dict[str, Any], **kwargs: Any
+    ) -> str | None: ...
 
     def to_schema(self) -> dict[str, Any]:
         return {

@@ -2,7 +2,7 @@ import json
 import threading
 
 from app.agent import Agent
-from app.models import Message, NodeConfig, NodeType, TodoItem
+from app.models import Message, NodeConfig, NodeType, ReceivedMessage, TodoItem
 from app.registry import registry
 from app.settings import RoleConfig, Settings
 from app.tools.idle import IdleTool
@@ -19,32 +19,21 @@ def test_idle_tool_uses_request_idle(monkeypatch):
     monkeypatch.setattr(
         agent,
         "request_idle",
-        lambda: (
-            called.append("idle")
-            or json.dumps(
-                {
-                    "reason": "message",
-                    "message": {"from": "tester", "content": "hello"},
-                }
-            )
-        ),
+        lambda: called.append("idle") or None,
     )
 
-    result = json.loads(IdleTool().execute(agent, {}))
+    result = IdleTool().execute(agent, {})
 
-    assert result == {
-        "reason": "message",
-        "message": {"from": "tester", "content": "hello"},
-    }
+    assert result is None
     assert called == ["idle"]
 
 
-def test_idle_tool_blocks_until_message_and_returns_tool_payload():
+def test_idle_tool_blocks_until_message_and_returns_no_result():
     agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle"]), uuid="agent-a")
-    result: list[dict[str, object]] = []
+    result: list[None] = []
 
     thread = threading.Thread(
-        target=lambda: result.append(json.loads(IdleTool().execute(agent, {}))),
+        target=lambda: result.append(IdleTool().execute(agent, {})),
         daemon=True,
     )
     thread.start()
@@ -55,12 +44,10 @@ def test_idle_tool_blocks_until_message_and_returns_tool_payload():
     thread.join(timeout=1.0)
 
     assert not thread.is_alive()
-    assert result == [
-        {
-            "reason": "message",
-            "message": {"from": "tester", "content": "hello from queue"},
-        }
-    ]
+    assert result == [None]
+    assert isinstance(agent.history[-1], ReceivedMessage)
+    assert agent.history[-1].from_id == "tester"
+    assert agent.history[-1].content == "hello from queue"
 
 
 def test_list_connections_tool_uses_agent_public_api(monkeypatch):

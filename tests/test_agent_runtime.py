@@ -191,7 +191,7 @@ def test_steward_content_streams_even_when_response_has_tool_calls(monkeypatch):
     assert [event.data for event in steward_events] == [{"content": "Working on it"}]
 
 
-def test_idle_tool_returns_message_as_tool_result_in_current_round(monkeypatch):
+def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle", "exit"]))
     wait_calls = 0
     llm_messages: list[list[dict]] = []
@@ -250,18 +250,12 @@ def test_idle_tool_returns_message_as_tool_result_in_current_round(monkeypatch):
     assert wait_calls == 1
     assert agent.state == AgentState.TERMINATED
     second_round = llm_messages[1]
-    assert any(
+    assert not any(
         msg.get("role") == "tool"
-        and msg.get("content")
-        == json.dumps(
-            {
-                "reason": "message",
-                "message": {"from": "human", "content": "wake up now"},
-            }
-        )
+        or (msg.get("role") == "assistant" and msg.get("tool_calls"))
         for msg in second_round
     )
-    assert not any(
+    assert any(
         msg.get("role") == "user"
         and msg.get("content")
         == json.dumps({"from": "human", "content": "wake up now"})

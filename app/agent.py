@@ -109,15 +109,10 @@ class Agent:
         with self._todos_lock:
             self.todos = [TodoItem(text=t.text) for t in todos]
 
-    def request_idle(self) -> str:
+    def request_idle(self) -> None:
         self.set_state(AgentState.IDLE)
         signal = self._wait_for_wakeup()
-        if signal.reason != "termination":
-            self.set_state(
-                AgentState.RUNNING,
-                signal.resume_reason or f"woke due to {signal.reason}",
-            )
-        return json.dumps(signal.payload)
+        self._resume_from_wakeup(signal)
 
     def get_connections_info(self) -> list[dict[str, Any]]:
         from app.registry import registry
@@ -385,6 +380,9 @@ class Agent:
                 if entry.streaming:
                     continue
 
+                if entry.tool_name == "idle" and entry.result is None:
+                    continue
+
                 pending_tool_calls.append(
                     {
                         "id": entry.tool_call_id,
@@ -451,20 +449,24 @@ class Agent:
 
     def _wait_for_input(self) -> None:
         signal = self._wait_for_wakeup()
-        if signal.reason != "message":
-            return
+        self._resume_from_wakeup(signal)
 
-        message = signal.payload["message"]
-        self._append_history(
-            ReceivedMessage(
-                content=message["content"],
-                from_id=message["from"],
-            ),
-        )
-        self.set_state(
-            AgentState.RUNNING,
-            signal.resume_reason,
-        )
+    def _resume_from_wakeup(self, signal: WakeSignal) -> None:
+        if signal.reason == "message":
+            message = signal.payload.get("message")
+            if isinstance(message, dict):
+                content = message.get("content")
+                from_id = message.get("from")
+                if isinstance(content, str) and isinstance(from_id, str):
+                    self._append_history(
+                        ReceivedMessage(content=content, from_id=from_id)
+                    )
+
+        if signal.reason != "termination":
+            self.set_state(
+                AgentState.RUNNING,
+                signal.resume_reason or f"woke due to {signal.reason}",
+            )
 
     def _wait_for_wakeup(self) -> WakeSignal:
         pending_message = self._consume_pending_message()
@@ -516,7 +518,7 @@ class Agent:
         name: str,
         arguments: dict[str, Any],
         call_id: str,
-    ) -> str:
+    ) -> str | None:
         self._log.debug(
             "Tool call: name={}, call_id={}, args={}",
             name,
@@ -590,7 +592,7 @@ class Agent:
         call_id: str,
         name: str,
         arguments: dict[str, Any],
-        result: str,
+        result: str | None,
     ) -> None:
         final: ToolCall | None = None
         with self._history_lock:

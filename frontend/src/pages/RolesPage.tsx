@@ -4,6 +4,7 @@ import {
   BookOpen,
   Check,
   Edit2,
+  Eye,
   Plus,
   RefreshCw,
   Trash2,
@@ -24,6 +25,7 @@ import type { Role } from "@/types";
 
 type RoleDraft = Omit<Role, "is_builtin">;
 type ToolState = "allowed" | "included" | "excluded";
+type PanelMode = "create" | "edit" | "view";
 
 const MINIMUM_TOOLS = new Set([
   "send",
@@ -44,8 +46,8 @@ export function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingName, setEditingName] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [panelMode, setPanelMode] = useState<PanelMode | null>(null);
+  const [activeRoleName, setActiveRoleName] = useState<string | null>(null);
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
 
@@ -75,14 +77,25 @@ export function RolesPage() {
   }, []);
 
   const handleCreate = () => {
-    setIsCreating(true);
-    setEditingName(null);
+    setPanelMode("create");
+    setActiveRoleName(null);
     setDraft(emptyDraft());
   };
 
+  const handleView = (role: Role) => {
+    setPanelMode("view");
+    setActiveRoleName(role.name);
+    setDraft({
+      name: role.name,
+      system_prompt: role.system_prompt,
+      included_tools: [...role.included_tools],
+      excluded_tools: [...role.excluded_tools],
+    });
+  };
+
   const handleEdit = (role: Role) => {
-    setEditingName(role.name);
-    setIsCreating(false);
+    setPanelMode("edit");
+    setActiveRoleName(role.name);
     setDraft({
       name: role.name,
       system_prompt: role.system_prompt,
@@ -92,8 +105,8 @@ export function RolesPage() {
   };
 
   const handleCancel = () => {
-    setIsCreating(false);
-    setEditingName(null);
+    setPanelMode(null);
+    setActiveRoleName(null);
     setDraft(emptyDraft());
   };
 
@@ -110,7 +123,7 @@ export function RolesPage() {
     }
 
     const nameExists = roles.some(
-      (role) => role.name === nextName && role.name !== editingName,
+      (role) => role.name === nextName && role.name !== activeRoleName,
     );
     if (nameExists) {
       toast.error("Role name already exists");
@@ -126,10 +139,10 @@ export function RolesPage() {
         excluded_tools: draft.excluded_tools,
       };
 
-      if (editingName) {
-        const updated = await updateRole(editingName, nextDraft);
+      if (panelMode === "edit" && activeRoleName) {
+        const updated = await updateRole(activeRoleName, nextDraft);
         setRoles((prev) =>
-          prev.map((role) => (role.name === editingName ? updated : role)),
+          prev.map((role) => (role.name === activeRoleName ? updated : role)),
         );
         toast.success("Role updated");
       } else {
@@ -152,7 +165,7 @@ export function RolesPage() {
     try {
       await deleteRole(name);
       setRoles((prev) => prev.filter((role) => role.name !== name));
-      if (editingName === name) handleCancel();
+      if (activeRoleName === name) handleCancel();
       toast.success("Role deleted");
     } catch (error) {
       toast.error(
@@ -161,7 +174,11 @@ export function RolesPage() {
     }
   };
 
-  const isEditing = Boolean(isCreating || editingName);
+  const isPanelOpen = panelMode !== null;
+  const isReadOnly = panelMode === "view";
+  const activeRole = activeRoleName
+    ? (roles.find((role) => role.name === activeRoleName) ?? null)
+    : null;
 
   const getToolState = (toolName: string): ToolState => {
     if (draft.included_tools.includes(toolName)) return "included";
@@ -209,7 +226,7 @@ export function RolesPage() {
     });
   };
 
-  if (loading && !isEditing) {
+  if (loading && !isPanelOpen) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
@@ -235,7 +252,7 @@ export function RolesPage() {
           </button>
           <button
             onClick={handleCreate}
-            disabled={isEditing}
+            disabled={isPanelOpen}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
           >
             <Plus className="size-4" />
@@ -244,116 +261,152 @@ export function RolesPage() {
         </div>
       }
     >
-      {isEditing ? (
-        <div className="mx-auto max-w-3xl">
-          <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">
-                {editingName ? "Edit Role" : "Create Role"}
-              </h2>
-              <button
-                onClick={handleCancel}
-                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Role Name</label>
-                <input
-                  type="text"
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  placeholder="e.g., Code Reviewer"
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
+      {isPanelOpen ? (
+        <div className="h-full min-h-0 overflow-y-auto pr-2">
+          <div className="mx-auto max-w-3xl pb-6">
+            <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold">
+                  {panelMode === "create"
+                    ? "Create Role"
+                    : panelMode === "edit"
+                      ? "Edit Role"
+                      : "Role Details"}
+                </h2>
+                <div className="flex items-center gap-2">
+                  {activeRole?.is_builtin && (
+                    <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+                      Built-in
+                    </span>
+                  )}
+                  <button
+                    onClick={handleCancel}
+                    className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">System Prompt</label>
-                <textarea
-                  value={draft.system_prompt}
-                  onChange={(e) =>
-                    setDraft({ ...draft, system_prompt: e.target.value })
-                  }
-                  placeholder="You are a helpful assistant that..."
-                  rows={12}
-                  className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <p className="text-xs text-muted-foreground">
-                  This prompt defines how agents with this role will behave.
-                </p>
-              </div>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Role Name</label>
+                  <input
+                    type="text"
+                    value={draft.name}
+                    onChange={(e) =>
+                      setDraft({ ...draft, name: e.target.value })
+                    }
+                    readOnly={isReadOnly}
+                    placeholder="e.g., Code Reviewer"
+                    className={cn(
+                      "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
+                      isReadOnly
+                        ? "cursor-default text-muted-foreground focus:outline-none"
+                        : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                    )}
+                  />
+                </div>
 
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-medium">Tool Configuration</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Minimum tools are injected by the framework. Configure the
-                    remaining tools as Allowed, Included, or Excluded.
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">System Prompt</label>
+                  <textarea
+                    value={draft.system_prompt}
+                    onChange={(e) =>
+                      setDraft({ ...draft, system_prompt: e.target.value })
+                    }
+                    readOnly={isReadOnly}
+                    placeholder="You are a helpful assistant that..."
+                    rows={12}
+                    className={cn(
+                      "w-full resize-y rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
+                      isReadOnly
+                        ? "cursor-default text-muted-foreground focus:outline-none"
+                        : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                    )}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {isReadOnly
+                      ? activeRole?.is_builtin
+                        ? "This built-in role can be inspected but not modified."
+                        : "This role is in read-only view. Use Edit to modify it."
+                      : "This prompt defines how agents with this role will behave."}
                   </p>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border border-border bg-background">
-                  {configurableTools.map((tool) => {
-                    const state = getToolState(tool.name);
-                    return (
-                      <div
-                        key={tool.name}
-                        className="flex items-center justify-between gap-4 border-b border-border/70 px-4 py-3 last:border-b-0"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-mono text-sm">{tool.name}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {tool.description}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => cycleToolState(tool.name)}
-                          className={cn(
-                            "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                            state === "included" &&
-                              "border-emerald-500/40 bg-emerald-500/10 text-emerald-600",
-                            state === "excluded" &&
-                              "border-red-500/40 bg-red-500/10 text-red-600",
-                            state === "allowed" &&
-                              "border-border bg-card text-muted-foreground",
-                          )}
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-medium">Tool Configuration</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Minimum tools are injected by the framework. Configure the
+                      remaining tools as Allowed, Included, or Excluded.
+                    </p>
+                  </div>
+
+                  <div className="overflow-hidden rounded-xl border border-border bg-background">
+                    {configurableTools.map((tool) => {
+                      const state = getToolState(tool.name);
+                      return (
+                        <div
+                          key={tool.name}
+                          className="flex items-center justify-between gap-4 border-b border-border/70 px-4 py-3 last:border-b-0"
                         >
-                          {state === "allowed"
-                            ? "Allowed"
-                            : state === "included"
-                              ? "Included"
-                              : "Excluded"}
-                        </button>
-                      </div>
-                    );
-                  })}
+                          <div className="min-w-0">
+                            <p className="font-mono text-sm">{tool.name}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {tool.description}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => cycleToolState(tool.name)}
+                            disabled={isReadOnly}
+                            className={cn(
+                              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                              state === "included" &&
+                                "border-emerald-500/40 bg-emerald-500/10 text-emerald-600",
+                              state === "excluded" &&
+                                "border-red-500/40 bg-red-500/10 text-red-600",
+                              state === "allowed" &&
+                                "border-border bg-card text-muted-foreground",
+                              isReadOnly &&
+                                "cursor-default opacity-90 hover:bg-inherit",
+                            )}
+                          >
+                            {state === "allowed"
+                              ? "Allowed"
+                              : state === "included"
+                                ? "Included"
+                                : "Excluded"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4">
+                  <button
+                    onClick={handleCancel}
+                    disabled={saving}
+                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
+                  >
+                    {isReadOnly ? "Close" : "Cancel"}
+                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => void handleSave()}
+                      disabled={saving}
+                      className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      <Check className="size-4" />
+                      {saving ? "Saving..." : "Save Role"}
+                    </button>
+                  )}
                 </div>
               </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4">
-                <button
-                  onClick={handleCancel}
-                  disabled={saving}
-                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => void handleSave()}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
-                >
-                  <Check className="size-4" />
-                  {saving ? "Saving..." : "Save Role"}
-                </button>
-              </div>
-            </div>
-          </SoftPanel>
+            </SoftPanel>
+          </div>
         </div>
       ) : roles.length === 0 ? (
         <motion.div
@@ -402,22 +455,36 @@ export function RolesPage() {
                     </div>
                   </div>
                 </div>
-                {!role.is_builtin && (
-                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      onClick={() => handleEdit(role)}
-                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                    >
-                      <Edit2 className="size-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(role.name)}
-                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    onClick={() => handleView(role)}
+                    aria-label={`View ${role.name}`}
+                    title={`View ${role.name}`}
+                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <Eye className="size-3.5" />
+                  </button>
+                  {!role.is_builtin && (
+                    <>
+                      <button
+                        onClick={() => handleEdit(role)}
+                        aria-label={`Edit ${role.name}`}
+                        title={`Edit ${role.name}`}
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <Edit2 className="size-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(role.name)}
+                        aria-label={`Delete ${role.name}`}
+                        title={`Delete ${role.name}`}
+                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4">

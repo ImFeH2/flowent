@@ -1,15 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from app.routes.nodes import router as nodes_router
-
-
-@pytest.fixture
-def client():
-    from app.main import app
-
-    with TestClient(app) as client:
-        yield client
 
 
 def test_health_check(client: TestClient):

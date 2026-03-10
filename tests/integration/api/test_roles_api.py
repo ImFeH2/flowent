@@ -1,15 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from app.settings import RoleConfig, Settings
-
-
-@pytest.fixture
-def client():
-    from app.main import app
-
-    with TestClient(app) as client:
-        yield client
 
 
 def test_create_role_rejects_duplicate_name(client: TestClient, monkeypatch):

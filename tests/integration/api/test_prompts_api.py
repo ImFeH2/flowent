@@ -1,15 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
 
 from app.settings import Settings
-
-
-@pytest.fixture
-def client():
-    from app.main import app
-
-    with TestClient(app) as client:
-        yield client
 
 
 def test_prompts_api_reads_and_updates_custom_prompt(

@@ -58,7 +58,7 @@ export function AgentGraph() {
     null,
   );
   const tooltipRef = useRef<HTMLDivElement | null>(null);
-  const didInitViewport = useRef(false);
+  const lastViewportStructureKey = useRef<string | null>(null);
   const [tooltipSize, setTooltipSize] = useState<{
     width: number;
     height: number;
@@ -83,12 +83,14 @@ export function AgentGraph() {
     return map;
   }, [activeMessages]);
 
-  const { nodes, edges } = useMemo(() => {
+  const { nodes, edges, structureKey } = useMemo(() => {
     const rawNodes: Node[] = [];
     const edgeSet = new Set<string>();
     const rawEdges: Edge[] = [];
+    const nodeIds: string[] = [];
 
     for (const [id, agent] of agents) {
+      nodeIds.push(id);
       rawNodes.push({
         id,
         type: "agent",
@@ -128,11 +130,16 @@ export function AgentGraph() {
       }
     }
 
+    const structureKey = `${nodeIds.sort().join("|")}::${Array.from(edgeSet)
+      .sort()
+      .join("|")}`;
+
     if (rawNodes.length === 0) {
-      return { nodes: [], edges: [] };
+      return { nodes: [], edges: [], structureKey };
     }
 
-    return getLayoutedElements(rawNodes, rawEdges);
+    const { nodes, edges } = getLayoutedElements(rawNodes, rawEdges);
+    return { nodes, edges, structureKey };
   }, [agents, selectedAgentId, activeToolCalls, activeEdgeMessages]);
 
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -253,44 +260,22 @@ export function AgentGraph() {
 
   useEffect(() => {
     if (!flowInstance || nodes.length === 0) return;
-    if (didInitViewport.current) return;
-    didInitViewport.current = true;
-
-    const stewardNode = nodes.find((node) => {
-      const data = node.data as Record<string, unknown> | undefined;
-      return data?.node_type === "steward";
-    });
+    if (lastViewportStructureKey.current === structureKey) return;
+    const isInitialViewport = lastViewportStructureKey.current === null;
+    lastViewportStructureKey.current = structureKey;
 
     const raf = requestAnimationFrame(() => {
-      const applyViewport = async () => {
-        await flowInstance
-          .fitView({ padding: 0.3, maxZoom: 0.75, duration: 0 })
-          .catch(() => false);
-
-        const zoom = Math.min(flowInstance.getZoom(), 0.75);
-
-        if (!stewardNode) return;
-
-        const internal = flowInstance.getInternalNode(stewardNode.id);
-        const position =
-          internal?.internals.positionAbsolute ?? stewardNode.position;
-        const width = internal?.measured.width ?? 210;
-        const height = internal?.measured.height ?? 60;
-        flowInstance.setCenter(
-          position.x + width / 2,
-          position.y + height / 2,
-          {
-            zoom,
-            duration: 0,
-          },
-        );
-      };
-
-      void applyViewport();
+      void flowInstance
+        .fitView({
+          padding: 0.3,
+          maxZoom: 0.75,
+          duration: isInitialViewport ? 0 : 250,
+        })
+        .catch(() => false);
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [flowInstance, nodes]);
+  }, [flowInstance, nodes.length, structureKey]);
 
   const tooltipStyle = useMemo(() => {
     if (!tooltip || typeof window === "undefined") return undefined;

@@ -9,7 +9,7 @@ SYSTEM_NODE_TIMEOUT = 5.0
 
 
 def bootstrap_runtime() -> None:
-    from app.agent import Agent
+    from app.agent import Agent, _get_tool_registry
     from app.models import Event, EventType, NodeConfig, NodeType
     from app.settings import ensure_builtin_roles, get_settings, save_settings
 
@@ -17,6 +17,7 @@ def bootstrap_runtime() -> None:
     if ensure_builtin_roles(settings):
         save_settings(settings)
     root_boundary = settings.root_boundary
+    conductor_tools = [tool.name for tool in _get_tool_registry().list_tools()]
 
     steward = Agent(
         NodeConfig(
@@ -33,12 +34,7 @@ def bootstrap_runtime() -> None:
     conductor = Agent(
         NodeConfig(
             node_type=NodeType.CONDUCTOR,
-            tools=[
-                "spawn",
-                "connect",
-                "list_roles",
-                "list_tools",
-            ],
+            tools=conductor_tools,
             write_dirs=list(root_boundary.write_dirs),
             allow_network=root_boundary.allow_network,
         ),

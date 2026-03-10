@@ -1,7 +1,7 @@
 import json
 
 import app.settings as settings_module
-from app.agent import Agent
+from app.agent import Agent, _get_tool_registry
 from app.registry import registry
 from app.runtime import bootstrap_runtime
 from app.settings import (
@@ -12,7 +12,7 @@ from app.settings import (
 )
 
 
-def test_bootstrap_runtime_adds_list_roles_and_list_tools_to_conductor(monkeypatch):
+def test_bootstrap_runtime_assigns_all_registered_tools_to_conductor(monkeypatch):
     registry.reset()
     monkeypatch.setattr(Agent, "start", lambda self: None)
 
@@ -22,8 +22,9 @@ def test_bootstrap_runtime_adds_list_roles_and_list_tools_to_conductor(monkeypat
         conductor = registry.get("conductor")
 
         assert conductor is not None
-        assert "list_roles" in conductor.config.tools
-        assert "list_tools" in conductor.config.tools
+        assert conductor.config.tools == [
+            tool.name for tool in _get_tool_registry().list_tools()
+        ]
     finally:
         registry.reset()
 

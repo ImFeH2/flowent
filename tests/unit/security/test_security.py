@@ -1,0 +1,85 @@
+from app.agent import Agent
+from app.models import NodeConfig, NodeType
+from app.security import authorize
+
+
+def test_authorize_allows_edit_within_write_dirs(tmp_path):
+    target = tmp_path / "allowed.txt"
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            tools=["edit"],
+            write_dirs=[str(tmp_path)],
+        )
+    )
+
+    result = authorize("edit", agent, {"path": str(target)})
+
+    assert result is None
+
+
+def test_authorize_rejects_edit_when_write_dirs_empty(tmp_path):
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            tools=["edit"],
+            write_dirs=[],
+        )
+    )
+
+    result = authorize("edit", agent, {"path": str(tmp_path / "blocked.txt")})
+
+    assert result == "Write access is disabled for this agent"
+
+
+def test_authorize_rejects_edit_outside_write_dirs(tmp_path):
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    blocked = tmp_path / "blocked.txt"
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            tools=["edit"],
+            write_dirs=[str(allowed)],
+        )
+    )
+
+    result = authorize("edit", agent, {"path": str(blocked)})
+
+    assert result == f"Path not in write_dirs: {blocked}"
+
+
+def test_authorize_allows_fetch_when_network_enabled():
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            tools=["fetch"],
+            allow_network=True,
+        )
+    )
+
+    result = authorize("fetch", agent, {"url": "https://example.com"})
+
+    assert result is None
+
+
+def test_authorize_rejects_fetch_when_network_disabled():
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            tools=["fetch"],
+            allow_network=False,
+        )
+    )
+
+    result = authorize("fetch", agent, {"url": "https://example.com"})
+
+    assert result == "Network access is disabled for this agent"
+
+
+def test_authorize_allows_other_tools_by_default():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["exec"]))
+
+    result = authorize("exec", agent, {"command": "pwd"})
+
+    assert result is None

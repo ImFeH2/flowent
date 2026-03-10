@@ -15,6 +15,7 @@ from app.models import (
     NodeConfig,
     NodeType,
     ReceivedMessage,
+    ToolCall,
     ToolCallResult,
 )
 from app.registry import registry
@@ -297,3 +298,34 @@ def test_agent_contextualizes_plain_loguru_calls(monkeypatch):
         logger.remove(sink_id)
 
     assert ("plain log inside agent", "agent-z") in captured
+
+
+def test_agent_denies_tool_call_before_edit_execute(monkeypatch, tmp_path):
+    agent = Agent(
+        NodeConfig(node_type=NodeType.AGENT, tools=["edit"]),
+        uuid="agent-security",
+    )
+
+    def fail_execute(*_args, **_kwargs):
+        raise AssertionError("edit execute should not be called")
+
+    monkeypatch.setattr("app.tools.edit.EditTool.execute", fail_execute)
+
+    result = agent._handle_tool_call(
+        "edit",
+        {
+            "path": str(tmp_path / "blocked.txt"),
+            "edits": [
+                {
+                    "start_line": 1,
+                    "end_line": 1,
+                    "new_content": "hello\n",
+                }
+            ],
+        },
+        "call-edit",
+    )
+
+    assert result == json.dumps({"error": "Write access is disabled for this agent"})
+    assert isinstance(agent.history[-1], ToolCall)
+    assert agent.history[-1].result == result

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
 
 
@@ -9,22 +8,27 @@ def is_path_writable(path: str | Path, write_dirs: list[str]) -> bool:
     return any(p.is_relative_to(Path(d).resolve()) for d in write_dirs)
 
 
-def build_firejail_cmd(
+def build_bwrap_cmd(
     write_dirs: list[str],
     command: str,
-    timeout_secs: int = 30,
+    *,
+    allow_network: bool = False,
 ) -> list[str]:
-    timeout_formatted = time.strftime("%H:%M:%S", time.gmtime(timeout_secs))
     cmd = [
-        "firejail",
-        "--noprofile",
-        "--quiet",
-        "--seccomp",
-        "--read-only=/",
+        "bwrap",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--tmpfs",
+        "/tmp",
     ]
-    if write_dirs:
-        for d in write_dirs:
-            cmd.append(f"--read-write={d}")
-        cmd.append("--read-write=/tmp")
-    cmd.extend([f"--timeout={timeout_formatted}", "bash", "-c", command])
+    for d in write_dirs:
+        cmd.extend(["--bind", d, d])
+    if not allow_network:
+        cmd.append("--unshare-net")
+    cmd.extend(["--die-with-parent", "--new-session", "--", "bash", "-c", command])
     return cmd

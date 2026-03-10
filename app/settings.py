@@ -50,10 +50,17 @@ class ModelSettings:
 
 
 @dataclass
+class RootBoundary:
+    write_dirs: list[str] = field(default_factory=list)
+    allow_network: bool = False
+
+
+@dataclass
 class Settings:
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
     model: ModelSettings = field(default_factory=ModelSettings)
     custom_prompt: str = ""
+    root_boundary: RootBoundary = field(default_factory=RootBoundary)
     providers: list[ProviderConfig] = field(default_factory=list)
     roles: list[RoleConfig] = field(default_factory=list)
 
@@ -111,6 +118,22 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         active_model=str(model_data.get("active_model", "")),
     )
     custom_prompt = str(data.get("custom_prompt", ""))
+
+    root_boundary_data = data.get("root_boundary", {})
+    if not isinstance(root_boundary_data, dict):
+        root_boundary_data = {}
+    root_boundary = RootBoundary(
+        write_dirs=[
+            path
+            for path in root_boundary_data.get("write_dirs", [])
+            if isinstance(path, str)
+        ]
+        if isinstance(root_boundary_data.get("write_dirs", []), list)
+        else [],
+        allow_network=root_boundary_data.get("allow_network", False)
+        if isinstance(root_boundary_data.get("allow_network", False), bool)
+        else False,
+    )
 
     providers_raw = data.get("providers", [])
     if not isinstance(providers_raw, list):
@@ -170,6 +193,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
             event_log=event_log,
             model=model_settings,
             custom_prompt=custom_prompt,
+            root_boundary=root_boundary,
             providers=providers,
             roles=roles,
         ),

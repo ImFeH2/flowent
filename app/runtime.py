@@ -16,11 +16,14 @@ def bootstrap_runtime() -> None:
     settings = get_settings()
     if ensure_builtin_roles(settings):
         save_settings(settings)
+    root_boundary = settings.root_boundary
 
     steward = Agent(
         NodeConfig(
             node_type=NodeType.STEWARD,
             tools=[],
+            write_dirs=list(root_boundary.write_dirs),
+            allow_network=root_boundary.allow_network,
         ),
         uuid="steward",
     )
@@ -36,6 +39,8 @@ def bootstrap_runtime() -> None:
                 "list_roles",
                 "list_tools",
             ],
+            write_dirs=list(root_boundary.write_dirs),
+            allow_network=root_boundary.allow_network,
         ),
         uuid="conductor",
     )

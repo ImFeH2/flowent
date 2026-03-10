@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import is_path_writable
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -59,12 +58,6 @@ class EditTool(Tool):
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         path_str = args["path"]
         real_path = Path(path_str)
-
-        write_dirs = agent.config.write_dirs
-        if not write_dirs:
-            return json.dumps({"error": "Write access is disabled for this agent"})
-        if not is_path_writable(real_path, write_dirs):
-            return json.dumps({"error": f"Path not in write_dirs: {path_str}"})
 
         try:
             edits = args["edits"]

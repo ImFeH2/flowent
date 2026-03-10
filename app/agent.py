@@ -35,6 +35,7 @@ from app.models import (
 )
 from app.prompts import get_system_prompt
 from app.providers.gateway import gateway
+from app.security import authorize
 
 
 @lru_cache(maxsize=1)
@@ -530,6 +531,25 @@ class Agent:
         if tool is None:
             self._log.warning("Unknown tool: {}", name)
             error_msg = json.dumps({"error": f"Unknown tool: {name}"})
+            self._append_history(
+                ToolCall(
+                    tool_name=name,
+                    tool_call_id=call_id,
+                    arguments=arguments,
+                    result=error_msg,
+                    streaming=False,
+                ),
+            )
+            return error_msg
+
+        authorization_error = authorize(name, self, arguments)
+        if authorization_error is not None:
+            self._log.warning(
+                "Tool denied by security policy: {} ({})",
+                name,
+                authorization_error,
+            )
+            error_msg = json.dumps({"error": authorization_error})
             self._append_history(
                 ToolCall(
                     tool_name=name,

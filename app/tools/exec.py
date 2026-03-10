@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import platform
 import subprocess
 import threading
 from collections.abc import Callable
@@ -10,18 +8,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.sandbox import build_firejail_cmd
+from app.sandbox import build_bwrap_cmd
 from app.tools import Tool
 
 if TYPE_CHECKING:
     from app.agent import Agent
-
-
-def is_wsl() -> bool:
-    if "wsl" in platform.system().lower():
-        return True
-    wsl_env_vars = ["WSL_INTEROP", "WSL_DISTRO_NAME", "WSLENV"]
-    return any(var in os.environ for var in wsl_env_vars)
 
 
 class ExecTool(Tool):
@@ -49,21 +40,20 @@ class ExecTool(Tool):
         timeout = int(args.get("timeout", 30))
         write_dirs = agent.config.write_dirs
 
-        firejail_cmd = build_firejail_cmd(write_dirs, command, timeout_secs=timeout)
+        bwrap_cmd = build_bwrap_cmd(
+            write_dirs,
+            command,
+            allow_network=agent.config.allow_network,
+        )
 
         logger.debug("Executing command: {} (timeout={}s)", command, timeout)
 
-        env = os.environ.copy()
-        if is_wsl():
-            env["container"] = "lxc"
-
         try:
             proc = subprocess.Popen(
-                firejail_cmd,
+                bwrap_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                env=env,
             )
 
             stdout_lines: list[str] = []

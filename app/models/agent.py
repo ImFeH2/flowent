@@ -25,3 +25,4 @@ class NodeConfig:
     name: str | None = None
     tools: list[str] = field(default_factory=list)
     write_dirs: list[str] = field(default_factory=list)
+    allow_network: bool = False

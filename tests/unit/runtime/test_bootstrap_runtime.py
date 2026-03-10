@@ -104,3 +104,42 @@ def test_bootstrap_runtime_reconciles_existing_worker_role(monkeypatch, tmp_path
         ]
     finally:
         registry.reset()
+
+
+def test_bootstrap_runtime_inherits_root_boundary(monkeypatch, tmp_path):
+    registry.reset()
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "root_boundary": {
+                    "write_dirs": [str(tmp_path / "workspace")],
+                    "allow_network": True,
+                },
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        steward = registry.get("steward")
+        conductor = registry.get("conductor")
+
+        assert steward is not None
+        assert conductor is not None
+        assert steward.config.write_dirs == [str(tmp_path / "workspace")]
+        assert steward.config.allow_network is True
+        assert conductor.config.write_dirs == [str(tmp_path / "workspace")]
+        assert conductor.config.allow_network is True
+    finally:
+        registry.reset()

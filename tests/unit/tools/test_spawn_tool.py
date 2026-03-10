@@ -19,7 +19,10 @@ def reset_registry():
 
 def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
     parent = Agent(
-        NodeConfig(node_type=NodeType.CONDUCTOR, tools=["spawn", "send"]),
+        NodeConfig(
+            node_type=NodeType.CONDUCTOR,
+            tools=["spawn", "send", "read", "edit"],
+        ),
         uuid="parent",
     )
     registry.register(parent)
@@ -89,7 +92,10 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
     task_prompt: str | None,
 ):
     parent = Agent(
-        NodeConfig(node_type=NodeType.CONDUCTOR, tools=["spawn", "send"]),
+        NodeConfig(
+            node_type=NodeType.CONDUCTOR,
+            tools=["spawn", "send", "read"],
+        ),
         uuid="parent",
     )
     registry.register(parent)
@@ -137,7 +143,10 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
 
 def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
     parent = Agent(
-        NodeConfig(node_type=NodeType.CONDUCTOR, tools=["spawn", "send"]),
+        NodeConfig(
+            node_type=NodeType.CONDUCTOR,
+            tools=["spawn", "send", "exec"],
+        ),
         uuid="parent",
     )
     registry.register(parent)
@@ -162,3 +171,143 @@ def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
     child = registry.get(result["agent_id"])
     assert child is not None
     assert child.config.tools == [*MINIMUM_TOOLS, "exec"]
+
+
+def test_spawn_allows_child_security_boundary_within_parent(monkeypatch, tmp_path):
+    parent_dir = tmp_path / "workspace"
+    child_dir = parent_dir / "child"
+    parent_dir.mkdir()
+    child_dir.mkdir()
+    parent = Agent(
+        NodeConfig(
+            node_type=NodeType.CONDUCTOR,
+            tools=["spawn", "send", "read"],
+            write_dirs=[str(parent_dir)],
+            allow_network=True,
+        ),
+        uuid="parent",
+    )
+    registry.register(parent)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="...",
+                    included_tools=["read"],
+                )
+            ]
+        ),
+    )
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+
+    result = json.loads(
+        SpawnTool().execute(
+            parent,
+            {
+                "role_name": "Worker",
+                "write_dirs": [str(child_dir)],
+                "allow_network": True,
+            },
+        )
+    )
+
+    assert result["role_name"] == "Worker"
+    child = registry.get(result["agent_id"])
+    assert child is not None
+    assert child.config.write_dirs == [str(child_dir)]
+    assert child.config.allow_network is True
+
+
+def test_spawn_rejects_write_dir_escalation(monkeypatch, tmp_path):
+    allowed_dir = tmp_path / "allowed"
+    blocked_dir = tmp_path / "blocked"
+    allowed_dir.mkdir()
+    blocked_dir.mkdir()
+    parent = Agent(
+        NodeConfig(
+            node_type=NodeType.CONDUCTOR,
+            tools=["spawn", "send"],
+            write_dirs=[str(allowed_dir)],
+        ),
+        uuid="parent",
+    )
+    registry.register(parent)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
+    )
+
+    result = json.loads(
+        SpawnTool().execute(
+            parent,
+            {
+                "role_name": "Worker",
+                "write_dirs": [str(blocked_dir)],
+            },
+        )
+    )
+
+    assert result == {"error": f"write_dirs boundary exceeded: {blocked_dir}"}
+    assert len(registry.get_all()) == 1
+
+
+def test_spawn_rejects_network_escalation(monkeypatch):
+    parent = Agent(
+        NodeConfig(
+            node_type=NodeType.CONDUCTOR,
+            tools=["spawn", "send"],
+            allow_network=False,
+        ),
+        uuid="parent",
+    )
+    registry.register(parent)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
+    )
+
+    result = json.loads(
+        SpawnTool().execute(
+            parent,
+            {
+                "role_name": "Worker",
+                "allow_network": True,
+            },
+        )
+    )
+
+    assert result == {
+        "error": "allow_network boundary exceeded: parent disallows network access"
+    }
+    assert len(registry.get_all()) == 1
+
+
+def test_spawn_rejects_tool_escalation(monkeypatch):
+    parent = Agent(
+        NodeConfig(node_type=NodeType.CONDUCTOR, tools=["spawn", "send"]),
+        uuid="parent",
+    )
+    registry.register(parent)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="...",
+                    included_tools=["read"],
+                )
+            ]
+        ),
+    )
+
+    result = json.loads(SpawnTool().execute(parent, {"role_name": "Worker"}))
+
+    assert result == {"error": "tool boundary exceeded: read"}
+    assert len(registry.get_all()) == 1

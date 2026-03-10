@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
@@ -48,6 +49,11 @@ class SpawnTool(Tool):
                 "items": {"type": "string"},
                 "description": "List of directories the agent can write to",
             },
+            "allow_network": {
+                "type": "boolean",
+                "description": "Whether the agent can access the network",
+                "default": False,
+            },
         },
         "required": ["role_name"],
     }
@@ -63,11 +69,18 @@ class SpawnTool(Tool):
         name = args.get("name")
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
+        allow_network = args.get("allow_network", False)
 
         if not isinstance(tools, list) or not all(
             isinstance(tool_name, str) for tool_name in tools
         ):
             return json.dumps({"error": "tools must be an array of strings"})
+        if not isinstance(write_dirs, list) or not all(
+            isinstance(path, str) for path in write_dirs
+        ):
+            return json.dumps({"error": "write_dirs must be an array of strings"})
+        if not isinstance(allow_network, bool):
+            return json.dumps({"error": "allow_network must be a boolean"})
 
         settings = get_settings()
         role_cfg = find_role(settings, role_name)
@@ -93,7 +106,41 @@ class SpawnTool(Tool):
             name=name,
             tools=final_tools,
             write_dirs=write_dirs,
+            allow_network=allow_network,
         )
+
+        parent_write_dirs = [Path(path).resolve() for path in agent.config.write_dirs]
+        invalid_write_dirs = sorted(
+            path
+            for path in config.write_dirs
+            if not any(
+                Path(path).resolve().is_relative_to(parent_path)
+                for parent_path in parent_write_dirs
+            )
+        )
+        if invalid_write_dirs:
+            return json.dumps(
+                {
+                    "error": "write_dirs boundary exceeded: "
+                    + ", ".join(invalid_write_dirs)
+                }
+            )
+
+        if config.allow_network and not agent.config.allow_network:
+            return json.dumps(
+                {
+                    "error": "allow_network boundary exceeded: parent disallows network access"
+                }
+            )
+
+        allowed_tools = set(agent.config.tools) | set(MINIMUM_TOOLS)
+        invalid_tools = sorted(
+            tool_name for tool_name in final_tools if tool_name not in allowed_tools
+        )
+        if invalid_tools:
+            return json.dumps(
+                {"error": "tool boundary exceeded: " + ", ".join(invalid_tools)}
+            )
 
         child = AgentClass(uuid=agent_uuid, config=config)
 

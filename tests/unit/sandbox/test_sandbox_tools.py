@@ -1,43 +1,41 @@
-import json
-
-from app.agent import Agent
-from app.models import NodeConfig, NodeType
-from app.sandbox import build_firejail_cmd
-from app.tools.edit import EditTool
+from app.sandbox import build_bwrap_cmd
 
 
-def test_edit_tool_rejects_all_writes_when_write_dirs_empty(tmp_path):
-    agent = Agent(
-        NodeConfig(node_type=NodeType.AGENT, tools=["edit"], write_dirs=[]),
+def test_build_bwrap_cmd_omits_bind_mounts_when_write_dirs_empty():
+    cmd = build_bwrap_cmd([], "pwd")
+
+    assert cmd[:10] == [
+        "bwrap",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev",
+        "/dev",
+        "--proc",
+        "/proc",
+        "--tmpfs",
+        "/tmp",
+    ]
+    assert "--bind" not in cmd
+    assert "--unshare-net" in cmd
+    assert cmd[-5:] == ["--new-session", "--", "bash", "-c", "pwd"]
+
+
+def test_build_bwrap_cmd_binds_write_dirs_and_preserves_network_when_allowed(tmp_path):
+    writable = tmp_path / "workspace"
+    writable.mkdir()
+
+    cmd = build_bwrap_cmd(
+        [str(writable)],
+        "pwd",
+        allow_network=True,
     )
-    target = tmp_path / "out.txt"
 
-    result = json.loads(
-        EditTool().execute(
-            agent,
-            {
-                "path": str(target),
-                "start_line": 1,
-                "end_line": 1,
-                "new_content": "hello\n",
-            },
-        )
-    )
-
-    assert result == {"error": "Write access is disabled for this agent"}
-    assert not target.exists()
-
-
-def test_build_firejail_cmd_keeps_tmp_read_only_when_write_dirs_empty():
-    cmd = build_firejail_cmd([], "pwd", timeout_secs=30)
-
-    assert "--read-only=/" in cmd
-    assert "--read-write=/tmp" not in cmd
-    assert not any(part.startswith("--read-write=") for part in cmd)
-
-
-def test_build_firejail_cmd_enables_tmp_when_write_dirs_present(tmp_path):
-    cmd = build_firejail_cmd([str(tmp_path)], "pwd", timeout_secs=30)
-
-    assert f"--read-write={tmp_path}" in cmd
-    assert "--read-write=/tmp" in cmd
+    bind_index = cmd.index("--bind")
+    assert cmd[bind_index : bind_index + 3] == [
+        "--bind",
+        str(writable),
+        str(writable),
+    ]
+    assert "--unshare-net" not in cmd
+    assert cmd[-3:] == ["bash", "-c", "pwd"]

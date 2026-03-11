@@ -21,6 +21,7 @@ class Tool(ABC):
     name: str
     description: str
     parameters: ClassVar[dict[str, Any]]
+    agent_visible: ClassVar[bool] = True
 
     @abstractmethod
     def execute(
@@ -48,8 +49,11 @@ class ToolRegistry:
     def get(self, name: str) -> Tool | None:
         return self._tools.get(name)
 
-    def list_tools(self) -> list[Tool]:
-        return list(self._tools.values())
+    def list_tools(self, *, agent_visible_only: bool = False) -> list[Tool]:
+        tools = list(self._tools.values())
+        if not agent_visible_only:
+            return tools
+        return [tool for tool in tools if tool.agent_visible]
 
     def get_tools_for_agent(self, agent: Agent) -> list[Tool]:
         allowed = set(agent.config.tools) | set(MINIMUM_TOOLS)
@@ -60,6 +64,7 @@ class ToolRegistry:
 
 
 def build_tool_registry() -> ToolRegistry:
+    from app.tools.create_root import CreateRootTool
     from app.tools.edit import EditTool
     from app.tools.exec import ExecTool
     from app.tools.exit import ExitTool
@@ -80,6 +85,7 @@ def build_tool_registry() -> ToolRegistry:
         TodoTool,
         ListConnectionsTool,
         ExitTool,
+        CreateRootTool,
         ReadTool,
         EditTool,
         ExecTool,

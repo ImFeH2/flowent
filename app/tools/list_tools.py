@@ -24,6 +24,6 @@ class ListToolsTool(Tool):
         registry = build_tool_registry()
         payload = [
             {"name": tool.name, "description": tool.description}
-            for tool in registry.list_tools()
+            for tool in registry.list_tools(agent_visible_only=True)
         ]
         return json.dumps(payload)

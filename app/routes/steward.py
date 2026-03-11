@@ -3,17 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.models import Message, NodeType
+from app.models import Message
 from app.registry import registry
 
 router = APIRouter()
 
 
 def _get_steward():
-    for node in registry.get_all():
-        if node.config.node_type == NodeType.STEWARD:
-            return node
-    return None
+    return registry.get("steward")
 
 
 @router.get("/api/steward")

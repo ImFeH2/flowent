@@ -78,6 +78,9 @@ def test_get_system_prompt_keeps_builtin_behavior_when_custom_prompt_is_empty(
     prompt = get_system_prompt(NodeConfig(node_type=NodeType.STEWARD))
 
     assert prompt == compose_system_prompt(STEWARD_PROMPT, custom_prompt="")
+    assert "create_root" in prompt
+    assert "Conductor at startup" not in prompt
+    assert "send(to=conductor_id" not in prompt
 
 
 def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):

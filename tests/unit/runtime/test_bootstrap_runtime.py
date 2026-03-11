@@ -1,7 +1,7 @@
 import json
 
 import app.settings as settings_module
-from app.agent import Agent, _get_tool_registry
+from app.agent import Agent
 from app.registry import registry
 from app.runtime import bootstrap_runtime
 from app.settings import (
@@ -15,26 +15,48 @@ from app.settings import (
 )
 
 
-def test_bootstrap_runtime_assigns_all_registered_tools_to_conductor(monkeypatch):
+def test_bootstrap_runtime_creates_only_steward_with_create_root(
+    monkeypatch,
+    tmp_path,
+):
     registry.reset()
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
     monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
 
     bootstrap_runtime()
 
     try:
-        conductor = registry.get("conductor")
+        nodes = registry.get_all()
+        steward = registry.get("steward")
 
-        assert conductor is not None
-        assert conductor.config.node_type.value == "agent"
-        assert conductor.config.role_name == CONDUCTOR_ROLE_NAME
-        assert conductor.config.tools == [
-            tool.name for tool in _get_tool_registry().list_tools()
-        ]
+        assert len(nodes) == 1
+        assert steward is not None
+        assert steward.config.node_type.value == "steward"
+        assert steward.config.tools == ["create_root"]
+        assert steward.config.write_dirs == []
+        assert steward.config.allow_network is True
     finally:
         registry.reset()
 
 
-def test_bootstrap_runtime_creates_builtin_worker_role(monkeypatch, tmp_path):
+def test_bootstrap_runtime_creates_builtin_worker_and_conductor_roles(
+    monkeypatch,
+    tmp_path,
+):
     registry.reset()
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
@@ -70,12 +92,11 @@ def test_bootstrap_runtime_creates_builtin_worker_role(monkeypatch, tmp_path):
                 included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
             ),
         ]
-
     finally:
         registry.reset()
 
 
-def test_bootstrap_runtime_reconciles_existing_worker_role(monkeypatch, tmp_path):
+def test_bootstrap_runtime_reconciles_existing_builtin_roles(monkeypatch, tmp_path):
     registry.reset()
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
@@ -122,7 +143,10 @@ def test_bootstrap_runtime_reconciles_existing_worker_role(monkeypatch, tmp_path
         registry.reset()
 
 
-def test_bootstrap_runtime_inherits_root_boundary(monkeypatch, tmp_path):
+def test_bootstrap_runtime_keeps_steward_boundary_independent_of_root_boundary(
+    monkeypatch,
+    tmp_path,
+):
     registry.reset()
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
@@ -132,7 +156,7 @@ def test_bootstrap_runtime_inherits_root_boundary(monkeypatch, tmp_path):
                 "model": {"active_provider_id": "", "active_model": ""},
                 "root_boundary": {
                     "write_dirs": [str(tmp_path / "workspace")],
-                    "allow_network": True,
+                    "allow_network": False,
                 },
                 "providers": [],
                 "roles": [],
@@ -148,16 +172,12 @@ def test_bootstrap_runtime_inherits_root_boundary(monkeypatch, tmp_path):
     bootstrap_runtime()
 
     try:
+        nodes = registry.get_all()
         steward = registry.get("steward")
-        conductor = registry.get("conductor")
 
+        assert len(nodes) == 1
         assert steward is not None
-        assert conductor is not None
-        assert steward.config.write_dirs == [str(tmp_path / "workspace")]
+        assert steward.config.write_dirs == []
         assert steward.config.allow_network is True
-        assert conductor.config.node_type.value == "agent"
-        assert conductor.config.role_name == CONDUCTOR_ROLE_NAME
-        assert conductor.config.write_dirs == [str(tmp_path / "workspace")]
-        assert conductor.config.allow_network is True
     finally:
         registry.reset()

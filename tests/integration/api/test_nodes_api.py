@@ -33,18 +33,15 @@ def test_direct_node_message_api_is_not_available(client: TestClient):
     )
 
 
-def test_conductor_node_is_a_regular_agent_and_can_be_terminated(client: TestClient):
+def test_only_steward_node_exists_at_startup(client: TestClient):
     list_response = client.get("/api/nodes")
 
     assert list_response.status_code == 200
-    nodes = {node["id"]: node for node in list_response.json()["nodes"]}
-    assert nodes["conductor"]["node_type"] == "agent"
-    assert nodes["conductor"]["role_name"] == "Conductor"
-
-    terminate_response = client.post("/api/nodes/conductor/terminate")
-
-    assert terminate_response.status_code == 200
-    assert terminate_response.json() == {"status": "terminating"}
+    nodes = list_response.json()["nodes"]
+    assert len(nodes) == 1
+    assert nodes[0]["id"] == "steward"
+    assert nodes[0]["node_type"] == "steward"
+    assert nodes[0]["role_name"] is None
 
 
 def test_steward_cannot_be_terminated_via_nodes_api(client: TestClient):

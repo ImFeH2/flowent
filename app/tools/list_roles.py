@@ -24,7 +24,9 @@ class ListRolesTool(Tool):
 
         settings = get_settings()
         tool_registry = build_tool_registry()
-        all_tool_names = [tool.name for tool in tool_registry.list_tools()]
+        all_tool_names = [
+            tool.name for tool in tool_registry.list_tools(agent_visible_only=True)
+        ]
         payload: list[dict[str, object]] = []
 
         for role in settings.roles:

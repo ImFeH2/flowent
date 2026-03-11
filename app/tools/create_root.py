@@ -1,0 +1,202 @@
+from __future__ import annotations
+
+import json
+import uuid
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar
+
+from loguru import logger
+
+from app.models import Event, EventType, NodeConfig, NodeType
+from app.tools import MINIMUM_TOOLS, Tool
+from app.tools.send import send_message
+
+if TYPE_CHECKING:
+    from app.agent import Agent
+
+
+class CreateRootTool(Tool):
+    name = "create_root"
+    description = (
+        "Create a new root agent in the Agent Forest. Choose the role, tools, "
+        "and security boundary based on the task. Use Worker for simple "
+        "execution tasks and Conductor for complex orchestration."
+    )
+    parameters: ClassVar[dict[str, Any]] = {
+        "type": "object",
+        "properties": {
+            "role_name": {
+                "type": "string",
+                "description": "Name of the Role to assign to the new root agent",
+            },
+            "task": {
+                "type": "string",
+                "description": "Initial task sent as the first message to the new root agent",
+            },
+            "name": {
+                "type": "string",
+                "description": "Human-readable name for the root agent (optional)",
+            },
+            "tools": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional list of additional tool names to give the root agent",
+            },
+            "write_dirs": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of directories the root agent can write to",
+            },
+            "allow_network": {
+                "type": "boolean",
+                "description": "Whether the root agent can access the network",
+                "default": False,
+            },
+        },
+        "required": ["role_name"],
+    }
+    agent_visible = False
+
+    def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+        from app.agent import Agent as AgentClass
+        from app.events import event_bus
+        from app.registry import registry
+        from app.settings import find_role, get_settings
+
+        role_name = args["role_name"]
+        task = args.get("task")
+        name = args.get("name")
+        tools = args.get("tools", [])
+        write_dirs = args.get("write_dirs", [])
+        allow_network = args.get("allow_network", False)
+
+        if not isinstance(role_name, str):
+            return json.dumps({"error": "role_name must be a string"})
+        if task is not None and not isinstance(task, str):
+            return json.dumps({"error": "task must be a string"})
+        if name is not None and not isinstance(name, str):
+            return json.dumps({"error": "name must be a string"})
+        if not isinstance(tools, list) or not all(
+            isinstance(tool_name, str) for tool_name in tools
+        ):
+            return json.dumps({"error": "tools must be an array of strings"})
+        if not isinstance(write_dirs, list) or not all(
+            isinstance(path, str) for path in write_dirs
+        ):
+            return json.dumps({"error": "write_dirs must be an array of strings"})
+        if not isinstance(allow_network, bool):
+            return json.dumps({"error": "allow_network must be a boolean"})
+
+        settings = get_settings()
+        role_cfg = find_role(settings, role_name)
+        if role_cfg is None:
+            return json.dumps({"error": f"Role '{role_name}' not found"})
+
+        root_write_dirs = [
+            Path(path).resolve() for path in settings.root_boundary.write_dirs
+        ]
+        invalid_write_dirs = sorted(
+            path
+            for path in write_dirs
+            if not any(
+                Path(path).resolve().is_relative_to(root_path)
+                for root_path in root_write_dirs
+            )
+        )
+        if invalid_write_dirs:
+            return json.dumps(
+                {
+                    "error": "write_dirs boundary exceeded: "
+                    + ", ".join(invalid_write_dirs)
+                }
+            )
+
+        if allow_network and not settings.root_boundary.allow_network:
+            return json.dumps(
+                {
+                    "error": "allow_network boundary exceeded: root boundary disallows network access"
+                }
+            )
+
+        final_tools: list[str] = []
+        seen_tools: set[str] = set()
+        excluded_tools = set(role_cfg.excluded_tools)
+
+        for tool_name in [*MINIMUM_TOOLS, *role_cfg.included_tools, *tools]:
+            if tool_name in seen_tools:
+                continue
+            if tool_name in excluded_tools and tool_name not in MINIMUM_TOOLS:
+                continue
+            final_tools.append(tool_name)
+            seen_tools.add(tool_name)
+
+        agent_uuid = str(uuid.uuid4())
+        child = AgentClass(
+            uuid=agent_uuid,
+            config=NodeConfig(
+                node_type=NodeType.AGENT,
+                role_name=role_name,
+                name=name,
+                tools=final_tools,
+                write_dirs=write_dirs,
+                allow_network=allow_network,
+            ),
+        )
+
+        registered = False
+        connected = False
+        started = False
+
+        try:
+            agent.add_connection(agent_uuid)
+            child.add_connection(agent.uuid)
+            connected = True
+
+            registry.register(child)
+            registered = True
+
+            child.start()
+            started = True
+
+            event_bus.emit(
+                Event(
+                    type=EventType.NODE_CONNECTED,
+                    agent_id=agent.uuid,
+                    data={"a": agent.uuid, "b": agent_uuid},
+                )
+            )
+
+            if task:
+                if not child.wait_until_idle(timeout=5.0):
+                    raise TimeoutError(
+                        "Root agent did not reach idle before task delivery"
+                    )
+                payload = send_message(agent, agent_uuid, task)
+                if "error" in payload:
+                    raise RuntimeError(str(payload["error"]))
+        except Exception as exc:
+            logger.exception(
+                "Failed to create root agent {} (role={}) by {}",
+                agent_uuid[:8],
+                role_name,
+                agent.uuid[:8],
+            )
+
+            if started:
+                child.terminate_and_wait(timeout=5.0)
+            if registered:
+                registry.unregister(agent_uuid)
+            if connected:
+                agent.remove_connection(agent_uuid)
+                child.remove_connection(agent.uuid)
+
+            return json.dumps({"error": f"Failed to create root agent: {exc}"})
+
+        logger.info(
+            "Created root agent {} (role={}) by {}",
+            agent_uuid[:8],
+            role_name,
+            agent.uuid[:8],
+        )
+
+        return json.dumps({"agent_id": agent_uuid, "role_name": role_name})

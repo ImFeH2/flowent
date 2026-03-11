@@ -24,7 +24,11 @@ import { AgentGraphNode } from "@/components/AgentGraphNode";
 import { AgentGraphTooltip } from "@/components/AgentGraphTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import { useTheme } from "@/context/ThemeContext";
-import { getLayoutedElements } from "@/lib/layout";
+import {
+  AGENT_NODE_HEIGHT,
+  AGENT_NODE_WIDTH,
+  getLayoutedElements,
+} from "@/lib/layout";
 import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 import { terminateNode } from "@/lib/api";
 
@@ -58,6 +62,7 @@ export function AgentGraph() {
     null,
   );
   const tooltipRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const lastViewportStructureKey = useRef<string | null>(null);
   const [tooltipSize, setTooltipSize] = useState<{
     width: number;
@@ -95,11 +100,14 @@ export function AgentGraph() {
         id,
         type: "agent",
         position: { x: 0, y: 0 },
+        width: AGENT_NODE_WIDTH,
+        height: AGENT_NODE_HEIGHT,
         data: {
           node_type: agent.node_type,
           state: agent.state,
           shortId: id.slice(0, 8),
           name: agent.name,
+          role_name: agent.role_name,
           latestTodo: agent.todos[agent.todos.length - 1]?.text ?? null,
           selected: id === selectedAgentId,
           toolCall: activeToolCalls.get(id) ?? null,
@@ -207,8 +215,7 @@ export function AgentGraph() {
     if (contextMenu.agentId) {
       const agentId = contextMenu.agentId;
       const node = agents.get(agentId);
-      const isProtected =
-        node?.node_type === "steward" || node?.node_type === "conductor";
+      const isProtected = node?.node_type === "steward";
       items.push({
         label: "Stop Agent",
         danger: true,
@@ -277,6 +284,31 @@ export function AgentGraph() {
     return () => cancelAnimationFrame(raf);
   }, [flowInstance, nodes.length, structureKey]);
 
+  useEffect(() => {
+    if (!flowInstance || !containerRef.current || nodes.length === 0) return;
+
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        void flowInstance
+          .fitView({
+            padding: 0.3,
+            maxZoom: 0.75,
+            duration: 250,
+          })
+          .catch(() => false);
+      });
+    });
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [flowInstance, nodes.length]);
+
   const tooltipStyle = useMemo(() => {
     if (!tooltip || typeof window === "undefined") return undefined;
     const margin = 8;
@@ -291,7 +323,7 @@ export function AgentGraph() {
   }, [tooltip, tooltipSize]);
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div ref={containerRef} className="relative flex h-full flex-col">
       <div className="relative flex-1 overflow-hidden">
         {nodes.length === 0 ? (
           <div className="flex h-full items-center justify-center">
@@ -299,7 +331,7 @@ export function AgentGraph() {
               <Network className="mx-auto size-8 text-primary/65" />
               <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
               <p className="text-sm text-muted-foreground">
-                Loading agent graph...
+                Loading agent forest...
               </p>
             </div>
           </div>

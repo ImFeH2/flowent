@@ -1,8 +1,8 @@
 import dagre from "@dagrejs/dagre";
 import type { Node, Edge } from "@xyflow/react";
 
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 60;
+export const AGENT_NODE_WIDTH = 220;
+export const AGENT_NODE_HEIGHT = 62;
 
 export function getLayoutedElements(
   nodes: Node[],
@@ -13,7 +13,10 @@ export function getLayoutedElements(
   g.setGraph({ rankdir: "TB", nodesep: 40, ranksep: 60 });
 
   for (const node of nodes) {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    g.setNode(node.id, {
+      width: AGENT_NODE_WIDTH,
+      height: AGENT_NODE_HEIGHT,
+    });
   }
   for (const edge of edges) {
     g.setEdge(edge.source, edge.target);
@@ -26,8 +29,8 @@ export function getLayoutedElements(
     return {
       ...node,
       position: {
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - NODE_HEIGHT / 2,
+        x: pos.x - AGENT_NODE_WIDTH / 2,
+        y: pos.y - AGENT_NODE_HEIGHT / 2,
       },
     };
   });

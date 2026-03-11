@@ -1,4 +1,4 @@
-export type NodeType = "steward" | "conductor" | "agent";
+export type NodeType = "steward" | "agent";
 
 export type AgentState =
   | "initializing"

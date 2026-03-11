@@ -6,7 +6,6 @@ import {
   PanelRightOpen,
   Radio,
   Shield,
-  Sparkles,
   X,
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
@@ -21,7 +20,7 @@ import {
 import { useStewardChat } from "@/hooks/useStewardChat";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { Badge } from "@/components/ui/badge";
-import { stateBadgeColor } from "@/lib/constants";
+import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
 import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 
@@ -175,6 +174,11 @@ function AgentDetailPanel({
   const detailConnections = detail?.connections ?? agent.connections;
   const detailTodos = detail?.todos ?? agent.todos;
   const detailHistory = detail?.history ?? [];
+  const label = getNodeLabel({
+    name: agent.name,
+    roleName: agent.role_name,
+    nodeType: agent.node_type,
+  });
 
   return (
     <>
@@ -183,14 +187,12 @@ function AgentDetailPanel({
           <div className="flex size-8 items-center justify-center rounded-md bg-primary/12">
             {agent.node_type === "steward" ? (
               <Shield className="size-4 text-primary" />
-            ) : agent.node_type === "conductor" ? (
-              <Sparkles className="size-4 text-primary" />
             ) : (
               <Bot className="size-4 text-primary" />
             )}
           </div>
           <div>
-            <p className="font-semibold">{agent.name || agent.node_type}</p>
+            <p className="font-semibold">{label}</p>
             <p className="font-mono text-[10px] text-muted-foreground">
               {agent.id.slice(0, 8)}
             </p>

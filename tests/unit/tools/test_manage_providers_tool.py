@@ -1,0 +1,221 @@
+import json
+
+from app.agent import Agent
+from app.models import NodeConfig, NodeType
+from app.settings import ModelSettings, ProviderConfig, Settings
+from app.tools.manage_providers import ManageProvidersTool
+
+
+def test_manage_providers_list_omits_api_keys(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ]
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(ManageProvidersTool().execute(agent, {"action": "list"}))
+
+    assert result == [
+        {
+            "id": "provider-1",
+            "name": "Primary",
+            "type": "openai_compatible",
+            "base_url": "https://api.example.com/v1",
+        }
+    ]
+
+
+def test_manage_providers_create_persists_provider(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    settings = Settings()
+    saved: list[Settings] = []
+    invalidations: list[str] = []
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr(
+        "app.providers.gateway.gateway.invalidate_cache",
+        lambda: invalidations.append("invalidate"),
+    )
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {
+                "action": "create",
+                "name": "Test Provider",
+                "type": "openai_compatible",
+                "base_url": "https://api.example.com/v1",
+            },
+        )
+    )
+
+    assert result["name"] == "Test Provider"
+    assert result["type"] == "openai_compatible"
+    assert result["base_url"] == "https://api.example.com/v1"
+    assert "api_key" not in result
+    assert len(settings.providers) == 1
+    assert settings.providers[0].name == "Test Provider"
+    assert saved == [settings]
+    assert invalidations == ["invalidate"]
+
+
+def test_manage_providers_create_requires_fields(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {
+                "action": "create",
+                "type": "openai_compatible",
+                "base_url": "https://api.example.com/v1",
+            },
+        )
+    )
+
+    assert result == {"error": "name is required"}
+
+
+def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Old Name",
+                type="openai_compatible",
+                base_url="https://old.example.com/v1",
+                api_key="secret",
+            )
+        ]
+    )
+    saved: list[Settings] = []
+    invalidations: list[str] = []
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr(
+        "app.providers.gateway.gateway.invalidate_cache",
+        lambda: invalidations.append("invalidate"),
+    )
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {
+                "action": "update",
+                "id": "provider-1",
+                "base_url": "https://new.example.com/v1",
+            },
+        )
+    )
+
+    assert result == {
+        "id": "provider-1",
+        "name": "Old Name",
+        "type": "openai_compatible",
+        "base_url": "https://new.example.com/v1",
+    }
+    assert settings.providers[0].name == "Old Name"
+    assert settings.providers[0].type == "openai_compatible"
+    assert settings.providers[0].base_url == "https://new.example.com/v1"
+    assert settings.providers[0].api_key == "secret"
+    assert saved == [settings]
+    assert invalidations == ["invalidate"]
+
+
+def test_manage_providers_update_rejects_unknown_provider(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {"action": "update", "id": "missing", "name": "Next"},
+        )
+    )
+
+    assert result == {"error": "Provider 'missing' not found"}
+
+
+def test_manage_providers_delete_removes_provider(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Delete Me",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ]
+    )
+    saved: list[Settings] = []
+    invalidations: list[str] = []
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr(
+        "app.providers.gateway.gateway.invalidate_cache",
+        lambda: invalidations.append("invalidate"),
+    )
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {"action": "delete", "id": "provider-1"},
+        )
+    )
+
+    assert result == {"status": "deleted"}
+    assert settings.providers == []
+    assert saved == [settings]
+    assert invalidations == ["invalidate"]
+
+
+def test_manage_providers_delete_clears_active_model_for_active_provider(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    settings = Settings(
+        model=ModelSettings(active_provider_id="provider-1", active_model="gpt-4o"),
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {"action": "delete", "id": "provider-1"},
+        )
+    )
+
+    assert result == {"status": "deleted"}
+    assert settings.model.active_provider_id == ""
+    assert settings.model.active_model == ""

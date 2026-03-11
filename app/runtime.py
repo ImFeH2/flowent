@@ -19,7 +19,13 @@ def bootstrap_runtime() -> None:
     steward = Agent(
         NodeConfig(
             node_type=NodeType.STEWARD,
-            tools=["create_root"],
+            tools=[
+                "create_root",
+                "manage_providers",
+                "manage_roles",
+                "manage_settings",
+                "manage_prompts",
+            ],
             write_dirs=[],
             allow_network=True,
         ),

@@ -46,7 +46,13 @@ def test_bootstrap_runtime_creates_only_steward_with_create_root(
         assert len(nodes) == 1
         assert steward is not None
         assert steward.config.node_type.value == "steward"
-        assert steward.config.tools == ["create_root"]
+        assert steward.config.tools == [
+            "create_root",
+            "manage_providers",
+            "manage_roles",
+            "manage_settings",
+            "manage_prompts",
+        ]
         assert steward.config.write_dirs == []
         assert steward.config.allow_network is True
     finally:

@@ -73,6 +73,10 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.list_connections import ListConnectionsTool
     from app.tools.list_roles import ListRolesTool
     from app.tools.list_tools import ListToolsTool
+    from app.tools.manage_prompts import ManagePromptsTool
+    from app.tools.manage_providers import ManageProvidersTool
+    from app.tools.manage_roles import ManageRolesTool
+    from app.tools.manage_settings import ManageSettingsTool
     from app.tools.read import ReadTool
     from app.tools.send import SendTool
     from app.tools.spawn import SpawnTool
@@ -86,6 +90,10 @@ def build_tool_registry() -> ToolRegistry:
         ListConnectionsTool,
         ExitTool,
         CreateRootTool,
+        ManageProvidersTool,
+        ManageRolesTool,
+        ManageSettingsTool,
+        ManagePromptsTool,
         ReadTool,
         EditTool,
         ExecTool,

@@ -46,3 +46,10 @@ repos:
         language: system
         files: ^frontend/.*\.(ts|tsx)$
         pass_filenames: false
+
+      - id: frontend-test
+        name: Frontend Test (Vitest)
+        entry: bash -c 'cd frontend && pnpm test'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false

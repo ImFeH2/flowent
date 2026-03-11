@@ -98,7 +98,13 @@ def test_agent_get_connections_info_returns_connected_node_metadata():
 
 
 def test_list_roles_tool_returns_registered_roles(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.CONDUCTOR, tools=["list_roles"]))
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            tools=["list_roles"],
+        )
+    )
 
     monkeypatch.setattr(
         "app.settings.get_settings",
@@ -137,7 +143,6 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "edit",
                 "fetch",
                 "spawn",
-                "connect",
                 "list_roles",
                 "list_tools",
             ],
@@ -157,7 +162,6 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "edit",
                 "exec",
                 "spawn",
-                "connect",
                 "list_roles",
                 "list_tools",
             ],
@@ -166,7 +170,13 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
 
 
 def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
-    agent = Agent(NodeConfig(node_type=NodeType.CONDUCTOR, tools=["list_tools"]))
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            tools=["list_tools"],
+        )
+    )
 
     result = json.loads(ListToolsTool().execute(agent, {}))
 
@@ -181,7 +191,6 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "exec",
         "fetch",
         "spawn",
-        "connect",
         "list_roles",
         "list_tools",
     }

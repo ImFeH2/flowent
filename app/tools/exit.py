@@ -24,7 +24,7 @@ class ExitTool(Tool):
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         from app.models import NodeType
 
-        if agent.node_type in (NodeType.STEWARD, NodeType.CONDUCTOR):
+        if agent.node_type == NodeType.STEWARD:
             return json.dumps(
                 {"error": f"{agent.node_type.value} cannot be terminated"}
             )

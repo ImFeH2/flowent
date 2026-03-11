@@ -6,7 +6,6 @@ from enum import StrEnum
 
 class NodeType(StrEnum):
     STEWARD = "steward"
-    CONDUCTOR = "conductor"
     AGENT = "agent"
 
 

@@ -29,3 +29,9 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
         "list_connections",
         "exit",
     ]
+
+
+def test_tool_registry_does_not_register_connect_tool():
+    tool_names = [tool.name for tool in build_tool_registry().list_tools()]
+
+    assert "connect" not in tool_names

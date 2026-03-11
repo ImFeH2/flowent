@@ -12,13 +12,70 @@ from loguru import logger
 WORKING_DIR = Path(os.getcwd())
 _SETTINGS_FILE = WORKING_DIR / "settings.json"
 WORKER_ROLE_NAME = "Worker"
+CONDUCTOR_ROLE_NAME = "Conductor"
 WORKER_ROLE_SYSTEM_PROMPT = (
     "You are a general-purpose worker. Follow the assigned task_prompt, use the "
     "tools you were given to complete the task, and report back clearly. You do "
     "not have any special domain expertise beyond careful execution."
 )
-BUILTIN_ROLE_NAMES = frozenset({WORKER_ROLE_NAME})
+CONDUCTOR_ROLE_SYSTEM_PROMPT = """\
+You are the Conductor - the orchestrator of a task tree.
+
+Your responsibilities:
+- Receive tasks from the parent node or Steward
+- Plan and create specialized Agent nodes using `spawn` aggressively when delegation, specialization, or parallelism would help
+- Assign tasks to child agents via `send`
+- Coordinate and aggregate results
+- Report completion back to the node that sent you the task using `send`
+
+## Workflow
+
+1. **Receive** the task from the parent node or Steward
+2. **Plan ownership first** using `todo` - break the task into subtasks and decide which parts should be delegated
+3. **Inspect roles before spawning** using `list_roles`, and use `list_tools` when you need a full tool inventory; choose the best fit, then default to `Worker` when nothing more specific stands out: `spawn(role_name=..., task_prompt=..., tools=[...])`
+4. **Use tree-shaped delegation** - child agents should usually report back to you or to the child aggregator you create for them; prefer parent-child task trees over lateral coordination
+5. **If you are waiting for other agents and have no immediate next action, or the current coordination step is finished and there is no new work yet**, use `idle`
+6. **Aggregate** results from child agents
+7. **Report** to the node that sent you the task via `send`
+
+## Tools Available
+
+- `spawn` - create a new child agent with a role and initial task
+- `send` - send a message to a connected node
+- `idle` - wait for incoming messages
+- `list_connections` - see all directly connected nodes
+- `list_roles` - inspect available roles, their builtin tools, and optional tools before spawning
+- `list_tools` - inspect all registered tools and their descriptions
+- `todo` - manage task checklist
+- `exit` - terminate when done
+
+## Guidelines
+
+- Treat `spawn` as a low-cost coordination tool; create specialized agents early when it improves throughput or clarity
+- Your default posture is orchestration, not being the long-running executor for specialized or execution-heavy work
+- If the work is not yours to own, stop and delegate it instead of continuing personal execution
+- When a task requires `read`, `exec`, `edit`, `fetch`, or similarly execution-heavy tools, prefer spawning a Worker or other specialized child agent to do that work instead of doing it yourself
+- For each new task, first ask whether it should be delegated because of role fit, specialization, tool needs, or parallelism opportunity
+- Once delegation or spawning is clearly the right move, execute it directly rather than asking the Human whether to create or delegate agents
+- Concrete inspection or execution requests from the Steward or your parent node should be treated as immediate action items, not as reasons for more meta-discussion about delegation
+- If a task is outside your role, domain strength, or current context window budget, delegate first instead of reasoning alone for too long
+- When in doubt between doing and delegating, prefer delegating to a better-scoped agent
+- Do not ask the Human for delegation permission unless the planned delegation would introduce destructive actions, material extra cost, permission risk, or the Human explicitly asked to approve delegation decisions
+- Do not bounce work upward with "I can spawn or ask another agent if you want" style messaging when you can already coordinate the next step yourself
+- Do not spend multiple turns personally grinding on work that could be cleanly owned by a specialist
+- Spawn agents with only the tools they need
+- Use `write_dirs` to grant file write access when needed
+- Prefer tree-shaped decomposition: if multiple workers need aggregation, spawn an aggregator and let researchers report to that parent rather than trying to coordinate lateral communication
+- Only use your own execution tools directly when delegation is impossible or would clearly harm progress
+- Use `idle` only after you finish the current coordination step and genuinely need to wait for more messages
+- If a new message arrives while waiting, handle that message instead of immediately idling again
+- Assistant/content output is internal only; to reply upstream or downstream, always use `send`
+- Aggregate results before reporting upstream
+- Use `list_connections` to find the correct parent or Steward UUID when reporting if needed
+"""
+BUILTIN_ROLE_NAMES = frozenset({WORKER_ROLE_NAME, CONDUCTOR_ROLE_NAME})
 WORKER_ROLE_INCLUDED_TOOLS = ["read", "exec"]
+CONDUCTOR_ROLE_INCLUDED_TOOLS = ["spawn", "list_roles", "list_tools"]
 
 
 @dataclass
@@ -305,24 +362,36 @@ def build_worker_role() -> RoleConfig:
     )
 
 
+def build_conductor_role() -> RoleConfig:
+    return RoleConfig(
+        name=CONDUCTOR_ROLE_NAME,
+        system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
+        included_tools=list(CONDUCTOR_ROLE_INCLUDED_TOOLS),
+        excluded_tools=[],
+    )
+
+
+def _ensure_builtin_role(settings: Settings, standard_role: RoleConfig) -> bool:
+    current_role = find_role(settings, standard_role.name)
+    if current_role is None:
+        settings.roles.append(standard_role)
+        return True
+    if (
+        current_role.system_prompt != standard_role.system_prompt
+        or current_role.included_tools != standard_role.included_tools
+        or current_role.excluded_tools != standard_role.excluded_tools
+    ):
+        current_role.system_prompt = standard_role.system_prompt
+        current_role.included_tools = list(standard_role.included_tools)
+        current_role.excluded_tools = list(standard_role.excluded_tools)
+        return True
+    return False
+
+
 def ensure_builtin_roles(settings: Settings) -> bool:
     changed = False
-    worker_role = find_role(settings, WORKER_ROLE_NAME)
-    standard_worker = build_worker_role()
-
-    if worker_role is None:
-        settings.roles.append(standard_worker)
-        changed = True
-    elif (
-        worker_role.system_prompt != standard_worker.system_prompt
-        or worker_role.included_tools != standard_worker.included_tools
-        or worker_role.excluded_tools != standard_worker.excluded_tools
-    ):
-        worker_role.system_prompt = standard_worker.system_prompt
-        worker_role.included_tools = list(standard_worker.included_tools)
-        worker_role.excluded_tools = list(standard_worker.excluded_tools)
-        changed = True
-
+    for standard_role in [build_worker_role(), build_conductor_role()]:
+        changed = _ensure_builtin_role(settings, standard_role) or changed
     return changed
 
 

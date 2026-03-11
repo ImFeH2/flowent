@@ -20,7 +20,8 @@ def reset_registry():
 def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
     parent = Agent(
         NodeConfig(
-            node_type=NodeType.CONDUCTOR,
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
             tools=["spawn", "send", "read", "edit"],
         ),
         uuid="parent",
@@ -93,7 +94,8 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
 ):
     parent = Agent(
         NodeConfig(
-            node_type=NodeType.CONDUCTOR,
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
             tools=["spawn", "send", "read"],
         ),
         uuid="parent",
@@ -144,7 +146,8 @@ def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
 def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
     parent = Agent(
         NodeConfig(
-            node_type=NodeType.CONDUCTOR,
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
             tools=["spawn", "send", "exec"],
         ),
         uuid="parent",
@@ -159,7 +162,7 @@ def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
                     name="Worker",
                     system_prompt="...",
                     included_tools=["exec"],
-                    excluded_tools=["send", "connect"],
+                    excluded_tools=["send"],
                 )
             ]
         ),
@@ -180,7 +183,8 @@ def test_spawn_allows_child_security_boundary_within_parent(monkeypatch, tmp_pat
     child_dir.mkdir()
     parent = Agent(
         NodeConfig(
-            node_type=NodeType.CONDUCTOR,
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
             tools=["spawn", "send", "read"],
             write_dirs=[str(parent_dir)],
             allow_network=True,
@@ -228,7 +232,8 @@ def test_spawn_rejects_write_dir_escalation(monkeypatch, tmp_path):
     blocked_dir.mkdir()
     parent = Agent(
         NodeConfig(
-            node_type=NodeType.CONDUCTOR,
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
             tools=["spawn", "send"],
             write_dirs=[str(allowed_dir)],
         ),
@@ -258,7 +263,8 @@ def test_spawn_rejects_write_dir_escalation(monkeypatch, tmp_path):
 def test_spawn_rejects_network_escalation(monkeypatch):
     parent = Agent(
         NodeConfig(
-            node_type=NodeType.CONDUCTOR,
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
             tools=["spawn", "send"],
             allow_network=False,
         ),
@@ -289,7 +295,11 @@ def test_spawn_rejects_network_escalation(monkeypatch):
 
 def test_spawn_rejects_tool_escalation(monkeypatch):
     parent = Agent(
-        NodeConfig(node_type=NodeType.CONDUCTOR, tools=["spawn", "send"]),
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            tools=["spawn", "send"],
+        ),
         uuid="parent",
     )
     registry.register(parent)

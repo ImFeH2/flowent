@@ -1,8 +1,17 @@
 from app.models import NodeConfig, NodeType
 from app.prompts import get_system_prompt
-from app.prompts.common import COMMON_AGENT_PROMPT, compose_system_prompt
+from app.prompts.common import (
+    COMMON_AGENT_PROMPT,
+    DEFAULT_AGENT_ROLE_PROMPT,
+    compose_system_prompt,
+)
 from app.prompts.steward import STEWARD_PROMPT
-from app.settings import RoleConfig, Settings
+from app.settings import (
+    CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    RoleConfig,
+    Settings,
+    build_conductor_role,
+)
 
 
 def test_compose_system_prompt_inserts_custom_prompt_between_common_and_role():
@@ -69,3 +78,32 @@ def test_get_system_prompt_keeps_builtin_behavior_when_custom_prompt_is_empty(
     prompt = get_system_prompt(NodeConfig(node_type=NodeType.STEWARD))
 
     assert prompt == compose_system_prompt(STEWARD_PROMPT, custom_prompt="")
+
+
+def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[build_conductor_role()],
+        ),
+    )
+
+    prompt = get_system_prompt(
+        NodeConfig(node_type=NodeType.AGENT, role_name="Conductor")
+    )
+
+    assert prompt == compose_system_prompt(
+        CONDUCTOR_ROLE_SYSTEM_PROMPT,
+        custom_prompt="",
+    )
+
+
+def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[]),
+    )
+
+    prompt = get_system_prompt(NodeConfig(node_type=NodeType.AGENT, role_name="Ghost"))
+
+    assert prompt == compose_system_prompt(DEFAULT_AGENT_ROLE_PROMPT, custom_prompt="")

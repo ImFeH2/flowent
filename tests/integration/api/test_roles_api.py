@@ -1,6 +1,15 @@
 from fastapi.testclient import TestClient
 
-from app.settings import RoleConfig, Settings
+from app.settings import CONDUCTOR_ROLE_NAME, RoleConfig, Settings
+
+
+def test_roles_api_lists_worker_and_conductor_as_builtin(client: TestClient):
+    response = client.get("/api/roles")
+
+    assert response.status_code == 200
+    roles = {role["name"]: role for role in response.json()["roles"]}
+    assert roles["Worker"]["is_builtin"] is True
+    assert roles[CONDUCTOR_ROLE_NAME]["is_builtin"] is True
 
 
 def test_create_role_rejects_duplicate_name(client: TestClient, monkeypatch):

@@ -11,7 +11,7 @@ from app.routes.roles import (
     list_roles,
     update_role,
 )
-from app.settings import RoleConfig, Settings
+from app.settings import CONDUCTOR_ROLE_NAME, RoleConfig, Settings
 
 
 def test_list_roles_returns_is_builtin_flags(monkeypatch):
@@ -21,6 +21,11 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 name="Worker",
                 system_prompt="Do work.",
                 included_tools=["read", "exec"],
+            ),
+            RoleConfig(
+                name=CONDUCTOR_ROLE_NAME,
+                system_prompt="Coordinate tasks.",
+                included_tools=["spawn", "list_roles", "list_tools"],
             ),
             RoleConfig(
                 name="Reviewer",
@@ -41,6 +46,13 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 "name": "Worker",
                 "system_prompt": "Do work.",
                 "included_tools": ["read", "exec"],
+                "excluded_tools": [],
+                "is_builtin": True,
+            },
+            {
+                "name": CONDUCTOR_ROLE_NAME,
+                "system_prompt": "Coordinate tasks.",
+                "included_tools": ["spawn", "list_roles", "list_tools"],
                 "excluded_tools": [],
                 "is_builtin": True,
             },
@@ -174,16 +186,19 @@ def test_update_role_rejects_duplicate_name(monkeypatch):
     assert excinfo.value.detail == "Role 'Architect' already exists"
 
 
-def test_update_role_rejects_renaming_builtin_role(monkeypatch):
-    settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
+@pytest.mark.parametrize("builtin_role_name", ["Worker", CONDUCTOR_ROLE_NAME])
+def test_update_role_rejects_renaming_builtin_role(monkeypatch, builtin_role_name):
+    settings = Settings(
+        roles=[RoleConfig(name=builtin_role_name, system_prompt="Do work.")]
+    )
 
     monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(update_role("Worker", UpdateRoleRequest(name="Helper")))
+        asyncio.run(update_role(builtin_role_name, UpdateRoleRequest(name="Helper")))
 
     assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Cannot rename built-in role 'Worker'"
+    assert excinfo.value.detail == f"Cannot rename built-in role '{builtin_role_name}'"
 
 
 def test_delete_role_uses_name_path_parameter(monkeypatch):
@@ -210,16 +225,19 @@ def test_delete_role_uses_name_path_parameter(monkeypatch):
     assert saved == [["Architect"]]
 
 
-def test_delete_role_rejects_builtin_role(monkeypatch):
-    settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
+@pytest.mark.parametrize("builtin_role_name", ["Worker", CONDUCTOR_ROLE_NAME])
+def test_delete_role_rejects_builtin_role(monkeypatch, builtin_role_name):
+    settings = Settings(
+        roles=[RoleConfig(name=builtin_role_name, system_prompt="Do work.")]
+    )
 
     monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(delete_role("Worker"))
+        asyncio.run(delete_role(builtin_role_name))
 
     assert excinfo.value.status_code == 400
-    assert excinfo.value.detail == "Cannot delete built-in role 'Worker'"
+    assert excinfo.value.detail == f"Cannot delete built-in role '{builtin_role_name}'"
 
 
 def test_create_role_rejects_overlapping_included_and_excluded_tools(monkeypatch):

@@ -5,6 +5,9 @@ from app.agent import Agent, _get_tool_registry
 from app.registry import registry
 from app.runtime import bootstrap_runtime
 from app.settings import (
+    CONDUCTOR_ROLE_INCLUDED_TOOLS,
+    CONDUCTOR_ROLE_NAME,
+    CONDUCTOR_ROLE_SYSTEM_PROMPT,
     WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
@@ -22,6 +25,8 @@ def test_bootstrap_runtime_assigns_all_registered_tools_to_conductor(monkeypatch
         conductor = registry.get("conductor")
 
         assert conductor is not None
+        assert conductor.config.node_type.value == "agent"
+        assert conductor.config.role_name == CONDUCTOR_ROLE_NAME
         assert conductor.config.tools == [
             tool.name for tool in _get_tool_registry().list_tools()
         ]
@@ -58,7 +63,12 @@ def test_bootstrap_runtime_creates_builtin_worker_role(monkeypatch, tmp_path):
                 name=WORKER_ROLE_NAME,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
                 included_tools=WORKER_ROLE_INCLUDED_TOOLS,
-            )
+            ),
+            RoleConfig(
+                name=CONDUCTOR_ROLE_NAME,
+                system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
+                included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
+            ),
         ]
 
     finally:
@@ -101,7 +111,12 @@ def test_bootstrap_runtime_reconciles_existing_worker_role(monkeypatch, tmp_path
                 name=WORKER_ROLE_NAME,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
                 included_tools=WORKER_ROLE_INCLUDED_TOOLS,
-            )
+            ),
+            RoleConfig(
+                name=CONDUCTOR_ROLE_NAME,
+                system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
+                included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
+            ),
         ]
     finally:
         registry.reset()
@@ -140,6 +155,8 @@ def test_bootstrap_runtime_inherits_root_boundary(monkeypatch, tmp_path):
         assert conductor is not None
         assert steward.config.write_dirs == [str(tmp_path / "workspace")]
         assert steward.config.allow_network is True
+        assert conductor.config.node_type.value == "agent"
+        assert conductor.config.role_name == CONDUCTOR_ROLE_NAME
         assert conductor.config.write_dirs == [str(tmp_path / "workspace")]
         assert conductor.config.allow_network is True
     finally:

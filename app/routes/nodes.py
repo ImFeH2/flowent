@@ -52,10 +52,8 @@ async def terminate_node(node_id: str) -> dict:
 
     from app.models import NodeType
 
-    if node.config.node_type in (NodeType.STEWARD, NodeType.CONDUCTOR):
-        raise HTTPException(
-            status_code=400, detail="Cannot terminate steward or conductor"
-        )
+    if node.config.node_type == NodeType.STEWARD:
+        raise HTTPException(status_code=400, detail="Cannot terminate steward")
 
     node.request_termination("user_requested")
     return {"status": "terminating"}

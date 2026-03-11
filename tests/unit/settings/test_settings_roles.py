@@ -2,6 +2,9 @@ import json
 
 import app.settings as settings_module
 from app.settings import (
+    CONDUCTOR_ROLE_INCLUDED_TOOLS,
+    CONDUCTOR_ROLE_NAME,
+    CONDUCTOR_ROLE_SYSTEM_PROMPT,
     WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
@@ -145,7 +148,7 @@ def test_load_settings_parses_role_tool_configuration(monkeypatch, tmp_path):
     ]
 
 
-def test_ensure_builtin_roles_repairs_worker_drift():
+def test_ensure_builtin_roles_repairs_and_creates_builtin_roles():
     settings = Settings(
         roles=[
             RoleConfig(
@@ -166,5 +169,11 @@ def test_ensure_builtin_roles_repairs_worker_drift():
             system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
             included_tools=WORKER_ROLE_INCLUDED_TOOLS,
             excluded_tools=[],
-        )
+        ),
+        RoleConfig(
+            name=CONDUCTOR_ROLE_NAME,
+            system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
+            included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
+            excluded_tools=[],
+        ),
     ]

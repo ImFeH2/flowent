@@ -11,7 +11,12 @@ SYSTEM_NODE_TIMEOUT = 5.0
 def bootstrap_runtime() -> None:
     from app.agent import Agent, _get_tool_registry
     from app.models import Event, EventType, NodeConfig, NodeType
-    from app.settings import ensure_builtin_roles, get_settings, save_settings
+    from app.settings import (
+        CONDUCTOR_ROLE_NAME,
+        ensure_builtin_roles,
+        get_settings,
+        save_settings,
+    )
 
     settings = get_settings()
     if ensure_builtin_roles(settings):
@@ -33,7 +38,8 @@ def bootstrap_runtime() -> None:
 
     conductor = Agent(
         NodeConfig(
-            node_type=NodeType.CONDUCTOR,
+            node_type=NodeType.AGENT,
+            role_name=CONDUCTOR_ROLE_NAME,
             tools=conductor_tools,
             write_dirs=list(root_boundary.write_dirs),
             allow_network=root_boundary.allow_network,
@@ -54,7 +60,10 @@ def bootstrap_runtime() -> None:
         )
     )
 
-    logger.info("Steward and Conductor started, initial connection established")
+    logger.info(
+        "Steward and Conductor started, initial connection established (conductor_role={})",
+        conductor.config.role_name,
+    )
 
 
 def shutdown_runtime(timeout: float = SYSTEM_NODE_TIMEOUT) -> None:

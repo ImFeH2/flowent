@@ -60,7 +60,6 @@ class ToolRegistry:
 
 
 def build_tool_registry() -> ToolRegistry:
-    from app.tools.connect import ConnectTool
     from app.tools.edit import EditTool
     from app.tools.exec import ExecTool
     from app.tools.exit import ExitTool
@@ -86,7 +85,6 @@ def build_tool_registry() -> ToolRegistry:
         ExecTool,
         FetchTool,
         SpawnTool,
-        ConnectTool,
         ListRolesTool,
         ListToolsTool,
     ]:

@@ -2,6 +2,10 @@ import { useState, useCallback } from "react";
 
 const widthCache: Record<string, number> = {};
 
+export function hasCachedPanelWidth(id: string): boolean {
+  return Object.hasOwn(widthCache, id);
+}
+
 export function usePanelWidth(
   id: string,
   defaultWidth: number,

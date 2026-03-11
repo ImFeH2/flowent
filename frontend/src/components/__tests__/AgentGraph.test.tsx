@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentGraph } from "@/components/AgentGraph";
+import { getAgentNodeWidth } from "@/lib/layout";
 import type { Node } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
@@ -175,7 +176,7 @@ afterEach(() => {
 });
 
 describe("AgentGraph", () => {
-  it("renders unnamed agent nodes using role_name and fixed node dimensions", async () => {
+  it("renders unnamed agent nodes using role_name and sizes width to fit the label", async () => {
     renderGraph([
       buildNode({
         id: "steward",
@@ -193,7 +194,9 @@ describe("AgentGraph", () => {
     expect(screen.getByText("Worker")).toBeInTheDocument();
 
     const workerNode = screen.getByTestId("node-worker-1").firstElementChild;
-    expect(workerNode).toHaveClass("w-[220px]");
+    expect(workerNode).toHaveStyle({
+      width: `${getAgentNodeWidth("Worker")}px`,
+    });
     expect(workerNode).toHaveClass("h-[62px]");
   });
 

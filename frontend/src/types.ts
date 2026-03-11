@@ -81,6 +81,9 @@ export interface NodeDetail {
   connections: string[];
   role_name: string | null;
   todos: TodoItem[];
+  tools: string[];
+  write_dirs: string[];
+  allow_network: boolean;
   history: HistoryEntry[];
 }
 

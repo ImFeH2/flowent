@@ -13,9 +13,10 @@ interface StewardPanelProps {
 export function StewardPanel({ variant = "page" }: StewardPanelProps) {
   const {
     connected,
-    bottomRef,
     handleKeyDown,
     input,
+    onMessagesScroll,
+    scrollRef,
     sending,
     sendMessage,
     setInput,
@@ -35,8 +36,9 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
     >
       <PanelHeader connected={connected} floating={isFloating} />
       <StewardChatMessages
-        bottomRef={bottomRef}
         messages={stewardMessages}
+        onScroll={onMessagesScroll}
+        scrollRef={scrollRef}
         variant={chatVariant}
       />
       <StewardChatComposer

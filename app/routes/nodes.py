@@ -40,6 +40,9 @@ async def get_node(node_id: str) -> dict:
         "connections": node.get_connections_snapshot(),
         "name": node.config.name,
         "todos": [t.serialize() for t in node.todos],
+        "tools": list(node.config.tools),
+        "write_dirs": list(node.config.write_dirs),
+        "allow_network": node.config.allow_network,
         "history": [entry.serialize() for entry in node.get_history_snapshot()],
     }
 

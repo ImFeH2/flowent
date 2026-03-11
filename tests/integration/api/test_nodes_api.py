@@ -26,6 +26,18 @@ def test_get_agent_not_found(client: TestClient):
     assert "Node not found" in response.json()["detail"]
 
 
+def test_get_node_detail_includes_runtime_config(client: TestClient):
+    response = client.get("/api/nodes/steward")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "steward"
+    assert isinstance(data["history"], list)
+    assert isinstance(data["tools"], list)
+    assert isinstance(data["write_dirs"], list)
+    assert isinstance(data["allow_network"], bool)
+
+
 def test_direct_node_message_api_is_not_available(client: TestClient):
     assert not any(
         getattr(route, "path", None) == "/api/nodes/{node_id}/message"
@@ -42,6 +54,23 @@ def test_only_steward_node_exists_at_startup(client: TestClient):
     assert nodes[0]["id"] == "steward"
     assert nodes[0]["node_type"] == "steward"
     assert nodes[0]["role_name"] is None
+
+
+def test_get_steward_detail_includes_tools_and_permissions(client: TestClient):
+    response = client.get("/api/nodes/steward")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == "steward"
+    assert data["tools"] == [
+        "create_root",
+        "manage_providers",
+        "manage_roles",
+        "manage_settings",
+        "manage_prompts",
+    ]
+    assert data["write_dirs"] == []
+    assert data["allow_network"] is True
 
 
 def test_steward_cannot_be_terminated_via_nodes_api(client: TestClient):

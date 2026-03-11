@@ -3,7 +3,6 @@ import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import {
-  getNodeLabel,
   nodeTypeIcon,
   nodeTypeIconStyle,
   stateBorder,
@@ -13,6 +12,8 @@ import {
 import type { AgentState, NodeType } from "@/types";
 
 interface AgentNodeData {
+  label: string;
+  width: number;
   node_type: NodeType;
   state: AgentState;
   shortId: string;
@@ -25,7 +26,7 @@ interface AgentNodeData {
 }
 
 export function AgentGraphNode({ data }: NodeProps) {
-  const { node_type, state, name, role_name, latestTodo, selected, toolCall } =
+  const { label, width, node_type, state, latestTodo, selected, toolCall } =
     data as unknown as AgentNodeData;
   const Icon = nodeTypeIcon[node_type];
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -74,11 +75,6 @@ export function AgentGraphNode({ data }: NodeProps) {
   const borderClass = selected
     ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
     : cn(baseBorder, "hover:border-graph-node-border-hover");
-  const label = getNodeLabel({
-    name,
-    roleName: role_name,
-    nodeType: node_type,
-  });
 
   return (
     <motion.div
@@ -94,12 +90,13 @@ export function AgentGraphNode({ data }: NodeProps) {
       }}
       transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
       className={cn(
-        "relative isolate flex h-[62px] w-[220px] items-center gap-3 overflow-visible rounded-md border px-4 py-3",
+        "relative isolate flex h-[62px] min-w-0 items-center gap-3 overflow-visible rounded-md border px-4 py-3",
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
         "bg-graph-node-bg",
         "transition-[border-color] duration-300",
         borderClass,
       )}
+      style={{ width: `${width}px` }}
     >
       <div
         aria-hidden="true"

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type UIEvent,
+} from "react";
 import { toast } from "sonner";
 import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 
@@ -7,11 +13,23 @@ export function useStewardChat() {
   const { stewardMessages, sendStewardMessage } = useAgentUI();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [stewardMessages.length]);
+    const element = scrollRef.current;
+    if (!element || !autoScrollRef.current) {
+      return;
+    }
+    element.scrollTop = element.scrollHeight;
+  }, [stewardMessages]);
+
+  const onMessagesScroll = (event: UIEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const distanceToBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight;
+    autoScrollRef.current = distanceToBottom <= 24;
+  };
 
   const sendMessage = async () => {
     const content = input.trim();
@@ -38,9 +56,10 @@ export function useStewardChat() {
 
   return {
     connected,
-    bottomRef,
     handleKeyDown,
     input,
+    onMessagesScroll,
+    scrollRef,
     sending,
     sendMessage,
     setInput,

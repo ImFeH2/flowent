@@ -9,7 +9,12 @@ interface MarkdownContentProps {
 
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
   return (
-    <div className={cn("break-words", className)}>
+    <div
+      className={cn(
+        "min-w-0 max-w-full overflow-hidden break-words [overflow-wrap:anywhere]",
+        className,
+      )}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -20,7 +25,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             const isInline = !cls;
             if (isInline) {
               return (
-                <code className="rounded bg-surface-3 px-1 py-0.5 font-mono text-[0.9em] text-foreground/90">
+                <code className="rounded bg-surface-3 px-1 py-0.5 font-mono text-[0.9em] text-foreground/90 break-all">
                   {children}
                 </code>
               );
@@ -32,7 +37,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             );
           },
           pre: ({ children }) => (
-            <pre className="mb-1.5 overflow-x-auto rounded bg-surface-1 p-2 text-[0.9em] leading-relaxed">
+            <pre className="mb-1.5 max-w-full overflow-x-auto rounded bg-surface-1 p-2 text-[0.9em] leading-relaxed">
               {children}
             </pre>
           ),

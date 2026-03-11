@@ -1,4 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bot,
@@ -21,24 +29,74 @@ import { useStewardChat } from "@/hooks/useStewardChat";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { Badge } from "@/components/ui/badge";
 import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
-import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
+import {
+  hasCachedPanelWidth,
+  usePanelDrag,
+  usePanelWidth,
+} from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
+
+const WORKSPACE_PANEL_ID = "workspace-panel-width";
+const MIN_PANEL_WIDTH = 320;
+const MIN_GRAPH_WIDTH = 320;
+const MAX_PANEL_WIDTH = 1400;
 
 export function HomePage() {
   const { agents, connected } = useAgentRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
-  const [panelWidth, setPanelWidth] = usePanelWidth(
-    "workspace-panel-width",
-    380,
-    280,
-    600,
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const [panelWidth, setStoredPanelWidth] = usePanelWidth(
+    WORKSPACE_PANEL_ID,
+    520,
+    MIN_PANEL_WIDTH,
+    MAX_PANEL_WIDTH,
+  );
+  const setPanelWidth = useCallback(
+    (nextWidth: number) => {
+      const containerWidth =
+        workspaceRef.current?.clientWidth ??
+        (typeof window === "undefined" ? nextWidth : window.innerWidth);
+      const maxWidth = Math.max(
+        MIN_PANEL_WIDTH,
+        containerWidth - MIN_GRAPH_WIDTH,
+      );
+      setStoredPanelWidth(Math.min(nextWidth, maxWidth));
+    },
+    [setStoredPanelWidth],
   );
   const { isDragging, startDrag } = usePanelDrag(
     panelWidth,
     setPanelWidth,
     "left",
   );
+
+  useLayoutEffect(() => {
+    if (hasCachedPanelWidth(WORKSPACE_PANEL_ID)) {
+      return;
+    }
+    const containerWidth = workspaceRef.current?.clientWidth;
+    if (!containerWidth) {
+      return;
+    }
+    setPanelWidth(containerWidth / 2);
+  }, [setPanelWidth]);
+
+  useEffect(() => {
+    const element = workspaceRef.current;
+    if (!element) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      setPanelWidth(panelWidth);
+    });
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [panelWidth, setPanelWidth]);
 
   const metrics = useMemo(() => {
     const states = Array.from(agents.values()).reduce(
@@ -70,7 +128,10 @@ export function HomePage() {
   };
 
   return (
-    <div className="relative flex h-full overflow-hidden rounded-xl bg-surface-1">
+    <div
+      ref={workspaceRef}
+      className="relative flex h-full overflow-hidden rounded-xl bg-surface-1"
+    >
       {/* Main Graph Area */}
       <div className="relative flex min-w-0 flex-1 flex-col">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_48%)] opacity-30 z-0" />
@@ -118,34 +179,40 @@ export function HomePage() {
               className="flex h-full flex-col overflow-hidden"
               style={{ width: `${panelWidth}px` }}
             >
-              <AnimatePresence mode="wait">
-                {selectedAgent ? (
-                  <motion.div
-                    key="detail"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex h-full flex-col"
-                  >
-                    <AgentDetailPanel
-                      agent={selectedAgent}
-                      onClose={() => selectAgent(null)}
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="chat"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex h-full flex-col"
-                  >
-                    <StewardChatPanel />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <div className="relative flex-1 overflow-hidden">
+                <motion.div
+                  animate={{
+                    opacity: selectedAgent ? 0 : 1,
+                    x: selectedAgent ? -8 : 0,
+                  }}
+                  transition={{ duration: 0.15 }}
+                  className={cn(
+                    "absolute inset-0 flex h-full flex-col",
+                    selectedAgent && "pointer-events-none",
+                  )}
+                  aria-hidden={selectedAgent ? true : undefined}
+                >
+                  <StewardChatPanel />
+                </motion.div>
+
+                <AnimatePresence>
+                  {selectedAgent ? (
+                    <motion.div
+                      key={selectedAgent.id}
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute inset-0 flex h-full flex-col bg-surface-2"
+                    >
+                      <AgentDetailPanel
+                        agent={selectedAgent}
+                        onClose={() => selectAgent(null)}
+                      />
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
             </div>
           </motion.aside>
         )}
@@ -169,15 +236,33 @@ function AgentDetailPanel({
   agent: Node;
   onClose: () => void;
 }) {
+  const { agents } = useAgentRuntime();
   const { detail, error, loading } = useAgentDetail(agent.id);
   const detailState = detail?.state ?? agent.state;
   const detailConnections = detail?.connections ?? agent.connections;
   const detailTodos = detail?.todos ?? agent.todos;
   const detailHistory = detail?.history ?? [];
+  const detailRoleName = detail?.role_name ?? agent.role_name;
+  const detailTools = detail?.tools ?? [];
+  const detailWriteDirs = detail?.write_dirs ?? [];
+  const detailAllowNetwork = detail?.allow_network ?? false;
   const label = getNodeLabel({
     name: agent.name,
     roleName: agent.role_name,
     nodeType: agent.node_type,
+  });
+  const connectionItems = detailConnections.map((connectionId) => {
+    const connectedAgent = agents.get(connectionId);
+    return {
+      id: connectionId,
+      label: connectedAgent
+        ? getNodeLabel({
+            name: connectedAgent.name,
+            roleName: connectedAgent.role_name,
+            nodeType: connectedAgent.node_type,
+          })
+        : connectionId.slice(0, 8),
+    };
   });
 
   return (
@@ -207,7 +292,7 @@ function AgentDetailPanel({
 
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Status
@@ -230,28 +315,109 @@ function AgentDetailPanel({
                 {detailConnections.length} connected nodes
               </p>
             </div>
+
+            <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Role
+              </p>
+              <p className="mt-2 text-sm text-foreground">
+                {detailRoleName ?? "None"}
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Todos
-            </p>
-            <div className="mt-2 space-y-2">
+          <DetailSection title="Connections">
+            {connectionItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No direct connections
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {connectionItems.map((connection) => (
+                  <span
+                    key={connection.id}
+                    className="rounded-full border border-glass-border bg-surface-3 px-2.5 py-1 text-xs text-foreground"
+                  >
+                    {connection.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </DetailSection>
+
+          <DetailSection title="Tools">
+            {detailTools.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No tools configured
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {detailTools.map((tool) => (
+                  <span
+                    key={tool}
+                    className="rounded-full border border-glass-border bg-surface-3 px-2.5 py-1 text-xs font-mono text-foreground"
+                  >
+                    {tool}
+                  </span>
+                ))}
+              </div>
+            )}
+          </DetailSection>
+
+          <DetailSection title="Permissions">
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Network
+                </p>
+                <p className="mt-1 text-sm text-foreground">
+                  {detailAllowNetwork ? "Enabled" : "Disabled"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Write Dirs
+                </p>
+                {detailWriteDirs.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    No write access
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-1">
+                    {detailWriteDirs.map((path) => (
+                      <p
+                        key={path}
+                        className="rounded-md bg-surface-3 px-2 py-1 font-mono text-[11px] text-foreground"
+                      >
+                        {path}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </DetailSection>
+
+          <DetailSection title="Todos">
+            <div className="space-y-2">
               {detailTodos.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No todos</p>
               ) : (
                 detailTodos.slice(0, 6).map((todo) => (
                   <div
                     key={todo.text}
-                    className="flex items-center gap-2 text-sm text-foreground"
+                    className="flex min-w-0 items-center gap-2 text-sm text-foreground"
                   >
                     <span className="size-2 rounded-full bg-amber-500" />
-                    <span>{todo.text}</span>
+                    <span className="min-w-0 break-words [overflow-wrap:anywhere]">
+                      {todo.text}
+                    </span>
                   </div>
                 ))
               )}
             </div>
-          </div>
+          </DetailSection>
 
           <div className="overflow-hidden rounded-lg border border-glass-border bg-surface-2">
             <div className="border-b border-glass-border px-3 py-2">
@@ -287,10 +453,11 @@ function AgentDetailPanel({
 
 function StewardChatPanel() {
   const {
-    bottomRef,
     connected,
     handleKeyDown,
     input,
+    onMessagesScroll,
+    scrollRef,
     sending,
     sendMessage,
     setInput,
@@ -312,8 +479,9 @@ function StewardChatPanel() {
       </div>
 
       <StewardChatMessages
-        bottomRef={bottomRef}
         messages={stewardMessages}
+        onScroll={onMessagesScroll}
+        scrollRef={scrollRef}
         variant="workspace"
       />
 
@@ -385,5 +553,22 @@ function PanelActionButton({
     >
       {children}
     </button>
+  );
+}
+
+function DetailSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </p>
+      <div className="mt-2">{children}</div>
+    </div>
   );
 }

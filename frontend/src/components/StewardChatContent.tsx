@@ -1,4 +1,4 @@
-import type { KeyboardEventHandler, RefObject } from "react";
+import type { KeyboardEventHandler, RefObject, UIEventHandler } from "react";
 import { MessageSquare, Send, Shield, Sparkles } from "lucide-react";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { cn } from "@/lib/utils";
@@ -7,8 +7,9 @@ import type { StewardMessage } from "@/types";
 export type StewardChatVariant = "panel" | "floating" | "workspace";
 
 interface StewardChatMessagesProps {
-  bottomRef: RefObject<HTMLDivElement | null>;
+  scrollRef: RefObject<HTMLDivElement | null>;
   messages: StewardMessage[];
+  onScroll: UIEventHandler<HTMLDivElement>;
   variant: StewardChatVariant;
 }
 
@@ -22,8 +23,9 @@ interface StewardChatComposerProps {
 }
 
 export function StewardChatMessages({
-  bottomRef,
+  scrollRef,
   messages,
+  onScroll,
   variant,
 }: StewardChatMessagesProps) {
   const isWorkspace = variant === "workspace";
@@ -31,6 +33,8 @@ export function StewardChatMessages({
 
   return (
     <div
+      ref={scrollRef}
+      onScroll={onScroll}
       className={cn(
         "flex-1 space-y-4 overflow-y-auto",
         isWorkspace ? "p-4" : "px-4 py-4",
@@ -46,12 +50,15 @@ export function StewardChatMessages({
       {messages.map((msg, i) => (
         <div
           key={`${msg.timestamp}-${i}`}
-          className={`flex ${msg.from === "human" ? "justify-end" : "justify-start"}`}
+          className={cn(
+            "flex min-w-0",
+            msg.from === "human" ? "justify-end" : "justify-start",
+          )}
         >
           {msg.from === "steward" && (
             <div
               className={cn(
-                "flex items-start gap-2",
+                "flex min-w-0 items-start gap-2",
                 isWorkspace ? "max-w-[85%]" : "max-w-[80%]",
               )}
             >
@@ -67,7 +74,7 @@ export function StewardChatMessages({
               />
               <div
                 className={cn(
-                  "border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground",
+                  "min-w-0 max-w-full overflow-hidden border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground",
                   isWorkspace ? "rounded-md" : "rounded-2xl",
                 )}
               >
@@ -79,7 +86,7 @@ export function StewardChatMessages({
           {msg.from === "human" && (
             <div
               className={cn(
-                "px-3 py-2 text-sm",
+                "min-w-0 overflow-hidden px-3 py-2 text-sm [overflow-wrap:anywhere]",
                 isWorkspace
                   ? "max-w-[85%] rounded-md bg-primary text-primary-foreground shadow-lg"
                   : "max-w-[80%] rounded-2xl border border-glass-border bg-surface-3 text-foreground",
@@ -90,8 +97,6 @@ export function StewardChatMessages({
           )}
         </div>
       ))}
-
-      <div ref={bottomRef} />
     </div>
   );
 }

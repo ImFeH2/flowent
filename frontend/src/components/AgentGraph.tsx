@@ -26,11 +26,12 @@ import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import { useTheme } from "@/context/ThemeContext";
 import {
   AGENT_NODE_HEIGHT,
-  AGENT_NODE_WIDTH,
+  getAgentNodeWidth,
   getLayoutedElements,
 } from "@/lib/layout";
 import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 import { terminateNode } from "@/lib/api";
+import { getNodeLabel } from "@/lib/constants";
 
 const nodeTypes: NodeTypes = {
   agent: AgentGraphNode,
@@ -96,13 +97,21 @@ export function AgentGraph() {
 
     for (const [id, agent] of agents) {
       nodeIds.push(id);
+      const label = getNodeLabel({
+        name: agent.name,
+        roleName: agent.role_name,
+        nodeType: agent.node_type,
+      });
+      const width = getAgentNodeWidth(label);
       rawNodes.push({
         id,
         type: "agent",
         position: { x: 0, y: 0 },
-        width: AGENT_NODE_WIDTH,
+        width,
         height: AGENT_NODE_HEIGHT,
         data: {
+          label,
+          width,
           node_type: agent.node_type,
           state: agent.state,
           shortId: id.slice(0, 8),
@@ -247,6 +256,10 @@ export function AgentGraph() {
   }, [contextMenu, agents, flowInstance, selectAgent]);
 
   const tooltipAgent = tooltip ? agents.get(tooltip.agentId) : null;
+  const tooltipToolCall =
+    tooltip && tooltip.agentId
+      ? (activeToolCalls.get(tooltip.agentId) ?? null)
+      : null;
 
   useEffect(() => {
     if (!tooltip || !tooltipAgent) return;
@@ -313,8 +326,8 @@ export function AgentGraph() {
     if (!tooltip || typeof window === "undefined") return undefined;
     const margin = 8;
     const offset = 12;
-    const width = tooltipSize?.width ?? 240;
-    const height = tooltipSize?.height ?? 64;
+    const width = tooltipSize?.width ?? 280;
+    const height = tooltipSize?.height ?? 120;
     const maxLeft = window.innerWidth - margin - width;
     const maxTop = window.innerHeight - margin - height;
     const left = Math.max(margin, Math.min(tooltip.x + offset, maxLeft));
@@ -419,6 +432,7 @@ export function AgentGraph() {
       <AgentGraphTooltip
         agent={tooltipAgent ?? null}
         agentId={tooltip?.agentId ?? null}
+        activeToolCall={tooltipToolCall}
         style={tooltipStyle}
         tooltipRef={tooltipRef}
       />

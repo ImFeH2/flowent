@@ -1,7 +1,13 @@
 import pytest
 
 from app.providers.gateway import ProviderGateway
-from app.settings import ModelSettings, Settings
+from app.settings import (
+    ModelSettings,
+    ProviderConfig,
+    RoleConfig,
+    RoleModelConfig,
+    Settings,
+)
 
 
 def test_gateway_requires_active_provider(monkeypatch):
@@ -20,3 +26,74 @@ def test_gateway_requires_active_provider(monkeypatch):
 
     with pytest.raises(RuntimeError, match="No active provider configured"):
         gateway.chat(messages=[])
+
+
+def test_gateway_prefers_role_model(monkeypatch):
+    gateway = ProviderGateway()
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-default",
+            ),
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Default Provider",
+                    type="openai_compatible",
+                    base_url="https://default.invalid",
+                    api_key="secret",
+                ),
+                ProviderConfig(
+                    id="provider-2",
+                    name="Role Provider",
+                    type="openai_compatible",
+                    base_url="https://role.invalid",
+                    api_key="secret",
+                ),
+            ],
+            roles=[
+                RoleConfig(
+                    name="Reviewer",
+                    system_prompt="Review carefully.",
+                    model=RoleModelConfig(
+                        provider_id="provider-2",
+                        model="gpt-role",
+                    ),
+                )
+            ],
+        ),
+    )
+
+    class ProviderStub:
+        def chat(self, messages, tools=None, on_chunk=None):
+            captured["message_count"] = str(len(messages))
+            return type(
+                "Response",
+                (),
+                {"content": "", "thinking": "", "tool_calls": []},
+            )()
+
+        def list_models(self):
+            return []
+
+    monkeypatch.setattr(
+        "app.providers.registry.create_provider",
+        lambda **kwargs: (
+            captured.update(
+                {
+                    "provider_name": kwargs["provider_name"],
+                    "model": kwargs["model"],
+                }
+            )
+            or ProviderStub()
+        ),
+    )
+
+    gateway.chat(messages=[], role_name="Reviewer")
+
+    assert captured["provider_name"] == "Role Provider"
+    assert captured["model"] == "gpt-role"

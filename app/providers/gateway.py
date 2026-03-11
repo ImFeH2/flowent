@@ -24,8 +24,9 @@ class ProviderGateway:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        role_name: str | None = None,
     ) -> LLMResponse:
-        provider = self._resolve()
+        provider = self._resolve(role_name=role_name)
         return provider.chat(messages, tools, on_chunk)
 
     def list_models_for(self, provider_id: str) -> list[ModelInfo]:
@@ -46,21 +47,34 @@ class ProviderGateway:
         )
         return provider.list_models()
 
-    def _resolve(self) -> LLMProvider:
+    def _resolve(self, role_name: str | None = None) -> LLMProvider:
         from app.providers.registry import create_provider
-        from app.settings import find_provider, get_settings
+        from app.settings import find_provider, find_role, get_settings
 
         settings = get_settings()
-        ms = settings.model
-        cfg = find_provider(settings, ms.active_provider_id)
+        provider_id = settings.model.active_provider_id
+        model = settings.model.active_model
 
-        if cfg is None:
+        role_cfg = find_role(settings, role_name) if role_name else None
+        if (
+            role_cfg is not None
+            and role_cfg.model is not None
+            and role_cfg.model.provider_id
+            and role_cfg.model.model
+        ):
+            provider_id = role_cfg.model.provider_id
+            model = role_cfg.model.model
+
+        if not provider_id:
             raise RuntimeError("No active provider configured")
+
+        cfg = find_provider(settings, provider_id)
+        if cfg is None:
+            raise RuntimeError(f"Provider '{provider_id}' not found")
 
         provider_type = cfg.type
         base_url = cfg.base_url
         api_key = cfg.api_key
-        model = ms.active_model
         provider_name = cfg.name
         cache_key = (
             cfg.id,

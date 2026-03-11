@@ -244,6 +244,7 @@ class Agent:
                         messages=messages,
                         tools=tools_schema or None,
                         on_chunk=_on_llm_chunk,
+                        role_name=self.config.role_name,
                     )
 
                     self._log.debug(

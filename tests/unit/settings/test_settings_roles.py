@@ -9,6 +9,7 @@ from app.settings import (
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
     RoleConfig,
+    RoleModelConfig,
     RootBoundary,
     Settings,
 )
@@ -20,7 +21,10 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
         json.dumps(
             {
                 "event_log": {"timestamp_format": "absolute"},
-                "model": {"active_provider_id": "", "active_model": ""},
+                "model": {
+                    "active_provider_id": "provider-1",
+                    "active_model": "gpt-default",
+                },
                 "providers": [],
                 "roles": [
                     {
@@ -53,6 +57,7 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
         {
             "name": "Worker",
             "system_prompt": "Do work.",
+            "model": None,
             "included_tools": ["read"],
             "excluded_tools": [],
         }
@@ -112,18 +117,22 @@ def test_load_settings_parses_root_boundary(monkeypatch, tmp_path):
     )
 
 
-def test_load_settings_parses_role_tool_configuration(monkeypatch, tmp_path):
+def test_load_settings_migrates_legacy_model_override(monkeypatch, tmp_path):
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
         json.dumps(
             {
                 "event_log": {"timestamp_format": "absolute"},
-                "model": {"active_provider_id": "", "active_model": ""},
+                "model": {
+                    "active_provider_id": "provider-1",
+                    "active_model": "gpt-default",
+                },
                 "providers": [],
                 "roles": [
                     {
                         "name": "Reviewer",
                         "system_prompt": "Review carefully.",
+                        "model_override": "gpt-4.1-mini",
                         "included_tools": ["read", "exec"],
                         "excluded_tools": ["fetch"],
                     }
@@ -142,8 +151,69 @@ def test_load_settings_parses_role_tool_configuration(monkeypatch, tmp_path):
         RoleConfig(
             name="Reviewer",
             system_prompt="Review carefully.",
+            model=RoleModelConfig(
+                provider_id="provider-1",
+                model="gpt-4.1-mini",
+            ),
             included_tools=["read", "exec"],
             excluded_tools=["fetch"],
+        )
+    ]
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["roles"] == [
+        {
+            "name": "Reviewer",
+            "system_prompt": "Review carefully.",
+            "model": {
+                "provider_id": "provider-1",
+                "model": "gpt-4.1-mini",
+            },
+            "included_tools": ["read", "exec"],
+            "excluded_tools": ["fetch"],
+        }
+    ]
+
+
+def test_load_settings_parses_role_model_object(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {
+                    "active_provider_id": "provider-1",
+                    "active_model": "gpt-default",
+                },
+                "providers": [],
+                "roles": [
+                    {
+                        "name": "Reviewer",
+                        "system_prompt": "Review carefully.",
+                        "model": {
+                            "provider_id": "provider-2",
+                            "model": "gpt-4.1-mini",
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+
+    assert loaded.roles == [
+        RoleConfig(
+            name="Reviewer",
+            system_prompt="Review carefully.",
+            model=RoleModelConfig(
+                provider_id="provider-2",
+                model="gpt-4.1-mini",
+            ),
         )
     ]
 

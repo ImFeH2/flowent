@@ -1,6 +1,12 @@
 from fastapi.testclient import TestClient
 
-from app.settings import CONDUCTOR_ROLE_NAME, RoleConfig, Settings
+from app.settings import (
+    CONDUCTOR_ROLE_NAME,
+    ProviderConfig,
+    RoleConfig,
+    RoleModelConfig,
+    Settings,
+)
 
 
 def test_roles_api_lists_worker_and_conductor_as_builtin(client: TestClient):
@@ -67,6 +73,7 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
     assert update.json() == {
         "name": "Researcher",
         "system_prompt": "investigate",
+        "model": None,
         "included_tools": [],
         "excluded_tools": [],
         "is_builtin": False,
@@ -116,3 +123,42 @@ def test_create_role_rejects_overlapping_included_and_excluded_tools(
     assert response.json() == {
         "detail": "included_tools and excluded_tools cannot overlap: read"
     }
+
+
+def test_create_role_accepts_model_override(client: TestClient, monkeypatch):
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ]
+    )
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("app.routes.roles.save_settings", lambda updated: None)
+
+    response = client.post(
+        "/api/roles",
+        json={
+            "name": "Reviewer",
+            "system_prompt": "Review work",
+            "model": {
+                "provider_id": "provider-1",
+                "model": "gpt-4.1-mini",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["model"] == {
+        "provider_id": "provider-1",
+        "model": "gpt-4.1-mini",
+    }
+    assert settings.roles[0].model == RoleModelConfig(
+        provider_id="provider-1",
+        model="gpt-4.1-mini",
+    )

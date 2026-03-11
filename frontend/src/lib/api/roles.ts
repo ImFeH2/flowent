@@ -1,9 +1,10 @@
-import type { Role } from "@/types";
+import type { Role, RoleModelConfig } from "@/types";
 import { requestJson, requestVoid } from "./shared";
 
 type RolePayload = {
   name: string;
   system_prompt: string;
+  model: RoleModelConfig | null;
   included_tools: string[];
   excluded_tools: string[];
 };

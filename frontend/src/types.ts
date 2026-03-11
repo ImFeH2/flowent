@@ -87,6 +87,11 @@ export interface NodeDetail {
   history: HistoryEntry[];
 }
 
+export interface RoleModelConfig {
+  provider_id: string;
+  model: string;
+}
+
 export type StreamingDelta =
   | { type: "ContentDelta"; text: string }
   | { type: "ThinkingDelta"; text: string }
@@ -95,6 +100,7 @@ export type StreamingDelta =
 export interface Role {
   name: string;
   system_prompt: string;
+  model: RoleModelConfig | null;
   included_tools: string[];
   excluded_tools: string[];
   is_builtin: boolean;

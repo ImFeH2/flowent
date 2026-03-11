@@ -1,27 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import {
-  BookOpen,
-  Check,
-  Edit2,
-  Eye,
-  Plus,
-  RefreshCw,
-  Trash2,
-  X,
-} from "lucide-react";
+import { BookOpen, Edit2, Eye, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   createRole,
   deleteRole,
+  fetchProviderModels,
+  fetchProviders,
   fetchRoles,
   fetchTools,
   updateRole,
+  type ModelOption,
   type ToolInfo,
 } from "@/lib/api";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { cn } from "@/lib/utils";
-import type { Role } from "@/types";
+import type { Provider, Role, RoleModelConfig } from "@/types";
 
 type RoleDraft = Omit<Role, "is_builtin">;
 type ToolState = "allowed" | "included" | "excluded";
@@ -38,6 +32,7 @@ const MINIMUM_TOOLS = new Set([
 const emptyDraft = (): RoleDraft => ({
   name: "",
   system_prompt: "",
+  model: null,
   included_tools: [],
   excluded_tools: [],
 });
@@ -45,26 +40,44 @@ const emptyDraft = (): RoleDraft => ({
 export function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [tools, setTools] = useState<ToolInfo[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
   const [loading, setLoading] = useState(true);
   const [panelMode, setPanelMode] = useState<PanelMode | null>(null);
   const [activeRoleName, setActiveRoleName] = useState<string | null>(null);
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
+  const [modelOptionsByProvider, setModelOptionsByProvider] = useState<
+    Record<string, ModelOption[]>
+  >({});
+  const [loadingModelProviderId, setLoadingModelProviderId] = useState<
+    string | null
+  >(null);
 
   const configurableTools = useMemo(
     () => tools.filter((tool) => !MINIMUM_TOOLS.has(tool.name)),
     [tools],
   );
+  const providersById = useMemo(
+    () =>
+      Object.fromEntries(providers.map((provider) => [provider.id, provider])),
+    [providers],
+  );
+  const activeProviderId = draft.model?.provider_id ?? "";
+  const activeProviderModelOptions = activeProviderId
+    ? (modelOptionsByProvider[activeProviderId] ?? [])
+    : [];
 
   const refreshRoles = async () => {
     setLoading(true);
     try {
-      const [roleItems, toolItems] = await Promise.all([
+      const [roleItems, toolItems, providerItems] = await Promise.all([
         fetchRoles(),
         fetchTools(),
+        fetchProviders(),
       ]);
       setRoles(roleItems);
       setTools(toolItems);
+      setProviders(providerItems);
     } catch {
       toast.error("Failed to load roles");
     } finally {
@@ -75,6 +88,48 @@ export function RolesPage() {
   useEffect(() => {
     void refreshRoles();
   }, []);
+
+  useEffect(() => {
+    const providerId = draft.model?.provider_id;
+    if (!providerId || modelOptionsByProvider[providerId]) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingModelProviderId(providerId);
+
+    void fetchProviderModels(providerId)
+      .then((items) => {
+        if (cancelled) {
+          return;
+        }
+        setModelOptionsByProvider((current) => ({
+          ...current,
+          [providerId]: items,
+        }));
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        toast.error("Failed to load provider models");
+        setModelOptionsByProvider((current) => ({
+          ...current,
+          [providerId]: [],
+        }));
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingModelProviderId((current) =>
+            current === providerId ? null : current,
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.model?.provider_id, modelOptionsByProvider]);
 
   const handleCreate = () => {
     setPanelMode("create");
@@ -88,6 +143,12 @@ export function RolesPage() {
     setDraft({
       name: role.name,
       system_prompt: role.system_prompt,
+      model: role.model
+        ? {
+            provider_id: role.model.provider_id,
+            model: role.model.model,
+          }
+        : null,
       included_tools: [...role.included_tools],
       excluded_tools: [...role.excluded_tools],
     });
@@ -99,6 +160,12 @@ export function RolesPage() {
     setDraft({
       name: role.name,
       system_prompt: role.system_prompt,
+      model: role.model
+        ? {
+            provider_id: role.model.provider_id,
+            model: role.model.model,
+          }
+        : null,
       included_tools: [...role.included_tools],
       excluded_tools: [...role.excluded_tools],
     });
@@ -108,6 +175,38 @@ export function RolesPage() {
     setPanelMode(null);
     setActiveRoleName(null);
     setDraft(emptyDraft());
+  };
+
+  const handleModelModeChange = (enabled: boolean) => {
+    if (!enabled) {
+      setDraft((current) => ({ ...current, model: null }));
+      return;
+    }
+    if (providers.length === 0) {
+      toast.error("Create a provider before setting a role model");
+      return;
+    }
+    setDraft((current) => ({
+      ...current,
+      model:
+        current.model ??
+        ({
+          provider_id: providers[0]?.id ?? "",
+          model: "",
+        } satisfies RoleModelConfig),
+    }));
+  };
+
+  const handleProviderChange = (providerId: string) => {
+    setDraft((current) => ({
+      ...current,
+      model: current.model
+        ? {
+            provider_id: providerId,
+            model: "",
+          }
+        : null,
+    }));
   };
 
   const handleSave = async () => {
@@ -120,6 +219,16 @@ export function RolesPage() {
     if (!draft.system_prompt.trim()) {
       toast.error("System prompt is required");
       return;
+    }
+    if (draft.model) {
+      if (!draft.model.provider_id.trim()) {
+        toast.error("Provider is required for a role model override");
+        return;
+      }
+      if (!draft.model.model.trim()) {
+        toast.error("Model is required for a role model override");
+        return;
+      }
     }
 
     const nameExists = roles.some(
@@ -135,12 +244,23 @@ export function RolesPage() {
       const nextDraft = {
         name: nextName,
         system_prompt: draft.system_prompt,
+        model: draft.model
+          ? {
+              provider_id: draft.model.provider_id.trim(),
+              model: draft.model.model.trim(),
+            }
+          : null,
         included_tools: draft.included_tools,
         excluded_tools: draft.excluded_tools,
       };
 
       if (panelMode === "edit" && activeRoleName) {
-        const updated = await updateRole(activeRoleName, nextDraft);
+        const activeRole =
+          roles.find((role) => role.name === activeRoleName) ?? null;
+        const updates = activeRole?.is_builtin
+          ? { model: nextDraft.model }
+          : nextDraft;
+        const updated = await updateRole(activeRoleName, updates);
         setRoles((prev) =>
           prev.map((role) => (role.name === activeRoleName ? updated : role)),
         );
@@ -161,11 +281,15 @@ export function RolesPage() {
   };
 
   const handleDelete = async (name: string) => {
-    if (!confirm("Are you sure you want to delete this role?")) return;
+    if (!confirm("Are you sure you want to delete this role?")) {
+      return;
+    }
     try {
       await deleteRole(name);
       setRoles((prev) => prev.filter((role) => role.name !== name));
-      if (activeRoleName === name) handleCancel();
+      if (activeRoleName === name) {
+        handleCancel();
+      }
       toast.success("Role deleted");
     } catch (error) {
       toast.error(
@@ -179,10 +303,18 @@ export function RolesPage() {
   const activeRole = activeRoleName
     ? (roles.find((role) => role.name === activeRoleName) ?? null)
     : null;
+  const lockBuiltinFields =
+    panelMode !== "create" &&
+    panelMode !== null &&
+    activeRole?.is_builtin === true;
 
   const getToolState = (toolName: string): ToolState => {
-    if (draft.included_tools.includes(toolName)) return "included";
-    if (draft.excluded_tools.includes(toolName)) return "excluded";
+    if (draft.included_tools.includes(toolName)) {
+      return "included";
+    }
+    if (draft.excluded_tools.includes(toolName)) {
+      return "excluded";
+    }
     return "allowed";
   };
 
@@ -297,11 +429,11 @@ export function RolesPage() {
                     onChange={(e) =>
                       setDraft({ ...draft, name: e.target.value })
                     }
-                    readOnly={isReadOnly}
+                    readOnly={isReadOnly || lockBuiltinFields}
                     placeholder="e.g., Code Reviewer"
                     className={cn(
                       "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
-                      isReadOnly
+                      isReadOnly || lockBuiltinFields
                         ? "cursor-default text-muted-foreground focus:outline-none"
                         : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
                     )}
@@ -315,12 +447,12 @@ export function RolesPage() {
                     onChange={(e) =>
                       setDraft({ ...draft, system_prompt: e.target.value })
                     }
-                    readOnly={isReadOnly}
+                    readOnly={isReadOnly || lockBuiltinFields}
                     placeholder="You are a helpful assistant that..."
                     rows={12}
                     className={cn(
                       "w-full resize-y rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
-                      isReadOnly
+                      isReadOnly || lockBuiltinFields
                         ? "cursor-default text-muted-foreground focus:outline-none"
                         : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
                     )}
@@ -328,10 +460,159 @@ export function RolesPage() {
                   <p className="text-xs text-muted-foreground">
                     {isReadOnly
                       ? activeRole?.is_builtin
-                        ? "This built-in role can be inspected but not modified."
+                        ? "This built-in role can be inspected. Use Edit to adjust only its model configuration."
                         : "This role is in read-only view. Use Edit to modify it."
-                      : "This prompt defines how agents with this role will behave."}
+                      : lockBuiltinFields
+                        ? "Built-in role prompt and tool configuration are fixed. Only model configuration can be changed."
+                        : "This prompt defines how agents with this role will behave."}
                   </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Model Configuration
+                    </label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={isReadOnly}
+                        onClick={() => handleModelModeChange(false)}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                          draft.model === null
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border bg-background text-muted-foreground hover:bg-accent",
+                          isReadOnly && "cursor-default hover:bg-background",
+                        )}
+                      >
+                        Use Settings Default
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isReadOnly}
+                        onClick={() => handleModelModeChange(true)}
+                        className={cn(
+                          "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                          draft.model !== null
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border bg-background text-muted-foreground hover:bg-accent",
+                          isReadOnly && "cursor-default hover:bg-background",
+                        )}
+                      >
+                        Set Role Override
+                      </button>
+                    </div>
+                  </div>
+
+                  {draft.model ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Provider</label>
+                        <select
+                          value={draft.model.provider_id}
+                          onChange={(e) => handleProviderChange(e.target.value)}
+                          disabled={isReadOnly}
+                          className={cn(
+                            "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200",
+                            isReadOnly
+                              ? "cursor-default text-muted-foreground focus:outline-none"
+                              : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                          )}
+                        >
+                          <option value="">Select a provider</option>
+                          {providers.map((provider) => (
+                            <option key={provider.id} value={provider.id}>
+                              {provider.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">
+                          Provider Models
+                        </label>
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (!draft.model) {
+                              return;
+                            }
+                            setDraft((current) => ({
+                              ...current,
+                              model: current.model
+                                ? {
+                                    ...current.model,
+                                    model: e.target.value,
+                                  }
+                                : null,
+                            }));
+                          }}
+                          disabled={
+                            isReadOnly ||
+                            !draft.model.provider_id ||
+                            loadingModelProviderId === draft.model.provider_id
+                          }
+                          className={cn(
+                            "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200",
+                            isReadOnly
+                              ? "cursor-default text-muted-foreground focus:outline-none"
+                              : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                          )}
+                        >
+                          <option value="">
+                            {loadingModelProviderId === draft.model.provider_id
+                              ? "Loading models..."
+                              : activeProviderModelOptions.length > 0
+                                ? "Pick a discovered model"
+                                : "No discovered models"}
+                          </option>
+                          {activeProviderModelOptions.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-sm font-medium">Model</label>
+                        <input
+                          type="text"
+                          value={draft.model.model}
+                          onChange={(e) =>
+                            setDraft((current) => ({
+                              ...current,
+                              model: current.model
+                                ? {
+                                    ...current.model,
+                                    model: e.target.value,
+                                  }
+                                : null,
+                            }))
+                          }
+                          readOnly={isReadOnly}
+                          placeholder="e.g., gpt-4.1-mini"
+                          className={cn(
+                            "w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
+                            isReadOnly
+                              ? "cursor-default text-muted-foreground focus:outline-none"
+                              : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                          )}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Select a discovered model or enter a model ID
+                          manually.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      This role follows the default provider and model from
+                      Settings.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -360,7 +641,7 @@ export function RolesPage() {
                           <button
                             type="button"
                             onClick={() => cycleToolState(tool.name)}
-                            disabled={isReadOnly}
+                            disabled={isReadOnly || lockBuiltinFields}
                             className={cn(
                               "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                               state === "included" &&
@@ -369,7 +650,7 @@ export function RolesPage() {
                                 "border-red-500/40 bg-red-500/10 text-red-600",
                               state === "allowed" &&
                                 "border-border bg-card text-muted-foreground",
-                              isReadOnly &&
+                              (isReadOnly || lockBuiltinFields) &&
                                 "cursor-default opacity-90 hover:bg-inherit",
                             )}
                           >
@@ -397,9 +678,8 @@ export function RolesPage() {
                     <button
                       onClick={() => void handleSave()}
                       disabled={saving}
-                      className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
+                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
                     >
-                      <Check className="size-4" />
                       {saving ? "Saving..." : "Save Role"}
                     </button>
                   )}
@@ -431,49 +711,54 @@ export function RolesPage() {
         </motion.div>
       ) : (
         <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {roles.map((role, i) => (
-            <motion.div
-              key={role.name}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-              className="group relative rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-foreground/15 hover:shadow-md"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                    <BookOpen className="size-5 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="truncate font-semibold">{role.name}</h3>
-                      {role.is_builtin && (
-                        <span className="shrink-0 text-[11px] font-medium tracking-[0.08em] text-muted-foreground/75">
-                          Built-in
-                        </span>
-                      )}
+          {roles.map((role, index) => {
+            const providerName = role.model
+              ? (providersById[role.model.provider_id]?.name ??
+                role.model.provider_id)
+              : null;
+
+            return (
+              <motion.div
+                key={role.name}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="group relative rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-foreground/15 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+                      <BookOpen className="size-5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate font-semibold">{role.name}</h3>
+                        {role.is_builtin && (
+                          <span className="shrink-0 text-[11px] font-medium tracking-[0.08em] text-muted-foreground/75">
+                            Built-in
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button
-                    onClick={() => handleView(role)}
-                    aria-label={`View ${role.name}`}
-                    title={`View ${role.name}`}
-                    className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                  >
-                    <Eye className="size-3.5" />
-                  </button>
-                  {!role.is_builtin && (
-                    <>
-                      <button
-                        onClick={() => handleEdit(role)}
-                        aria-label={`Edit ${role.name}`}
-                        title={`Edit ${role.name}`}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                      >
-                        <Edit2 className="size-3.5" />
-                      </button>
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      onClick={() => handleView(role)}
+                      aria-label={`View ${role.name}`}
+                      title={`View ${role.name}`}
+                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Eye className="size-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleEdit(role)}
+                      aria-label={`Edit ${role.name}`}
+                      title={`Edit ${role.name}`}
+                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <Edit2 className="size-3.5" />
+                    </button>
+                    {!role.is_builtin && (
                       <button
                         onClick={() => handleDelete(role.name)}
                         aria-label={`Delete ${role.name}`}
@@ -482,40 +767,57 @@ export function RolesPage() {
                       >
                         <Trash2 className="size-3.5" />
                       </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="line-clamp-4 text-sm text-muted-foreground">
+                    {role.system_prompt}
+                  </p>
+                </div>
+
+                <div className="mt-4 space-y-1">
+                  {role.model ? (
+                    <>
+                      <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+                        Provider: {providerName}
+                      </p>
+                      <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+                        Model: {role.model.model}
+                      </p>
                     </>
+                  ) : (
+                    <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+                      Model: Settings default
+                    </p>
                   )}
                 </div>
-              </div>
 
-              <div className="mt-4">
-                <p className="line-clamp-4 text-sm text-muted-foreground">
-                  {role.system_prompt}
-                </p>
-              </div>
-
-              {(role.included_tools.length > 0 ||
-                role.excluded_tools.length > 0) && (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {role.included_tools.map((toolName) => (
-                    <span
-                      key={`included-${role.name}-${toolName}`}
-                      className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600"
-                    >
-                      {toolName}
-                    </span>
-                  ))}
-                  {role.excluded_tools.map((toolName) => (
-                    <span
-                      key={`excluded-${role.name}-${toolName}`}
-                      className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-600"
-                    >
-                      {toolName}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          ))}
+                {(role.included_tools.length > 0 ||
+                  role.excluded_tools.length > 0) && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {role.included_tools.map((toolName) => (
+                      <span
+                        key={`included-${role.name}-${toolName}`}
+                        className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600"
+                      >
+                        {toolName}
+                      </span>
+                    ))}
+                    {role.excluded_tools.map((toolName) => (
+                      <span
+                        key={`excluded-${role.name}-${toolName}`}
+                        className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-600"
+                      >
+                        {toolName}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </PageScaffold>

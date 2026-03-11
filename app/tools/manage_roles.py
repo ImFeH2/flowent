@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from app.agent import Agent
-    from app.settings import RoleConfig
+    from app.settings import RoleConfig, RoleModelConfig
 
 from app.tools import Tool
 
@@ -17,12 +17,71 @@ def _find_role_by_name(roles: list[RoleConfig], role_name: str) -> RoleConfig | 
     return None
 
 
+def _resolve_role_model(
+    requested: object,
+    *,
+    current: RoleModelConfig | None,
+    provided: bool,
+) -> tuple[RoleModelConfig | None, str | None]:
+    from app.settings import RoleModelConfig, find_provider, get_settings
+
+    if not provided:
+        return current, None
+    if requested is None:
+        return None, None
+    if not isinstance(requested, dict):
+        return None, "model must be an object or null"
+
+    provider_id = requested.get("provider_id")
+    model = requested.get("model")
+
+    if not isinstance(provider_id, str) or not provider_id.strip():
+        return None, "model.provider_id must be a non-empty string"
+    if not isinstance(model, str) or not model.strip():
+        return None, "model.model must be a non-empty string"
+    if find_provider(get_settings(), provider_id.strip()) is None:
+        return None, f"Provider '{provider_id.strip()}' not found"
+
+    return (
+        RoleModelConfig(
+            provider_id=provider_id.strip(),
+            model=model.strip(),
+        ),
+        None,
+    )
+
+
+def _enforce_builtin_role_guards(
+    role: RoleConfig,
+    *,
+    new_name: str | None,
+    system_prompt: str | None,
+    next_included_tools: list[str],
+    next_excluded_tools: list[str],
+) -> str | None:
+    from app.settings import is_builtin_role_name
+
+    if not is_builtin_role_name(role.name):
+        return None
+    if new_name is not None and new_name != role.name:
+        return f"Cannot rename built-in role '{role.name}'"
+    if system_prompt is not None and system_prompt != role.system_prompt:
+        return f"Cannot modify built-in role '{role.name}' fields other than model"
+    if (
+        next_included_tools != role.included_tools
+        or next_excluded_tools != role.excluded_tools
+    ):
+        return f"Cannot modify built-in role '{role.name}' fields other than model"
+    return None
+
+
 class ManageRolesTool(Tool):
     name = "manage_roles"
     agent_visible = False
     description = (
         "Manage Role configuration. Supports listing, creating, updating, "
-        "and deleting roles. Built-in roles cannot be deleted or renamed."
+        "and deleting roles. Built-in roles cannot be deleted, renamed, "
+        "or modified except for model configuration."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -44,6 +103,16 @@ class ManageRolesTool(Tool):
                 "type": "string",
                 "description": "Role system prompt",
             },
+            "model": {
+                "type": ["object", "null"],
+                "description": "Optional provider and model override for this role",
+                "properties": {
+                    "provider_id": {"type": "string"},
+                    "model": {"type": "string"},
+                },
+                "required": ["provider_id", "model"],
+                "additionalProperties": False,
+            },
             "included_tools": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -59,6 +128,7 @@ class ManageRolesTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+        from app.providers.gateway import gateway
         from app.settings import (
             RoleConfig,
             get_settings,
@@ -73,6 +143,7 @@ class ManageRolesTool(Tool):
         role_name = args.get("name")
         new_name = args.get("new_name")
         system_prompt = args.get("system_prompt")
+        role_model = args.get("model")
         included_tools = args.get("included_tools")
         excluded_tools = args.get("excluded_tools")
 
@@ -118,14 +189,24 @@ class ManageRolesTool(Tool):
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
 
+            next_model, role_model_error = _resolve_role_model(
+                role_model,
+                current=None,
+                provided="model" in args,
+            )
+            if role_model_error is not None:
+                return json.dumps({"error": role_model_error})
+
             new_role = RoleConfig(
                 name=role_name.strip(),
                 system_prompt=system_prompt,
+                model=next_model,
                 included_tools=next_included,
                 excluded_tools=next_excluded,
             )
             settings.roles.append(new_role)
             save_settings(settings)
+            gateway.invalidate_cache()
             return json.dumps(serialize_role(new_role))
 
         if action == "update":
@@ -151,17 +232,19 @@ class ManageRolesTool(Tool):
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
 
+            next_model, role_model_error = _resolve_role_model(
+                role_model,
+                current=target_role.model,
+                provided="model" in args,
+            )
+            if role_model_error is not None:
+                return json.dumps({"error": role_model_error})
+
+            stripped_name = None
             if new_name is not None:
                 stripped_name = new_name.strip()
                 if not stripped_name:
                     return json.dumps({"error": "Role name is required"})
-                if (
-                    is_builtin_role_name(target_role.name)
-                    and stripped_name != target_role.name
-                ):
-                    return json.dumps(
-                        {"error": f"Cannot rename built-in role '{target_role.name}'"}
-                    )
                 if any(
                     other.name == stripped_name and other.name != target_role.name
                     for other in settings.roles
@@ -169,13 +252,27 @@ class ManageRolesTool(Tool):
                     return json.dumps(
                         {"error": f"Role '{stripped_name}' already exists"}
                     )
-                target_role.name = stripped_name
 
+            builtin_error = _enforce_builtin_role_guards(
+                target_role,
+                new_name=stripped_name,
+                system_prompt=system_prompt,
+                next_included_tools=next_included,
+                next_excluded_tools=next_excluded,
+            )
+            if builtin_error is not None:
+                return json.dumps({"error": builtin_error})
+
+            if stripped_name is not None:
+                target_role.name = stripped_name
             if system_prompt is not None:
                 target_role.system_prompt = system_prompt
+            if "model" in args:
+                target_role.model = next_model
             target_role.included_tools = next_included
             target_role.excluded_tools = next_excluded
             save_settings(settings)
+            gateway.invalidate_cache()
             return json.dumps(serialize_role(target_role))
 
         if action == "delete":
@@ -194,6 +291,7 @@ class ManageRolesTool(Tool):
                 existing for existing in settings.roles if existing != target_role
             ]
             save_settings(settings)
+            gateway.invalidate_cache()
             return json.dumps({"status": "deleted"})
 
         return json.dumps({"error": f"Unsupported action: {action}"})

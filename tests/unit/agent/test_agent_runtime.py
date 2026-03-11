@@ -51,7 +51,7 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
             return
         raise AssertionError("agent should not auto-idle after pure assistant text")
 
-    def fake_chat(messages, tools=None, on_chunk=None):
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
         llm_messages.append(messages)
         return next(responses)
 
@@ -89,7 +89,7 @@ def test_agent_unregisters_from_registry_after_exit_tool(monkeypatch):
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(
         "app.agent.gateway.chat",
-        lambda messages, tools=None, on_chunk=None: LLMResponse(
+        lambda messages, tools=None, on_chunk=None, role_name=None: LLMResponse(
             tool_calls=[
                 ToolCallResult(
                     id="call-exit",
@@ -130,9 +130,9 @@ def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(
         "app.agent.gateway.chat",
-        lambda messages, tools=None, on_chunk=None: (_ for _ in ()).throw(
-            RuntimeError("No active provider configured")
-        ),
+        lambda messages, tools=None, on_chunk=None, role_name=None: (
+            _ for _ in ()
+        ).throw(RuntimeError("No active provider configured")),
     )
 
     agent._run()
@@ -161,7 +161,7 @@ def test_steward_content_streams_even_when_response_has_tool_calls(monkeypatch):
         )
         steward.set_state(AgentState.RUNNING, "received message from human")
 
-    def fake_chat(messages, tools=None, on_chunk=None):
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
         if on_chunk is not None:
             on_chunk("content", "Working on it")
         return LLMResponse(
@@ -227,7 +227,7 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
         )
         agent.set_state(AgentState.RUNNING, "received message from tester")
 
-    def fake_chat(messages, tools=None, on_chunk=None):
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
         llm_messages.append(messages)
         if len(llm_messages) == 1:
             timer = threading.Timer(
@@ -277,7 +277,7 @@ def test_agent_contextualizes_plain_loguru_calls(monkeypatch):
         agent._append_history(ReceivedMessage(content="do the task", from_id="tester"))
         agent.set_state(AgentState.RUNNING, "received message from tester")
 
-    def fake_chat(messages, tools=None, on_chunk=None):
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
         logger.info("plain log inside agent")
         return LLMResponse(
             tool_calls=[

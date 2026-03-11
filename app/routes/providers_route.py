@@ -6,7 +6,11 @@ from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
-from app.settings import ProviderConfig, get_settings, save_settings
+from app.settings import (
+    ProviderConfig,
+    get_settings,
+    save_settings,
+)
 
 router = APIRouter()
 
@@ -74,24 +78,25 @@ async def update_provider(
 
     settings = get_settings()
     for p in settings.providers:
-        if p.id == provider_id:
-            if req.name is not None:
-                p.name = req.name
-            if req.type is not None:
-                p.type = req.type
-            if req.base_url is not None:
-                p.base_url = req.base_url
-            if req.api_key is not None:
-                p.api_key = req.api_key
-            save_settings(settings)
-            gateway.invalidate_cache()
-            return {
-                "id": p.id,
-                "name": p.name,
-                "type": p.type,
-                "base_url": p.base_url,
-                "api_key": p.api_key,
-            }
+        if p.id != provider_id:
+            continue
+        if req.name is not None:
+            p.name = req.name
+        if req.type is not None:
+            p.type = req.type
+        if req.base_url is not None:
+            p.base_url = req.base_url
+        if req.api_key is not None:
+            p.api_key = req.api_key
+        save_settings(settings)
+        gateway.invalidate_cache()
+        return {
+            "id": p.id,
+            "name": p.name,
+            "type": p.type,
+            "base_url": p.base_url,
+            "api_key": p.api_key,
+        }
     raise HTTPException(status_code=404, detail="Provider not found")
 
 
@@ -104,6 +109,12 @@ async def delete_provider(provider_id: str) -> dict[str, object]:
     settings.providers = [p for p in settings.providers if p.id != provider_id]
     if len(settings.providers) == before:
         raise HTTPException(status_code=404, detail="Provider not found")
+    if settings.model.active_provider_id == provider_id:
+        settings.model.active_provider_id = ""
+        settings.model.active_model = ""
+    for role in settings.roles:
+        if role.model is not None and role.model.provider_id == provider_id:
+            role.model = None
     save_settings(settings)
     gateway.invalidate_cache()
     return {"status": "deleted"}

@@ -5,13 +5,20 @@ from fastapi import HTTPException
 
 from app.routes.roles import (
     CreateRoleRequest,
+    RoleModelRequest,
     UpdateRoleRequest,
     create_role,
     delete_role,
     list_roles,
     update_role,
 )
-from app.settings import CONDUCTOR_ROLE_NAME, RoleConfig, Settings
+from app.settings import (
+    CONDUCTOR_ROLE_NAME,
+    ProviderConfig,
+    RoleConfig,
+    RoleModelConfig,
+    Settings,
+)
 
 
 def test_list_roles_returns_is_builtin_flags(monkeypatch):
@@ -45,6 +52,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             {
                 "name": "Worker",
                 "system_prompt": "Do work.",
+                "model": None,
                 "included_tools": ["read", "exec"],
                 "excluded_tools": [],
                 "is_builtin": True,
@@ -52,6 +60,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             {
                 "name": CONDUCTOR_ROLE_NAME,
                 "system_prompt": "Coordinate tasks.",
+                "model": None,
                 "included_tools": ["spawn", "list_roles", "list_tools"],
                 "excluded_tools": [],
                 "is_builtin": True,
@@ -59,6 +68,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             {
                 "name": "Reviewer",
                 "system_prompt": "Review code carefully",
+                "model": None,
                 "included_tools": ["read"],
                 "excluded_tools": ["fetch"],
                 "is_builtin": False,
@@ -90,6 +100,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
     assert result == {
         "name": "Reviewer",
         "system_prompt": "Review code carefully",
+        "model": None,
         "included_tools": ["read"],
         "excluded_tools": [],
         "is_builtin": False,
@@ -154,6 +165,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
     assert result == {
         "name": "Architect",
         "system_prompt": "Design systems",
+        "model": None,
         "included_tools": ["read"],
         "excluded_tools": ["fetch"],
         "is_builtin": False,
@@ -199,6 +211,30 @@ def test_update_role_rejects_renaming_builtin_role(monkeypatch, builtin_role_nam
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == f"Cannot rename built-in role '{builtin_role_name}'"
+
+
+def test_update_role_rejects_builtin_prompt_change(monkeypatch):
+    settings = Settings(
+        roles=[
+            RoleConfig(name="Worker", system_prompt="Do work.", included_tools=["read"])
+        ]
+    )
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_role(
+                "Worker",
+                UpdateRoleRequest(system_prompt="Different prompt"),
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert (
+        excinfo.value.detail
+        == "Cannot modify built-in role 'Worker' fields other than model"
+    )
 
 
 def test_delete_role_uses_name_path_parameter(monkeypatch):
@@ -258,4 +294,43 @@ def test_create_role_rejects_overlapping_included_and_excluded_tools(monkeypatch
     assert excinfo.value.status_code == 400
     assert (
         excinfo.value.detail == "included_tools and excluded_tools cannot overlap: read"
+    )
+
+
+def test_update_role_persists_model(monkeypatch):
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+        roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully")],
+    )
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("app.routes.roles.save_settings", lambda current: None)
+
+    result = asyncio.run(
+        update_role(
+            "Reviewer",
+            UpdateRoleRequest(
+                model=RoleModelRequest(
+                    provider_id="provider-1",
+                    model="gpt-4.1-mini",
+                )
+            ),
+        )
+    )
+
+    assert result["model"] == {
+        "provider_id": "provider-1",
+        "model": "gpt-4.1-mini",
+    }
+    assert settings.roles[0].model == RoleModelConfig(
+        provider_id="provider-1",
+        model="gpt-4.1-mini",
     )

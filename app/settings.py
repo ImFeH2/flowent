@@ -93,9 +93,16 @@ class ProviderConfig:
 
 
 @dataclass
+class RoleModelConfig:
+    provider_id: str
+    model: str
+
+
+@dataclass
 class RoleConfig:
     name: str
     system_prompt: str
+    model: RoleModelConfig | None = None
     included_tools: list[str] = field(default_factory=list)
     excluded_tools: list[str] = field(default_factory=list)
 
@@ -149,14 +156,58 @@ def validate_role_tool_config(
         )
 
 
+def serialize_role_model(
+    role_model: RoleModelConfig | None,
+) -> dict[str, str] | None:
+    if role_model is None:
+        return None
+    return {
+        "provider_id": role_model.provider_id,
+        "model": role_model.model,
+    }
+
+
 def serialize_role(role: RoleConfig) -> dict[str, object]:
     return {
         "name": role.name,
         "system_prompt": role.system_prompt,
+        "model": serialize_role_model(role.model),
         "included_tools": list(role.included_tools),
         "excluded_tools": list(role.excluded_tools),
         "is_builtin": is_builtin_role_name(role.name),
     }
+
+
+def _normalize_role_model(
+    raw_role_model: object,
+    *,
+    default_provider_id: str,
+) -> tuple[RoleModelConfig | None, bool]:
+    if raw_role_model is None:
+        return None, False
+
+    if isinstance(raw_role_model, dict):
+        provider_id = str(raw_role_model.get("provider_id", "")).strip()
+        model = str(raw_role_model.get("model", "")).strip()
+        if provider_id and model:
+            return RoleModelConfig(provider_id=provider_id, model=model), False
+        if model and default_provider_id:
+            return (
+                RoleModelConfig(provider_id=default_provider_id, model=model),
+                True,
+            )
+        return None, bool(provider_id or model)
+
+    if isinstance(raw_role_model, str):
+        model = raw_role_model.strip()
+        if model and default_provider_id:
+            return (
+                RoleModelConfig(provider_id=default_provider_id, model=model),
+                True,
+            )
+        return None, True
+
+    return None, True
 
 
 def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
@@ -232,10 +283,26 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         excluded_tools_raw = role.get("excluded_tools", [])
         if not isinstance(excluded_tools_raw, list):
             excluded_tools_raw = []
+
+        role_model: RoleModelConfig | None = None
+        if "model" in role:
+            role_model, role_model_migrated = _normalize_role_model(
+                role.get("model"),
+                default_provider_id=model_settings.active_provider_id.strip(),
+            )
+            migrated = migrated or role_model_migrated
+        elif "model_override" in role:
+            role_model, role_model_migrated = _normalize_role_model(
+                role.get("model_override"),
+                default_provider_id=model_settings.active_provider_id.strip(),
+            )
+            migrated = migrated or role_model_migrated or True
+
         roles.append(
             RoleConfig(
                 name=role_name,
                 system_prompt=str(role.get("system_prompt", "")),
+                model=role_model,
                 included_tools=normalize_tool_names(
                     [name for name in included_tools_raw if isinstance(name, str)]
                 ),
@@ -351,6 +418,22 @@ def find_role(settings: Settings, role_name: str) -> RoleConfig | None:
         if r.name == role_name:
             return r
     return None
+
+
+def clear_provider_references(settings: Settings, provider_id: str) -> bool:
+    changed = False
+
+    if settings.model.active_provider_id == provider_id:
+        settings.model.active_provider_id = ""
+        settings.model.active_model = ""
+        changed = True
+
+    for role in settings.roles:
+        if role.model is None or role.model.provider_id != provider_id:
+            continue
+        role.model = None
+        changed = True
+    return changed
 
 
 def build_worker_role() -> RoleConfig:

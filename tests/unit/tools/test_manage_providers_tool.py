@@ -2,7 +2,13 @@ import json
 
 from app.agent import Agent
 from app.models import NodeConfig, NodeType
-from app.settings import ModelSettings, ProviderConfig, Settings
+from app.settings import (
+    ModelSettings,
+    ProviderConfig,
+    RoleConfig,
+    RoleModelConfig,
+    Settings,
+)
 from app.tools.manage_providers import ManageProvidersTool
 
 
@@ -219,3 +225,42 @@ def test_manage_providers_delete_clears_active_model_for_active_provider(monkeyp
     assert result == {"status": "deleted"}
     assert settings.model.active_provider_id == ""
     assert settings.model.active_model == ""
+
+
+def test_manage_providers_delete_clears_role_model_references(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+        roles=[
+            RoleConfig(
+                name="Reviewer",
+                system_prompt="Review carefully",
+                model=RoleModelConfig(
+                    provider_id="provider-1",
+                    model="gpt-4.1-mini",
+                ),
+            )
+        ],
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {"action": "delete", "id": "provider-1"},
+        )
+    )
+
+    assert result == {"status": "deleted"}
+    assert settings.roles[0].model is None

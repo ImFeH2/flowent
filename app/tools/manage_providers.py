@@ -63,7 +63,12 @@ class ManageProvidersTool(Tool):
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         from app.providers.gateway import gateway
-        from app.settings import ProviderConfig, get_settings, save_settings
+        from app.settings import (
+            ProviderConfig,
+            clear_provider_references,
+            get_settings,
+            save_settings,
+        )
 
         action = args.get("action")
         provider_id = args.get("id")
@@ -142,9 +147,7 @@ class ManageProvidersTool(Tool):
                 if provider.id != provider_id:
                     continue
                 settings.providers.pop(index)
-                if settings.model.active_provider_id == provider_id:
-                    settings.model.active_provider_id = ""
-                    settings.model.active_model = ""
+                clear_provider_references(settings, provider_id)
                 save_settings(settings)
                 gateway.invalidate_cache()
                 return json.dumps({"status": "deleted"})

@@ -14,7 +14,7 @@ class ManagePromptsTool(Tool):
     agent_visible = False
     description = (
         "Read and update the global custom prompt. The custom prompt is "
-        "appended to every node's system prompt, including the Steward."
+        "appended to every node's system prompt, including the Assistant."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",

@@ -8,6 +8,8 @@ from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    STEWARD_ROLE_NAME,
+    STEWARD_ROLE_SYSTEM_PROMPT,
     WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
@@ -46,6 +48,8 @@ def test_bootstrap_runtime_creates_only_steward_with_create_root(
         assert len(nodes) == 1
         assert steward is not None
         assert steward.config.node_type.value == "steward"
+        assert steward.config.name == "Assistant"
+        assert steward.config.role_name == STEWARD_ROLE_NAME
         assert steward.config.tools == [
             "create_root",
             "manage_providers",
@@ -87,6 +91,11 @@ def test_bootstrap_runtime_creates_builtin_worker_and_conductor_roles(
         settings = settings_module.get_settings()
 
         assert settings.roles == [
+            RoleConfig(
+                name=STEWARD_ROLE_NAME,
+                system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
+                included_tools=[],
+            ),
             RoleConfig(
                 name=WORKER_ROLE_NAME,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
@@ -134,6 +143,11 @@ def test_bootstrap_runtime_reconciles_existing_builtin_roles(monkeypatch, tmp_pa
         settings = settings_module.get_settings()
 
         assert settings.roles == [
+            RoleConfig(
+                name=STEWARD_ROLE_NAME,
+                system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
+                included_tools=[],
+            ),
             RoleConfig(
                 name=WORKER_ROLE_NAME,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
@@ -183,7 +197,81 @@ def test_bootstrap_runtime_keeps_steward_boundary_independent_of_root_boundary(
 
         assert len(nodes) == 1
         assert steward is not None
+        assert steward.config.name == "Assistant"
+        assert steward.config.role_name == STEWARD_ROLE_NAME
         assert steward.config.write_dirs == []
         assert steward.config.allow_network is True
+    finally:
+        registry.reset()
+
+
+def test_bootstrap_runtime_uses_configured_assistant_role(monkeypatch, tmp_path):
+    registry.reset()
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "assistant": {"role_name": "Reviewer"},
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [
+                    {
+                        "name": "Reviewer",
+                        "system_prompt": "Review everything.",
+                        "included_tools": [],
+                        "excluded_tools": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        steward = registry.get("steward")
+        assert steward is not None
+        assert steward.config.role_name == "Reviewer"
+        assert settings_module.get_settings().assistant.role_name == "Reviewer"
+    finally:
+        registry.reset()
+
+
+def test_bootstrap_runtime_falls_back_to_steward_when_assistant_role_missing(
+    monkeypatch,
+    tmp_path,
+):
+    registry.reset()
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "assistant": {"role_name": "Ghost"},
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        steward = registry.get("steward")
+        assert steward is not None
+        assert steward.config.role_name == STEWARD_ROLE_NAME
+        assert settings_module.get_settings().assistant.role_name == STEWARD_ROLE_NAME
     finally:
         registry.reset()

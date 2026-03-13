@@ -190,7 +190,7 @@ describe("AgentGraph", () => {
       }),
     ]);
 
-    expect(await screen.findByText("Steward")).toBeInTheDocument();
+    expect(await screen.findByText("Assistant")).toBeInTheDocument();
     expect(screen.getByText("Worker")).toBeInTheDocument();
 
     const workerNode = screen.getByTestId("node-worker-1").firstElementChild;

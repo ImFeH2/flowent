@@ -661,14 +661,20 @@ class Agent:
     def inject_system_message(self, content: str) -> None:
         self._append_history(SystemInjection(content=content))
 
-    def set_state(self, state: AgentState, reason: str = "") -> None:
+    def set_state(
+        self,
+        state: AgentState,
+        reason: str = "",
+        *,
+        force_emit: bool = False,
+    ) -> None:
         old = self.state
         self.state = state
         if state == AgentState.IDLE:
             self._idle_state_event.set()
         else:
             self._idle_state_event.clear()
-        if old != state:
+        if old != state or force_emit:
             self._log.debug(
                 "State: {} -> {}{}",
                 old.value,
@@ -682,6 +688,8 @@ class Agent:
                     data={
                         "old_state": old.value,
                         "new_state": state.value,
+                        "role_name": self.config.role_name,
+                        "name": self.config.name,
                         "todos": [t.serialize() for t in self.get_todos_snapshot()],
                     },
                 ),

@@ -9,8 +9,11 @@ from pathlib import Path
 
 from loguru import logger
 
+from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
+
 WORKING_DIR = Path(os.getcwd())
 _SETTINGS_FILE = WORKING_DIR / "settings.json"
+STEWARD_ROLE_NAME = "Steward"
 WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
 WORKER_ROLE_SYSTEM_PROMPT = (
@@ -22,7 +25,7 @@ CONDUCTOR_ROLE_SYSTEM_PROMPT = """\
 You are the Conductor - the orchestrator of a task tree.
 
 Your responsibilities:
-- Receive tasks from the parent node or Steward
+- Receive tasks from the parent node or Assistant
 - Plan and create specialized Agent nodes using `spawn` aggressively when delegation, specialization, or parallelism would help
 - Assign tasks to child agents via `send`
 - Coordinate and aggregate results
@@ -30,7 +33,7 @@ Your responsibilities:
 
 ## Workflow
 
-1. **Receive** the task from the parent node or Steward
+1. **Receive** the task from the parent node or Assistant
 2. **Plan ownership first** using `todo` - break the task into subtasks and decide which parts should be delegated
 3. **Inspect roles before spawning** using `list_roles`, and use `list_tools` when you need a full tool inventory; choose the best fit, then default to `Worker` when nothing more specific stands out: `spawn(role_name=..., task_prompt=..., tools=[...])`
 4. **Use tree-shaped delegation** - child agents should usually report back to you or to the child aggregator you create for them; prefer parent-child task trees over lateral coordination
@@ -57,7 +60,7 @@ Your responsibilities:
 - When a task requires `read`, `exec`, `edit`, `fetch`, or similarly execution-heavy tools, prefer spawning a Worker or other specialized child agent to do that work instead of doing it yourself
 - For each new task, first ask whether it should be delegated because of role fit, specialization, tool needs, or parallelism opportunity
 - Once delegation or spawning is clearly the right move, execute it directly rather than asking the Human whether to create or delegate agents
-- Concrete inspection or execution requests from the Steward or your parent node should be treated as immediate action items, not as reasons for more meta-discussion about delegation
+- Concrete inspection or execution requests from the Assistant or your parent node should be treated as immediate action items, not as reasons for more meta-discussion about delegation
 - If a task is outside your role, domain strength, or current context window budget, delegate first instead of reasoning alone for too long
 - When in doubt between doing and delegating, prefer delegating to a better-scoped agent
 - Do not ask the Human for delegation permission unless the planned delegation would introduce destructive actions, material extra cost, permission risk, or the Human explicitly asked to approve delegation decisions
@@ -71,9 +74,11 @@ Your responsibilities:
 - If a new message arrives while waiting, handle that message instead of immediately idling again
 - Assistant/content output is internal only; to reply upstream or downstream, always use `send`
 - Aggregate results before reporting upstream
-- Use `list_connections` to find the correct parent or Steward UUID when reporting if needed
+- Use `list_connections` to find the correct parent or Assistant UUID when reporting if needed
 """
-BUILTIN_ROLE_NAMES = frozenset({WORKER_ROLE_NAME, CONDUCTOR_ROLE_NAME})
+BUILTIN_ROLE_NAMES = frozenset(
+    {STEWARD_ROLE_NAME, WORKER_ROLE_NAME, CONDUCTOR_ROLE_NAME}
+)
 WORKER_ROLE_INCLUDED_TOOLS = ["read", "exec"]
 CONDUCTOR_ROLE_INCLUDED_TOOLS = ["spawn", "list_roles", "list_tools"]
 
@@ -114,6 +119,11 @@ class ModelSettings:
 
 
 @dataclass
+class AssistantSettings:
+    role_name: str = STEWARD_ROLE_NAME
+
+
+@dataclass
 class RootBoundary:
     write_dirs: list[str] = field(default_factory=list)
     allow_network: bool = False
@@ -122,6 +132,7 @@ class RootBoundary:
 @dataclass
 class Settings:
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
+    assistant: AssistantSettings = field(default_factory=AssistantSettings)
     model: ModelSettings = field(default_factory=ModelSettings)
     custom_prompt: str = ""
     root_boundary: RootBoundary = field(default_factory=RootBoundary)
@@ -217,6 +228,23 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     if not isinstance(event_log_data, dict):
         event_log_data = {}
     event_log = EventLogSettings(**event_log_data)
+
+    assistant_data = data.get("assistant", {})
+    if not isinstance(assistant_data, dict):
+        assistant_data = {}
+        migrated = True
+    if "assistant" not in data:
+        migrated = True
+    assistant_role_name = assistant_data.get("role_name")
+    assistant = AssistantSettings(
+        role_name=assistant_role_name.strip()
+        if isinstance(assistant_role_name, str) and assistant_role_name.strip()
+        else STEWARD_ROLE_NAME
+    )
+    if assistant.role_name == STEWARD_ROLE_NAME and (
+        not isinstance(assistant_role_name, str) or not assistant_role_name.strip()
+    ):
+        migrated = True
 
     model_data = data.get("model", {})
     if not isinstance(model_data, dict):
@@ -315,6 +343,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     return (
         Settings(
             event_log=event_log,
+            assistant=assistant,
             model=model_settings,
             custom_prompt=custom_prompt,
             root_boundary=root_boundary,
@@ -436,6 +465,15 @@ def clear_provider_references(settings: Settings, provider_id: str) -> bool:
     return changed
 
 
+def build_steward_role() -> RoleConfig:
+    return RoleConfig(
+        name=STEWARD_ROLE_NAME,
+        system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
+        included_tools=[],
+        excluded_tools=[],
+    )
+
+
 def build_worker_role() -> RoleConfig:
     return RoleConfig(
         name=WORKER_ROLE_NAME,
@@ -452,6 +490,31 @@ def build_conductor_role() -> RoleConfig:
         included_tools=list(CONDUCTOR_ROLE_INCLUDED_TOOLS),
         excluded_tools=[],
     )
+
+
+def rename_role_references(
+    settings: Settings,
+    old_role_name: str,
+    new_role_name: str,
+) -> bool:
+    if settings.assistant.role_name != old_role_name:
+        return False
+    settings.assistant.role_name = new_role_name
+    return True
+
+
+def clear_role_references(settings: Settings, role_name: str) -> bool:
+    if settings.assistant.role_name != role_name:
+        return False
+    settings.assistant.role_name = STEWARD_ROLE_NAME
+    return True
+
+
+def ensure_assistant_role(settings: Settings) -> bool:
+    if find_role(settings, settings.assistant.role_name) is not None:
+        return False
+    settings.assistant.role_name = STEWARD_ROLE_NAME
+    return True
 
 
 def _ensure_builtin_role(settings: Settings, standard_role: RoleConfig) -> bool:
@@ -473,8 +536,27 @@ def _ensure_builtin_role(settings: Settings, standard_role: RoleConfig) -> bool:
 
 def ensure_builtin_roles(settings: Settings) -> bool:
     changed = False
-    for standard_role in [build_worker_role(), build_conductor_role()]:
+    builtin_role_order = [
+        build_steward_role(),
+        build_worker_role(),
+        build_conductor_role(),
+    ]
+    for standard_role in builtin_role_order:
         changed = _ensure_builtin_role(settings, standard_role) or changed
+    changed = ensure_assistant_role(settings) or changed
+
+    ordered_roles: list[RoleConfig] = []
+    builtin_role_names = {role.name for role in builtin_role_order}
+    for standard_role in builtin_role_order:
+        current_role = find_role(settings, standard_role.name)
+        if current_role is not None:
+            ordered_roles.append(current_role)
+    for role in settings.roles:
+        if role.name not in builtin_role_names:
+            ordered_roles.append(role)
+    if ordered_roles != settings.roles:
+        settings.roles = ordered_roles
+        changed = True
     return changed
 
 

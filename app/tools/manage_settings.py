@@ -12,6 +12,9 @@ from app.tools import Tool
 
 def _serialize_settings(settings: Settings) -> dict[str, object]:
     return {
+        "assistant": {
+            "role_name": settings.assistant.role_name,
+        },
         "model": {
             "active_provider_id": settings.model.active_provider_id,
             "active_model": settings.model.active_model,
@@ -30,8 +33,8 @@ class ManageSettingsTool(Tool):
     name = "manage_settings"
     agent_visible = False
     description = (
-        "Read and update system settings, including the active provider and "
-        "model, event log timestamp format, and root boundary."
+        "Read and update system settings, including the Assistant role, active "
+        "provider and model, event log timestamp format, and root boundary."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -44,6 +47,10 @@ class ManageSettingsTool(Tool):
             "active_provider_id": {
                 "type": "string",
                 "description": "Active provider ID for update",
+            },
+            "assistant_role_name": {
+                "type": "string",
+                "description": "Role name used by the Assistant",
             },
             "active_model": {
                 "type": "string",
@@ -72,9 +79,11 @@ class ManageSettingsTool(Tool):
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         from app.providers.gateway import gateway
-        from app.settings import get_settings, save_settings
+        from app.registry import registry
+        from app.settings import find_role, get_settings, save_settings
 
         action = args.get("action")
+        assistant_role_name = args.get("assistant_role_name")
         active_provider_id = args.get("active_provider_id")
         active_model = args.get("active_model")
         timestamp_format = args.get("timestamp_format")
@@ -83,6 +92,8 @@ class ManageSettingsTool(Tool):
         if not isinstance(action, str):
             return json.dumps({"error": "action must be a string"})
 
+        if assistant_role_name is not None and not isinstance(assistant_role_name, str):
+            return json.dumps({"error": "assistant_role_name must be a string"})
         if active_provider_id is not None and not isinstance(active_provider_id, str):
             return json.dumps({"error": "active_provider_id must be a string"})
         if active_model is not None and not isinstance(active_model, str):
@@ -99,6 +110,14 @@ class ManageSettingsTool(Tool):
 
         if action != "update":
             return json.dumps({"error": f"Unsupported action: {action}"})
+
+        if assistant_role_name is not None:
+            next_role_name = assistant_role_name.strip()
+            if not next_role_name:
+                return json.dumps({"error": "assistant_role_name must not be empty"})
+            if find_role(settings, next_role_name) is None:
+                return json.dumps({"error": f"Role '{next_role_name}' not found"})
+            settings.assistant.role_name = next_role_name
 
         if active_provider_id is not None:
             settings.model.active_provider_id = active_provider_id
@@ -129,5 +148,14 @@ class ManageSettingsTool(Tool):
                 settings.root_boundary.allow_network = allow_network
 
         save_settings(settings)
+        assistant = registry.get("steward")
+        if assistant is not None:
+            assistant.config.role_name = settings.assistant.role_name
+            assistant._sync_system_prompt_entry()
+            assistant.set_state(
+                assistant.state,
+                "assistant settings updated",
+                force_emit=True,
+            )
         gateway.invalidate_cache()
         return json.dumps(_serialize_settings(settings))

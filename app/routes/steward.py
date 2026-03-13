@@ -17,9 +17,11 @@ def _get_steward():
 async def get_steward() -> dict:
     steward = _get_steward()
     if steward is None:
-        raise HTTPException(status_code=404, detail="Steward not found")
+        raise HTTPException(status_code=404, detail="Assistant not found")
     return {
         "id": steward.uuid,
+        "name": steward.config.name,
+        "role_name": steward.config.role_name,
         "state": steward.state.value,
         "connections": steward.get_connections_snapshot(),
     }
@@ -33,7 +35,7 @@ class StewardMessageRequest(BaseModel):
 async def send_steward_message(req: StewardMessageRequest) -> dict:
     steward = _get_steward()
     if steward is None:
-        raise HTTPException(status_code=404, detail="Steward not found")
+        raise HTTPException(status_code=404, detail="Assistant not found")
 
     msg = Message(from_id="human", to_id=steward.uuid, content=req.content)
     steward.enqueue_message(msg)

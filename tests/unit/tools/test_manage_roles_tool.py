@@ -2,7 +2,13 @@ import json
 
 from app.agent import Agent
 from app.models import NodeConfig, NodeType
-from app.settings import ProviderConfig, RoleConfig, RoleModelConfig, Settings
+from app.settings import (
+    AssistantSettings,
+    ProviderConfig,
+    RoleConfig,
+    RoleModelConfig,
+    Settings,
+)
 from app.tools.manage_roles import ManageRolesTool
 
 
@@ -283,3 +289,51 @@ def test_manage_roles_delete_rejects_builtin_role(monkeypatch):
     )
 
     assert result == {"error": "Cannot delete built-in role 'Worker'"}
+
+
+def test_manage_roles_update_renames_selected_assistant_role(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    settings = Settings(
+        assistant=AssistantSettings(role_name="Reviewer"),
+        roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully.")],
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageRolesTool().execute(
+            agent,
+            {
+                "action": "update",
+                "name": "Reviewer",
+                "new_name": "Architect",
+            },
+        )
+    )
+
+    assert result["name"] == "Architect"
+    assert settings.assistant.role_name == "Architect"
+
+
+def test_manage_roles_delete_resets_selected_assistant_role(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    settings = Settings(
+        assistant=AssistantSettings(role_name="Reviewer"),
+        roles=[RoleConfig(name="Reviewer", system_prompt="Review.")],
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageRolesTool().execute(
+            agent,
+            {"action": "delete", "name": "Reviewer"},
+        )
+    )
+
+    assert result == {"status": "deleted"}
+    assert settings.assistant.role_name == "Steward"

@@ -2,16 +2,20 @@ from __future__ import annotations
 
 from app.models import NodeConfig, NodeType
 from app.prompts.common import DEFAULT_AGENT_ROLE_PROMPT, compose_system_prompt
-from app.prompts.steward import STEWARD_PROMPT
+from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
 
 
 def get_system_prompt(config: NodeConfig) -> str:
-    from app.settings import find_role, get_settings
+    from app.settings import STEWARD_ROLE_NAME, find_role, get_settings
 
     settings = get_settings()
 
     if config.node_type == NodeType.STEWARD:
-        prompt = STEWARD_PROMPT
+        role_name = (
+            config.role_name or settings.assistant.role_name or STEWARD_ROLE_NAME
+        )
+        role = find_role(settings, role_name)
+        prompt = role.system_prompt if role is not None else STEWARD_ROLE_SYSTEM_PROMPT
     else:
         prompt = DEFAULT_AGENT_ROLE_PROMPT
         if config.role_name:

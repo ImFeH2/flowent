@@ -74,7 +74,7 @@ function PanelHeader({
         )}
       />
       <span className="text-sm font-semibold text-foreground">
-        Steward Chat
+        Assistant Chat
       </span>
       <StatusBadge connected={connected} />
     </div>

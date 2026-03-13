@@ -56,12 +56,16 @@ export function useAgents() {
         if (!node) return prev;
         const next = new Map(prev);
         const todos = event.data.todos as Node["todos"] | undefined;
+        const roleName = event.data.role_name as Node["role_name"] | undefined;
+        const name = event.data.name as Node["name"] | undefined;
         next.set(event.agent_id, {
           ...node,
           state:
             event.type === "node_state_changed"
               ? (event.data.new_state as Node["state"])
               : node.state,
+          role_name: roleName ?? node.role_name,
+          name: name ?? node.name,
           todos: todos ?? node.todos,
         });
         return next;

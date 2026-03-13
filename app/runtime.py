@@ -16,9 +16,11 @@ def bootstrap_runtime() -> None:
     if ensure_builtin_roles(settings):
         save_settings(settings)
 
-    steward = Agent(
+    assistant = Agent(
         NodeConfig(
             node_type=NodeType.STEWARD,
+            role_name=settings.assistant.role_name,
+            name="Assistant",
             tools=[
                 "create_root",
                 "manage_providers",
@@ -31,9 +33,9 @@ def bootstrap_runtime() -> None:
         ),
         uuid="steward",
     )
-    registry.register(steward)
-    steward.start()
-    logger.info("Steward started")
+    registry.register(assistant)
+    assistant.start()
+    logger.info("Assistant started with role {}", settings.assistant.role_name)
 
 
 def shutdown_runtime(timeout: float = SYSTEM_NODE_TIMEOUT) -> None:

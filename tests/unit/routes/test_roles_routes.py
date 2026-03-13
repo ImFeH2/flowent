@@ -14,6 +14,7 @@ from app.routes.roles import (
 )
 from app.settings import (
     CONDUCTOR_ROLE_NAME,
+    AssistantSettings,
     ProviderConfig,
     RoleConfig,
     RoleModelConfig,
@@ -334,3 +335,36 @@ def test_update_role_persists_model(monkeypatch):
         provider_id="provider-1",
         model="gpt-4.1-mini",
     )
+
+
+def test_update_role_renames_selected_assistant_role(monkeypatch):
+    settings = Settings(
+        assistant=AssistantSettings(role_name="Reviewer"),
+        roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully")],
+    )
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("app.routes.roles.save_settings", lambda current: None)
+
+    asyncio.run(
+        update_role(
+            "Reviewer",
+            UpdateRoleRequest(name="Architect"),
+        )
+    )
+
+    assert settings.assistant.role_name == "Architect"
+
+
+def test_delete_role_resets_selected_assistant_role_to_steward(monkeypatch):
+    settings = Settings(
+        assistant=AssistantSettings(role_name="Reviewer"),
+        roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully")],
+    )
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("app.routes.roles.save_settings", lambda current: None)
+
+    asyncio.run(delete_role("Reviewer"))
+
+    assert settings.assistant.role_name == "Steward"

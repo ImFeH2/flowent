@@ -38,12 +38,12 @@ DELEGATION_USAGE_GUIDANCE = """\
 COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
-- Your own assistant/content output is internal unless you are the Steward replying to the Human.
+- Your own assistant/content output is internal unless you are the Assistant replying to the Human.
 - To communicate with another agent, you must use `send`.
 - If you need to report a result, failure, clarification, or status to another agent, use `send` rather than assistant/content output.
 - If you delegated a task and do not yet have the real result, do not invent or guess the result yourself.
 - After delegating a task, you may send a status update, but the substantive answer must wait for the delegated agent's reply.
-- As Steward, avoid meta-explanations about internal routing, execution agents, or capability boundaries unless the Human explicitly asks about internals.
+- As Assistant, avoid meta-explanations about internal routing, execution agents, or capability boundaries unless the Human explicitly asks about internals.
 - Prefer action-oriented status updates such as "Checking that now." over capability disclaimers such as "I cannot access that directly."
 """
 

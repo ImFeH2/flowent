@@ -6,10 +6,13 @@ from pydantic import BaseModel, Field
 from app.settings import (
     RoleConfig,
     RoleModelConfig,
+    Settings,
+    clear_role_references,
     find_provider,
     get_settings,
     is_builtin_role_name,
     normalize_tool_names,
+    rename_role_references,
     save_settings,
     serialize_role,
     validate_role_tool_config,
@@ -68,6 +71,7 @@ def _resolve_role_tool_config(
 def _resolve_role_model(
     requested: RoleModelRequest | None,
     *,
+    settings: Settings,
     current: RoleModelConfig | None,
     provided: bool,
 ) -> RoleModelConfig | None:
@@ -76,7 +80,6 @@ def _resolve_role_model(
     if requested is None:
         return None
 
-    settings = get_settings()
     provider_id = requested.provider_id.strip()
     model = requested.model.strip()
 
@@ -93,6 +96,21 @@ def _resolve_role_model(
         )
 
     return RoleModelConfig(provider_id=provider_id, model=model)
+
+
+def _sync_running_assistant_role(role_name: str) -> None:
+    from app.registry import registry
+
+    assistant = registry.get("steward")
+    if assistant is None:
+        return
+    assistant.config.role_name = role_name
+    assistant._sync_system_prompt_entry()
+    assistant.set_state(
+        assistant.state,
+        "assistant role updated",
+        force_emit=True,
+    )
 
 
 def _enforce_builtin_role_guards(
@@ -152,6 +170,7 @@ async def create_role(req: CreateRoleRequest) -> dict:
         system_prompt=req.system_prompt,
         model=_resolve_role_model(
             req.model,
+            settings=settings,
             current=None,
             provided="model" in req.model_fields_set,
         ),
@@ -199,19 +218,23 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
             next_excluded_tools=excluded_tools,
         )
 
+        previous_name = role.name
         if next_name is not None:
             role.name = next_name
+            rename_role_references(settings, previous_name, role.name)
         if req.system_prompt is not None:
             role.system_prompt = req.system_prompt
         if "model" in req.model_fields_set:
             role.model = _resolve_role_model(
                 req.model,
+                settings=settings,
                 current=role.model,
                 provided=True,
             )
         role.included_tools = included_tools
         role.excluded_tools = excluded_tools
         save_settings(settings)
+        _sync_running_assistant_role(settings.assistant.role_name)
         gateway.invalidate_cache()
         return serialize_role(role)
 
@@ -233,6 +256,8 @@ async def delete_role(role_name: str) -> dict:
     settings.roles = [role for role in settings.roles if role.name != role_name]
     if len(settings.roles) == before:
         raise HTTPException(status_code=404, detail="Role not found")
+    clear_role_references(settings, role_name)
     save_settings(settings)
+    _sync_running_assistant_role(settings.assistant.role_name)
     gateway.invalidate_cache()
     return {"status": "deleted"}

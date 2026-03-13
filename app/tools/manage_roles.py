@@ -17,6 +17,21 @@ def _find_role_by_name(roles: list[RoleConfig], role_name: str) -> RoleConfig | 
     return None
 
 
+def _sync_running_assistant_role(role_name: str) -> None:
+    from app.registry import registry
+
+    assistant = registry.get("steward")
+    if assistant is None:
+        return
+    assistant.config.role_name = role_name
+    assistant._sync_system_prompt_entry()
+    assistant.set_state(
+        assistant.state,
+        "assistant role updated",
+        force_emit=True,
+    )
+
+
 def _resolve_role_model(
     requested: object,
     *,
@@ -131,9 +146,11 @@ class ManageRolesTool(Tool):
         from app.providers.gateway import gateway
         from app.settings import (
             RoleConfig,
+            clear_role_references,
             get_settings,
             is_builtin_role_name,
             normalize_tool_names,
+            rename_role_references,
             save_settings,
             serialize_role,
             validate_role_tool_config,
@@ -263,8 +280,10 @@ class ManageRolesTool(Tool):
             if builtin_error is not None:
                 return json.dumps({"error": builtin_error})
 
+            previous_name = target_role.name
             if stripped_name is not None:
                 target_role.name = stripped_name
+                rename_role_references(settings, previous_name, target_role.name)
             if system_prompt is not None:
                 target_role.system_prompt = system_prompt
             if "model" in args:
@@ -272,6 +291,7 @@ class ManageRolesTool(Tool):
             target_role.included_tools = next_included
             target_role.excluded_tools = next_excluded
             save_settings(settings)
+            _sync_running_assistant_role(settings.assistant.role_name)
             gateway.invalidate_cache()
             return json.dumps(serialize_role(target_role))
 
@@ -290,7 +310,9 @@ class ManageRolesTool(Tool):
             settings.roles = [
                 existing for existing in settings.roles if existing != target_role
             ]
+            clear_role_references(settings, role_name)
             save_settings(settings)
+            _sync_running_assistant_role(settings.assistant.role_name)
             gateway.invalidate_cache()
             return json.dumps({"status": "deleted"})
 

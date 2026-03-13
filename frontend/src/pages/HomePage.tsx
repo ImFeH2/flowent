@@ -452,6 +452,7 @@ function AgentDetailPanel({
 }
 
 function StewardChatPanel() {
+  const { agents } = useAgentRuntime();
   const {
     connected,
     handleKeyDown,
@@ -463,6 +464,7 @@ function StewardChatPanel() {
     setInput,
     stewardMessages,
   } = useStewardChat();
+  const assistantRoleName = agents.get("steward")?.role_name ?? null;
 
   return (
     <>
@@ -471,9 +473,13 @@ function StewardChatPanel() {
           <Shield className="size-4 text-primary" />
         </div>
         <div className="flex-1">
-          <p className="font-semibold">Steward</p>
+          <p className="font-semibold">Assistant</p>
           <p className="text-[11px] text-muted-foreground">
-            {connected ? "Online" : "Connecting..."}
+            {assistantRoleName
+              ? `Role: ${assistantRoleName} · ${connected ? "Online" : "Connecting..."}`
+              : connected
+                ? "Online"
+                : "Connecting..."}
           </p>
         </div>
       </div>

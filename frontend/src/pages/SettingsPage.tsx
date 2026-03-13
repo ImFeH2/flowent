@@ -5,6 +5,7 @@ import {
   fetchAppMeta,
   fetchProviderModels,
   fetchProviders,
+  fetchRoles,
   fetchSettings,
   saveSettings,
   type ModelOption,
@@ -19,9 +20,12 @@ import {
 } from "@/components/ui/select";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
-import type { Provider } from "@/types";
+import type { Provider, Role } from "@/types";
 
 interface UserSettings {
+  assistant: {
+    role_name: string;
+  };
   model: {
     active_provider_id: string;
     active_model: string;
@@ -31,6 +35,7 @@ interface UserSettings {
 export function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,11 +51,12 @@ export function SettingsPage() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([fetchSettings<UserSettings>(), fetchProviders()])
-      .then(([settingsData, providersData]) => {
+    Promise.all([fetchSettings<UserSettings>(), fetchProviders(), fetchRoles()])
+      .then(([settingsData, providersData, rolesData]) => {
         if (!mounted) return;
         setSettings(settingsData);
         setProviders(providersData);
+        setRoles(rolesData);
       })
       .catch(() => {
         toast.error("Failed to load settings");
@@ -117,7 +123,10 @@ export function SettingsPage() {
     if (!settings) return;
     setSaving(true);
     try {
-      await saveSettings({ model: settings.model });
+      await saveSettings({
+        assistant: settings.assistant,
+        model: settings.model,
+      });
       toast.success("Settings saved");
     } catch {
       toast.error("Failed to save settings");
@@ -140,7 +149,7 @@ export function SettingsPage() {
   return (
     <PageScaffold
       title="Settings"
-      description="Configure your AI model preferences"
+      description="Configure Assistant and AI model preferences"
       actions={
         <button
           onClick={() => void handleSave()}
@@ -153,6 +162,42 @@ export function SettingsPage() {
       }
     >
       <div className="mx-auto max-w-2xl space-y-6">
+        <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
+          <h2 className="mb-4 text-lg font-semibold">
+            Assistant Configuration
+          </h2>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Assistant Role</label>
+            <Select
+              value={settings.assistant.role_name}
+              onValueChange={(value) =>
+                setSettings({
+                  ...settings,
+                  assistant: {
+                    role_name: value,
+                  },
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((role) => (
+                  <SelectItem key={role.name} value={role.name}>
+                    {role.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              The Assistant uses this role&apos;s prompt and model
+              configuration. The default system role is Steward.
+            </p>
+          </div>
+        </SoftPanel>
+
         <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
           <h2 className="mb-4 text-lg font-semibold">Model Configuration</h2>
 

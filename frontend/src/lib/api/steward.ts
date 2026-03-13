@@ -6,6 +6,6 @@ export async function sendStewardMessageRequest(
   await requestVoid("/api/steward/message", {
     method: "POST",
     body: { content },
-    errorMessage: "Failed to send steward message",
+    errorMessage: "Failed to send Assistant message",
   });
 }

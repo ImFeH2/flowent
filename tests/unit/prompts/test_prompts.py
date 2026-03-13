@@ -5,9 +5,10 @@ from app.prompts.common import (
     DEFAULT_AGENT_ROLE_PROMPT,
     compose_system_prompt,
 )
-from app.prompts.steward import STEWARD_PROMPT
+from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
 from app.settings import (
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    STEWARD_ROLE_NAME,
     RoleConfig,
     Settings,
     build_conductor_role,
@@ -67,17 +68,30 @@ def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
     )
 
 
-def test_get_system_prompt_keeps_builtin_behavior_when_custom_prompt_is_empty(
+def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_empty(
     monkeypatch,
 ):
     monkeypatch.setattr(
         "app.settings.get_settings",
-        lambda: Settings(custom_prompt=""),
+        lambda: Settings(
+            custom_prompt="",
+            roles=[
+                RoleConfig(
+                    name=STEWARD_ROLE_NAME,
+                    system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
+                )
+            ],
+        ),
     )
 
-    prompt = get_system_prompt(NodeConfig(node_type=NodeType.STEWARD))
+    prompt = get_system_prompt(
+        NodeConfig(node_type=NodeType.STEWARD, role_name=STEWARD_ROLE_NAME)
+    )
 
-    assert prompt == compose_system_prompt(STEWARD_PROMPT, custom_prompt="")
+    assert prompt == compose_system_prompt(
+        STEWARD_ROLE_SYSTEM_PROMPT,
+        custom_prompt="",
+    )
     assert "create_root" in prompt
     assert "manage_providers" in prompt
     assert "manage_roles" in prompt
@@ -114,3 +128,19 @@ def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
     prompt = get_system_prompt(NodeConfig(node_type=NodeType.AGENT, role_name="Ghost"))
 
     assert prompt == compose_system_prompt(DEFAULT_AGENT_ROLE_PROMPT, custom_prompt="")
+
+
+def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[]),
+    )
+
+    prompt = get_system_prompt(
+        NodeConfig(node_type=NodeType.STEWARD, role_name="Ghost")
+    )
+
+    assert prompt == compose_system_prompt(
+        STEWARD_ROLE_SYSTEM_PROMPT,
+        custom_prompt="",
+    )

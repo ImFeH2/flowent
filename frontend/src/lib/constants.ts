@@ -15,7 +15,7 @@ export function getNodeLabel({
   roleName: string | null;
   nodeType: NodeType;
 }): string {
-  return name ?? roleName ?? (nodeType === "steward" ? "Steward" : "Agent");
+  return name ?? roleName ?? (nodeType === "steward" ? "Assistant" : "Agent");
 }
 
 export const stateColor: Record<AgentState, string> = {

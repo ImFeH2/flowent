@@ -5,9 +5,12 @@ from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    STEWARD_ROLE_NAME,
+    STEWARD_ROLE_SYSTEM_PROMPT,
     WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
+    AssistantSettings,
     RoleConfig,
     RoleModelConfig,
     RootBoundary,
@@ -51,8 +54,10 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
             included_tools=["read"],
         )
     ]
+    assert loaded.assistant == AssistantSettings()
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["assistant"] == {"role_name": STEWARD_ROLE_NAME}
     assert persisted["roles"] == [
         {
             "name": "Worker",
@@ -85,6 +90,7 @@ def test_load_settings_preserves_custom_prompt(monkeypatch, tmp_path):
     loaded = settings_module.load_settings()
 
     assert loaded.custom_prompt == "Apply extra guardrails."
+    assert loaded.assistant == AssistantSettings()
     assert loaded.root_boundary == RootBoundary()
 
 
@@ -235,6 +241,12 @@ def test_ensure_builtin_roles_repairs_and_creates_builtin_roles():
     assert changed is True
     assert settings.roles == [
         RoleConfig(
+            name=STEWARD_ROLE_NAME,
+            system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
+            included_tools=[],
+            excluded_tools=[],
+        ),
+        RoleConfig(
             name=WORKER_ROLE_NAME,
             system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
             included_tools=WORKER_ROLE_INCLUDED_TOOLS,
@@ -247,3 +259,4 @@ def test_ensure_builtin_roles_repairs_and_creates_builtin_roles():
             excluded_tools=[],
         ),
     ]
+    assert settings.assistant.role_name == STEWARD_ROLE_NAME

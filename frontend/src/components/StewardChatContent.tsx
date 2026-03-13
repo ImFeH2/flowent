@@ -125,8 +125,8 @@ export function StewardChatComposer({
           onKeyDown={onKeyDown}
           placeholder={
             isWorkspace
-              ? "Message the Steward..."
-              : "Message the Steward... (Enter to send)"
+              ? "Message the Assistant..."
+              : "Message the Assistant... (Enter to send)"
           }
           rows={isWorkspace ? 1 : 2}
           className={cn(
@@ -159,8 +159,8 @@ function WorkspaceEmptyState() {
       <div className="space-y-1">
         <p className="text-sm font-medium">Start a conversation</p>
         <p className="max-w-[200px] text-[11px] text-muted-foreground">
-          Ask the Steward to plan tasks, summarize progress, or coordinate next
-          steps.
+          Ask the Assistant to plan tasks, summarize progress, or coordinate
+          next steps.
         </p>
       </div>
     </div>
@@ -178,8 +178,8 @@ function PanelEmptyState({ floating }: { floating: boolean }) {
           )}
         />
         <p className="text-sm text-muted-foreground">
-          Ask the Steward to plan tasks, summarize progress, or coordinate next
-          steps.
+          Ask the Assistant to plan tasks, summarize progress, or coordinate
+          next steps.
         </p>
       </div>
     </div>

@@ -53,7 +53,8 @@ def test_only_steward_node_exists_at_startup(client: TestClient):
     assert len(nodes) == 1
     assert nodes[0]["id"] == "steward"
     assert nodes[0]["node_type"] == "steward"
-    assert nodes[0]["role_name"] is None
+    assert nodes[0]["name"] == "Assistant"
+    assert nodes[0]["role_name"] == "Steward"
 
 
 def test_get_steward_detail_includes_tools_and_permissions(client: TestClient):
@@ -77,4 +78,4 @@ def test_steward_cannot_be_terminated_via_nodes_api(client: TestClient):
     response = client.post("/api/nodes/steward/terminate")
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Cannot terminate steward"}
+    assert response.json() == {"detail": "Cannot terminate assistant"}

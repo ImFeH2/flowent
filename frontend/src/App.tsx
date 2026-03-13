@@ -42,7 +42,7 @@ function AppContent() {
   };
 
   return (
-    <div className="relative h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(48,80,120,0.16),transparent_24%),radial-gradient(circle_at_78%_14%,rgba(255,255,255,0.04),transparent_18%),linear-gradient(180deg,#05070c_0%,#090c12_100%)]">
+    <div className="relative h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.042),transparent_22%),radial-gradient(circle_at_78%_14%,rgba(255,255,255,0.022),transparent_18%),linear-gradient(180deg,#040404_0%,#080808_100%)]">
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_18%,transparent_82%,rgba(255,255,255,0.015))]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:24px_24px]" />
 
@@ -56,8 +56,8 @@ function AppContent() {
           className={cn(
             "relative h-full overflow-hidden backdrop-blur-xl",
             isWorkspace
-              ? "bg-[linear-gradient(180deg,rgba(11,15,24,0.84),rgba(8,11,18,0.8))]"
-              : "bg-[linear-gradient(180deg,rgba(14,18,28,0.88),rgba(10,13,20,0.84))]",
+              ? "bg-[linear-gradient(180deg,rgba(11,11,12,0.88),rgba(9,9,10,0.84))]"
+              : "bg-[linear-gradient(180deg,rgba(15,15,16,0.92),rgba(10,10,11,0.88))]",
           )}
         >
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.024),transparent_18%,transparent_80%,rgba(255,255,255,0.014))]" />

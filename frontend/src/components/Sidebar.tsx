@@ -59,12 +59,12 @@ export function Sidebar({
     <aside
       style={{ width: `${width}px` }}
       className={cn(
-        "text-sidebar-foreground z-40 flex flex-col overflow-hidden border border-white/6 bg-[linear-gradient(180deg,rgba(5,7,11,0.84),rgba(8,11,18,0.76))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl",
+        "text-sidebar-foreground z-40 flex flex-col overflow-hidden border border-white/6 bg-[linear-gradient(180deg,rgba(7,7,8,0.96),rgba(5,5,6,0.94))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl",
         autoHide ? "h-full" : "fixed inset-y-0 left-0 h-auto",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),transparent_22%,transparent_82%,rgba(255,255,255,0.015))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.022),transparent_22%,transparent_82%,rgba(255,255,255,0.01))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="flex h-full flex-col overflow-hidden">
         <div className="shrink-0 border-b border-white/6 px-4 py-[1.125rem]">
@@ -115,8 +115,8 @@ export function Sidebar({
               className={cn(
                 "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
                 currentPage === id
-                  ? "bg-white/[0.05] text-foreground"
-                  : "text-muted-foreground hover:bg-white/[0.028] hover:text-foreground",
+                  ? "bg-white/[0.06] text-foreground"
+                  : "text-muted-foreground hover:bg-white/[0.034] hover:text-foreground",
               )}
             >
               <span
@@ -132,7 +132,7 @@ export function Sidebar({
                   "flex size-8 shrink-0 items-center justify-center rounded-md transition-all",
                   currentPage === id
                     ? "bg-primary/12 text-primary"
-                    : "bg-white/[0.02] text-muted-foreground group-hover:bg-white/[0.035] group-hover:text-foreground",
+                    : "bg-white/[0.025] text-muted-foreground group-hover:bg-white/[0.045] group-hover:text-foreground",
                 )}
               >
                 <Icon className="size-4 shrink-0" />

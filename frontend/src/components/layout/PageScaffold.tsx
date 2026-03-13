@@ -22,8 +22,13 @@ export function PageScaffold({
   className,
 }: PageScaffoldProps) {
   return (
-    <div className={cn("flex h-full flex-col p-6 md:p-8", className)}>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+    <div
+      className={cn(
+        "flex h-full flex-col px-6 py-5 md:px-8 md:py-6",
+        className,
+      )}
+    >
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-white/6 pb-4">
         <div>
           <h1 className="text-[1.45rem] font-semibold tracking-[-0.02em] text-foreground">
             {title}
@@ -43,7 +48,7 @@ export function SoftPanel({ children, className }: SoftPanelProps) {
   return (
     <section
       className={cn(
-        "rounded-3xl border border-glass-border bg-surface-raised p-5 shadow-lg backdrop-blur-xl ios-card-shadow",
+        "rounded-lg border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.032),rgba(255,255,255,0.018))] p-4 backdrop-blur-xl md:p-5",
         className,
       )}
     >

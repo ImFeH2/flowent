@@ -378,14 +378,14 @@ export function RolesPage() {
           <button
             onClick={() => void refreshRoles()}
             disabled={loading}
-            className="flex size-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="flex size-9 items-center justify-center rounded-md border border-white/8 bg-white/[0.024] text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
           >
             <RefreshCw className={cn("size-4", loading && "animate-spin")} />
           </button>
           <button
             onClick={handleCreate}
             disabled={isPanelOpen}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
           >
             <Plus className="size-4" />
             New Role
@@ -396,8 +396,8 @@ export function RolesPage() {
       {isPanelOpen ? (
         <div className="h-full min-h-0 overflow-y-auto pr-2">
           <div className="mx-auto max-w-3xl pb-6">
-            <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
-              <div className="mb-6 flex items-center justify-between">
+            <SoftPanel className="overflow-hidden p-0">
+              <div className="flex items-center justify-between border-b border-white/6 px-5 py-4">
                 <h2 className="text-xl font-semibold">
                   {panelMode === "create"
                     ? "Create Role"
@@ -407,20 +407,20 @@ export function RolesPage() {
                 </h2>
                 <div className="flex items-center gap-2">
                   {activeRole?.is_builtin && (
-                    <span className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
+                    <span className="rounded-full bg-white/[0.065] px-2.5 py-1 text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
                       Built-in
                     </span>
                   )}
                   <button
                     onClick={handleCancel}
-                    className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
                   >
                     <X className="size-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-6">
+              <div className="space-y-5 px-5 py-5">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Role Name</label>
                   <input
@@ -432,10 +432,10 @@ export function RolesPage() {
                     readOnly={isReadOnly || lockBuiltinFields}
                     placeholder="e.g., Code Reviewer"
                     className={cn(
-                      "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
+                      "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
                       isReadOnly || lockBuiltinFields
                         ? "cursor-default text-muted-foreground focus:outline-none"
-                        : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                        : "focus:border-white/16 focus:outline-none",
                     )}
                   />
                 </div>
@@ -451,10 +451,10 @@ export function RolesPage() {
                     placeholder="You are a helpful assistant that..."
                     rows={12}
                     className={cn(
-                      "w-full resize-y rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
+                      "w-full resize-y rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
                       isReadOnly || lockBuiltinFields
                         ? "cursor-default text-muted-foreground focus:outline-none"
-                        : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                        : "focus:border-white/16 focus:outline-none",
                     )}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -479,11 +479,11 @@ export function RolesPage() {
                         disabled={isReadOnly}
                         onClick={() => handleModelModeChange(false)}
                         className={cn(
-                          "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                          "rounded-md border px-3 py-2 text-left text-sm transition-colors",
                           draft.model === null
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border bg-background text-muted-foreground hover:bg-accent",
-                          isReadOnly && "cursor-default hover:bg-background",
+                            ? "border-white/10 bg-white/[0.075] text-foreground"
+                            : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
+                          isReadOnly && "cursor-default hover:bg-black/[0.18]",
                         )}
                       >
                         Use Settings Default
@@ -493,11 +493,11 @@ export function RolesPage() {
                         disabled={isReadOnly}
                         onClick={() => handleModelModeChange(true)}
                         className={cn(
-                          "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                          "rounded-md border px-3 py-2 text-left text-sm transition-colors",
                           draft.model !== null
-                            ? "border-primary bg-primary/10 text-foreground"
-                            : "border-border bg-background text-muted-foreground hover:bg-accent",
-                          isReadOnly && "cursor-default hover:bg-background",
+                            ? "border-white/10 bg-white/[0.075] text-foreground"
+                            : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
+                          isReadOnly && "cursor-default hover:bg-black/[0.18]",
                         )}
                       >
                         Set Role Override
@@ -514,10 +514,10 @@ export function RolesPage() {
                           onChange={(e) => handleProviderChange(e.target.value)}
                           disabled={isReadOnly}
                           className={cn(
-                            "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200",
+                            "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200",
                             isReadOnly
                               ? "cursor-default text-muted-foreground focus:outline-none"
-                              : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                              : "focus:border-white/16 focus:outline-none",
                           )}
                         >
                           <option value="">Select a provider</option>
@@ -555,10 +555,10 @@ export function RolesPage() {
                             loadingModelProviderId === draft.model.provider_id
                           }
                           className={cn(
-                            "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200",
+                            "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200",
                             isReadOnly
                               ? "cursor-default text-muted-foreground focus:outline-none"
-                              : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                              : "focus:border-white/16 focus:outline-none",
                           )}
                         >
                           <option value="">
@@ -595,10 +595,10 @@ export function RolesPage() {
                           readOnly={isReadOnly}
                           placeholder="e.g., gpt-4.1-mini"
                           className={cn(
-                            "w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
+                            "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
                             isReadOnly
                               ? "cursor-default text-muted-foreground focus:outline-none"
-                              : "focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary",
+                              : "focus:border-white/16 focus:outline-none",
                           )}
                         />
                         <p className="text-xs text-muted-foreground">
@@ -624,13 +624,13 @@ export function RolesPage() {
                     </p>
                   </div>
 
-                  <div className="overflow-hidden rounded-xl border border-border bg-background">
+                  <div className="overflow-hidden rounded-md border border-white/6 bg-black/[0.18]">
                     {configurableTools.map((tool) => {
                       const state = getToolState(tool.name);
                       return (
                         <div
                           key={tool.name}
-                          className="flex items-center justify-between gap-4 border-b border-border/70 px-4 py-3 last:border-b-0"
+                          className="flex items-center justify-between gap-4 border-b border-white/6 px-4 py-3 last:border-b-0"
                         >
                           <div className="min-w-0">
                             <p className="font-mono text-sm">{tool.name}</p>
@@ -645,11 +645,11 @@ export function RolesPage() {
                             className={cn(
                               "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
                               state === "included" &&
-                                "border-emerald-500/40 bg-emerald-500/10 text-emerald-600",
+                                "border-emerald-500/30 bg-emerald-500/8 text-emerald-300",
                               state === "excluded" &&
-                                "border-red-500/40 bg-red-500/10 text-red-600",
+                                "border-red-500/30 bg-red-500/8 text-red-300",
                               state === "allowed" &&
-                                "border-border bg-card text-muted-foreground",
+                                "border-white/8 bg-black/[0.24] text-muted-foreground",
                               (isReadOnly || lockBuiltinFields) &&
                                 "cursor-default opacity-90 hover:bg-inherit",
                             )}
@@ -670,7 +670,7 @@ export function RolesPage() {
                   <button
                     onClick={handleCancel}
                     disabled={saving}
-                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
+                    className="rounded-md border border-white/8 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/[0.05]"
                   >
                     {isReadOnly ? "Close" : "Cancel"}
                   </button>
@@ -678,7 +678,7 @@ export function RolesPage() {
                     <button
                       onClick={() => void handleSave()}
                       disabled={saving}
-                      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
                     >
                       {saving ? "Saving..." : "Save Role"}
                     </button>
@@ -694,130 +694,125 @@ export function RolesPage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex h-full flex-col items-center justify-center text-center"
         >
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-accent">
-            <BookOpen className="size-8 text-primary/50" />
-          </div>
+          <BookOpen className="size-8 text-muted-foreground/60" />
           <h3 className="mt-4 text-lg font-semibold">No Roles Yet</h3>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
             Create your first role to define how agents should behave.
           </p>
           <button
             onClick={handleCreate}
-            className="mt-4 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90"
+            className="mt-4 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90"
           >
             <Plus className="size-4" />
             Create Role
           </button>
         </motion.div>
       ) : (
-        <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {roles.map((role, index) => {
-            const providerName = role.model
-              ? (providersById[role.model.provider_id]?.name ??
-                role.model.provider_id)
-              : null;
+        <div className="mx-auto max-w-5xl">
+          <SoftPanel className="overflow-hidden p-0">
+            <div className="divide-y divide-white/6">
+              {roles.map((role, index) => {
+                const providerName = role.model
+                  ? (providersById[role.model.provider_id]?.name ??
+                    role.model.provider_id)
+                  : null;
 
-            return (
-              <motion.div
-                key={role.name}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="group relative rounded-xl border border-border bg-card p-5 shadow-sm transition-all hover:border-foreground/15 hover:shadow-md"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-                      <BookOpen className="size-5 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="truncate font-semibold">{role.name}</h3>
-                        {role.is_builtin && (
-                          <span className="shrink-0 text-[11px] font-medium tracking-[0.08em] text-muted-foreground/75">
-                            Built-in
-                          </span>
+                return (
+                  <motion.div
+                    key={role.name}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="group relative px-5 py-4 transition-colors hover:bg-white/[0.028]"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start gap-3">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white/[0.05]">
+                            <BookOpen className="size-4 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="truncate font-semibold">
+                                {role.name}
+                              </h3>
+                              {role.is_builtin && (
+                                <span className="shrink-0 text-[11px] font-medium tracking-[0.08em] text-muted-foreground/75">
+                                  Built-in
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                              {role.system_prompt}
+                            </p>
+                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                              {role.model ? (
+                                <>
+                                  <span>Provider: {providerName}</span>
+                                  <span>Model: {role.model.model}</span>
+                                </>
+                              ) : (
+                                <span>Model: Settings default</span>
+                              )}
+                            </div>
+                            {(role.included_tools.length > 0 ||
+                              role.excluded_tools.length > 0) && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {role.included_tools.map((toolName) => (
+                                  <span
+                                    key={`included-${role.name}-${toolName}`}
+                                    className="rounded-full bg-emerald-500/8 px-2.5 py-1 text-xs font-medium text-emerald-300"
+                                  >
+                                    {toolName}
+                                  </span>
+                                ))}
+                                {role.excluded_tools.map((toolName) => (
+                                  <span
+                                    key={`excluded-${role.name}-${toolName}`}
+                                    className="rounded-full bg-red-500/8 px-2.5 py-1 text-xs font-medium text-red-300"
+                                  >
+                                    {toolName}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                        <button
+                          onClick={() => handleView(role)}
+                          aria-label={`View ${role.name}`}
+                          title={`View ${role.name}`}
+                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                        >
+                          <Eye className="size-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(role)}
+                          aria-label={`Edit ${role.name}`}
+                          title={`Edit ${role.name}`}
+                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                        >
+                          <Edit2 className="size-3.5" />
+                        </button>
+                        {!role.is_builtin && (
+                          <button
+                            onClick={() => handleDelete(role.name)}
+                            aria-label={`Delete ${role.name}`}
+                            title={`Delete ${role.name}`}
+                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
                         )}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      onClick={() => handleView(role)}
-                      aria-label={`View ${role.name}`}
-                      title={`View ${role.name}`}
-                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                    >
-                      <Eye className="size-3.5" />
-                    </button>
-                    <button
-                      onClick={() => handleEdit(role)}
-                      aria-label={`Edit ${role.name}`}
-                      title={`Edit ${role.name}`}
-                      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                    >
-                      <Edit2 className="size-3.5" />
-                    </button>
-                    {!role.is_builtin && (
-                      <button
-                        onClick={() => handleDelete(role.name)}
-                        aria-label={`Delete ${role.name}`}
-                        title={`Delete ${role.name}`}
-                        className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <p className="line-clamp-4 text-sm text-muted-foreground">
-                    {role.system_prompt}
-                  </p>
-                </div>
-
-                <div className="mt-4 space-y-1">
-                  {role.model ? (
-                    <>
-                      <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
-                        Provider: {providerName}
-                      </p>
-                      <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
-                        Model: {role.model.model}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-[11px] font-medium tracking-[0.08em] text-muted-foreground">
-                      Model: Settings default
-                    </p>
-                  )}
-                </div>
-
-                {(role.included_tools.length > 0 ||
-                  role.excluded_tools.length > 0) && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {role.included_tools.map((toolName) => (
-                      <span
-                        key={`included-${role.name}-${toolName}`}
-                        className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-600"
-                      >
-                        {toolName}
-                      </span>
-                    ))}
-                    {role.excluded_tools.map((toolName) => (
-                      <span
-                        key={`excluded-${role.name}-${toolName}`}
-                        className="rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-600"
-                      >
-                        {toolName}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </SoftPanel>
         </div>
       )}
     </PageScaffold>

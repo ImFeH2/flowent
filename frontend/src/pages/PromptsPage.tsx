@@ -61,7 +61,7 @@ export function PromptsPage() {
         <button
           onClick={() => void handleSave()}
           disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
         >
           <Save className="size-4" />
           {saving ? "Saving..." : "Save Changes"}
@@ -69,7 +69,7 @@ export function PromptsPage() {
       }
     >
       <div className="mx-auto max-w-3xl">
-        <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
+        <SoftPanel className="space-y-4">
           <div className="space-y-3">
             <div>
               <h2 className="text-lg font-semibold">Global Custom Prompt</h2>
@@ -84,7 +84,7 @@ export function PromptsPage() {
               onChange={(event) => setCustomPrompt(event.target.value)}
               placeholder="Add extra instructions that should apply to every node..."
               rows={18}
-              className="min-h-[26rem] w-full resize-y rounded-xl border border-border bg-background px-4 py-3 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="min-h-[26rem] w-full resize-y rounded-md border border-white/8 bg-black/[0.22] px-4 py-3 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
             />
           </div>
         </SoftPanel>

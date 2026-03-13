@@ -173,7 +173,7 @@ export function HomePage() {
             animate={{ width: panelWidth, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="relative z-20 shrink-0 border-l border-white/6 bg-[linear-gradient(180deg,rgba(12,16,24,0.88),rgba(9,12,19,0.82))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
+            className="relative z-20 shrink-0 border-l border-white/6 bg-[linear-gradient(180deg,rgba(14,14,15,0.92),rgba(11,11,12,0.88))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
           >
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),transparent_14%,transparent_82%,rgba(255,255,255,0.012))]" />
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
@@ -210,7 +210,7 @@ export function HomePage() {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 10 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute inset-0 flex h-full flex-col bg-[linear-gradient(180deg,rgba(14,18,27,0.44),rgba(10,13,20,0.38))]"
+                      className="absolute inset-0 flex h-full flex-col bg-[linear-gradient(180deg,rgba(18,18,19,0.5),rgba(12,12,13,0.42))]"
                     >
                       <AgentDetailPanel
                         agent={selectedAgent}

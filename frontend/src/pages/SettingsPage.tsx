@@ -154,54 +154,62 @@ export function SettingsPage() {
         <button
           onClick={() => void handleSave()}
           disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
         >
           <Save className="size-4" />
           {saving ? "Saving..." : "Save Changes"}
         </button>
       }
     >
-      <div className="mx-auto max-w-2xl space-y-6">
-        <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
-          <h2 className="mb-4 text-lg font-semibold">
-            Assistant Configuration
-          </h2>
+      <div className="mx-auto max-w-3xl space-y-5">
+        <SoftPanel className="space-y-5">
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold">Assistant Configuration</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Choose the role that powers the system assistant.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Assistant Role</label>
+              <Select
+                value={settings.assistant.role_name}
+                onValueChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    assistant: {
+                      role_name: value,
+                    },
+                  })
+                }
+              >
+                <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.name} value={role.name}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                The Assistant uses this role&apos;s prompt and model
+                configuration. The default system role is Steward.
+              </p>
+            </div>
+          </section>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Assistant Role</label>
-            <Select
-              value={settings.assistant.role_name}
-              onValueChange={(value) =>
-                setSettings({
-                  ...settings,
-                  assistant: {
-                    role_name: value,
-                  },
-                })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.name} value={role.name}>
-                    {role.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              The Assistant uses this role&apos;s prompt and model
-              configuration. The default system role is Steward.
-            </p>
-          </div>
-        </SoftPanel>
+          <section className="space-y-5 border-t border-white/6 pt-5">
+            <div>
+              <h2 className="text-lg font-semibold">Model Configuration</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Set the default provider and model used when a role does not
+                define its own override.
+              </p>
+            </div>
 
-        <SoftPanel className="rounded-xl border-border p-6 shadow-lg">
-          <h2 className="mb-4 text-lg font-semibold">Model Configuration</h2>
-
-          <div className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium">Active Provider</label>
               <Select
@@ -217,7 +225,7 @@ export function SettingsPage() {
                   })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
                   <SelectValue placeholder="Select a provider" />
                 </SelectTrigger>
                 <SelectContent>
@@ -241,7 +249,7 @@ export function SettingsPage() {
                 <button
                   onClick={refreshModels}
                   disabled={!settings.model.active_provider_id || loadingModels}
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground disabled:opacity-50"
                 >
                   <RefreshCw
                     className={cn("size-3", loadingModels && "animate-spin")}
@@ -263,7 +271,7 @@ export function SettingsPage() {
                     })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
                     <SelectValue placeholder="Select a model" />
                   </SelectTrigger>
                   <SelectContent>
@@ -292,22 +300,17 @@ export function SettingsPage() {
                       ? "Loading models..."
                       : "Enter model ID manually"
                   }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                 />
               )}
             </div>
-          </div>
+          </section>
         </SoftPanel>
 
-        <SoftPanel className="rounded-xl border-border bg-card/50 p-4">
-          <h3 className="mb-2 text-sm font-semibold">About</h3>
-          <p className="text-sm text-muted-foreground">
-            Autopoe Agent Studio v{appVersion ?? "—"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            A multi-agent collaboration framework.
-          </p>
-        </SoftPanel>
+        <div className="border-t border-white/6 pt-4 text-sm text-muted-foreground">
+          <p>Autopoe Agent Studio v{appVersion ?? "—"}</p>
+          <p className="mt-1 text-xs">A multi-agent collaboration framework.</p>
+        </div>
       </div>
     </PageScaffold>
   );

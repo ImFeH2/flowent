@@ -1,32 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAgentRuntime } from "@/context/AgentContext";
 import { fetchNodeDetail } from "@/lib/api";
-import type { NodeDetail, HistoryEntry, StreamingDelta } from "@/types";
-
-function reduceDeltas(deltas: StreamingDelta[]) {
-  let content = "";
-  let thinking = "";
-  const toolResults = new Map<string, string>();
-
-  for (const d of deltas) {
-    switch (d.type) {
-      case "ContentDelta":
-        content += d.text;
-        break;
-      case "ThinkingDelta":
-        thinking += d.text;
-        break;
-      case "ToolResultDelta":
-        toolResults.set(
-          d.tool_call_id,
-          (toolResults.get(d.tool_call_id) ?? "") + d.text,
-        );
-        break;
-    }
-  }
-
-  return { content, thinking, toolResults };
-}
+import { mergeHistoryWithDeltas } from "@/lib/history";
+import type { NodeDetail } from "@/types";
 
 export function useAgentDetail(agentId: string | null) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
@@ -79,49 +55,14 @@ export function useAgentDetail(agentId: string | null) {
 
   const merged = useMemo(() => {
     if (!detail || !agentId) return null;
-    const incremental = agentId ? agentHistories.get(agentId) : undefined;
-    const base =
-      incremental && incremental.length > 0
-        ? [...detail.history, ...incremental]
-        : [...detail.history];
-
-    const deltas = agentId ? streamingDeltas.get(agentId) : undefined;
-    if (deltas && deltas.length > 0) {
-      const { content, thinking, toolResults } = reduceDeltas(deltas);
-      const now = fetchedAt / 1000;
-
-      if (thinking) {
-        base.push({
-          type: "AssistantThinking",
-          content: thinking,
-          timestamp: now,
-          streaming: true,
-        } satisfies HistoryEntry);
-      }
-      if (content) {
-        base.push({
-          type: "AssistantText",
-          content,
-          timestamp: now,
-          streaming: true,
-        } satisfies HistoryEntry);
-      }
-      if (toolResults.size > 0) {
-        for (const [toolCallId, resultText] of toolResults) {
-          for (let i = base.length - 1; i >= 0; i--) {
-            const entry = base[i];
-            if (
-              entry.type === "ToolCall" &&
-              entry.tool_call_id === toolCallId &&
-              entry.streaming
-            ) {
-              base[i] = { ...entry, result: resultText };
-              break;
-            }
-          }
-        }
-      }
-    }
+    const incremental = agentHistories.get(agentId);
+    const deltas = streamingDeltas.get(agentId);
+    const base = mergeHistoryWithDeltas({
+      history: detail.history,
+      incremental,
+      deltas,
+      fetchedAt,
+    });
 
     const liveAgent = agentId ? agents.get(agentId) : undefined;
     const merged = { ...detail, history: base };

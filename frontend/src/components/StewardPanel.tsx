@@ -20,7 +20,7 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
     sending,
     sendMessage,
     setInput,
-    stewardMessages,
+    timelineItems,
   } = useStewardChat();
   const isFloating = variant === "floating";
   const chatVariant = isFloating ? "floating" : "panel";
@@ -36,7 +36,7 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
     >
       <PanelHeader connected={connected} floating={isFloating} />
       <StewardChatMessages
-        messages={stewardMessages}
+        items={timelineItems}
         onScroll={onMessagesScroll}
         scrollRef={scrollRef}
         variant={chatVariant}

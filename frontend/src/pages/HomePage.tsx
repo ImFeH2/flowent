@@ -462,7 +462,7 @@ function StewardChatPanel() {
     sending,
     sendMessage,
     setInput,
-    stewardMessages,
+    timelineItems,
   } = useStewardChat();
   const assistantRoleName = agents.get("steward")?.role_name ?? null;
 
@@ -485,7 +485,7 @@ function StewardChatPanel() {
       </div>
 
       <StewardChatMessages
-        messages={stewardMessages}
+        items={timelineItems}
         onScroll={onMessagesScroll}
         scrollRef={scrollRef}
         variant="workspace"

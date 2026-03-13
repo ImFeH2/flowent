@@ -2,24 +2,19 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
-import { fetchNodeDetail, sendStewardMessageRequest } from "@/lib/api";
-import {
-  appendStewardMessage,
-  appendStewardStreamChunk,
-  finalizeStewardStream,
-} from "@/context/stewardMessages";
+import { sendStewardMessageRequest } from "@/lib/api";
 import { useAgents } from "@/hooks/useAgents";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type {
   AgentEvent,
   HistoryEntry,
   Node,
+  PendingStewardMessage,
   StewardMessage,
   StreamingDelta,
 } from "@/types";
@@ -55,7 +50,7 @@ interface AgentUIContextValue {
   selectAgent: (id: string | null) => void;
   hoveredAgentId: string | null;
   setHoveredAgentId: (id: string | null) => void;
-  stewardMessages: StewardMessage[];
+  pendingStewardMessages: PendingStewardMessage[];
   sendStewardMessage: (content: string) => Promise<void>;
   currentPage: PageId;
   setCurrentPage: (page: PageId) => void;
@@ -69,51 +64,6 @@ const AgentUIContext = createContext<AgentUIContextValue | null>(null);
 const MESSAGE_ANIMATION_MS = 2000;
 const TOOL_CALL_ANIMATION_MS = 2000;
 const STEWARD_ID = "steward";
-
-function historyTimestampToMs(timestamp: number): number {
-  return timestamp > 1_000_000_000_000
-    ? timestamp
-    : Math.round(timestamp * 1000);
-}
-
-function toStewardMessage(
-  entry: HistoryEntry,
-  id: string,
-): StewardMessage | null {
-  if (entry.type === "ReceivedMessage") {
-    if (entry.from_id !== "human" || !entry.content) {
-      return null;
-    }
-    return {
-      id,
-      content: entry.content,
-      timestamp: historyTimestampToMs(entry.timestamp),
-      from: "human",
-    };
-  }
-
-  if (entry.type === "AssistantText" && entry.content) {
-    return {
-      id,
-      content: entry.content,
-      timestamp: historyTimestampToMs(entry.timestamp),
-      from: "steward",
-    };
-  }
-
-  return null;
-}
-
-function buildStewardMessages(history: HistoryEntry[]): StewardMessage[] {
-  return history
-    .map((entry, index) =>
-      toStewardMessage(
-        entry,
-        `history-${historyTimestampToMs(entry.timestamp)}-${index}`,
-      ),
-    )
-    .filter((entry): entry is StewardMessage => entry !== null);
-}
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const { agents, events, handleDisplayEvent, handleUpdateEvent } = useAgents();
@@ -129,7 +79,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, string>>(
     () => new Map(),
   );
-  const [stewardMessages, setStewardMessages] = useState<StewardMessage[]>([]);
+  const [pendingStewardMessages, setPendingStewardMessages] = useState<
+    PendingStewardMessage[]
+  >([]);
   const [currentPage, setCurrentPage] = useState<PageId>("graph");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
@@ -137,7 +89,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
-  const stewardStreamingMessageIdRef = useRef<string | null>(null);
   const stewardMessageCounterRef = useRef(0);
 
   const nextStewardMessageId = useCallback(
@@ -163,20 +114,21 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const sendStewardMessage = useCallback(
     async (content: string) => {
       const timestamp = Date.now();
-      setStewardMessages((prev) => [
+      setPendingStewardMessages((prev) => [
         ...prev,
-        createStewardMessage("human", content, timestamp),
+        {
+          ...createStewardMessage("human", content, timestamp),
+          type: "PendingHumanMessage",
+        },
       ]);
 
       try {
         await sendStewardMessageRequest(content);
       } catch (error) {
-        setStewardMessages((prev) => {
+        setPendingStewardMessages((prev) => {
           const idx = prev.findIndex(
             (message) =>
-              message.from === "human" &&
-              message.content === content &&
-              message.timestamp === timestamp,
+              message.content === content && message.timestamp === timestamp,
           );
           if (idx < 0) {
             return prev;
@@ -216,13 +168,13 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         const toId = event.data.to_id as string | undefined;
         if (fromId && toId) {
           const msgId = `msg-${Date.now()}-${Math.random()}`;
-          const am: ActiveMessage = {
+          const message: ActiveMessage = {
             id: msgId,
             fromId,
             toId,
             timestamp: Date.now(),
           };
-          setActiveMessages((prev) => [...prev, am]);
+          setActiveMessages((prev) => [...prev, message]);
           const timer = setTimeout(() => {
             setActiveMessages((prev) => prev.filter((m) => m.id !== msgId));
             msgTimers.current.delete(msgId);
@@ -252,20 +204,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         toolTimers.current.set(agentId, timer);
       }
 
-      if (event.type === "steward_content") {
-        const content = event.data.content as string;
-        setStewardMessages((prev) => {
-          const result = appendStewardStreamChunk(
-            prev,
-            stewardStreamingMessageIdRef.current,
-            content,
-            () => createStewardMessage("steward", content, Date.now()),
-          );
-          stewardStreamingMessageIdRef.current = result.activeStreamMessageId;
-          return result.messages;
-        });
-      }
-
       if (event.type === "history_entry_delta") {
         const delta = event.data as unknown as StreamingDelta;
         setStreamingDeltas((prev) => {
@@ -279,28 +217,23 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       if (event.type === "history_entry_added") {
         const entry = event.data as unknown as HistoryEntry;
 
-        if (event.agent_id === STEWARD_ID) {
-          const stewardMessageId = nextStewardMessageId(
-            entry.type === "ReceivedMessage" ? "human" : "steward",
-            historyTimestampToMs(entry.timestamp),
-          );
-          const stewardMessage = toStewardMessage(entry, stewardMessageId);
-          if (entry.type === "AssistantText" && stewardMessage) {
-            setStewardMessages((prev) => {
-              const result = finalizeStewardStream(
-                prev,
-                stewardStreamingMessageIdRef.current,
-                stewardMessage,
-              );
-              stewardStreamingMessageIdRef.current =
-                result.activeStreamMessageId;
-              return result.messages;
-            });
-          } else if (stewardMessage) {
-            setStewardMessages((prev) =>
-              appendStewardMessage(prev, stewardMessage),
+        if (
+          event.agent_id === STEWARD_ID &&
+          entry.type === "ReceivedMessage" &&
+          entry.from_id === "human" &&
+          entry.content
+        ) {
+          setPendingStewardMessages((prev) => {
+            const idx = prev.findIndex(
+              (message) => message.content === entry.content,
             );
-          }
+            if (idx < 0) {
+              return prev;
+            }
+            const next = [...prev];
+            next.splice(idx, 1);
+            return next;
+          });
         }
 
         if (
@@ -312,7 +245,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             if (!list || list.length === 0) return prev;
             const next = new Map(prev);
             const filtered = list.filter(
-              (d) => d.type !== "ContentDelta" && d.type !== "ThinkingDelta",
+              (delta) =>
+                delta.type !== "ContentDelta" && delta.type !== "ThinkingDelta",
             );
             if (filtered.length === 0) {
               next.delete(event.agent_id);
@@ -331,10 +265,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             if (!list || list.length === 0) return prev;
             const next = new Map(prev);
             const filtered = list.filter(
-              (d) =>
+              (delta) =>
                 !(
-                  d.type === "ToolResultDelta" &&
-                  d.tool_call_id === entry.tool_call_id
+                  delta.type === "ToolResultDelta" &&
+                  delta.tool_call_id === entry.tool_call_id
                 ),
             );
             if (filtered.length === 0) {
@@ -356,10 +290,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             !entry.streaming
           ) {
             const idx = existing.findIndex(
-              (e) =>
-                e.type === "ToolCall" &&
-                e.tool_call_id === entry.tool_call_id &&
-                e.streaming === true,
+              (historyEntry) =>
+                historyEntry.type === "ToolCall" &&
+                historyEntry.tool_call_id === entry.tool_call_id &&
+                historyEntry.streaming === true,
             );
             if (idx >= 0) {
               const updated = [...existing];
@@ -374,33 +308,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [createStewardMessage, handleUpdateEvent, nextStewardMessageId],
+    [handleUpdateEvent],
   );
 
   const { connected } = useWebSocket({ onDisplayEvent, onUpdateEvent });
-
-  useEffect(() => {
-    if (!connected) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadStewardHistory = async () => {
-      const detail = await fetchNodeDetail(STEWARD_ID);
-      if (cancelled || !detail) {
-        return;
-      }
-      stewardStreamingMessageIdRef.current = null;
-      setStewardMessages(buildStewardMessages(detail.history));
-    };
-
-    void loadStewardHistory();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [connected]);
 
   const selectAgent = useCallback((id: string | null) => {
     setSelectedAgentId(id);
@@ -435,7 +346,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       selectAgent,
       hoveredAgentId,
       setHoveredAgentId,
-      stewardMessages,
+      pendingStewardMessages,
       sendStewardMessage,
       currentPage,
       setCurrentPage,
@@ -444,7 +355,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       selectedAgentId,
       selectAgent,
       hoveredAgentId,
-      stewardMessages,
+      pendingStewardMessages,
       sendStewardMessage,
       currentPage,
     ],
@@ -461,14 +372,17 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
 export function useAgentRuntime() {
   const ctx = useContext(AgentRuntimeContext);
-  if (!ctx)
+  if (!ctx) {
     throw new Error("useAgentRuntime must be used within AgentProvider");
+  }
   return ctx;
 }
 
 export function useAgentUI() {
   const ctx = useContext(AgentUIContext);
-  if (!ctx) throw new Error("useAgentUI must be used within AgentProvider");
+  if (!ctx) {
+    throw new Error("useAgentUI must be used within AgentProvider");
+  }
   return ctx;
 }
 

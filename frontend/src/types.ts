@@ -53,6 +53,10 @@ export interface StewardMessage {
   from: "human" | "steward";
 }
 
+export interface PendingStewardMessage extends StewardMessage {
+  type: "PendingHumanMessage";
+}
+
 export type HistoryEntryType =
   | "SystemEntry"
   | "SystemInjection"
@@ -73,6 +77,8 @@ export interface HistoryEntry {
   timestamp: number;
   streaming?: boolean;
 }
+
+export type StewardChatItem = HistoryEntry | PendingStewardMessage;
 
 export interface NodeDetail {
   id: string;

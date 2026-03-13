@@ -22,10 +22,10 @@ import type { Node } from "@/types";
 import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 import { cn } from "@/lib/utils";
 import {
-  StewardChatComposer,
-  StewardChatMessages,
-} from "@/components/StewardChatContent";
-import { useStewardChat } from "@/hooks/useStewardChat";
+  AssistantChatComposer,
+  AssistantChatMessages,
+} from "@/components/AssistantChatContent";
+import { useAssistantChat } from "@/hooks/useAssistantChat";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { Badge } from "@/components/ui/badge";
 import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
@@ -192,7 +192,7 @@ export function HomePage() {
                   )}
                   aria-hidden={selectedAgent ? true : undefined}
                 >
-                  <StewardChatPanel />
+                  <AssistantChatPanel />
                 </motion.div>
 
                 <AnimatePresence>
@@ -270,7 +270,7 @@ function AgentDetailPanel({
       <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="flex size-8 items-center justify-center rounded-md bg-primary/12">
-            {agent.node_type === "steward" ? (
+            {agent.node_type === "assistant" ? (
               <Shield className="size-4 text-primary" />
             ) : (
               <Bot className="size-4 text-primary" />
@@ -451,7 +451,7 @@ function AgentDetailPanel({
   );
 }
 
-function StewardChatPanel() {
+function AssistantChatPanel() {
   const { agents } = useAgentRuntime();
   const {
     connected,
@@ -463,8 +463,8 @@ function StewardChatPanel() {
     sendMessage,
     setInput,
     timelineItems,
-  } = useStewardChat();
-  const assistantRoleName = agents.get("steward")?.role_name ?? null;
+  } = useAssistantChat();
+  const assistantRoleName = agents.get("assistant")?.role_name ?? null;
 
   return (
     <>
@@ -484,14 +484,14 @@ function StewardChatPanel() {
         </div>
       </div>
 
-      <StewardChatMessages
+      <AssistantChatMessages
         items={timelineItems}
         onScroll={onMessagesScroll}
         scrollRef={scrollRef}
         variant="workspace"
       />
 
-      <StewardChatComposer
+      <AssistantChatComposer
         disabled={!input.trim() || sending}
         input={input}
         onChange={setInput}

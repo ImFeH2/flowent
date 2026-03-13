@@ -7,15 +7,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { sendStewardMessageRequest } from "@/lib/api";
+import { sendAssistantMessageRequest } from "@/lib/api";
 import { useAgents } from "@/hooks/useAgents";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type {
   AgentEvent,
+  AssistantChatMessage,
   HistoryEntry,
   Node,
-  PendingStewardMessage,
-  StewardMessage,
+  PendingAssistantChatMessage,
   StreamingDelta,
 } from "@/types";
 
@@ -50,8 +50,8 @@ interface AgentUIContextValue {
   selectAgent: (id: string | null) => void;
   hoveredAgentId: string | null;
   setHoveredAgentId: (id: string | null) => void;
-  pendingStewardMessages: PendingStewardMessage[];
-  sendStewardMessage: (content: string) => Promise<void>;
+  pendingAssistantMessages: PendingAssistantChatMessage[];
+  sendAssistantMessage: (content: string) => Promise<void>;
   currentPage: PageId;
   setCurrentPage: (page: PageId) => void;
 }
@@ -63,7 +63,7 @@ const AgentUIContext = createContext<AgentUIContextValue | null>(null);
 
 const MESSAGE_ANIMATION_MS = 2000;
 const TOOL_CALL_ANIMATION_MS = 2000;
-const STEWARD_ID = "steward";
+const ASSISTANT_ID = "assistant";
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const { agents, events, handleDisplayEvent, handleUpdateEvent } = useAgents();
@@ -79,8 +79,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, string>>(
     () => new Map(),
   );
-  const [pendingStewardMessages, setPendingStewardMessages] = useState<
-    PendingStewardMessage[]
+  const [pendingAssistantMessages, setPendingAssistantMessages] = useState<
+    PendingAssistantChatMessage[]
   >([]);
   const [currentPage, setCurrentPage] = useState<PageId>("graph");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
@@ -89,43 +89,43 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
-  const stewardMessageCounterRef = useRef(0);
+  const assistantMessageCounterRef = useRef(0);
 
-  const nextStewardMessageId = useCallback(
-    (from: StewardMessage["from"], timestamp: number) =>
-      `${from}-${timestamp}-${stewardMessageCounterRef.current++}`,
+  const nextAssistantMessageId = useCallback(
+    (from: AssistantChatMessage["from"], timestamp: number) =>
+      `${from}-${timestamp}-${assistantMessageCounterRef.current++}`,
     [],
   );
 
-  const createStewardMessage = useCallback(
+  const createAssistantMessage = useCallback(
     (
-      from: StewardMessage["from"],
+      from: AssistantChatMessage["from"],
       content: string,
       timestamp: number,
-    ): StewardMessage => ({
-      id: nextStewardMessageId(from, timestamp),
+    ): AssistantChatMessage => ({
+      id: nextAssistantMessageId(from, timestamp),
       from,
       content,
       timestamp,
     }),
-    [nextStewardMessageId],
+    [nextAssistantMessageId],
   );
 
-  const sendStewardMessage = useCallback(
+  const sendAssistantMessage = useCallback(
     async (content: string) => {
       const timestamp = Date.now();
-      setPendingStewardMessages((prev) => [
+      setPendingAssistantMessages((prev) => [
         ...prev,
         {
-          ...createStewardMessage("human", content, timestamp),
+          ...createAssistantMessage("human", content, timestamp),
           type: "PendingHumanMessage",
         },
       ]);
 
       try {
-        await sendStewardMessageRequest(content);
+        await sendAssistantMessageRequest(content);
       } catch (error) {
-        setPendingStewardMessages((prev) => {
+        setPendingAssistantMessages((prev) => {
           const idx = prev.findIndex(
             (message) =>
               message.content === content && message.timestamp === timestamp,
@@ -140,7 +140,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         throw error;
       }
     },
-    [createStewardMessage],
+    [createAssistantMessage],
   );
 
   const clearAgentHistory = useCallback((agentId: string) => {
@@ -218,12 +218,12 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         const entry = event.data as unknown as HistoryEntry;
 
         if (
-          event.agent_id === STEWARD_ID &&
+          event.agent_id === ASSISTANT_ID &&
           entry.type === "ReceivedMessage" &&
           entry.from_id === "human" &&
           entry.content
         ) {
-          setPendingStewardMessages((prev) => {
+          setPendingAssistantMessages((prev) => {
             const idx = prev.findIndex(
               (message) => message.content === entry.content,
             );
@@ -346,8 +346,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       selectAgent,
       hoveredAgentId,
       setHoveredAgentId,
-      pendingStewardMessages,
-      sendStewardMessage,
+      pendingAssistantMessages,
+      sendAssistantMessage,
       currentPage,
       setCurrentPage,
     }),
@@ -355,8 +355,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       selectedAgentId,
       selectAgent,
       hoveredAgentId,
-      pendingStewardMessages,
-      sendStewardMessage,
+      pendingAssistantMessages,
+      sendAssistantMessage,
       currentPage,
     ],
   );

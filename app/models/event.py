@@ -13,7 +13,7 @@ class EventType(StrEnum):
     NODE_MESSAGE = "node_message"
     NODE_TERMINATED = "node_terminated"
     NODE_CONNECTED = "node_connected"
-    STEWARD_CONTENT = "steward_content"
+    ASSISTANT_CONTENT = "assistant_content"
     TOOL_CALLED = "tool_called"
     HISTORY_ENTRY_ADDED = "history_entry_added"
     HISTORY_ENTRY_DELTA = "history_entry_delta"
@@ -26,7 +26,7 @@ DISPLAY_EVENTS: set[EventType] = {
     EventType.NODE_MESSAGE,
     EventType.NODE_TERMINATED,
     EventType.NODE_CONNECTED,
-    EventType.STEWARD_CONTENT,
+    EventType.ASSISTANT_CONTENT,
     EventType.TOOL_CALLED,
 }
 

@@ -99,9 +99,10 @@ def _resolve_role_model(
 
 
 def _sync_running_assistant_role(role_name: str) -> None:
+    from app.models import ASSISTANT_NODE_ID
     from app.registry import registry
 
-    assistant = registry.get("steward")
+    assistant = registry.get(ASSISTANT_NODE_ID)
     if assistant is None:
         return
     assistant.config.role_name = role_name

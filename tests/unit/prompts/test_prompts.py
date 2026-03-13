@@ -85,7 +85,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     )
 
     prompt = get_system_prompt(
-        NodeConfig(node_type=NodeType.STEWARD, role_name=STEWARD_ROLE_NAME)
+        NodeConfig(node_type=NodeType.ASSISTANT, role_name=STEWARD_ROLE_NAME)
     )
 
     assert prompt == compose_system_prompt(
@@ -137,7 +137,7 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
     )
 
     prompt = get_system_prompt(
-        NodeConfig(node_type=NodeType.STEWARD, role_name="Ghost")
+        NodeConfig(node_type=NodeType.ASSISTANT, role_name="Ghost")
     )
 
     assert prompt == compose_system_prompt(

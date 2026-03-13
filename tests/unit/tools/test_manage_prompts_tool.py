@@ -7,7 +7,7 @@ from app.tools.manage_prompts import ManagePromptsTool
 
 
 def test_manage_prompts_get_returns_current_prompt(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_prompts"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
     settings = Settings(custom_prompt="Be concise.")
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -18,7 +18,7 @@ def test_manage_prompts_get_returns_current_prompt(monkeypatch):
 
 
 def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_prompts"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
     settings = Settings(custom_prompt="")
     saved: list[Settings] = []
 
@@ -43,7 +43,7 @@ def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
 
 
 def test_manage_prompts_update_requires_custom_prompt(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_prompts"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
     monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
 
     result = json.loads(

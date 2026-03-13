@@ -10,7 +10,7 @@ def get_system_prompt(config: NodeConfig) -> str:
 
     settings = get_settings()
 
-    if config.node_type == NodeType.STEWARD:
+    if config.node_type == NodeType.ASSISTANT:
         role_name = (
             config.role_name or settings.assistant.role_name or STEWARD_ROLE_NAME
         )

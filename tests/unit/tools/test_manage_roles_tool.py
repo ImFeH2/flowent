@@ -13,7 +13,7 @@ from app.tools.manage_roles import ManageRolesTool
 
 
 def test_manage_roles_list_includes_builtin_flags(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(
         roles=[
             RoleConfig(name="Worker", system_prompt="Do work."),
@@ -46,7 +46,7 @@ def test_manage_roles_list_includes_builtin_flags(monkeypatch):
 
 
 def test_manage_roles_create_adds_custom_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(
         providers=[
             ProviderConfig(
@@ -109,7 +109,7 @@ def test_manage_roles_create_adds_custom_role(monkeypatch):
 
 
 def test_manage_roles_create_rejects_duplicate_name(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(roles=[RoleConfig(name="Reviewer", system_prompt="Review.")])
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -129,7 +129,7 @@ def test_manage_roles_create_rejects_duplicate_name(monkeypatch):
 
 
 def test_manage_roles_create_rejects_overlapping_tool_config(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
 
     result = json.loads(
@@ -149,7 +149,7 @@ def test_manage_roles_create_rejects_overlapping_tool_config(monkeypatch):
 
 
 def test_manage_roles_update_renames_and_updates_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(
         providers=[
             ProviderConfig(
@@ -214,7 +214,7 @@ def test_manage_roles_update_renames_and_updates_role(monkeypatch):
 
 
 def test_manage_roles_update_rejects_builtin_rename(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -234,7 +234,7 @@ def test_manage_roles_update_rejects_builtin_rename(monkeypatch):
 
 
 def test_manage_roles_update_rejects_builtin_prompt_change(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -256,7 +256,7 @@ def test_manage_roles_update_rejects_builtin_prompt_change(monkeypatch):
 
 
 def test_manage_roles_delete_removes_custom_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(roles=[RoleConfig(name="Reviewer", system_prompt="Review.")])
     saved: list[Settings] = []
 
@@ -278,7 +278,7 @@ def test_manage_roles_delete_removes_custom_role(monkeypatch):
 
 
 def test_manage_roles_delete_rejects_builtin_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
 
     result = json.loads(
@@ -292,7 +292,7 @@ def test_manage_roles_delete_rejects_builtin_role(monkeypatch):
 
 
 def test_manage_roles_update_renames_selected_assistant_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(
         assistant=AssistantSettings(role_name="Reviewer"),
         roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully.")],
@@ -318,7 +318,7 @@ def test_manage_roles_update_renames_selected_assistant_role(monkeypatch):
 
 
 def test_manage_roles_delete_resets_selected_assistant_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_roles"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(
         assistant=AssistantSettings(role_name="Reviewer"),
         roles=[RoleConfig(name="Reviewer", system_prompt="Review.")],

@@ -27,11 +27,11 @@ def test_get_agent_not_found(client: TestClient):
 
 
 def test_get_node_detail_includes_runtime_config(client: TestClient):
-    response = client.get("/api/nodes/steward")
+    response = client.get("/api/nodes/assistant")
 
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == "steward"
+    assert data["id"] == "assistant"
     assert isinstance(data["history"], list)
     assert isinstance(data["tools"], list)
     assert isinstance(data["write_dirs"], list)
@@ -45,24 +45,24 @@ def test_direct_node_message_api_is_not_available(client: TestClient):
     )
 
 
-def test_only_steward_node_exists_at_startup(client: TestClient):
+def test_only_assistant_node_exists_at_startup(client: TestClient):
     list_response = client.get("/api/nodes")
 
     assert list_response.status_code == 200
     nodes = list_response.json()["nodes"]
     assert len(nodes) == 1
-    assert nodes[0]["id"] == "steward"
-    assert nodes[0]["node_type"] == "steward"
+    assert nodes[0]["id"] == "assistant"
+    assert nodes[0]["node_type"] == "assistant"
     assert nodes[0]["name"] == "Assistant"
     assert nodes[0]["role_name"] == "Steward"
 
 
-def test_get_steward_detail_includes_tools_and_permissions(client: TestClient):
-    response = client.get("/api/nodes/steward")
+def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient):
+    response = client.get("/api/nodes/assistant")
 
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == "steward"
+    assert data["id"] == "assistant"
     assert data["tools"] == [
         "create_root",
         "manage_providers",
@@ -74,8 +74,8 @@ def test_get_steward_detail_includes_tools_and_permissions(client: TestClient):
     assert data["allow_network"] is True
 
 
-def test_steward_cannot_be_terminated_via_nodes_api(client: TestClient):
-    response = client.post("/api/nodes/steward/terminate")
+def test_assistant_cannot_be_terminated_via_nodes_api(client: TestClient):
+    response = client.post("/api/nodes/assistant/terminate")
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Cannot terminate assistant"}

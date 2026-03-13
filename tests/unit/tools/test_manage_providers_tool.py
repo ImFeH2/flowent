@@ -13,7 +13,7 @@ from app.tools.manage_providers import ManageProvidersTool
 
 
 def test_manage_providers_list_omits_api_keys(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     settings = Settings(
         providers=[
             ProviderConfig(
@@ -41,7 +41,7 @@ def test_manage_providers_list_omits_api_keys(monkeypatch):
 
 
 def test_manage_providers_create_persists_provider(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     settings = Settings()
     saved: list[Settings] = []
     invalidations: list[str] = []
@@ -78,7 +78,7 @@ def test_manage_providers_create_persists_provider(monkeypatch):
 
 
 def test_manage_providers_create_requires_fields(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
 
     result = json.loads(
         ManageProvidersTool().execute(
@@ -95,7 +95,7 @@ def test_manage_providers_create_requires_fields(monkeypatch):
 
 
 def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     settings = Settings(
         providers=[
             ProviderConfig(
@@ -145,7 +145,7 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
 
 
 def test_manage_providers_update_rejects_unknown_provider(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
 
     result = json.loads(
@@ -159,7 +159,7 @@ def test_manage_providers_update_rejects_unknown_provider(monkeypatch):
 
 
 def test_manage_providers_delete_removes_provider(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     settings = Settings(
         providers=[
             ProviderConfig(
@@ -197,7 +197,7 @@ def test_manage_providers_delete_removes_provider(monkeypatch):
 
 
 def test_manage_providers_delete_clears_active_model_for_active_provider(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     settings = Settings(
         model=ModelSettings(active_provider_id="provider-1", active_model="gpt-4o"),
         providers=[
@@ -228,7 +228,7 @@ def test_manage_providers_delete_clears_active_model_for_active_provider(monkeyp
 
 
 def test_manage_providers_delete_clears_role_model_references(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_providers"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     settings = Settings(
         providers=[
             ProviderConfig(

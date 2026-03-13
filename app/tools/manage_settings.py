@@ -78,6 +78,7 @@ class ManageSettingsTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+        from app.models import ASSISTANT_NODE_ID
         from app.providers.gateway import gateway
         from app.registry import registry
         from app.settings import find_role, get_settings, save_settings
@@ -148,7 +149,7 @@ class ManageSettingsTool(Tool):
                 settings.root_boundary.allow_network = allow_network
 
         save_settings(settings)
-        assistant = registry.get("steward")
+        assistant = registry.get(ASSISTANT_NODE_ID)
         if assistant is not None:
             assistant.config.role_name = settings.assistant.role_name
             assistant._sync_system_prompt_entry()

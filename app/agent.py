@@ -211,18 +211,18 @@ class Agent:
                         len(tools_schema) if tools_schema else 0,
                         len(self.history),
                     )
-                    saw_steward_content_chunk = False
+                    saw_assistant_content_chunk = False
 
                     def _on_llm_chunk(chunk_type: str, text: str) -> None:
-                        nonlocal saw_steward_content_chunk
+                        nonlocal saw_assistant_content_chunk
                         delta: ContentDelta | ThinkingDelta
                         if chunk_type == "content":
                             delta = ContentDelta(text=text)
-                            if self.node_type == NodeType.STEWARD:
-                                saw_steward_content_chunk = True
+                            if self.node_type == NodeType.ASSISTANT:
+                                saw_assistant_content_chunk = True
                                 event_bus.emit(
                                     Event(
-                                        type=EventType.STEWARD_CONTENT,
+                                        type=EventType.ASSISTANT_CONTENT,
                                         agent_id=self.uuid,
                                         data={"content": text},
                                     ),
@@ -268,12 +268,12 @@ class Agent:
                         )
                         if response.content:
                             if (
-                                self.node_type == NodeType.STEWARD
-                                and not saw_steward_content_chunk
+                                self.node_type == NodeType.ASSISTANT
+                                and not saw_assistant_content_chunk
                             ):
                                 event_bus.emit(
                                     Event(
-                                        type=EventType.STEWARD_CONTENT,
+                                        type=EventType.ASSISTANT_CONTENT,
                                         agent_id=self.uuid,
                                         data={"content": response.content},
                                     ),
@@ -287,12 +287,12 @@ class Agent:
                                 break
                     elif response.content:
                         if (
-                            self.node_type == NodeType.STEWARD
-                            and not saw_steward_content_chunk
+                            self.node_type == NodeType.ASSISTANT
+                            and not saw_assistant_content_chunk
                         ):
                             event_bus.emit(
                                 Event(
-                                    type=EventType.STEWARD_CONTENT,
+                                    type=EventType.ASSISTANT_CONTENT,
                                     agent_id=self.uuid,
                                     data={"content": response.content},
                                 ),

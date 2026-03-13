@@ -24,10 +24,8 @@ class ExitTool(Tool):
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         from app.models import NodeType
 
-        if agent.node_type == NodeType.STEWARD:
-            return json.dumps(
-                {"error": f"{agent.node_type.value} cannot be terminated"}
-            )
+        if agent.node_type == NodeType.ASSISTANT:
+            return json.dumps({"error": "assistant cannot be terminated"})
 
         reason = args.get("reason", "Task completed")
         logger.info("Agent {} exiting: {}", agent.uuid[:8], reason)

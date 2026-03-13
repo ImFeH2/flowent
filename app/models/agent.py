@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+ASSISTANT_NODE_ID = "assistant"
+
 
 class NodeType(StrEnum):
-    STEWARD = "steward"
+    ASSISTANT = "assistant"
     AGENT = "agent"
 
 

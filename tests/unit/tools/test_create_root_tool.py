@@ -17,20 +17,20 @@ def reset_registry():
     registry.reset()
 
 
-def test_create_root_registers_root_agent_and_connects_to_steward(
+def test_create_root_registers_root_agent_and_connects_to_assistant(
     monkeypatch,
     tmp_path,
 ):
-    steward = Agent(
+    assistant = Agent(
         NodeConfig(
-            node_type=NodeType.STEWARD,
+            node_type=NodeType.ASSISTANT,
             tools=["create_root"],
             write_dirs=[],
             allow_network=False,
         ),
-        uuid="steward",
+        uuid="assistant",
     )
-    registry.register(steward)
+    registry.register(assistant)
 
     workspace = tmp_path / "workspace"
     notes_dir = workspace / "notes"
@@ -54,7 +54,7 @@ def test_create_root_registers_root_agent_and_connects_to_steward(
 
     result = json.loads(
         CreateRootTool().execute(
-            steward,
+            assistant,
             {
                 "role_name": "Worker",
                 "name": "Root Worker",
@@ -74,16 +74,16 @@ def test_create_root_registers_root_agent_and_connects_to_steward(
     assert child.config.name == "Root Worker"
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert child.config.write_dirs == [str(notes_dir)]
-    assert steward.is_connected_to(child_id) is True
-    assert child.is_connected_to("steward") is True
+    assert assistant.is_connected_to(child_id) is True
+    assert child.is_connected_to("assistant") is True
 
 
 def test_create_root_rejects_write_dir_outside_root_boundary(monkeypatch, tmp_path):
-    steward = Agent(
-        NodeConfig(node_type=NodeType.STEWARD, tools=["create_root"]),
-        uuid="steward",
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
+        uuid="assistant",
     )
-    registry.register(steward)
+    registry.register(assistant)
 
     allowed_dir = tmp_path / "allowed"
     blocked_dir = tmp_path / "blocked"
@@ -100,7 +100,7 @@ def test_create_root_rejects_write_dir_outside_root_boundary(monkeypatch, tmp_pa
 
     result = json.loads(
         CreateRootTool().execute(
-            steward,
+            assistant,
             {
                 "role_name": "Worker",
                 "write_dirs": [str(blocked_dir)],
@@ -113,11 +113,11 @@ def test_create_root_rejects_write_dir_outside_root_boundary(monkeypatch, tmp_pa
 
 
 def test_create_root_rejects_network_outside_root_boundary(monkeypatch):
-    steward = Agent(
-        NodeConfig(node_type=NodeType.STEWARD, tools=["create_root"]),
-        uuid="steward",
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
+        uuid="assistant",
     )
-    registry.register(steward)
+    registry.register(assistant)
 
     monkeypatch.setattr(
         "app.settings.get_settings",
@@ -129,7 +129,7 @@ def test_create_root_rejects_network_outside_root_boundary(monkeypatch):
 
     result = json.loads(
         CreateRootTool().execute(
-            steward,
+            assistant,
             {
                 "role_name": "Worker",
                 "allow_network": True,
@@ -144,11 +144,11 @@ def test_create_root_rejects_network_outside_root_boundary(monkeypatch):
 
 
 def test_create_root_delivers_initial_task_after_idle(monkeypatch):
-    steward = Agent(
-        NodeConfig(node_type=NodeType.STEWARD, tools=["create_root"]),
-        uuid="steward",
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
+        uuid="assistant",
     )
-    registry.register(steward)
+    registry.register(assistant)
 
     monkeypatch.setattr(
         "app.settings.get_settings",
@@ -187,7 +187,7 @@ def test_create_root_delivers_initial_task_after_idle(monkeypatch):
 
     result = json.loads(
         CreateRootTool().execute(
-            steward,
+            assistant,
             {
                 "role_name": "Worker",
                 "task": "handle this task",
@@ -205,7 +205,7 @@ def test_create_root_delivers_initial_task_after_idle(monkeypatch):
     assert call_order == [
         ("start", child_id),
         ("wait_until_idle", child_id, 5.0),
-        ("send_message", "steward", child_id, "handle this task"),
+        ("send_message", "assistant", child_id, "handle this task"),
     ]
 
 
@@ -213,16 +213,16 @@ def test_create_root_ignores_caller_boundary_and_uses_root_boundary(
     monkeypatch,
     tmp_path,
 ):
-    steward = Agent(
+    assistant = Agent(
         NodeConfig(
-            node_type=NodeType.STEWARD,
+            node_type=NodeType.ASSISTANT,
             tools=["create_root"],
             write_dirs=[],
             allow_network=False,
         ),
-        uuid="steward",
+        uuid="assistant",
     )
-    registry.register(steward)
+    registry.register(assistant)
 
     workspace = tmp_path / "workspace"
     output_dir = workspace / "output"
@@ -242,7 +242,7 @@ def test_create_root_ignores_caller_boundary_and_uses_root_boundary(
 
     result = json.loads(
         CreateRootTool().execute(
-            steward,
+            assistant,
             {
                 "role_name": "Worker",
                 "write_dirs": [str(output_dir)],

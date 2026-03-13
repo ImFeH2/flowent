@@ -2,7 +2,7 @@ import { Bot, Shield } from "lucide-react";
 import { type AgentState, type NodeType } from "@/types";
 
 export const nodeTypeIcon = {
-  steward: Shield,
+  assistant: Shield,
   agent: Bot,
 } as const;
 
@@ -15,7 +15,7 @@ export function getNodeLabel({
   roleName: string | null;
   nodeType: NodeType;
 }): string {
-  return name ?? roleName ?? (nodeType === "steward" ? "Assistant" : "Agent");
+  return name ?? roleName ?? (nodeType === "assistant" ? "Assistant" : "Agent");
 }
 
 export const stateColor: Record<AgentState, string> = {
@@ -47,8 +47,8 @@ export const stateRing: Record<AgentState, string> = {
 };
 
 export const nodeTypeIconStyle: Record<NodeType, string> = {
-  steward:
-    "rounded-sm border-graph-steward/40 bg-graph-steward/10 text-graph-steward",
+  assistant:
+    "rounded-sm border-graph-assistant/40 bg-graph-assistant/10 text-graph-assistant",
   agent: "rounded-sm border-graph-node-border bg-surface-3 text-foreground/80",
 };
 

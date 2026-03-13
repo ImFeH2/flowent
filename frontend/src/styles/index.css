@@ -60,7 +60,7 @@
   --color-graph-handle-border: var(--graph-handle-border);
   --color-graph-attention: var(--graph-attention);
   --color-graph-attention-text: var(--graph-attention-text);
-  --color-graph-steward: var(--graph-steward);
+  --color-graph-assistant: var(--graph-assistant);
   --color-graph-status-running: var(--graph-status-running);
   --color-graph-status-idle: var(--graph-status-idle);
   --color-graph-status-initializing: var(--graph-status-initializing);
@@ -126,7 +126,7 @@
   --graph-edge: oklch(0.98 0 0 / 18%);
   --graph-edge-active: oklch(0.98 0 0 / 72%);
   --graph-glow: oklch(0.98 0 0 / 14%);
-  --graph-steward: oklch(0.72 0.14 220);
+  --graph-assistant: oklch(0.72 0.14 220);
   --graph-status-running: oklch(0.78 0.18 170);
   --graph-status-idle: oklch(0.68 0.05 250);
   --graph-status-initializing: oklch(0.72 0.13 295);
@@ -189,7 +189,7 @@
   --graph-edge: oklch(0.58 0.18 205 / 22%);
   --graph-edge-active: oklch(0.58 0.18 205 / 88%);
   --graph-glow: oklch(0.58 0.18 205 / 16%);
-  --graph-steward: oklch(0.5 0.16 220);
+  --graph-assistant: oklch(0.5 0.16 220);
   --graph-status-running: oklch(0.58 0.18 205);
   --graph-status-idle: oklch(0.55 0.02 250);
   --graph-status-initializing: oklch(0.58 0.16 285);

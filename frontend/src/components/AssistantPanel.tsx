@@ -1,16 +1,16 @@
 import { Shield } from "lucide-react";
 import {
-  StewardChatComposer,
-  StewardChatMessages,
-} from "@/components/StewardChatContent";
-import { useStewardChat } from "@/hooks/useStewardChat";
+  AssistantChatComposer,
+  AssistantChatMessages,
+} from "@/components/AssistantChatContent";
+import { useAssistantChat } from "@/hooks/useAssistantChat";
 import { cn } from "@/lib/utils";
 
-interface StewardPanelProps {
+interface AssistantPanelProps {
   variant?: "page" | "floating" | "docked";
 }
 
-export function StewardPanel({ variant = "page" }: StewardPanelProps) {
+export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
   const {
     connected,
     handleKeyDown,
@@ -21,7 +21,7 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
     sendMessage,
     setInput,
     timelineItems,
-  } = useStewardChat();
+  } = useAssistantChat();
   const isFloating = variant === "floating";
   const chatVariant = isFloating ? "floating" : "panel";
 
@@ -35,13 +35,13 @@ export function StewardPanel({ variant = "page" }: StewardPanelProps) {
       )}
     >
       <PanelHeader connected={connected} floating={isFloating} />
-      <StewardChatMessages
+      <AssistantChatMessages
         items={timelineItems}
         onScroll={onMessagesScroll}
         scrollRef={scrollRef}
         variant={chatVariant}
       />
-      <StewardChatComposer
+      <AssistantChatComposer
         disabled={!input.trim() || sending}
         input={input}
         onChange={setInput}

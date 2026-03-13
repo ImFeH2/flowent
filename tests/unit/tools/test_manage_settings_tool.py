@@ -14,7 +14,7 @@ from app.tools.manage_settings import ManageSettingsTool
 
 
 def test_manage_settings_get_returns_current_settings(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_settings"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(
         assistant=AssistantSettings(role_name="Steward"),
         event_log=EventLogSettings(timestamp_format="relative"),
@@ -47,7 +47,7 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
 
 
 def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_settings"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
     saved: list[Settings] = []
     invalidations: list[str] = []
@@ -83,7 +83,7 @@ def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
 
 
 def test_manage_settings_update_changes_assistant_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_settings"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(
         roles=[
             RoleConfig(name="Steward", system_prompt="Default assistant role."),
@@ -114,7 +114,7 @@ def test_manage_settings_update_changes_assistant_role(monkeypatch):
 
 
 def test_manage_settings_update_rejects_unknown_assistant_role(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_settings"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(roles=[RoleConfig(name="Steward", system_prompt="Default.")])
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -133,7 +133,7 @@ def test_manage_settings_update_rejects_unknown_assistant_role(monkeypatch):
 
 
 def test_manage_settings_update_merges_root_boundary(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["manage_settings"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(
         root_boundary=RootBoundary(
             write_dirs=["/project/workspace"],

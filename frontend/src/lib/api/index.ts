@@ -11,4 +11,4 @@ export {
 export { fetchPromptSettings, savePromptSettings } from "./prompts";
 export { fetchSettings, saveSettings } from "./settings";
 export { fetchAppMeta, fetchTools, type ToolInfo } from "./meta";
-export { sendStewardMessageRequest } from "./steward";
+export { sendAssistantMessageRequest } from "./assistant";

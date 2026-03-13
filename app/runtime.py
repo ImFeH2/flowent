@@ -9,7 +9,7 @@ SYSTEM_NODE_TIMEOUT = 5.0
 
 def bootstrap_runtime() -> None:
     from app.agent import Agent
-    from app.models import NodeConfig, NodeType
+    from app.models import ASSISTANT_NODE_ID, NodeConfig, NodeType
     from app.settings import ensure_builtin_roles, get_settings, save_settings
 
     settings = get_settings()
@@ -18,7 +18,7 @@ def bootstrap_runtime() -> None:
 
     assistant = Agent(
         NodeConfig(
-            node_type=NodeType.STEWARD,
+            node_type=NodeType.ASSISTANT,
             role_name=settings.assistant.role_name,
             name="Assistant",
             tools=[
@@ -31,7 +31,7 @@ def bootstrap_runtime() -> None:
             write_dirs=[],
             allow_network=True,
         ),
-        uuid="steward",
+        uuid=ASSISTANT_NODE_ID,
     )
     registry.register(assistant)
     assistant.start()

@@ -146,20 +146,20 @@ def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
     )
 
 
-def test_steward_content_streams_even_when_response_has_tool_calls(monkeypatch):
+def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch):
     registry.reset()
-    steward = Agent(
-        NodeConfig(node_type=NodeType.STEWARD, tools=["exit"]),
-        uuid="steward",
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["exit"]),
+        uuid="assistant",
     )
-    registry.register(steward)
+    registry.register(assistant)
     events = []
 
     def fake_wait_for_input() -> None:
-        steward._append_history(
+        assistant._append_history(
             ReceivedMessage(content="report progress", from_id="human")
         )
-        steward.set_state(AgentState.RUNNING, "received message from human")
+        assistant.set_state(AgentState.RUNNING, "received message from human")
 
     def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
         if on_chunk is not None:
@@ -175,21 +175,21 @@ def test_steward_content_streams_even_when_response_has_tool_calls(monkeypatch):
             ],
         )
 
-    monkeypatch.setattr(steward, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
     monkeypatch.setattr(
-        steward,
+        assistant,
         "_handle_tool_call",
-        lambda name, arguments, call_id: steward.request_termination("done"),
+        lambda name, arguments, call_id: assistant.request_termination("done"),
     )
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
-    steward._run()
+    assistant._run()
 
-    steward_events = [
-        event for event in events if event.type == EventType.STEWARD_CONTENT
+    assistant_events = [
+        event for event in events if event.type == EventType.ASSISTANT_CONTENT
     ]
-    assert [event.data for event in steward_events] == [{"content": "Working on it"}]
+    assert [event.data for event in assistant_events] == [{"content": "Working on it"}]
 
 
 def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):

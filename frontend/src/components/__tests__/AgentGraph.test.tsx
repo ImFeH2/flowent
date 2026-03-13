@@ -179,14 +179,14 @@ describe("AgentGraph", () => {
   it("renders unnamed agent nodes using role_name and sizes width to fit the label", async () => {
     renderGraph([
       buildNode({
-        id: "steward",
-        node_type: "steward",
+        id: "assistant",
+        node_type: "assistant",
         connections: ["worker-1"],
       }),
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: ["steward"],
+        connections: ["assistant"],
       }),
     ]);
 
@@ -200,25 +200,25 @@ describe("AgentGraph", () => {
     expect(workerNode).toHaveClass("h-[62px]");
   });
 
-  it("protects only steward termination and allows stopping regular agents", async () => {
+  it("protects only assistant termination and allows stopping regular agents", async () => {
     renderGraph([
       buildNode({
-        id: "steward",
-        node_type: "steward",
+        id: "assistant",
+        node_type: "assistant",
         connections: ["worker-1"],
       }),
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: ["steward"],
+        connections: ["assistant"],
       }),
     ]);
 
-    fireEvent.contextMenu(screen.getByTestId("node-steward"));
-    const stopSteward = await screen.findByRole("button", {
+    fireEvent.contextMenu(screen.getByTestId("node-assistant"));
+    const stopAssistant = await screen.findByRole("button", {
       name: "Stop Agent",
     });
-    expect(stopSteward).toBeDisabled();
+    expect(stopAssistant).toBeDisabled();
 
     fireEvent.mouseDown(document.body);
     await waitFor(() => {
@@ -242,14 +242,14 @@ describe("AgentGraph", () => {
   it("re-fits the forest when the container is resized", async () => {
     renderGraph([
       buildNode({
-        id: "steward",
-        node_type: "steward",
+        id: "assistant",
+        node_type: "assistant",
         connections: ["worker-1"],
       }),
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: ["steward"],
+        connections: ["assistant"],
       }),
     ]);
 

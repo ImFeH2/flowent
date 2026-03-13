@@ -55,7 +55,7 @@ async def terminate_node(node_id: str) -> dict:
 
     from app.models import NodeType
 
-    if node.config.node_type == NodeType.STEWARD:
+    if node.config.node_type == NodeType.ASSISTANT:
         raise HTTPException(status_code=400, detail="Cannot terminate assistant")
 
     node.request_termination("user_requested")

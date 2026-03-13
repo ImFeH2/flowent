@@ -224,7 +224,7 @@ export function AgentGraph() {
     if (contextMenu.agentId) {
       const agentId = contextMenu.agentId;
       const node = agents.get(agentId);
-      const isProtected = node?.node_type === "steward";
+      const isProtected = node?.node_type === "assistant";
       items.push({
         label: "Stop Agent",
         danger: true,

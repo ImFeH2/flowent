@@ -5,12 +5,12 @@ from app.models import NodeConfig, NodeType
 from app.tools.exit import ExitTool
 
 
-def test_exit_tool_rejects_steward():
-    steward = Agent(NodeConfig(node_type=NodeType.STEWARD), uuid="steward")
+def test_exit_tool_rejects_assistant():
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
 
-    result = json.loads(ExitTool().execute(steward, {}))
+    result = json.loads(ExitTool().execute(assistant, {}))
 
-    assert result == {"error": "steward cannot be terminated"}
+    assert result == {"error": "assistant cannot be terminated"}
 
 
 def test_exit_tool_allows_conductor_role_agent():

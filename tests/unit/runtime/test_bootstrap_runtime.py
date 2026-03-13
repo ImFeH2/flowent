@@ -17,7 +17,7 @@ from app.settings import (
 )
 
 
-def test_bootstrap_runtime_creates_only_steward_with_create_root(
+def test_bootstrap_runtime_creates_only_assistant_with_create_root(
     monkeypatch,
     tmp_path,
 ):
@@ -43,22 +43,22 @@ def test_bootstrap_runtime_creates_only_steward_with_create_root(
 
     try:
         nodes = registry.get_all()
-        steward = registry.get("steward")
+        assistant = registry.get("assistant")
 
         assert len(nodes) == 1
-        assert steward is not None
-        assert steward.config.node_type.value == "steward"
-        assert steward.config.name == "Assistant"
-        assert steward.config.role_name == STEWARD_ROLE_NAME
-        assert steward.config.tools == [
+        assert assistant is not None
+        assert assistant.config.node_type.value == "assistant"
+        assert assistant.config.name == "Assistant"
+        assert assistant.config.role_name == STEWARD_ROLE_NAME
+        assert assistant.config.tools == [
             "create_root",
             "manage_providers",
             "manage_roles",
             "manage_settings",
             "manage_prompts",
         ]
-        assert steward.config.write_dirs == []
-        assert steward.config.allow_network is True
+        assert assistant.config.write_dirs == []
+        assert assistant.config.allow_network is True
     finally:
         registry.reset()
 
@@ -163,7 +163,7 @@ def test_bootstrap_runtime_reconciles_existing_builtin_roles(monkeypatch, tmp_pa
         registry.reset()
 
 
-def test_bootstrap_runtime_keeps_steward_boundary_independent_of_root_boundary(
+def test_bootstrap_runtime_keeps_assistant_boundary_independent_of_root_boundary(
     monkeypatch,
     tmp_path,
 ):
@@ -193,14 +193,14 @@ def test_bootstrap_runtime_keeps_steward_boundary_independent_of_root_boundary(
 
     try:
         nodes = registry.get_all()
-        steward = registry.get("steward")
+        assistant = registry.get("assistant")
 
         assert len(nodes) == 1
-        assert steward is not None
-        assert steward.config.name == "Assistant"
-        assert steward.config.role_name == STEWARD_ROLE_NAME
-        assert steward.config.write_dirs == []
-        assert steward.config.allow_network is True
+        assert assistant is not None
+        assert assistant.config.name == "Assistant"
+        assert assistant.config.role_name == STEWARD_ROLE_NAME
+        assert assistant.config.write_dirs == []
+        assert assistant.config.allow_network is True
     finally:
         registry.reset()
 
@@ -235,9 +235,9 @@ def test_bootstrap_runtime_uses_configured_assistant_role(monkeypatch, tmp_path)
     bootstrap_runtime()
 
     try:
-        steward = registry.get("steward")
-        assert steward is not None
-        assert steward.config.role_name == "Reviewer"
+        assistant = registry.get("assistant")
+        assert assistant is not None
+        assert assistant.config.role_name == "Reviewer"
         assert settings_module.get_settings().assistant.role_name == "Reviewer"
     finally:
         registry.reset()
@@ -269,9 +269,9 @@ def test_bootstrap_runtime_falls_back_to_steward_when_assistant_role_missing(
     bootstrap_runtime()
 
     try:
-        steward = registry.get("steward")
-        assert steward is not None
-        assert steward.config.role_name == STEWARD_ROLE_NAME
+        assistant = registry.get("assistant")
+        assert assistant is not None
+        assert assistant.config.role_name == STEWARD_ROLE_NAME
         assert settings_module.get_settings().assistant.role_name == STEWARD_ROLE_NAME
     finally:
         registry.reset()

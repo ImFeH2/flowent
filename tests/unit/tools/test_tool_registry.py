@@ -43,7 +43,7 @@ def test_tool_registry_does_not_register_connect_tool():
 
 
 def test_tool_registry_grants_create_root_when_explicitly_allowed():
-    agent = Agent(NodeConfig(node_type=NodeType.STEWARD, tools=["create_root"]))
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]))
 
     tools = build_tool_registry().get_tools_for_agent(agent)
 
@@ -57,7 +57,7 @@ def test_tool_registry_grants_create_root_when_explicitly_allowed():
     ]
 
 
-def test_tool_registry_hides_steward_only_management_tools_from_agent_visible_list():
+def test_tool_registry_hides_assistant_only_management_tools_from_agent_visible_list():
     visible_tool_names = {
         tool.name for tool in build_tool_registry().list_tools(agent_visible_only=True)
     }

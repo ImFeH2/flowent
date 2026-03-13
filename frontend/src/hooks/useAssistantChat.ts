@@ -10,14 +10,14 @@ import { toast } from "sonner";
 import { fetchNodeDetail } from "@/lib/api";
 import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
 import { mergeHistoryWithDeltas } from "@/lib/history";
-import type { NodeDetail, StewardChatItem } from "@/types";
+import type { AssistantChatItem, NodeDetail } from "@/types";
 
-const STEWARD_ID = "steward";
+const ASSISTANT_ID = "assistant";
 
-export function useStewardChat() {
+export function useAssistantChat() {
   const { connected, agentHistories, clearAgentHistory, streamingDeltas } =
     useAgentRuntime();
-  const { pendingStewardMessages, sendStewardMessage } = useAgentUI();
+  const { pendingAssistantMessages, sendAssistantMessage } = useAgentUI();
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [input, setInput] = useState("");
@@ -34,9 +34,9 @@ export function useStewardChat() {
     let cancelled = false;
 
     const load = async () => {
-      clearAgentHistory(STEWARD_ID);
+      clearAgentHistory(ASSISTANT_ID);
       try {
-        const data = await fetchNodeDetail(STEWARD_ID, controller.signal);
+        const data = await fetchNodeDetail(ASSISTANT_ID, controller.signal);
         if (cancelled || !data) {
           return;
         }
@@ -57,23 +57,23 @@ export function useStewardChat() {
     };
   }, [clearAgentHistory, connected]);
 
-  const timelineItems = useMemo<StewardChatItem[]>(() => {
+  const timelineItems = useMemo<AssistantChatItem[]>(() => {
     const history = mergeHistoryWithDeltas({
       history: detail?.history ?? [],
-      incremental: agentHistories.get(STEWARD_ID),
-      deltas: streamingDeltas.get(STEWARD_ID),
+      incremental: agentHistories.get(ASSISTANT_ID),
+      deltas: streamingDeltas.get(ASSISTANT_ID),
       fetchedAt: fetchedAt || Date.now(),
     });
 
     return [
       ...history,
-      ...pendingStewardMessages.map((message) => ({ ...message })),
+      ...pendingAssistantMessages.map((message) => ({ ...message })),
     ];
   }, [
     agentHistories,
     detail,
     fetchedAt,
-    pendingStewardMessages,
+    pendingAssistantMessages,
     streamingDeltas,
   ]);
 
@@ -100,7 +100,7 @@ export function useStewardChat() {
     setInput("");
 
     try {
-      await sendStewardMessage(content);
+      await sendAssistantMessage(content);
     } catch {
       toast.error("Failed to send message");
     } finally {

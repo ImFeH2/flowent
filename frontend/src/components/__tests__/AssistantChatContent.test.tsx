@@ -1,12 +1,12 @@
 import { createRef } from "react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { StewardChatMessages } from "@/components/StewardChatContent";
-import type { StewardChatItem } from "@/types";
+import { AssistantChatMessages } from "@/components/AssistantChatContent";
+import type { AssistantChatItem } from "@/types";
 
-describe("StewardChatMessages", () => {
+describe("AssistantChatMessages", () => {
   it("renders thinking and tool call activity cards in the chat timeline and hides idle tool calls", () => {
-    const items: StewardChatItem[] = [
+    const items: AssistantChatItem[] = [
       {
         type: "PendingHumanMessage",
         id: "pending-1",
@@ -45,7 +45,7 @@ describe("StewardChatMessages", () => {
     ];
 
     render(
-      <StewardChatMessages
+      <AssistantChatMessages
         items={items}
         onScroll={() => {}}
         scrollRef={createRef<HTMLDivElement>()}

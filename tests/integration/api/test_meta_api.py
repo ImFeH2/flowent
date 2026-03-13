@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 
-def test_tools_api_hides_steward_only_tools(client: TestClient):
+def test_tools_api_hides_assistant_only_tools(client: TestClient):
     response = client.get("/api/tools")
 
     assert response.status_code == 200

@@ -1,4 +1,4 @@
-export type NodeType = "steward" | "agent";
+export type NodeType = "assistant" | "agent";
 
 export type AgentState =
   | "initializing"
@@ -14,7 +14,7 @@ export type DisplayEventType =
   | "node_message"
   | "node_terminated"
   | "node_connected"
-  | "steward_content"
+  | "assistant_content"
   | "tool_called";
 
 export type UpdateEventType =
@@ -46,14 +46,14 @@ export interface AgentEvent {
   timestamp: number;
 }
 
-export interface StewardMessage {
+export interface AssistantChatMessage {
   id: string;
   content: string;
   timestamp: number;
-  from: "human" | "steward";
+  from: "human" | "assistant";
 }
 
-export interface PendingStewardMessage extends StewardMessage {
+export interface PendingAssistantChatMessage extends AssistantChatMessage {
   type: "PendingHumanMessage";
 }
 
@@ -78,7 +78,7 @@ export interface HistoryEntry {
   streaming?: boolean;
 }
 
-export type StewardChatItem = HistoryEntry | PendingStewardMessage;
+export type AssistantChatItem = HistoryEntry | PendingAssistantChatMessage;
 
 export interface NodeDetail {
   id: string;

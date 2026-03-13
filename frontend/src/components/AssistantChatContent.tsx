@@ -20,32 +20,32 @@ import {
 import { CopyButton } from "@/components/CopyButton";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { cn } from "@/lib/utils";
-import type { HistoryEntry, StewardChatItem } from "@/types";
+import type { AssistantChatItem, HistoryEntry } from "@/types";
 
-export type StewardChatVariant = "panel" | "floating" | "workspace";
+export type AssistantChatVariant = "panel" | "floating" | "workspace";
 
-interface StewardChatMessagesProps {
+interface AssistantChatMessagesProps {
   scrollRef: RefObject<HTMLDivElement | null>;
-  items: StewardChatItem[];
+  items: AssistantChatItem[];
   onScroll: UIEventHandler<HTMLDivElement>;
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
 }
 
-interface StewardChatComposerProps {
+interface AssistantChatComposerProps {
   disabled: boolean;
   input: string;
   onChange: (value: string) => void;
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>;
   onSend: () => void;
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
 }
 
-export function StewardChatMessages({
+export function AssistantChatMessages({
   scrollRef,
   items,
   onScroll,
   variant,
-}: StewardChatMessagesProps) {
+}: AssistantChatMessagesProps) {
   const isWorkspace = variant === "workspace";
   const isFloating = variant === "floating";
   const visibleItems = items.filter(
@@ -82,14 +82,14 @@ export function StewardChatMessages({
   );
 }
 
-export function StewardChatComposer({
+export function AssistantChatComposer({
   disabled,
   input,
   onChange,
   onKeyDown,
   onSend,
   variant,
-}: StewardChatComposerProps) {
+}: AssistantChatComposerProps) {
   const isWorkspace = variant === "workspace";
 
   return (
@@ -135,8 +135,8 @@ function TimelineItem({
   item,
   variant,
 }: {
-  item: StewardChatItem;
-  variant: StewardChatVariant;
+  item: AssistantChatItem;
+  variant: AssistantChatVariant;
 }) {
   if (item.type === "PendingHumanMessage") {
     return <HumanBubble content={item.content} variant={variant} pending />;
@@ -186,7 +186,7 @@ function HumanBubble({
   pending = false,
 }: {
   content: string;
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
   pending?: boolean;
 }) {
   const isWorkspace = variant === "workspace";
@@ -223,7 +223,7 @@ function AssistantBubble({
 }: {
   content: string;
   streaming?: boolean;
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
 }) {
   const isWorkspace = variant === "workspace";
   const isFloating = variant === "floating";
@@ -283,7 +283,7 @@ function ThinkingCard({
   variant,
 }: {
   item: HistoryEntry & { type: "AssistantThinking" };
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
 }) {
   return (
     <ActivityDisclosure
@@ -309,7 +309,7 @@ function ToolCallCard({
   variant,
 }: {
   item: HistoryEntry & { type: "ToolCall" };
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
 }) {
   const isSend = item.tool_name === "send";
   const toId = item.arguments?.to as string | undefined;
@@ -382,7 +382,7 @@ function ErrorCard({
   variant,
 }: {
   content: string;
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
 }) {
   const isWorkspace = variant === "workspace";
 
@@ -424,7 +424,7 @@ function ActivityDisclosure({
   icon: ReactNode;
   tone: "thinking" | "tool" | "send";
   streaming?: boolean;
-  variant: StewardChatVariant;
+  variant: AssistantChatVariant;
   defaultOpen: boolean;
   children: ReactNode;
 }) {
@@ -588,7 +588,7 @@ function formatToolLabel(value: string | null | undefined) {
     .join(" ");
 }
 
-function getTimelineItemKey(item: StewardChatItem, index: number) {
+function getTimelineItemKey(item: AssistantChatItem, index: number) {
   if (item.type === "PendingHumanMessage") {
     return item.id;
   }

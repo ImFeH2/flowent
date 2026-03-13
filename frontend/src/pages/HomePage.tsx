@@ -130,11 +130,13 @@ export function HomePage() {
   return (
     <div
       ref={workspaceRef}
-      className="relative flex h-full overflow-hidden rounded-xl bg-surface-1"
+      className="relative flex h-full overflow-hidden rounded-[1rem] border border-white/6 bg-[linear-gradient(180deg,rgba(10,14,22,0.82),rgba(7,10,16,0.78))] shadow-[0_16px_42px_-32px_rgba(0,0,0,0.78)]"
     >
-      {/* Main Graph Area */}
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_16%,transparent_82%,rgba(255,255,255,0.015))]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,var(--surface-3),transparent_48%)] opacity-30 z-0" />
+        <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_18%_14%,rgba(92,162,255,0.09),transparent_0,transparent_28%),radial-gradient(circle_at_70%_86%,rgba(255,255,255,0.028),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.016),transparent_30%)]" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-[linear-gradient(90deg,transparent,rgba(5,7,12,0.24))]" />
 
         <div className="relative flex-1">
           <AgentGraph />
@@ -145,7 +147,7 @@ export function HomePage() {
         </div>
 
         <div className="absolute left-5 top-5 z-30 flex max-w-[75%] flex-wrap items-center gap-2 sm:left-6 sm:top-6">
-          <BadgeChip>
+          <BadgeChip tone="primary">
             <Radio
               className={cn(
                 "size-3",
@@ -153,14 +155,17 @@ export function HomePage() {
               )}
             />
             {connected ? "Live" : "Reconnecting"}
-            <span className="text-muted-foreground/50">·</span>
-            {metrics.total} nodes · {metrics.running} running · {metrics.idle}{" "}
-            idle
+          </BadgeChip>
+          <BadgeChip>
+            {metrics.total} nodes
+            <span className="text-muted-foreground/50">/</span>
+            {metrics.running} running
+            <span className="text-muted-foreground/50">/</span>
+            {metrics.idle} idle
           </BadgeChip>
         </div>
       </div>
 
-      {/* Side Panel Area */}
       <AnimatePresence initial={false}>
         {panelVisible && (
           <motion.aside
@@ -168,8 +173,10 @@ export function HomePage() {
             animate={{ width: panelWidth, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="z-20 shrink-0 border-l border-border bg-surface-2 relative"
+            className="relative z-20 shrink-0 border-l border-white/6 bg-[linear-gradient(180deg,rgba(12,16,24,0.88),rgba(9,12,19,0.82))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
           >
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),transparent_14%,transparent_82%,rgba(255,255,255,0.012))]" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
             <PanelResizer
               position="left"
               isDragging={isDragging}
@@ -203,7 +210,7 @@ export function HomePage() {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 10 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute inset-0 flex h-full flex-col bg-surface-2"
+                      className="absolute inset-0 flex h-full flex-col bg-[linear-gradient(180deg,rgba(14,18,27,0.44),rgba(10,13,20,0.38))]"
                     >
                       <AgentDetailPanel
                         agent={selectedAgent}
@@ -221,9 +228,22 @@ export function HomePage() {
   );
 }
 
-function BadgeChip({ children }: { children: ReactNode }) {
+function BadgeChip({
+  children,
+  tone = "default",
+}: {
+  children: ReactNode;
+  tone?: "default" | "primary";
+}) {
   return (
-    <div className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-glass-border bg-surface-overlay px-2.5 py-1 text-[11px] font-medium text-foreground shadow-lg backdrop-blur-sm">
+    <div
+      className={cn(
+        "pointer-events-auto flex items-center gap-1.5 rounded-[0.85rem] border px-3 py-1.5 text-[11px] font-medium shadow-[0_10px_24px_-20px_rgba(0,0,0,0.76)] backdrop-blur-lg",
+        tone === "primary"
+          ? "border-primary/12 bg-primary/[0.06] text-foreground"
+          : "border-white/6 bg-black/[0.14] text-foreground",
+      )}
+    >
       {children}
     </div>
   );
@@ -267,9 +287,9 @@ function AgentDetailPanel({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
+      <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-md bg-primary/12">
+          <div className="flex size-8 items-center justify-center rounded-md bg-primary/8">
             {agent.node_type === "assistant" ? (
               <Shield className="size-4 text-primary" />
             ) : (
@@ -291,9 +311,9 @@ function AgentDetailPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+        <div className="space-y-4">
+          <div className="grid gap-4 border-b border-white/6 pb-4 sm:grid-cols-3">
+            <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Status
               </p>
@@ -307,7 +327,7 @@ function AgentDetailPanel({
               </div>
             </div>
 
-            <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Connections
               </p>
@@ -316,7 +336,7 @@ function AgentDetailPanel({
               </p>
             </div>
 
-            <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Role
               </p>
@@ -336,7 +356,7 @@ function AgentDetailPanel({
                 {connectionItems.map((connection) => (
                   <span
                     key={connection.id}
-                    className="rounded-full border border-glass-border bg-surface-3 px-2.5 py-1 text-xs text-foreground"
+                    className="rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
                   >
                     {connection.label}
                   </span>
@@ -355,7 +375,7 @@ function AgentDetailPanel({
                 {detailTools.map((tool) => (
                   <span
                     key={tool}
-                    className="rounded-full border border-glass-border bg-surface-3 px-2.5 py-1 text-xs font-mono text-foreground"
+                    className="rounded-md bg-white/[0.04] px-2 py-1 text-xs font-mono text-foreground"
                   >
                     {tool}
                   </span>
@@ -388,7 +408,7 @@ function AgentDetailPanel({
                     {detailWriteDirs.map((path) => (
                       <p
                         key={path}
-                        className="rounded-md bg-surface-3 px-2 py-1 font-mono text-[11px] text-foreground"
+                        className="rounded-md bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-foreground"
                       >
                         {path}
                       </p>
@@ -419,15 +439,15 @@ function AgentDetailPanel({
             </div>
           </DetailSection>
 
-          <div className="overflow-hidden rounded-lg border border-glass-border bg-surface-2">
-            <div className="border-b border-glass-border px-3 py-2">
+          <div className="border-t border-white/6 pt-4">
+            <div className="px-0 pb-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 History
               </p>
             </div>
 
             {loading ? (
-              <div className="space-y-2 p-3">
+              <div className="space-y-2">
                 {[...Array(4)].map((_, index) => (
                   <div
                     key={index}
@@ -436,9 +456,9 @@ function AgentDetailPanel({
                 ))}
               </div>
             ) : error ? (
-              <div className="p-3 text-sm text-destructive">{error}</div>
+              <div className="text-sm text-destructive">{error}</div>
             ) : detailHistory.length === 0 ? (
-              <div className="p-3 text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground">
                 No history yet.
               </div>
             ) : (
@@ -468,8 +488,8 @@ function AssistantChatPanel() {
 
   return (
     <>
-      <div className="flex items-center gap-3 border-b border-glass-border px-4 py-3">
-        <div className="flex size-8 items-center justify-center rounded-md bg-primary/12">
+      <div className="flex items-center gap-3 border-b border-white/6 px-4 py-3">
+        <div className="flex size-8 items-center justify-center rounded-md bg-primary/8">
           <Shield className="size-4 text-primary" />
         </div>
         <div className="flex-1">
@@ -529,7 +549,7 @@ function PanelToggleButton({
       title={title}
       aria-label={title}
       className={cn(
-        "pointer-events-auto flex size-8 items-center justify-center rounded-md border border-glass-border bg-surface-overlay text-muted-foreground shadow-lg backdrop-blur-sm transition-all hover:bg-surface-3 hover:text-foreground",
+        "pointer-events-auto flex size-10 items-center justify-center rounded-lg bg-black/[0.16] text-muted-foreground backdrop-blur-lg transition-all hover:bg-white/[0.05] hover:text-foreground",
         className,
       )}
     >
@@ -555,7 +575,7 @@ function PanelActionButton({
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground"
+      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-white/[0.045] hover:text-foreground"
     >
       {children}
     </button>
@@ -570,11 +590,11 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-glass-border bg-surface-2 p-3">
+    <section className="border-t border-white/6 pt-4">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </p>
       <div className="mt-2">{children}</div>
-    </div>
+    </section>
   );
 }

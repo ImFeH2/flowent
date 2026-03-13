@@ -61,7 +61,7 @@ export function AssistantChatMessages({
       onScroll={onScroll}
       className={cn(
         "flex-1 space-y-4 overflow-y-auto",
-        isWorkspace ? "p-4" : "px-4 py-4",
+        isWorkspace ? "p-3.5" : "px-4 py-4",
       )}
     >
       {visibleItems.length === 0 &&
@@ -95,7 +95,7 @@ export function AssistantChatComposer({
   return (
     <div
       className={cn(
-        "border-glass-border border-t",
+        "border-t border-white/6",
         isWorkspace ? "p-3" : "px-4 py-3",
       )}
     >
@@ -111,8 +111,10 @@ export function AssistantChatComposer({
           }
           rows={isWorkspace ? 1 : 2}
           className={cn(
-            "flex-1 resize-none border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground transition-all duration-200 placeholder:text-muted-foreground focus:border-primary focus:outline-none",
-            isWorkspace ? "min-h-[40px] rounded-md" : "rounded-2xl",
+            "flex-1 resize-none border px-3 py-2 text-sm text-foreground transition-all duration-200 placeholder:text-muted-foreground focus:border-primary/55 focus:outline-none",
+            isWorkspace
+              ? "min-h-[40px] rounded-md border-white/6 bg-transparent"
+              : "rounded-xl border-glass-border bg-surface-2",
           )}
         />
         <button
@@ -120,8 +122,10 @@ export function AssistantChatComposer({
           onClick={onSend}
           disabled={disabled}
           className={cn(
-            "flex size-10 items-center justify-center bg-primary text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50",
-            isWorkspace ? "rounded-md shadow-lg" : "rounded-2xl",
+            "flex size-10 items-center justify-center transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+            isWorkspace
+              ? "rounded-md bg-primary/[0.9] text-primary-foreground hover:bg-primary/[0.84]"
+              : "rounded-xl bg-primary text-primary-foreground hover:bg-primary/90",
           )}
         >
           <Send className="size-4" />
@@ -197,8 +201,8 @@ function HumanBubble({
         className={cn(
           "min-w-0 overflow-hidden px-3 py-2 text-sm [overflow-wrap:anywhere]",
           isWorkspace
-            ? "max-w-[85%] rounded-md bg-primary text-primary-foreground shadow-lg"
-            : "max-w-[80%] rounded-2xl border border-glass-border bg-surface-3 text-foreground",
+            ? "max-w-[85%] rounded-md bg-primary/[0.86] text-primary-foreground"
+            : "max-w-[80%] rounded-xl border border-glass-border bg-surface-3 text-foreground",
           pending && "opacity-80",
         )}
       >
@@ -248,8 +252,10 @@ function AssistantBubble({
         />
         <div
           className={cn(
-            "group min-w-0 max-w-full overflow-hidden border border-glass-border bg-surface-2 px-3 py-2 text-sm text-foreground",
-            isWorkspace ? "rounded-md" : "rounded-2xl",
+            "group min-w-0 max-w-full overflow-hidden px-3 py-2 text-sm text-foreground",
+            isWorkspace
+              ? "rounded-md bg-white/[0.04]"
+              : "rounded-xl border-glass-border bg-surface-2",
           )}
         >
           <div className="mb-2 flex items-center gap-2">
@@ -390,8 +396,8 @@ function ErrorCard({
     <div className="flex min-w-0 justify-start">
       <div
         className={cn(
-          "min-w-0 space-y-2 border border-red-500/25 bg-red-500/6 px-3 py-2",
-          isWorkspace ? "max-w-[85%] rounded-md" : "max-w-[80%] rounded-2xl",
+          "min-w-0 space-y-2 border-l-2 border-red-500/40 bg-red-500/5 px-3 py-2",
+          isWorkspace ? "max-w-[85%]" : "max-w-[80%] rounded-xl",
         )}
       >
         <div className="flex items-center gap-2">
@@ -435,14 +441,16 @@ function ActivityDisclosure({
     <div className="flex min-w-0 justify-start">
       <div
         className={cn(
-          "min-w-0 border px-3 py-2 backdrop-blur-sm",
-          isWorkspace ? "max-w-[82%] rounded-md" : "max-w-[78%] rounded-2xl",
+          "min-w-0 px-3 py-2",
+          isWorkspace
+            ? "max-w-[82%] border-l border-white/8 pl-4"
+            : "max-w-[78%] rounded-xl",
           tone === "thinking" &&
-            "border-amber-500/20 bg-[linear-gradient(180deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03))]",
+            "border-amber-500/30 bg-[linear-gradient(180deg,rgba(245,158,11,0.04),rgba(245,158,11,0.014))]",
           tone === "tool" &&
-            "border-teal-500/20 bg-[linear-gradient(180deg,rgba(20,184,166,0.08),rgba(20,184,166,0.03))]",
+            "border-teal-500/30 bg-[linear-gradient(180deg,rgba(20,184,166,0.04),rgba(20,184,166,0.014))]",
           tone === "send" &&
-            "border-sky-500/20 bg-[linear-gradient(180deg,rgba(14,165,233,0.08),rgba(14,165,233,0.03))]",
+            "border-sky-500/30 bg-[linear-gradient(180deg,rgba(14,165,233,0.04),rgba(14,165,233,0.014))]",
         )}
       >
         <button
@@ -450,7 +458,7 @@ function ActivityDisclosure({
           onClick={() => setOpen((current) => !current)}
           className="flex w-full items-center gap-2 text-left"
         >
-          <span className="flex size-6 items-center justify-center rounded-full bg-background/80 shadow-sm">
+          <span className="flex size-5 items-center justify-center text-current">
             {icon}
           </span>
           <span className="min-w-0 flex-1">
@@ -465,8 +473,8 @@ function ActivityDisclosure({
             className={cn(
               "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
               streaming
-                ? "bg-foreground/6 text-foreground/75"
-                : "bg-foreground/6 text-muted-foreground",
+                ? "bg-white/[0.04] text-foreground/75"
+                : "bg-white/[0.04] text-muted-foreground",
             )}
           >
             {streaming ? (
@@ -598,16 +606,18 @@ function getTimelineItemKey(item: AssistantChatItem, index: number) {
 
 function WorkspaceEmptyState() {
   return (
-    <div className="flex h-full flex-col items-center justify-center space-y-3 rounded-lg border border-dashed border-glass-border bg-surface-2 p-4 text-center">
-      <div className="flex size-11 items-center justify-center rounded-md bg-surface-3">
-        <MessageSquare className="size-5 text-primary" />
-      </div>
-      <div className="space-y-1">
-        <p className="text-sm font-medium">Start a conversation</p>
-        <p className="max-w-[200px] text-[11px] text-muted-foreground">
-          Ask the Assistant to plan tasks, summarize progress, or coordinate
-          next steps.
-        </p>
+    <div className="flex h-full items-center justify-center px-4">
+      <div className="max-w-[220px] space-y-3 text-center">
+        <div className="mx-auto flex size-11 items-center justify-center">
+          <MessageSquare className="size-5 text-primary" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Start a conversation</p>
+          <p className="text-[11px] text-muted-foreground">
+            Ask the Assistant to plan tasks, summarize progress, or coordinate
+            next steps.
+          </p>
+        </div>
       </div>
     </div>
   );

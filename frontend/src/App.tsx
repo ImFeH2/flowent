@@ -14,8 +14,6 @@ import { ToolsPage } from "@/pages/ToolsPage";
 import { cn } from "@/lib/utils";
 import { usePanelWidth } from "@/hooks/usePanelDrag";
 
-const SHELL_INSET = 12;
-
 function AppContent() {
   const { currentPage } = useAgentUI();
   const isWorkspace = currentPage === "graph";
@@ -51,12 +49,12 @@ function AppContent() {
       <Sidebar width={sidebarWidth} onWidthChange={setSidebarWidth} />
 
       <main
-        className="relative z-10 h-full p-3"
-        style={{ paddingLeft: `${sidebarWidth + SHELL_INSET * 2}px` }}
+        className="relative z-10 h-full"
+        style={{ paddingLeft: `${sidebarWidth}px` }}
       >
         <div
           className={cn(
-            "relative h-full overflow-hidden rounded-[0.95rem] border border-white/6 shadow-[0_16px_40px_-30px_rgba(0,0,0,0.78)] backdrop-blur-xl",
+            "relative h-full overflow-hidden backdrop-blur-xl",
             isWorkspace
               ? "bg-[linear-gradient(180deg,rgba(11,15,24,0.84),rgba(8,11,18,0.8))]"
               : "bg-[linear-gradient(180deg,rgba(14,18,28,0.88),rgba(10,13,20,0.84))]",

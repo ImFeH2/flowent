@@ -60,9 +60,7 @@ export function Sidebar({
       style={{ width: `${width}px` }}
       className={cn(
         "text-sidebar-foreground z-40 flex flex-col overflow-hidden border border-white/6 bg-[linear-gradient(180deg,rgba(5,7,11,0.84),rgba(8,11,18,0.76))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl",
-        autoHide
-          ? "h-full rounded-[1rem]"
-          : "fixed inset-y-3 left-3 h-auto rounded-[1.05rem]",
+        autoHide ? "h-full" : "fixed inset-y-0 left-0 h-auto",
         className,
       )}
     >

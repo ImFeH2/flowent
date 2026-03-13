@@ -99,19 +99,6 @@
   animation: fade-in-up 0.3s ease-out both;
 }
 
-.light .ios-card-shadow {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 4px 12px rgba(0, 0, 0, 0.06),
-    0 12px 32px rgba(0, 0, 0, 0.04);
-}
-
-.light input,
-.light textarea,
-.light select {
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-
 @property --border-angle {
   syntax: "<angle>";
   initial-value: 0deg;

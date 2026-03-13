@@ -23,7 +23,6 @@ import { AnimatedMessageEdge } from "@/components/AgentGraphEdge";
 import { AgentGraphNode } from "@/components/AgentGraphNode";
 import { AgentGraphTooltip } from "@/components/AgentGraphTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
-import { useTheme } from "@/context/ThemeContext";
 import {
   AGENT_NODE_HEIGHT,
   getAgentNodeWidth,
@@ -54,7 +53,6 @@ interface ContextMenuState {
 }
 
 export function AgentGraph() {
-  const { theme } = useTheme();
   const { agents, activeMessages, activeToolCalls } = useAgentRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
@@ -354,7 +352,7 @@ export function AgentGraph() {
             edges={edges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            colorMode={theme}
+            colorMode="dark"
             onInit={setFlowInstance}
             onNodeClick={onNodeClick}
             onNodeMouseEnter={onNodeMouseEnter}

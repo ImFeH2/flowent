@@ -15,7 +15,6 @@ import type { Node } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 const terminateNodeMock = vi.fn().mockResolvedValue(undefined);
-const useThemeMock = vi.fn();
 const useAgentRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
 const resizeObservers: ResizeObserverMock[] = [];
@@ -31,10 +30,6 @@ class ResizeObserverMock {
     resizeObservers.push(this);
   }
 }
-
-vi.mock("@/context/ThemeContext", () => ({
-  useTheme: () => useThemeMock(),
-}));
 
 vi.mock("@/context/AgentContext", () => ({
   useAgentRuntime: () => useAgentRuntimeMock(),
@@ -150,7 +145,6 @@ function buildNode(overrides: Partial<Node>): Node {
 }
 
 function renderGraph(nodes: Node[]) {
-  useThemeMock.mockReturnValue({ theme: "dark" });
   useAgentRuntimeMock.mockReturnValue({
     agents: new Map(nodes.map((node) => [node.id, node])),
     activeMessages: [],

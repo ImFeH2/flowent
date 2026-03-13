@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgentUI } from "@/context/AgentContext";
-import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { HomePage } from "@/pages/HomePage";
 import { ProvidersPage } from "@/pages/ProvidersPage";
@@ -57,7 +57,14 @@ function AppContent() {
             isWorkspace ? "bg-glass-bg" : "bg-surface-overlay",
           )}
         >
-          <ThemeAwareToaster />
+          <Toaster
+            theme="dark"
+            position="bottom-right"
+            toastOptions={{
+              className:
+                "rounded-md border border-border bg-surface-2 text-foreground shadow-xl",
+            }}
+          />
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}
@@ -73,20 +80,6 @@ function AppContent() {
         </div>
       </main>
     </div>
-  );
-}
-
-function ThemeAwareToaster() {
-  const { theme } = useTheme();
-  return (
-    <Toaster
-      theme={theme}
-      position="bottom-right"
-      toastOptions={{
-        className:
-          "rounded-md border border-border bg-surface-2 text-foreground shadow-xl",
-      }}
-    />
   );
 }
 

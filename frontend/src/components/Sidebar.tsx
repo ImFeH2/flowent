@@ -1,13 +1,11 @@
 import {
   BookOpen,
   Bot,
-  Moon,
   Network,
   ScrollText,
   Server,
   Settings,
   Sparkles,
-  Sun,
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,7 +14,6 @@ import {
   useAgentUI,
   type PageId,
 } from "@/context/AgentContext";
-import { useTheme } from "@/context/ThemeContext";
 import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 
@@ -46,7 +43,6 @@ export function Sidebar({
 }: SidebarProps) {
   const { connected, agents } = useAgentRuntime();
   const { currentPage, setCurrentPage } = useAgentUI();
-  const { theme, toggleTheme } = useTheme();
 
   const { isDragging, startDrag } = usePanelDrag(width, onWidthChange, "right");
 
@@ -70,7 +66,7 @@ export function Sidebar({
     >
       <div className="flex h-full flex-col overflow-hidden">
         <div className="border-sidebar-border border-b px-4 py-4 shrink-0">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80 truncate">
                 Autopoe
@@ -79,22 +75,6 @@ export function Sidebar({
                 Agent Studio
               </h1>
             </div>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="hover:bg-sidebar-accent shrink-0 text-muted-foreground flex size-8 items-center justify-center rounded-md transition-colors hover:text-foreground"
-              title={
-                theme === "light"
-                  ? "Switch to dark mode"
-                  : "Switch to light mode"
-              }
-            >
-              {theme === "light" ? (
-                <Moon className="size-4" />
-              ) : (
-                <Sun className="size-4" />
-              )}
-            </button>
           </div>
           <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap overflow-hidden">
             <span

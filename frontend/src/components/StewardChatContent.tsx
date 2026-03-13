@@ -47,9 +47,9 @@ export function StewardChatMessages({
           <PanelEmptyState floating={isFloating} />
         ))}
 
-      {messages.map((msg, i) => (
+      {messages.map((msg) => (
         <div
-          key={`${msg.timestamp}-${i}`}
+          key={msg.id}
           className={cn(
             "flex min-w-0",
             msg.from === "human" ? "justify-end" : "justify-start",

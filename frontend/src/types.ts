@@ -47,6 +47,7 @@ export interface AgentEvent {
 }
 
 export interface StewardMessage {
+  id: string;
   content: string;
   timestamp: number;
   from: "human" | "steward";

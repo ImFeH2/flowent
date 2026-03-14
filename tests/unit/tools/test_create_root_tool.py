@@ -262,3 +262,59 @@ def test_create_root_ignores_caller_boundary_and_uses_root_boundary(
     assert child.config.graph_id == result["graph_id"]
     assert child.config.write_dirs == [str(output_dir)]
     assert child.config.allow_network is True
+
+
+def test_create_root_grants_builtin_conductor_graph_tools_by_default(monkeypatch):
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
+        uuid="assistant",
+    )
+    registry.register(assistant)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Conductor",
+                    system_prompt="Coordinate work.",
+                    included_tools=[
+                        "spawn",
+                        "create_graph",
+                        "connect_nodes",
+                        "disconnect_nodes",
+                        "list_graphs",
+                        "describe_graph",
+                        "list_roles",
+                        "list_tools",
+                    ],
+                )
+            ]
+        ),
+    )
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+
+    result = json.loads(
+        CreateRootTool().execute(
+            assistant,
+            {
+                "role_name": "Conductor",
+                "name": "Planner",
+            },
+        )
+    )
+
+    child = registry.get(result["agent_id"])
+
+    assert child is not None
+    assert child.config.tools == [
+        *MINIMUM_TOOLS,
+        "spawn",
+        "create_graph",
+        "connect_nodes",
+        "disconnect_nodes",
+        "list_graphs",
+        "describe_graph",
+        "list_roles",
+        "list_tools",
+    ]

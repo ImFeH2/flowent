@@ -85,7 +85,16 @@ BUILTIN_ROLE_NAMES = frozenset(
     {STEWARD_ROLE_NAME, WORKER_ROLE_NAME, CONDUCTOR_ROLE_NAME}
 )
 WORKER_ROLE_INCLUDED_TOOLS = ["read", "exec"]
-CONDUCTOR_ROLE_INCLUDED_TOOLS = ["spawn", "list_roles", "list_tools"]
+CONDUCTOR_ROLE_INCLUDED_TOOLS = [
+    "spawn",
+    "create_graph",
+    "connect_nodes",
+    "disconnect_nodes",
+    "list_graphs",
+    "describe_graph",
+    "list_roles",
+    "list_tools",
+]
 
 
 @dataclass

@@ -553,7 +553,7 @@ function PanelToggleButton({
       title={title}
       aria-label={title}
       className={cn(
-        "pointer-events-auto flex size-10 items-center justify-center rounded-lg bg-black/[0.16] text-muted-foreground backdrop-blur-lg transition-all hover:bg-white/[0.05] hover:text-foreground",
+        "pointer-events-auto relative isolate flex size-10 items-center justify-center rounded-lg bg-black/[0.16] text-muted-foreground backdrop-blur-lg transition-[background-color,color] duration-150 hover:bg-white/[0.05] hover:text-foreground [contain:paint]",
         className,
       )}
     >
@@ -579,7 +579,7 @@ function PanelActionButton({
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-white/[0.045] hover:text-foreground"
+      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-white/[0.045] hover:text-foreground"
     >
       {children}
     </button>

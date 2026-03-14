@@ -1,6 +1,6 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import {
   nodeTypeIcon,
@@ -31,39 +31,29 @@ export function AgentGraphNode({ data }: NodeProps) {
   const Icon = nodeTypeIcon[node_type];
   const nodeRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!nodeRef.current) return;
-      const rect = nodeRef.current.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
+  const updateMouseEffect = (clientX: number, clientY: number) => {
+    if (!nodeRef.current) return;
+    const rect = nodeRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const intensity = Math.max(0, 1 - distance / 240);
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
 
-      const dx = e.clientX - centerX;
-      const dy = e.clientY - centerY;
+    nodeRef.current.style.setProperty("--mouse-angle", `${angle}deg`);
+    nodeRef.current.style.setProperty(
+      "--mouse-intensity",
+      intensity.toString(),
+    );
+  };
 
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const maxDistance = 400; // Effect radius
-
-      const intensity = Math.max(0, 1 - distance / maxDistance);
-      // Angle in degrees, where top is 0
-      const angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-
-      nodeRef.current.style.setProperty("--mouse-angle", `${angle}deg`);
-      nodeRef.current.style.setProperty(
-        "--mouse-intensity",
-        intensity.toString(),
-      );
-    };
-
-    // Initialize with a default slightly-off angle so it looks nice before movement
-    if (nodeRef.current) {
-      nodeRef.current.style.setProperty("--mouse-angle", "135deg");
-      nodeRef.current.style.setProperty("--mouse-intensity", "0");
-    }
-
-    window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
+  const resetMouseEffect = () => {
+    if (!nodeRef.current) return;
+    nodeRef.current.style.setProperty("--mouse-angle", "135deg");
+    nodeRef.current.style.setProperty("--mouse-intensity", "0");
+  };
 
   const isToolActive = !!toolCall;
   const isRunning = state === "running";
@@ -89,6 +79,9 @@ export function AgentGraphNode({ data }: NodeProps) {
             : "blur(0px) grayscale(0%)",
       }}
       transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+      onMouseEnter={(event) => updateMouseEffect(event.clientX, event.clientY)}
+      onMouseMove={(event) => updateMouseEffect(event.clientX, event.clientY)}
+      onMouseLeave={resetMouseEffect}
       className={cn(
         "relative isolate flex h-[62px] min-w-0 items-center gap-3 overflow-visible rounded-md border px-4 py-3",
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
@@ -96,7 +89,13 @@ export function AgentGraphNode({ data }: NodeProps) {
         "transition-[border-color] duration-300",
         borderClass,
       )}
-      style={{ width: `${width}px` }}
+      style={
+        {
+          width: `${width}px`,
+          "--mouse-angle": "135deg",
+          "--mouse-intensity": "0",
+        } as CSSProperties
+      }
     >
       <div
         aria-hidden="true"

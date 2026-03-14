@@ -24,13 +24,19 @@ import { AgentGraphNode } from "@/components/AgentGraphNode";
 import { AgentGraphTooltip } from "@/components/AgentGraphTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import {
+  AGENT_NODE_MIN_WIDTH,
   AGENT_NODE_HEIGHT,
   getAgentNodeWidth,
   getLayoutedElements,
 } from "@/lib/layout";
-import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
+import {
+  useAgentActivityRuntime,
+  useAgentNodesRuntime,
+  useAgentUI,
+} from "@/context/AgentContext";
 import { terminateNode } from "@/lib/api";
 import { getNodeLabel } from "@/lib/constants";
+import type { AgentState, NodeType } from "@/types";
 
 const nodeTypes: NodeTypes = {
   agent: AgentGraphNode,
@@ -52,8 +58,85 @@ interface ContextMenuState {
   agentId: string | null;
 }
 
+interface LayoutCache {
+  structureKey: string;
+  nodes: Array<{
+    id: string;
+    position: { x: number; y: number };
+    width: number;
+    height: number;
+  }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+    type: "animated";
+  }>;
+}
+
+interface StructuralGraph {
+  structureKey: string;
+  rawNodes: Node[];
+  rawEdges: Edge[];
+}
+
+interface GraphNodeData extends Record<string, unknown> {
+  label: string;
+  width: number;
+  node_type: NodeType;
+  state: AgentState;
+  shortId: string;
+  name: string | null;
+  role_name: string | null;
+  latestTodo: string | null;
+  selected: boolean;
+  toolCall: string | null;
+}
+
+const graphLayoutCache = new Map<string, LayoutCache>();
+const MAX_LAYOUT_CACHE_SIZE = 20;
+
+function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
+  const cached = graphLayoutCache.get(structuralGraph.structureKey);
+  if (cached) {
+    return cached;
+  }
+
+  const layout = getLayoutedElements(
+    structuralGraph.rawNodes,
+    structuralGraph.rawEdges,
+  );
+
+  const nextLayout = {
+    structureKey: structuralGraph.structureKey,
+    nodes: layout.nodes.map((node) => ({
+      id: node.id,
+      position: node.position,
+      width: typeof node.width === "number" ? node.width : AGENT_NODE_MIN_WIDTH,
+      height: typeof node.height === "number" ? node.height : AGENT_NODE_HEIGHT,
+    })),
+    edges: layout.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      type: "animated" as const,
+    })),
+  } satisfies LayoutCache;
+
+  graphLayoutCache.set(structuralGraph.structureKey, nextLayout);
+  if (graphLayoutCache.size > MAX_LAYOUT_CACHE_SIZE) {
+    const oldestKey = graphLayoutCache.keys().next().value;
+    if (typeof oldestKey === "string") {
+      graphLayoutCache.delete(oldestKey);
+    }
+  }
+
+  return nextLayout;
+}
+
 export function AgentGraph() {
-  const { agents, activeMessages, activeToolCalls } = useAgentRuntime();
+  const { agents } = useAgentNodesRuntime();
+  const { activeMessages, activeToolCalls } = useAgentActivityRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -87,21 +170,59 @@ export function AgentGraph() {
     return map;
   }, [activeMessages]);
 
-  const { nodes, edges, structureKey } = useMemo(() => {
-    const rawNodes: Node[] = [];
+  const structuralGraph = useMemo(() => {
     const edgeSet = new Set<string>();
-    const rawEdges: Edge[] = [];
-    const nodeIds: string[] = [];
+    const structuralEdges: Array<{
+      id: string;
+      source: string;
+      target: string;
+    }> = [];
+    const structuralNodes: Array<{
+      id: string;
+      nodeType: NodeType;
+      label: string;
+      width: number;
+    }> = [];
+    const structureNodeKeys: string[] = [];
 
     for (const [id, agent] of agents) {
-      nodeIds.push(id);
       const label = getNodeLabel({
         name: agent.name,
         roleName: agent.role_name,
         nodeType: agent.node_type,
       });
       const width = getAgentNodeWidth(label);
-      rawNodes.push({
+      structuralNodes.push({
+        id,
+        nodeType: agent.node_type,
+        label,
+        width,
+      });
+      structureNodeKeys.push(
+        `${id}:${agent.node_type}:${label}:${width}:${[...agent.connections].sort().join(",")}`,
+      );
+
+      for (const connId of agent.connections) {
+        const edgeId = [id, connId].sort().join("-");
+        if (!edgeSet.has(edgeId)) {
+          edgeSet.add(edgeId);
+          structuralEdges.push({
+            id: edgeId,
+            source: id,
+            target: connId,
+          });
+        }
+      }
+    }
+
+    const structureKey = `${structureNodeKeys.sort().join("|")}::${Array.from(
+      edgeSet,
+    )
+      .sort()
+      .join("|")}`;
+
+    const rawNodes: Node[] = structuralNodes.map(
+      ({ id, nodeType, label, width }) => ({
         id,
         type: "agent",
         position: { x: 0, y: 0 },
@@ -109,53 +230,99 @@ export function AgentGraph() {
         height: AGENT_NODE_HEIGHT,
         data: {
           label,
-          width,
-          node_type: agent.node_type,
-          state: agent.state,
-          shortId: id.slice(0, 8),
-          name: agent.name,
-          role_name: agent.role_name,
-          latestTodo: agent.todos[agent.todos.length - 1]?.text ?? null,
-          selected: id === selectedAgentId,
-          toolCall: activeToolCalls.get(id) ?? null,
+          node_type: nodeType,
         },
+      }),
+    );
+
+    const rawEdges: Edge[] = structuralEdges.map(({ id, source, target }) => ({
+      id,
+      source,
+      target,
+      type: "animated",
+      animated: false,
+    }));
+
+    return {
+      structureKey,
+      rawNodes,
+      rawEdges,
+    } satisfies StructuralGraph;
+  }, [agents]);
+
+  const layoutGraph = useMemo(
+    () => getCachedLayoutGraph(structuralGraph),
+    [structuralGraph],
+  );
+
+  const transientData = useMemo(() => {
+    const data = new Map<string, GraphNodeData>();
+
+    for (const [id, agent] of agents) {
+      const label = getNodeLabel({
+        name: agent.name,
+        roleName: agent.role_name,
+        nodeType: agent.node_type,
       });
+      data.set(id, {
+        label,
+        width: getAgentNodeWidth(label),
+        node_type: agent.node_type,
+        state: agent.state,
+        shortId: id.slice(0, 8),
+        name: agent.name,
+        role_name: agent.role_name,
+        latestTodo: agent.todos[agent.todos.length - 1]?.text ?? null,
+        selected: id === selectedAgentId,
+        toolCall: activeToolCalls.get(id) ?? null,
+      });
+    }
 
-      for (const connId of agent.connections) {
-        const edgeId = [id, connId].sort().join("-");
-        if (!edgeSet.has(edgeId)) {
-          edgeSet.add(edgeId);
-          const activeMessage = activeEdgeMessages.get(edgeId);
-          rawEdges.push({
-            id: edgeId,
-            source: id,
-            target: connId,
-            type: "animated",
-            data: {
-              active: !!activeMessage,
-              flowDirection: activeMessage
-                ? activeMessage.fromId === id && activeMessage.toId === connId
-                  ? "forward"
-                  : "reverse"
-                : null,
-            },
-            animated: false,
-          });
-        }
+    return data;
+  }, [agents, selectedAgentId, activeToolCalls]);
+
+  const { nodes, edges, structureKey } = useMemo(() => {
+    const nodes: Node[] = layoutGraph.nodes.flatMap((layoutNode) => {
+      const data = transientData.get(layoutNode.id);
+      if (!data) {
+        return [];
       }
-    }
 
-    const structureKey = `${nodeIds.sort().join("|")}::${Array.from(edgeSet)
-      .sort()
-      .join("|")}`;
+      return [
+        {
+          id: layoutNode.id,
+          type: "agent",
+          position: layoutNode.position,
+          width: layoutNode.width,
+          height: layoutNode.height,
+          data,
+        } satisfies Node,
+      ];
+    });
 
-    if (rawNodes.length === 0) {
-      return { nodes: [], edges: [], structureKey };
-    }
+    const edges = layoutGraph.edges.map((edge) => {
+      const activeMessage = activeEdgeMessages.get(edge.id);
+      return {
+        ...edge,
+        data: {
+          active: !!activeMessage,
+          flowDirection: activeMessage
+            ? activeMessage.fromId === edge.source &&
+              activeMessage.toId === edge.target
+              ? "forward"
+              : "reverse"
+            : null,
+        },
+        animated: false,
+      } satisfies Edge;
+    });
 
-    const { nodes, edges } = getLayoutedElements(rawNodes, rawEdges);
-    return { nodes, edges, structureKey };
-  }, [agents, selectedAgentId, activeToolCalls, activeEdgeMessages]);
+    return {
+      nodes,
+      edges,
+      structureKey: layoutGraph.structureKey,
+    };
+  }, [activeEdgeMessages, layoutGraph, transientData]);
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {

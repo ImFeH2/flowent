@@ -36,11 +36,29 @@ export type PageId =
 
 interface AgentRuntimeContextValue {
   agents: Map<string, Node>;
-  events: AgentEvent[];
   connected: boolean;
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
   streamingDeltas: Map<string, StreamingDelta[]>;
+  activeMessages: ActiveMessage[];
+  activeToolCalls: Map<string, string>;
+}
+
+interface AgentNodesContextValue {
+  agents: Map<string, Node>;
+}
+
+interface AgentConnectionContextValue {
+  connected: boolean;
+}
+
+interface AgentHistoryContextValue {
+  agentHistories: Map<string, HistoryEntry[]>;
+  clearAgentHistory: (agentId: string) => void;
+  streamingDeltas: Map<string, StreamingDelta[]>;
+}
+
+interface AgentActivityContextValue {
   activeMessages: ActiveMessage[];
   activeToolCalls: Map<string, string>;
 }
@@ -56,7 +74,13 @@ interface AgentUIContextValue {
   setCurrentPage: (page: PageId) => void;
 }
 
-const AgentRuntimeContext = createContext<AgentRuntimeContextValue | null>(
+const AgentNodesContext = createContext<AgentNodesContextValue | null>(null);
+const AgentConnectionContext =
+  createContext<AgentConnectionContextValue | null>(null);
+const AgentHistoryContext = createContext<AgentHistoryContextValue | null>(
+  null,
+);
+const AgentActivityContext = createContext<AgentActivityContextValue | null>(
   null,
 );
 const AgentUIContext = createContext<AgentUIContextValue | null>(null);
@@ -66,7 +90,7 @@ const TOOL_CALL_ANIMATION_MS = 2000;
 const ASSISTANT_ID = "assistant";
 
 export function AgentProvider({ children }: { children: ReactNode }) {
-  const { agents, events, handleDisplayEvent, handleUpdateEvent } = useAgents();
+  const { agents, handleUpdateEvent } = useAgents();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [agentHistories, setAgentHistories] = useState<
@@ -152,12 +176,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const onDisplayEvent = useCallback(
-    (event: AgentEvent) => {
-      handleDisplayEvent(event);
-    },
-    [handleDisplayEvent],
-  );
+  const onDisplayEvent = useCallback(() => {}, []);
 
   const onUpdateEvent = useCallback(
     (event: AgentEvent) => {
@@ -317,27 +336,35 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setSelectedAgentId(id);
   }, []);
 
-  const runtimeValue = useMemo(
+  const nodesValue = useMemo(
     () => ({
       agents,
-      events,
+    }),
+    [agents],
+  );
+
+  const connectionValue = useMemo(
+    () => ({
       connected,
+    }),
+    [connected],
+  );
+
+  const historyValue = useMemo(
+    () => ({
       agentHistories,
       clearAgentHistory,
       streamingDeltas,
+    }),
+    [agentHistories, clearAgentHistory, streamingDeltas],
+  );
+
+  const activityValue = useMemo(
+    () => ({
       activeMessages,
       activeToolCalls,
     }),
-    [
-      agents,
-      events,
-      connected,
-      agentHistories,
-      clearAgentHistory,
-      streamingDeltas,
-      activeMessages,
-      activeToolCalls,
-    ],
+    [activeMessages, activeToolCalls],
   );
 
   const uiValue = useMemo(
@@ -362,20 +389,83 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AgentRuntimeContext.Provider value={runtimeValue}>
-      <AgentUIContext.Provider value={uiValue}>
-        {children}
-      </AgentUIContext.Provider>
-    </AgentRuntimeContext.Provider>
+    <AgentNodesContext.Provider value={nodesValue}>
+      <AgentConnectionContext.Provider value={connectionValue}>
+        <AgentHistoryContext.Provider value={historyValue}>
+          <AgentActivityContext.Provider value={activityValue}>
+            <AgentUIContext.Provider value={uiValue}>
+              {children}
+            </AgentUIContext.Provider>
+          </AgentActivityContext.Provider>
+        </AgentHistoryContext.Provider>
+      </AgentConnectionContext.Provider>
+    </AgentNodesContext.Provider>
   );
 }
 
-export function useAgentRuntime() {
-  const ctx = useContext(AgentRuntimeContext);
+export function useAgentNodesRuntime() {
+  const ctx = useContext(AgentNodesContext);
   if (!ctx) {
-    throw new Error("useAgentRuntime must be used within AgentProvider");
+    throw new Error("useAgentNodesRuntime must be used within AgentProvider");
   }
   return ctx;
+}
+
+export function useAgentConnectionRuntime() {
+  const ctx = useContext(AgentConnectionContext);
+  if (!ctx) {
+    throw new Error(
+      "useAgentConnectionRuntime must be used within AgentProvider",
+    );
+  }
+  return ctx;
+}
+
+export function useAgentHistoryRuntime() {
+  const ctx = useContext(AgentHistoryContext);
+  if (!ctx) {
+    throw new Error("useAgentHistoryRuntime must be used within AgentProvider");
+  }
+  return ctx;
+}
+
+export function useAgentActivityRuntime() {
+  const ctx = useContext(AgentActivityContext);
+  if (!ctx) {
+    throw new Error(
+      "useAgentActivityRuntime must be used within AgentProvider",
+    );
+  }
+  return ctx;
+}
+
+export function useAgentRuntime(): AgentRuntimeContextValue {
+  const { agents } = useAgentNodesRuntime();
+  const { connected } = useAgentConnectionRuntime();
+  const { agentHistories, clearAgentHistory, streamingDeltas } =
+    useAgentHistoryRuntime();
+  const { activeMessages, activeToolCalls } = useAgentActivityRuntime();
+
+  return useMemo(
+    () => ({
+      agents,
+      connected,
+      agentHistories,
+      clearAgentHistory,
+      streamingDeltas,
+      activeMessages,
+      activeToolCalls,
+    }),
+    [
+      agents,
+      connected,
+      agentHistories,
+      clearAgentHistory,
+      streamingDeltas,
+      activeMessages,
+      activeToolCalls,
+    ],
+  );
 }
 
 export function useAgentUI() {

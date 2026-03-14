@@ -2,11 +2,8 @@ import { useState, useCallback, useEffect } from "react";
 import type { Node, AgentEvent } from "@/types";
 import { fetchNodes } from "@/lib/api";
 
-const MAX_EVENTS = 200;
-
 export function useAgents() {
   const [agents, setAgents] = useState<Map<string, Node>>(new Map());
-  const [events, setEvents] = useState<AgentEvent[]>([]);
 
   useEffect(() => {
     fetchNodes()
@@ -18,13 +15,6 @@ export function useAgents() {
         setAgents(map);
       })
       .catch(() => {});
-  }, []);
-
-  const handleDisplayEvent = useCallback((event: AgentEvent) => {
-    setEvents((prev) => {
-      const next = [...prev, event];
-      return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
-    });
   }, []);
 
   const handleUpdateEvent = useCallback((event: AgentEvent) => {
@@ -101,5 +91,5 @@ export function useAgents() {
     }
   }, []);
 
-  return { agents, events, handleDisplayEvent, handleUpdateEvent };
+  return { agents, handleUpdateEvent };
 }

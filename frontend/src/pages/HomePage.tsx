@@ -19,7 +19,11 @@ import {
 import { AgentGraph } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
 import type { Node } from "@/types";
-import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
+import {
+  useAgentConnectionRuntime,
+  useAgentNodesRuntime,
+  useAgentUI,
+} from "@/context/AgentContext";
 import { cn } from "@/lib/utils";
 import {
   AssistantChatComposer,
@@ -43,7 +47,8 @@ const MAX_PANEL_WIDTH = 1400;
 const ASSISTANT_ID = "assistant";
 
 export function HomePage() {
-  const { agents, connected } = useAgentRuntime();
+  const { agents } = useAgentNodesRuntime();
+  const { connected } = useAgentConnectionRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -257,7 +262,7 @@ function AgentDetailPanel({
   agent: Node;
   onClose: () => void;
 }) {
-  const { agents } = useAgentRuntime();
+  const { agents } = useAgentNodesRuntime();
   const { detail, error, loading } = useAgentDetail(
     agent.id,
     agent.id === ASSISTANT_ID,
@@ -476,7 +481,7 @@ function AgentDetailPanel({
 }
 
 function AssistantChatPanel() {
-  const { agents } = useAgentRuntime();
+  const { agents } = useAgentNodesRuntime();
   const {
     connected,
     handleKeyDown,

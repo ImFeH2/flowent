@@ -15,7 +15,8 @@ import type { Node } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 const terminateNodeMock = vi.fn().mockResolvedValue(undefined);
-const useAgentRuntimeMock = vi.fn();
+const useAgentNodesRuntimeMock = vi.fn();
+const useAgentActivityRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
 const resizeObservers: ResizeObserverMock[] = [];
 
@@ -32,7 +33,8 @@ class ResizeObserverMock {
 }
 
 vi.mock("@/context/AgentContext", () => ({
-  useAgentRuntime: () => useAgentRuntimeMock(),
+  useAgentNodesRuntime: () => useAgentNodesRuntimeMock(),
+  useAgentActivityRuntime: () => useAgentActivityRuntimeMock(),
   useAgentUI: () => useAgentUIMock(),
 }));
 
@@ -145,8 +147,10 @@ function buildNode(overrides: Partial<Node>): Node {
 }
 
 function renderGraph(nodes: Node[]) {
-  useAgentRuntimeMock.mockReturnValue({
+  useAgentNodesRuntimeMock.mockReturnValue({
     agents: new Map(nodes.map((node) => [node.id, node])),
+  });
+  useAgentActivityRuntimeMock.mockReturnValue({
     activeMessages: [],
     activeToolCalls: new Map(),
   });

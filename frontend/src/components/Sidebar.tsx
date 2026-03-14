@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  useAgentRuntime,
+  useAgentConnectionRuntime,
+  useAgentNodesRuntime,
   useAgentUI,
   type PageId,
 } from "@/context/AgentContext";
@@ -41,7 +42,8 @@ export function Sidebar({
   width,
   onWidthChange,
 }: SidebarProps) {
-  const { connected, agents } = useAgentRuntime();
+  const { agents } = useAgentNodesRuntime();
+  const { connected } = useAgentConnectionRuntime();
   const { currentPage, setCurrentPage } = useAgentUI();
 
   const { isDragging, startDrag } = usePanelDrag(width, onWidthChange, "right");

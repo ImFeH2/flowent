@@ -8,15 +8,20 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { fetchNodeDetail } from "@/lib/api";
-import { useAgentRuntime, useAgentUI } from "@/context/AgentContext";
+import {
+  useAgentConnectionRuntime,
+  useAgentHistoryRuntime,
+  useAgentUI,
+} from "@/context/AgentContext";
 import { mergeHistoryWithDeltas } from "@/lib/history";
 import type { AssistantChatItem, NodeDetail } from "@/types";
 
 const ASSISTANT_ID = "assistant";
 
 export function useAssistantChat() {
-  const { connected, agentHistories, clearAgentHistory, streamingDeltas } =
-    useAgentRuntime();
+  const { connected } = useAgentConnectionRuntime();
+  const { agentHistories, clearAgentHistory, streamingDeltas } =
+    useAgentHistoryRuntime();
   const { pendingAssistantMessages, sendAssistantMessage } = useAgentUI();
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);

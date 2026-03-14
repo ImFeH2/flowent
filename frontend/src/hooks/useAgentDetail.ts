@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { useAgentRuntime } from "@/context/AgentContext";
+import {
+  useAgentHistoryRuntime,
+  useAgentNodesRuntime,
+} from "@/context/AgentContext";
 import { fetchNodeDetail } from "@/lib/api";
 import { mergeHistoryWithDeltas } from "@/lib/history";
 import type { NodeDetail } from "@/types";
@@ -12,8 +15,9 @@ export function useAgentDetail(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
-  const { agentHistories, clearAgentHistory, streamingDeltas, agents } =
-    useAgentRuntime();
+  const { agents } = useAgentNodesRuntime();
+  const { agentHistories, clearAgentHistory, streamingDeltas } =
+    useAgentHistoryRuntime();
 
   useEffect(() => {
     if (!agentId) {

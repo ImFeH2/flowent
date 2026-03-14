@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import type { HistoryEntry, Node, NodeDetail } from "@/types";
 
-const useAgentRuntimeMock = vi.fn();
+const useAgentNodesRuntimeMock = vi.fn();
+const useAgentHistoryRuntimeMock = vi.fn();
 const fetchNodeDetailMock = vi.fn();
 
 vi.mock("@/context/AgentContext", () => ({
-  useAgentRuntime: () => useAgentRuntimeMock(),
+  useAgentNodesRuntime: () => useAgentNodesRuntimeMock(),
+  useAgentHistoryRuntime: () => useAgentHistoryRuntimeMock(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -45,7 +47,8 @@ function buildNode(): Node {
 describe("useAgentDetail", () => {
   beforeEach(() => {
     fetchNodeDetailMock.mockReset();
-    useAgentRuntimeMock.mockReset();
+    useAgentNodesRuntimeMock.mockReset();
+    useAgentHistoryRuntimeMock.mockReset();
   });
 
   it("preserves assistant incremental history when requested", async () => {
@@ -61,11 +64,13 @@ describe("useAgentDetail", () => {
       agentHistories.delete(agentId);
     });
 
-    useAgentRuntimeMock.mockReturnValue({
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map<string, Node>([["assistant", buildNode()]]),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory,
       streamingDeltas: new Map(),
-      agents: new Map<string, Node>([["assistant", buildNode()]]),
     });
     fetchNodeDetailMock.mockResolvedValue(buildDetail());
 
@@ -90,11 +95,13 @@ describe("useAgentDetail", () => {
       agentHistories.delete(agentId);
     });
 
-    useAgentRuntimeMock.mockReturnValue({
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map<string, Node>([["assistant", buildNode()]]),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory,
       streamingDeltas: new Map(),
-      agents: new Map<string, Node>([["assistant", buildNode()]]),
     });
     fetchNodeDetailMock.mockResolvedValue({
       ...buildDetail(),

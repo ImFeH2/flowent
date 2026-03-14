@@ -4,7 +4,10 @@ import { fetchNodeDetail } from "@/lib/api";
 import { mergeHistoryWithDeltas } from "@/lib/history";
 import type { NodeDetail } from "@/types";
 
-export function useAgentDetail(agentId: string | null) {
+export function useAgentDetail(
+  agentId: string | null,
+  preserveIncrementalHistory = false,
+) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +29,9 @@ export function useAgentDetail(agentId: string | null) {
     const load = async () => {
       setLoading(true);
       setError(null);
-      clearAgentHistory(agentId);
+      if (!preserveIncrementalHistory) {
+        clearAgentHistory(agentId);
+      }
       try {
         const data = await fetchNodeDetail(agentId, controller.signal);
         if (cancelled) return;
@@ -51,7 +56,7 @@ export function useAgentDetail(agentId: string | null) {
       cancelled = true;
       controller.abort();
     };
-  }, [agentId, clearAgentHistory]);
+  }, [agentId, clearAgentHistory, preserveIncrementalHistory]);
 
   const merged = useMemo(() => {
     if (!detail || !agentId) return null;

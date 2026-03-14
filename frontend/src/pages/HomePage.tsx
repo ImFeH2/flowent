@@ -40,6 +40,7 @@ const WORKSPACE_PANEL_ID = "workspace-panel-width";
 const MIN_PANEL_WIDTH = 320;
 const MIN_GRAPH_WIDTH = 320;
 const MAX_PANEL_WIDTH = 1400;
+const ASSISTANT_ID = "assistant";
 
 export function HomePage() {
   const { agents, connected } = useAgentRuntime();
@@ -257,7 +258,10 @@ function AgentDetailPanel({
   onClose: () => void;
 }) {
   const { agents } = useAgentRuntime();
-  const { detail, error, loading } = useAgentDetail(agent.id);
+  const { detail, error, loading } = useAgentDetail(
+    agent.id,
+    agent.id === ASSISTANT_ID,
+  );
   const detailState = detail?.state ?? agent.state;
   const detailConnections = detail?.connections ?? agent.connections;
   const detailTodos = detail?.todos ?? agent.todos;

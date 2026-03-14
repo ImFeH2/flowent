@@ -59,7 +59,7 @@ export function Sidebar({
     <aside
       style={{ width: `${width}px` }}
       className={cn(
-        "text-sidebar-foreground z-40 flex flex-col overflow-hidden border border-white/6 bg-[linear-gradient(180deg,rgba(7,7,8,0.96),rgba(5,5,6,0.94))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl",
+        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border border-white/6 bg-[linear-gradient(180deg,rgba(7,7,8,0.96),rgba(5,5,6,0.94))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl [contain:paint]",
         autoHide ? "h-full" : "fixed inset-y-0 left-0 h-auto",
         className,
       )}
@@ -113,7 +113,7 @@ export function Sidebar({
               type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all",
+                "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150",
                 currentPage === id
                   ? "bg-white/[0.06] text-foreground"
                   : "text-muted-foreground hover:bg-white/[0.034] hover:text-foreground",
@@ -121,7 +121,7 @@ export function Sidebar({
             >
               <span
                 className={cn(
-                  "h-7 w-px shrink-0 rounded-full transition-all",
+                  "h-7 w-px shrink-0 rounded-full transition-[opacity,background-color] duration-150",
                   currentPage === id
                     ? "bg-primary/70 opacity-100"
                     : "bg-white/0 opacity-0 group-hover:bg-white/8 group-hover:opacity-100",
@@ -129,7 +129,7 @@ export function Sidebar({
               />
               <div
                 className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-md transition-all",
+                  "flex size-8 shrink-0 items-center justify-center rounded-md transition-[background-color,color] duration-150",
                   currentPage === id
                     ? "bg-primary/12 text-primary"
                     : "bg-white/[0.025] text-muted-foreground group-hover:bg-white/[0.045] group-hover:text-foreground",

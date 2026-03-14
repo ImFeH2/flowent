@@ -131,7 +131,7 @@ export function HomePage() {
   return (
     <div
       ref={workspaceRef}
-      className="relative flex h-full overflow-hidden rounded-[1rem] border border-white/6 bg-[linear-gradient(180deg,rgba(10,14,22,0.82),rgba(7,10,16,0.78))] shadow-[0_16px_42px_-32px_rgba(0,0,0,0.78)]"
+      className="relative isolate flex h-full overflow-hidden rounded-[1rem] border border-white/6 bg-[linear-gradient(180deg,rgba(10,14,22,0.82),rgba(7,10,16,0.78))] shadow-[0_16px_42px_-32px_rgba(0,0,0,0.78)] [contain:paint]"
     >
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_16%,transparent_82%,rgba(255,255,255,0.015))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
@@ -239,10 +239,10 @@ function BadgeChip({
   return (
     <div
       className={cn(
-        "pointer-events-auto flex items-center gap-1.5 rounded-[0.85rem] border px-3 py-1.5 text-[11px] font-medium shadow-[0_10px_24px_-20px_rgba(0,0,0,0.76)] backdrop-blur-lg",
+        "pointer-events-auto relative isolate flex items-center gap-1.5 rounded-[0.85rem] border px-3 py-1.5 text-[11px] font-medium shadow-[0_10px_24px_-20px_rgba(0,0,0,0.76)] [contain:paint]",
         tone === "primary"
-          ? "border-primary/12 bg-primary/[0.06] text-foreground"
-          : "border-white/6 bg-black/[0.14] text-foreground",
+          ? "border-primary/12 bg-white/[0.045] text-foreground"
+          : "border-white/6 bg-black/[0.2] text-foreground",
       )}
     >
       {children}

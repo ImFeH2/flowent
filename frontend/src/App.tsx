@@ -49,12 +49,15 @@ function AppContent() {
       <Sidebar width={sidebarWidth} onWidthChange={setSidebarWidth} />
 
       <main
-        className="relative z-10 h-full"
-        style={{ paddingLeft: `${sidebarWidth}px` }}
+        className="relative z-10 h-full isolate"
+        style={{
+          marginLeft: `${sidebarWidth}px`,
+          width: `calc(100% - ${sidebarWidth}px)`,
+        }}
       >
         <div
           className={cn(
-            "relative h-full overflow-hidden backdrop-blur-xl",
+            "relative isolate h-full overflow-hidden backdrop-blur-xl [contain:paint]",
             isWorkspace
               ? "bg-[linear-gradient(180deg,rgba(11,11,12,0.88),rgba(9,9,10,0.84))]"
               : "bg-[linear-gradient(180deg,rgba(15,15,16,0.92),rgba(10,10,11,0.88))]",

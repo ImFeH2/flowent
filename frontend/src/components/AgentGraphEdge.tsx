@@ -35,6 +35,16 @@ export function AnimatedMessageEdge(props: EdgeProps) {
   const motionPath = flowDirection === 1 ? edgePath : reversePath;
   const dashOffsetFrom = flowDirection === 1 ? "18" : "0";
   const dashOffsetTo = flowDirection === 1 ? "0" : "18";
+  const trailOffsetFrom = flowDirection === 1 ? "32" : "0";
+  const trailOffsetTo = flowDirection === 1 ? "0" : "32";
+  const trailParticles = [
+    { radius: 5.4, opacity: 0.12, begin: "0s", glow: true },
+    { radius: 3.8, opacity: 0.95, begin: "0s", glow: false },
+    { radius: 3.2, opacity: 0.62, begin: "0.06s", glow: false },
+    { radius: 2.7, opacity: 0.42, begin: "0.12s", glow: false },
+    { radius: 2.2, opacity: 0.28, begin: "0.18s", glow: false },
+    { radius: 1.8, opacity: 0.18, begin: "0.24s", glow: false },
+  ] as const;
 
   return (
     <motion.g
@@ -90,29 +100,43 @@ export function AnimatedMessageEdge(props: EdgeProps) {
               repeatCount="indefinite"
             />
           </motion.path>
-          <circle r="3.2" fill="url(#agent-edge-pulse)">
-            <animateMotion
+          <motion.path
+            d={edgePath}
+            fill="none"
+            stroke="var(--graph-edge-active)"
+            strokeWidth="5.8"
+            strokeLinecap="round"
+            strokeDasharray="22 30"
+            opacity="0.22"
+            filter="url(#agent-edge-glow)"
+            initial={{ opacity: 0, pathLength: 0.72 }}
+            animate={{ opacity: 0.22, pathLength: 1 }}
+            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              from={trailOffsetFrom}
+              to={trailOffsetTo}
               dur="0.72s"
               repeatCount="indefinite"
-              path={motionPath}
             />
-          </circle>
-          <circle r="2.4" fill="url(#agent-edge-pulse)" opacity="0.82">
-            <animateMotion
-              dur="0.72s"
-              repeatCount="indefinite"
-              path={motionPath}
-              begin="0.18s"
-            />
-          </circle>
-          <circle r="1.9" fill="url(#agent-edge-pulse)" opacity="0.66">
-            <animateMotion
-              dur="0.72s"
-              repeatCount="indefinite"
-              path={motionPath}
-              begin="0.36s"
-            />
-          </circle>
+          </motion.path>
+          {trailParticles.map((particle) => (
+            <circle
+              key={`${id}-${particle.radius}-${particle.begin}`}
+              r={particle.radius}
+              fill="url(#agent-edge-pulse)"
+              opacity={particle.opacity}
+              filter={particle.glow ? "url(#agent-edge-glow)" : undefined}
+            >
+              <animateMotion
+                dur="0.72s"
+                repeatCount="indefinite"
+                path={motionPath}
+                begin={particle.begin}
+              />
+            </circle>
+          ))}
         </>
       )}
     </motion.g>

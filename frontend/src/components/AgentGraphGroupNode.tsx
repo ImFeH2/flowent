@@ -16,14 +16,20 @@ interface GraphGroupNodeData {
 export function AgentGraphGroupNode({ data }: NodeProps) {
   const { label, goal, depth, nodeCount, childGraphCount } =
     data as GraphGroupNodeData;
+  const leaving = Boolean((data as GraphGroupNodeData).leaving);
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.985, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.32, ease: [0.23, 1, 0.32, 1] }}
+      animate={{
+        opacity: leaving ? 0 : 1,
+        scale: leaving ? 0.98 : 1,
+        y: leaving ? 8 : 0,
+      }}
+      transition={{ duration: leaving ? 0.26 : 0.32, ease: [0.23, 1, 0.32, 1] }}
       className={cn(
         "relative h-full w-full overflow-hidden rounded-lg border border-white/[0.07] bg-white/[0.018] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-sm",
+        leaving && "pointer-events-none",
         depth > 0 && "bg-white/[0.014]",
       )}
     >

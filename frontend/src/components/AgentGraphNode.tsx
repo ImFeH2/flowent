@@ -22,12 +22,14 @@ interface AgentNodeData {
   latestTodo: string | null;
   selected: boolean;
   toolCall: string | null;
+  leaving: boolean;
   [key: string]: unknown;
 }
 
 export function AgentGraphNode({ data }: NodeProps) {
   const { label, width, node_type, state, latestTodo, selected, toolCall } =
     data as unknown as AgentNodeData;
+  const leaving = Boolean((data as AgentNodeData).leaving);
   const Icon = nodeTypeIcon[node_type];
   const nodeRef = useRef<HTMLDivElement>(null);
 
@@ -71,14 +73,16 @@ export function AgentGraphNode({ data }: NodeProps) {
       ref={nodeRef}
       initial={{ opacity: 0, scale: 0.92, filter: "blur(6px) grayscale(0%)" }}
       animate={{
-        opacity: state === "terminated" ? 0.4 : 1,
-        scale: 1,
-        filter:
-          state === "terminated"
+        opacity: leaving ? 0 : state === "terminated" ? 0.4 : 1,
+        scale: leaving ? 0.9 : 1,
+        y: leaving ? 8 : 0,
+        filter: leaving
+          ? "blur(8px) grayscale(100%)"
+          : state === "terminated"
             ? "blur(0px) grayscale(100%)"
             : "blur(0px) grayscale(0%)",
       }}
-      transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+      transition={{ duration: leaving ? 0.28 : 0.35, ease: [0.23, 1, 0.32, 1] }}
       onMouseEnter={(event) => updateMouseEffect(event.clientX, event.clientY)}
       onMouseMove={(event) => updateMouseEffect(event.clientX, event.clientY)}
       onMouseLeave={resetMouseEffect}
@@ -87,6 +91,7 @@ export function AgentGraphNode({ data }: NodeProps) {
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
         "bg-graph-node-bg",
         "transition-[border-color] duration-300",
+        leaving && "pointer-events-none",
         borderClass,
       )}
       style={

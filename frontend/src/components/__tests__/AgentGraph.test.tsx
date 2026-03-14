@@ -185,6 +185,7 @@ beforeEach(() => {
   terminateNodeMock.mockClear();
   resizeObservers.splice(0, resizeObservers.length);
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+  vi.useRealTimers();
 });
 
 afterEach(() => {
@@ -333,5 +334,49 @@ describe("AgentGraph", () => {
         duration: 250,
       });
     });
+  });
+
+  it("keeps removed nodes briefly for exit transitions before unmounting them", () => {
+    vi.useFakeTimers();
+
+    const view = renderGraph([
+      buildNode({
+        id: "assistant",
+        node_type: "assistant",
+        connections: ["worker-1"],
+        graph_id: null,
+      }),
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+        connections: ["assistant"],
+      }),
+    ]);
+
+    expect(screen.getByTestId("node-worker-1")).toBeInTheDocument();
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([
+        [
+          "assistant",
+          buildNode({
+            id: "assistant",
+            node_type: "assistant",
+            connections: [],
+            graph_id: null,
+          }),
+        ],
+      ]),
+    });
+
+    view.rerender(<AgentGraph />);
+
+    expect(screen.getByTestId("node-worker-1")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(330);
+    });
+
+    expect(screen.queryByTestId("node-worker-1")).not.toBeInTheDocument();
   });
 });

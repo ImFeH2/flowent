@@ -30,6 +30,7 @@ import {
   getAgentNodeWidth,
   getLayoutedElements,
 } from "@/lib/layout";
+import { cn } from "@/lib/utils";
 import {
   useAgentActivityRuntime,
   useAgentGraphRuntime,
@@ -46,6 +47,8 @@ const GRAPH_MIN_HEIGHT = 140;
 const GRAPH_HEADER_HEIGHT = 52;
 const GRAPH_SIDE_PADDING = 24;
 const GRAPH_BOTTOM_PADDING = 24;
+const NODE_EXIT_MS = 320;
+const EDGE_EXIT_MS = 220;
 
 const nodeTypes: NodeTypes = {
   agent: AgentGraphNode,
@@ -102,6 +105,7 @@ interface AgentNodeData extends Record<string, unknown> {
   latestTodo: string | null;
   selected: boolean;
   toolCall: string | null;
+  leaving: boolean;
 }
 
 interface GraphGroupData extends Record<string, unknown> {
@@ -111,6 +115,7 @@ interface GraphGroupData extends Record<string, unknown> {
   depth: number;
   nodeCount: number;
   childGraphCount: number;
+  leaving: boolean;
 }
 
 interface AgentLayoutNode {
@@ -154,6 +159,131 @@ interface LayoutCache {
 
 const graphLayoutCache = new Map<string, LayoutCache>();
 const MAX_LAYOUT_CACHE_SIZE = 20;
+
+function useTransientGraphElements(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  const [renderNodes, setRenderNodes] = useState<FlowNode[]>(nodes);
+  const [renderEdges, setRenderEdges] = useState<FlowEdge[]>(edges);
+  const nodeTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const edgeTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  useEffect(() => {
+    setRenderNodes((prev) => {
+      const nextIds = new Set(nodes.map((node) => node.id));
+      const prevMap = new Map(prev.map((node) => [node.id, node] as const));
+      const nextNodes = nodes.map((node) => {
+        const timer = nodeTimers.current.get(node.id);
+        if (timer) {
+          clearTimeout(timer);
+          nodeTimers.current.delete(node.id);
+        }
+
+        const previous = prevMap.get(node.id);
+        return {
+          ...previous,
+          ...node,
+          className: cn(node.className, "agent-graph-node-present"),
+          data: {
+            ...((previous?.data as Record<string, unknown> | undefined) ?? {}),
+            ...((node.data as Record<string, unknown> | undefined) ?? {}),
+            leaving: false,
+          },
+        } satisfies FlowNode;
+      });
+
+      for (const node of prev) {
+        if (nextIds.has(node.id)) {
+          continue;
+        }
+        if (!nodeTimers.current.has(node.id)) {
+          const timer = setTimeout(() => {
+            setRenderNodes((current) =>
+              current.filter((item) => item.id !== node.id),
+            );
+            nodeTimers.current.delete(node.id);
+          }, NODE_EXIT_MS);
+          nodeTimers.current.set(node.id, timer);
+        }
+
+        nextNodes.push({
+          ...node,
+          className: cn(node.className, "agent-graph-node-leaving"),
+          data: {
+            ...((node.data as Record<string, unknown> | undefined) ?? {}),
+            leaving: true,
+          },
+        } satisfies FlowNode);
+      }
+
+      return nextNodes;
+    });
+  }, [nodes]);
+
+  useEffect(() => {
+    setRenderEdges((prev) => {
+      const nextIds = new Set(edges.map((edge) => edge.id));
+      const prevMap = new Map(prev.map((edge) => [edge.id, edge] as const));
+      const nextEdges = edges.map((edge) => {
+        const timer = edgeTimers.current.get(edge.id);
+        if (timer) {
+          clearTimeout(timer);
+          edgeTimers.current.delete(edge.id);
+        }
+
+        const previous = prevMap.get(edge.id);
+        return {
+          ...previous,
+          ...edge,
+          data: {
+            ...((previous?.data as Record<string, unknown> | undefined) ?? {}),
+            ...((edge.data as Record<string, unknown> | undefined) ?? {}),
+            leaving: false,
+          },
+        } satisfies FlowEdge;
+      });
+
+      for (const edge of prev) {
+        if (nextIds.has(edge.id)) {
+          continue;
+        }
+        if (!edgeTimers.current.has(edge.id)) {
+          const timer = setTimeout(() => {
+            setRenderEdges((current) =>
+              current.filter((item) => item.id !== edge.id),
+            );
+            edgeTimers.current.delete(edge.id);
+          }, EDGE_EXIT_MS);
+          edgeTimers.current.set(edge.id, timer);
+        }
+
+        nextEdges.push({
+          ...edge,
+          data: {
+            ...((edge.data as Record<string, unknown> | undefined) ?? {}),
+            leaving: true,
+          },
+        } satisfies FlowEdge);
+      }
+
+      return nextEdges;
+    });
+  }, [edges]);
+
+  useEffect(() => {
+    return () => {
+      for (const timer of nodeTimers.current.values()) {
+        clearTimeout(timer);
+      }
+      for (const timer of edgeTimers.current.values()) {
+        clearTimeout(timer);
+      }
+    };
+  }, []);
+
+  return { nodes: renderNodes, edges: renderEdges };
+}
 
 function getGraphNodeId(graphId: string): string {
   return `${GRAPH_NODE_PREFIX}${graphId}`;
@@ -493,6 +623,7 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
         depth: getGraphDepth(graphId),
         nodeCount: countSubtreeNodes(graphId),
         childGraphCount: childGraphIds.length,
+        leaving: false,
       },
       nodes,
     };
@@ -724,6 +855,7 @@ export function AgentGraph() {
         latestTodo: agent.todos[agent.todos.length - 1]?.text ?? null,
         selected: id === selectedAgentId,
         toolCall: activeToolCalls.get(id) ?? null,
+        leaving: false,
       });
     }
 
@@ -779,6 +911,7 @@ export function AgentGraph() {
         data: {
           active: !!activeMessage,
           flowDirection: activeMessage ? "forward" : null,
+          leaving: false,
         },
         animated: false,
       } satisfies FlowEdge;
@@ -791,9 +924,15 @@ export function AgentGraph() {
     };
   }, [activeEdgeMessages, layoutGraph, transientData]);
 
+  const { nodes: animatedNodes, edges: animatedEdges } =
+    useTransientGraphElements(nodes, edges);
+
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
-      if (node.type !== "agent") {
+      if (
+        node.type !== "agent" ||
+        (node.data as Record<string, unknown> | undefined)?.leaving
+      ) {
         return;
       }
       selectAgent(node.id);
@@ -923,7 +1062,7 @@ export function AgentGraph() {
   }, [tooltip, tooltipAgent]);
 
   useEffect(() => {
-    if (!flowInstance || nodes.length === 0) return;
+    if (!flowInstance || animatedNodes.length === 0) return;
     if (lastViewportStructureKey.current === structureKey) return;
     const isInitialViewport = lastViewportStructureKey.current === null;
     lastViewportStructureKey.current = structureKey;
@@ -939,10 +1078,12 @@ export function AgentGraph() {
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [flowInstance, nodes.length, structureKey]);
+  }, [flowInstance, animatedNodes.length, structureKey]);
 
   useEffect(() => {
-    if (!flowInstance || !containerRef.current || nodes.length === 0) return;
+    if (!flowInstance || !containerRef.current || animatedNodes.length === 0) {
+      return;
+    }
 
     let raf = 0;
     const observer = new ResizeObserver(() => {
@@ -964,7 +1105,7 @@ export function AgentGraph() {
       cancelAnimationFrame(raf);
       observer.disconnect();
     };
-  }, [flowInstance, nodes.length]);
+  }, [flowInstance, animatedNodes.length]);
 
   const tooltipStyle = useMemo(() => {
     if (!tooltip || typeof window === "undefined") return undefined;
@@ -982,7 +1123,7 @@ export function AgentGraph() {
   return (
     <div ref={containerRef} className="relative flex h-full flex-col">
       <div className="relative flex-1 overflow-hidden">
-        {nodes.length === 0 ? (
+        {animatedNodes.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="space-y-3 text-center">
               <Network className="mx-auto size-8 text-primary/65" />
@@ -994,8 +1135,8 @@ export function AgentGraph() {
           </div>
         ) : (
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            nodes={animatedNodes}
+            edges={animatedEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             colorMode="dark"

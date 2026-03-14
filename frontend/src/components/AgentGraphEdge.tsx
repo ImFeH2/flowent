@@ -30,6 +30,7 @@ export function AnimatedMessageEdge(props: EdgeProps) {
   });
   const edgeData = (data as Record<string, unknown> | undefined) ?? {};
   const hasActiveMessage = !!edgeData.active;
+  const leaving = !!edgeData.leaving;
   const flowDirection = edgeData.flowDirection === "reverse" ? -1 : 1;
   const motionPath = flowDirection === 1 ? edgePath : reversePath;
   const dashOffsetFrom = flowDirection === 1 ? "18" : "0";
@@ -39,8 +40,8 @@ export function AnimatedMessageEdge(props: EdgeProps) {
     <motion.g
       className="agent-graph-edge-shell"
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+      animate={{ opacity: leaving ? 0 : 1 }}
+      transition={{ duration: leaving ? 0.2 : 0.26, ease: [0.23, 1, 0.32, 1] }}
     >
       <BaseEdge
         id={id}

@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
 
 export function AnimatedMessageEdge(props: EdgeProps) {
@@ -35,7 +36,12 @@ export function AnimatedMessageEdge(props: EdgeProps) {
   const dashOffsetTo = flowDirection === 1 ? "0" : "18";
 
   return (
-    <>
+    <motion.g
+      className="agent-graph-edge-shell"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+    >
       <BaseEdge
         id={id}
         path={edgePath}
@@ -44,11 +50,13 @@ export function AnimatedMessageEdge(props: EdgeProps) {
             ? "var(--graph-edge-active)"
             : "var(--graph-edge)",
           strokeWidth: hasActiveMessage ? 2.2 : 1.2,
+          transition:
+            "stroke 220ms ease, stroke-width 220ms ease, opacity 220ms ease",
         }}
       />
       {hasActiveMessage && (
         <>
-          <path
+          <motion.path
             d={edgePath}
             fill="none"
             stroke="var(--graph-edge-active)"
@@ -56,8 +64,11 @@ export function AnimatedMessageEdge(props: EdgeProps) {
             strokeLinecap="round"
             opacity="0.18"
             filter="url(#agent-edge-glow)"
+            initial={{ opacity: 0, pathLength: 0.68 }}
+            animate={{ opacity: 0.18, pathLength: 1 }}
+            transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
           />
-          <path
+          <motion.path
             d={edgePath}
             fill="none"
             stroke="url(#agent-edge-flow)"
@@ -66,6 +77,9 @@ export function AnimatedMessageEdge(props: EdgeProps) {
             strokeDasharray="10 8"
             opacity="0.95"
             filter="url(#agent-edge-glow)"
+            initial={{ opacity: 0, pathLength: 0.76 }}
+            animate={{ opacity: 0.95, pathLength: 1 }}
+            transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
           >
             <animate
               attributeName="stroke-dashoffset"
@@ -74,7 +88,7 @@ export function AnimatedMessageEdge(props: EdgeProps) {
               dur="0.7s"
               repeatCount="indefinite"
             />
-          </path>
+          </motion.path>
           <circle r="3.2" fill="url(#agent-edge-pulse)">
             <animateMotion
               dur="0.72s"
@@ -100,6 +114,6 @@ export function AnimatedMessageEdge(props: EdgeProps) {
           </circle>
         </>
       )}
-    </>
+    </motion.g>
   );
 }

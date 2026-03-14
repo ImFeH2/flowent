@@ -746,7 +746,8 @@ export function AgentGraph() {
               draggable: false,
               selectable: false,
               connectable: false,
-              className: "!border-none !bg-transparent !shadow-none",
+              className:
+                "agent-graph-group-shell !border-none !bg-transparent !shadow-none",
             } satisfies FlowNode,
           ];
         }
@@ -765,6 +766,7 @@ export function AgentGraph() {
             width: layoutNode.width,
             height: layoutNode.height,
             data,
+            className: "agent-graph-node-shell",
           } satisfies FlowNode,
         ];
       },

@@ -1,4 +1,5 @@
 import { Layers3, Route } from "lucide-react";
+import { motion } from "motion/react";
 import { type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +18,10 @@ export function AgentGraphGroupNode({ data }: NodeProps) {
     data as GraphGroupNodeData;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, scale: 0.985, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.32, ease: [0.23, 1, 0.32, 1] }}
       className={cn(
         "relative h-full w-full overflow-hidden rounded-lg border border-white/[0.07] bg-white/[0.018] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-sm",
         depth > 0 && "bg-white/[0.014]",
@@ -54,6 +58,6 @@ export function AgentGraphGroupNode({ data }: NodeProps) {
           </span>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

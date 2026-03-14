@@ -104,3 +104,15 @@ def build_tool_registry() -> ToolRegistry:
     ]:
         reg.register(tool_cls())  # type: ignore[abstract]
     return reg
+
+
+def list_agent_visible_tool_descriptors() -> list[dict[str, Any]]:
+    registry = build_tool_registry()
+    return [
+        {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.parameters,
+        }
+        for tool in registry.list_tools(agent_visible_only=True)
+    ]

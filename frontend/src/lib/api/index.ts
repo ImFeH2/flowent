@@ -1,5 +1,11 @@
 export { fetchNodes, fetchNodeDetail, terminateNode } from "./nodes";
-export { fetchRoles, createRole, updateRole, deleteRole } from "./roles";
+export {
+  fetchRoles,
+  fetchRolesBootstrap,
+  createRole,
+  updateRole,
+  deleteRole,
+} from "./roles";
 export {
   fetchProviders,
   createProvider,
@@ -9,6 +15,10 @@ export {
   type ModelOption,
 } from "./providers";
 export { fetchPromptSettings, savePromptSettings } from "./prompts";
-export { fetchSettings, saveSettings } from "./settings";
+export {
+  fetchSettings,
+  fetchSettingsBootstrap,
+  saveSettings,
+} from "./settings";
 export { fetchAppMeta, fetchTools, type ToolInfo } from "./meta";
 export { sendAssistantMessageRequest } from "./assistant";

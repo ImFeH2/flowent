@@ -6,9 +6,7 @@ import {
   createRole,
   deleteRole,
   fetchProviderModels,
-  fetchProviders,
-  fetchRoles,
-  fetchTools,
+  fetchRolesBootstrap,
   updateRole,
   type ModelOption,
   type ToolInfo,
@@ -70,11 +68,11 @@ export function RolesPage() {
   const refreshRoles = async () => {
     setLoading(true);
     try {
-      const [roleItems, toolItems, providerItems] = await Promise.all([
-        fetchRoles(),
-        fetchTools(),
-        fetchProviders(),
-      ]);
+      const {
+        roles: roleItems,
+        tools: toolItems,
+        providers: providerItems,
+      } = await fetchRolesBootstrap();
       setRoles(roleItems);
       setTools(toolItems);
       setProviders(providerItems);

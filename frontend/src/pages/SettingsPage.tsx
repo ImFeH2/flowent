@@ -2,11 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
-  fetchAppMeta,
   fetchProviderModels,
-  fetchProviders,
-  fetchRoles,
-  fetchSettings,
+  fetchSettingsBootstrap,
   saveSettings,
   type ModelOption,
 } from "@/lib/api";
@@ -51,13 +48,21 @@ export function SettingsPage() {
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([fetchSettings<UserSettings>(), fetchProviders(), fetchRoles()])
-      .then(([settingsData, providersData, rolesData]) => {
-        if (!mounted) return;
-        setSettings(settingsData);
-        setProviders(providersData);
-        setRoles(rolesData);
-      })
+    fetchSettingsBootstrap<UserSettings>()
+      .then(
+        ({
+          settings: settingsData,
+          providers: providersData,
+          roles: rolesData,
+          version,
+        }) => {
+          if (!mounted) return;
+          setSettings(settingsData);
+          setProviders(providersData);
+          setRoles(rolesData);
+          setAppVersion(version);
+        },
+      )
       .catch(() => {
         toast.error("Failed to load settings");
       })
@@ -68,14 +73,6 @@ export function SettingsPage() {
     return () => {
       mounted = false;
     };
-  }, []);
-
-  useEffect(() => {
-    fetchAppMeta()
-      .then((data) => {
-        setAppVersion(typeof data.version === "string" ? data.version : null);
-      })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -23,16 +23,6 @@ async def get_meta() -> dict:
 
 @router.get("/api/tools")
 async def list_tools() -> dict:
-    from app.tools import build_tool_registry
+    from app.tools import list_agent_visible_tool_descriptors
 
-    registry = build_tool_registry()
-    tools = []
-    for tool in registry.list_tools(agent_visible_only=True):
-        tools.append(
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.parameters,
-            }
-        )
-    return {"tools": tools}
+    return {"tools": list_agent_visible_tool_descriptors()}

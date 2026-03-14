@@ -10,6 +10,7 @@ from app.settings import (
     ProviderConfig,
     get_settings,
     save_settings,
+    serialize_provider,
 )
 
 router = APIRouter()
@@ -33,16 +34,7 @@ class UpdateProviderRequest(BaseModel):
 async def list_providers() -> dict[str, object]:
     settings = get_settings()
     return {
-        "providers": [
-            {
-                "id": p.id,
-                "name": p.name,
-                "type": p.type,
-                "base_url": p.base_url,
-                "api_key": p.api_key,
-            }
-            for p in settings.providers
-        ]
+        "providers": [serialize_provider(provider) for provider in settings.providers]
     }
 
 
@@ -61,13 +53,7 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
     settings.providers.append(provider)
     save_settings(settings)
     gateway.invalidate_cache()
-    return {
-        "id": provider.id,
-        "name": provider.name,
-        "type": provider.type,
-        "base_url": provider.base_url,
-        "api_key": provider.api_key,
-    }
+    return serialize_provider(provider)
 
 
 @router.put("/api/providers/{provider_id}")
@@ -90,13 +76,7 @@ async def update_provider(
             p.api_key = req.api_key
         save_settings(settings)
         gateway.invalidate_cache()
-        return {
-            "id": p.id,
-            "name": p.name,
-            "type": p.type,
-            "base_url": p.base_url,
-            "api_key": p.api_key,
-        }
+        return serialize_provider(p)
     raise HTTPException(status_code=404, detail="Provider not found")
 
 

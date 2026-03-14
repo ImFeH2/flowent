@@ -3,8 +3,13 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
-from app.routes.settings import UpdateSettingsRequest, get_settings_api, update_settings
-from app.settings import RoleConfig, Settings
+from app.routes.settings import (
+    UpdateSettingsRequest,
+    get_settings_api,
+    get_settings_bootstrap,
+    update_settings,
+)
+from app.settings import ProviderConfig, RoleConfig, Settings
 
 
 def test_get_settings_returns_assistant_configuration(monkeypatch):
@@ -17,6 +22,74 @@ def test_get_settings_returns_assistant_configuration(monkeypatch):
     result = asyncio.run(get_settings_api())
 
     assert result["assistant"] == {"role_name": "Steward"}
+
+
+def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")],
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app._version.__version__", "1.2.3")
+
+    result = asyncio.run(get_settings_bootstrap())
+
+    assert result == {
+        "settings": {
+            "event_log": {"timestamp_format": "absolute"},
+            "assistant": {"role_name": "Steward"},
+            "model": {"active_provider_id": "", "active_model": ""},
+            "custom_prompt": "",
+            "root_boundary": {"write_dirs": [], "allow_network": False},
+            "providers": [
+                {
+                    "id": "provider-1",
+                    "name": "Primary",
+                    "type": "openai_compatible",
+                    "base_url": "https://api.example.com/v1",
+                    "api_key": "secret",
+                }
+            ],
+            "roles": [
+                {
+                    "name": "Steward",
+                    "system_prompt": "Default assistant role.",
+                    "model": None,
+                    "included_tools": [],
+                    "excluded_tools": [],
+                }
+            ],
+        },
+        "providers": [
+            {
+                "id": "provider-1",
+                "name": "Primary",
+                "type": "openai_compatible",
+                "base_url": "https://api.example.com/v1",
+                "api_key": "secret",
+            }
+        ],
+        "roles": [
+            {
+                "name": "Steward",
+                "system_prompt": "Default assistant role.",
+                "model": None,
+                "included_tools": [],
+                "excluded_tools": [],
+                "is_builtin": True,
+            }
+        ],
+        "version": "1.2.3",
+    }
 
 
 def test_update_settings_persists_assistant_role(monkeypatch):

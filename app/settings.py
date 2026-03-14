@@ -178,6 +178,16 @@ def serialize_role_model(
     }
 
 
+def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
+    return {
+        "id": provider.id,
+        "name": provider.name,
+        "type": provider.type,
+        "base_url": provider.base_url,
+        "api_key": provider.api_key,
+    }
+
+
 def serialize_role(role: RoleConfig) -> dict[str, object]:
     return {
         "name": role.name,

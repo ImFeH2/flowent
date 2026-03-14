@@ -13,9 +13,24 @@ from app.settings import (
     find_role,
     get_settings,
     save_settings,
+    serialize_provider,
+    serialize_role,
 )
 
 router = APIRouter()
+
+
+@router.get("/api/settings/bootstrap")
+async def get_settings_bootstrap() -> dict[str, object]:
+    from app._version import __version__
+
+    settings = get_settings()
+    return {
+        "settings": asdict(settings),
+        "providers": [serialize_provider(provider) for provider in settings.providers],
+        "roles": [serialize_role(role) for role in settings.roles],
+        "version": __version__,
+    }
 
 
 @router.get("/api/settings")

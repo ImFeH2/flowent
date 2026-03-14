@@ -18,6 +18,44 @@ def test_roles_api_lists_worker_and_conductor_as_builtin(client: TestClient):
     assert roles[CONDUCTOR_ROLE_NAME]["is_builtin"] is True
 
 
+def test_roles_bootstrap_includes_tools_and_providers(client: TestClient, monkeypatch):
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+        roles=[
+            RoleConfig(name="Steward", system_prompt="Default assistant role."),
+            RoleConfig(name="Reviewer", system_prompt="Review carefully."),
+        ],
+    )
+
+    monkeypatch.setattr("app.routes.roles.get_settings", lambda: settings)
+
+    response = client.get("/api/roles/bootstrap")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["providers"] == [
+        {
+            "id": "provider-1",
+            "name": "Primary",
+            "type": "openai_compatible",
+            "base_url": "https://api.example.com/v1",
+            "api_key": "secret",
+        }
+    ]
+    assert {role["name"] for role in payload["roles"]} == {"Steward", "Reviewer"}
+    tool_names = {tool["name"] for tool in payload["tools"]}
+    assert "spawn" in tool_names
+    assert "manage_roles" not in tool_names
+
+
 def test_create_role_rejects_duplicate_name(client: TestClient, monkeypatch):
     settings = Settings(roles=[RoleConfig(name="Writer", system_prompt="draft")])
     saved: list[Settings] = []

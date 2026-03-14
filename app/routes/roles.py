@@ -14,6 +14,7 @@ from app.settings import (
     normalize_tool_names,
     rename_role_references,
     save_settings,
+    serialize_provider,
     serialize_role,
     validate_role_tool_config,
 )
@@ -148,6 +149,18 @@ def _enforce_builtin_role_guards(
 async def list_roles() -> dict:
     settings = get_settings()
     return {"roles": [serialize_role(role) for role in settings.roles]}
+
+
+@router.get("/api/roles/bootstrap")
+async def get_roles_bootstrap() -> dict[str, object]:
+    from app.tools import list_agent_visible_tool_descriptors
+
+    settings = get_settings()
+    return {
+        "roles": [serialize_role(role) for role in settings.roles],
+        "providers": [serialize_provider(provider) for provider in settings.providers],
+        "tools": list_agent_visible_tool_descriptors(),
+    }
 
 
 @router.post("/api/roles")

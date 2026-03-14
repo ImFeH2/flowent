@@ -12,3 +12,17 @@ def test_tools_api_hides_assistant_only_tools(client: TestClient):
     assert "manage_settings" not in tool_names
     assert "manage_prompts" not in tool_names
     assert "spawn" in tool_names
+
+
+def test_settings_bootstrap_returns_settings_related_resources(client: TestClient):
+    response = client.get("/api/settings/bootstrap")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["version"]
+    assert "settings" in payload
+    assert "providers" in payload
+    assert "roles" in payload
+    role_names = {role["name"] for role in payload["roles"]}
+    assert "Steward" in role_names
+    assert "Worker" in role_names

@@ -1,18 +1,60 @@
 import "@/styles/App.css";
 import { AnimatePresence, motion } from "motion/react";
+import { Suspense, lazy, type ComponentType } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AgentProvider, useAgentUI } from "@/context/AgentContext";
+import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { HomePage } from "@/pages/HomePage";
-import { ProvidersPage } from "@/pages/ProvidersPage";
-import { PromptsPage } from "@/pages/PromptsPage";
-import { RolesPage } from "@/pages/RolesPage";
-import { SettingsPage } from "@/pages/SettingsPage";
-import { ToolsPage } from "@/pages/ToolsPage";
 import { cn } from "@/lib/utils";
 import { usePanelWidth } from "@/hooks/usePanelDrag";
+
+function lazyPage<TModule, TKey extends keyof TModule & string>(
+  loader: () => Promise<TModule>,
+  exportName: TKey,
+) {
+  return lazy(async () => {
+    const module = await loader();
+    return {
+      default: module[exportName] as ComponentType,
+    };
+  });
+}
+
+const ProvidersPage = lazyPage(
+  () => import("@/pages/ProvidersPage"),
+  "ProvidersPage",
+);
+const RolesPage = lazyPage(() => import("@/pages/RolesPage"), "RolesPage");
+const PromptsPage = lazyPage(
+  () => import("@/pages/PromptsPage"),
+  "PromptsPage",
+);
+const ToolsPage = lazyPage(() => import("@/pages/ToolsPage"), "ToolsPage");
+const SettingsPage = lazyPage(
+  () => import("@/pages/SettingsPage"),
+  "SettingsPage",
+);
+
+const lazyPageMap: Partial<Record<PageId, ComponentType>> = {
+  providers: ProvidersPage,
+  roles: RolesPage,
+  prompts: PromptsPage,
+  tools: ToolsPage,
+  settings: SettingsPage,
+};
+
+function PageLoadingFallback() {
+  return (
+    <div className="flex h-full items-center justify-center">
+      <div className="space-y-3 text-center">
+        <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
+        <p className="text-sm text-muted-foreground">Loading page...</p>
+      </div>
+    </div>
+  );
+}
 
 function AppContent() {
   const { currentPage } = useAgentUI();
@@ -24,21 +66,18 @@ function AppContent() {
     400,
   );
 
+  const LazyPage = lazyPageMap[currentPage];
+
   const renderPage = () => {
-    switch (currentPage) {
-      case "providers":
-        return <ProvidersPage />;
-      case "roles":
-        return <RolesPage />;
-      case "prompts":
-        return <PromptsPage />;
-      case "tools":
-        return <ToolsPage />;
-      case "settings":
-        return <SettingsPage />;
-      default:
-        return <HomePage />;
+    if (!LazyPage) {
+      return <HomePage />;
     }
+
+    return (
+      <Suspense fallback={<PageLoadingFallback />}>
+        <LazyPage />
+      </Suspense>
+    );
   };
 
   return (

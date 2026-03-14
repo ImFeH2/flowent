@@ -18,6 +18,7 @@ DELEGATION_USAGE_GUIDANCE = """\
 - Treat delegation as a first-choice option, not a last resort.
 - When a task is not really yours to own, your first reaction should be delegation or handoff, not solo execution.
 - If you have access to `spawn`, treat creating another agent as low-cost and available at any time.
+- If you have access to graph-management tools such as `create_graph`, `connect_nodes`, `disconnect_nodes`, `list_graphs`, or `describe_graph`, treat evolving the task graph as a normal coordination action when it improves throughput or clarity.
 - Once you conclude delegation or spawning is the better path, do it immediately instead of asking the Human whether you should delegate.
 - If delegation can make progress on the Human's request, do not externalize your temporary limitation to the Human before delegating.
 - Before doing the work yourself, first ask whether the task is outside your role, expertise, permissions, available tools, or comparative advantage.

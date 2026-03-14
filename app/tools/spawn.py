@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.models import Event, EventType, NodeConfig, NodeType
+from app.graph_runtime import connect_nodes
+from app.models import NodeConfig, NodeType
 from app.tools import MINIMUM_TOOLS, Tool
 from app.tools.send import send_message
 
@@ -54,13 +55,16 @@ class SpawnTool(Tool):
                 "description": "Whether the agent can access the network",
                 "default": False,
             },
+            "graph_id": {
+                "type": "string",
+                "description": "Graph to add the new node to. Defaults to the caller's current graph.",
+            },
         },
         "required": ["role_name"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         from app.agent import Agent as AgentClass
-        from app.events import event_bus
         from app.registry import registry
         from app.settings import find_role, get_settings
 
@@ -70,6 +74,7 @@ class SpawnTool(Tool):
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
+        graph_id = args.get("graph_id") or agent.config.graph_id
 
         if not isinstance(tools, list) or not all(
             isinstance(tool_name, str) for tool_name in tools
@@ -86,6 +91,15 @@ class SpawnTool(Tool):
         role_cfg = find_role(settings, role_name)
         if role_cfg is None:
             return json.dumps({"error": f"Role '{role_name}' not found"})
+        if not isinstance(graph_id, str) or not graph_id:
+            return json.dumps({"error": "graph_id must be a non-empty string"})
+        graph = registry.get_graph(graph_id)
+        if graph is None:
+            return json.dumps({"error": f"Graph '{graph_id}' not found"})
+        if graph.owner_agent_id != agent.uuid:
+            return json.dumps(
+                {"error": f"Graph '{graph_id}' is not managed by this agent"}
+            )
 
         final_tools: list[str] = []
         seen_tools: set[str] = set()
@@ -103,6 +117,7 @@ class SpawnTool(Tool):
         config = NodeConfig(
             node_type=NodeType.AGENT,
             role_name=role_name,
+            graph_id=graph_id,
             name=name,
             tools=final_tools,
             write_dirs=write_dirs,
@@ -149,23 +164,15 @@ class SpawnTool(Tool):
         started = False
 
         try:
-            agent.add_connection(agent_uuid)
-            child.add_connection(agent.uuid)
-            connected = True
-
             registry.register(child)
             registered = True
 
             child.start()
             started = True
 
-            event_bus.emit(
-                Event(
-                    type=EventType.NODE_CONNECTED,
-                    agent_id=agent.uuid,
-                    data={"a": agent.uuid, "b": agent_uuid},
-                )
-            )
+            connect_nodes(agent.uuid, agent_uuid)
+            connect_nodes(agent_uuid, agent.uuid)
+            connected = True
 
             if isinstance(task_prompt, str) and task_prompt != "":
                 if not child.wait_until_idle(timeout=5.0):
@@ -194,10 +201,16 @@ class SpawnTool(Tool):
             return json.dumps({"error": f"Failed to spawn agent: {exc}"})
 
         logger.info(
-            "Spawned agent {} (role={}) by {}",
+            "Spawned agent {} (role={}, graph={}) by {}",
             agent_uuid[:8],
             role_name,
+            graph_id[:8],
             agent.uuid[:8],
         )
 
-        return json.dumps({"agent_id": agent_uuid, "role_name": role_name})
+        if graph.entry_node_id is None:
+            graph.entry_node_id = agent_uuid
+
+        return json.dumps(
+            {"agent_id": agent_uuid, "graph_id": graph_id, "role_name": role_name}
+        )

@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.models import Event, EventType, NodeConfig, NodeType
+from app.graph_runtime import connect_nodes, emit_graph_created
+from app.models import Graph, NodeConfig, NodeType
 from app.tools import MINIMUM_TOOLS, Tool
 from app.tools.send import send_message
 
@@ -18,9 +19,9 @@ if TYPE_CHECKING:
 class CreateRootTool(Tool):
     name = "create_root"
     description = (
-        "Create a new root agent in the Agent Forest. Choose the role, tools, "
+        "Create a new entry agent in the Agent Graph. Choose the role, tools, "
         "and security boundary based on the task. Use Worker for simple "
-        "execution tasks and Conductor for complex orchestration."
+        "execution tasks and Conductor for complex graph orchestration."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -59,7 +60,6 @@ class CreateRootTool(Tool):
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         from app.agent import Agent as AgentClass
-        from app.events import event_bus
         from app.registry import registry
         from app.settings import find_role, get_settings
 
@@ -131,11 +131,21 @@ class CreateRootTool(Tool):
             seen_tools.add(tool_name)
 
         agent_uuid = str(uuid.uuid4())
+        graph_id = str(uuid.uuid4())
+        graph = Graph(
+            id=graph_id,
+            owner_agent_id=agent_uuid,
+            parent_graph_id=None,
+            name=name or role_name,
+            goal=task if isinstance(task, str) else "",
+            entry_node_id=agent_uuid,
+        )
         child = AgentClass(
             uuid=agent_uuid,
             config=NodeConfig(
                 node_type=NodeType.AGENT,
                 role_name=role_name,
+                graph_id=graph_id,
                 name=name,
                 tools=final_tools,
                 write_dirs=write_dirs,
@@ -144,13 +154,13 @@ class CreateRootTool(Tool):
         )
 
         registered = False
+        graph_registered = False
         connected = False
         started = False
 
         try:
-            agent.add_connection(agent_uuid)
-            child.add_connection(agent.uuid)
-            connected = True
+            registry.register_graph(graph)
+            graph_registered = True
 
             registry.register(child)
             registered = True
@@ -158,13 +168,11 @@ class CreateRootTool(Tool):
             child.start()
             started = True
 
-            event_bus.emit(
-                Event(
-                    type=EventType.NODE_CONNECTED,
-                    agent_id=agent.uuid,
-                    data={"a": agent.uuid, "b": agent_uuid},
-                )
-            )
+            emit_graph_created(graph)
+
+            connect_nodes(agent.uuid, agent_uuid)
+            connect_nodes(agent_uuid, agent.uuid)
+            connected = True
 
             if task:
                 if not child.wait_until_idle(timeout=5.0):
@@ -186,6 +194,8 @@ class CreateRootTool(Tool):
                 child.terminate_and_wait(timeout=5.0)
             if registered:
                 registry.unregister(agent_uuid)
+            if graph_registered:
+                registry.unregister_graph(graph_id)
             if connected:
                 agent.remove_connection(agent_uuid)
                 child.remove_connection(agent.uuid)
@@ -193,10 +203,13 @@ class CreateRootTool(Tool):
             return json.dumps({"error": f"Failed to create root agent: {exc}"})
 
         logger.info(
-            "Created root agent {} (role={}) by {}",
+            "Created root agent {} (role={}, graph={}) by {}",
             agent_uuid[:8],
             role_name,
+            graph_id[:8],
             agent.uuid[:8],
         )
 
-        return json.dumps({"agent_id": agent_uuid, "role_name": role_name})
+        return json.dumps(
+            {"agent_id": agent_uuid, "graph_id": graph_id, "role_name": role_name}
+        )

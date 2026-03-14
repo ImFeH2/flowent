@@ -15,6 +15,7 @@ async def list_nodes() -> dict:
             {
                 "id": n.uuid,
                 "node_type": n.config.node_type.value,
+                "graph_id": n.config.graph_id,
                 "role_name": n.config.role_name,
                 "state": n.state.value,
                 "connections": n.get_connections_snapshot(),
@@ -31,10 +32,12 @@ async def get_node(node_id: str) -> dict:
     node = registry.get(node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
+    graph = registry.get_graph(node.config.graph_id) if node.config.graph_id else None
 
     return {
         "id": node.uuid,
         "node_type": node.config.node_type.value,
+        "graph_id": node.config.graph_id,
         "role_name": node.config.role_name,
         "state": node.state.value,
         "connections": node.get_connections_snapshot(),
@@ -43,6 +46,7 @@ async def get_node(node_id: str) -> dict:
         "tools": list(node.config.tools),
         "write_dirs": list(node.config.write_dirs),
         "allow_network": node.config.allow_network,
+        "graph": graph.serialize() if graph is not None else None,
         "history": [entry.serialize() for entry in node.get_history_snapshot()],
     }
 

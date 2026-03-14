@@ -65,12 +65,14 @@ def test_create_root_registers_root_agent_and_connects_to_assistant(
     )
 
     child_id = result["agent_id"]
+    graph_id = result["graph_id"]
     child = registry.get(child_id)
 
-    assert result == {"agent_id": child_id, "role_name": "Worker"}
+    assert result == {"agent_id": child_id, "graph_id": graph_id, "role_name": "Worker"}
     assert child is not None
     assert child.config.node_type == NodeType.AGENT
     assert child.config.role_name == "Worker"
+    assert child.config.graph_id == graph_id
     assert child.config.name == "Root Worker"
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert child.config.write_dirs == [str(notes_dir)]
@@ -197,10 +199,12 @@ def test_create_root_delivers_initial_task_after_idle(monkeypatch):
     )
 
     child_id = result["agent_id"]
+    graph_id = result["graph_id"]
     child = registry.get(child_id)
 
-    assert result == {"agent_id": child_id, "role_name": "Worker"}
+    assert result == {"agent_id": child_id, "graph_id": graph_id, "role_name": "Worker"}
     assert child is not None
+    assert child.config.graph_id == graph_id
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert call_order == [
         ("start", child_id),
@@ -255,5 +259,6 @@ def test_create_root_ignores_caller_boundary_and_uses_root_boundary(
 
     assert result["role_name"] == "Worker"
     assert child is not None
+    assert child.config.graph_id == result["graph_id"]
     assert child.config.write_dirs == [str(output_dir)]
     assert child.config.allow_network is True

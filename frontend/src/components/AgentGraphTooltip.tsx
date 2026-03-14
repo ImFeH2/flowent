@@ -62,6 +62,10 @@ export function AgentGraphTooltip({
             <span className="text-foreground/80">
               {agent.connections.length}
             </span>
+            <span>Graph</span>
+            <span className="font-mono text-foreground/80">
+              {agent.graph_id ? agent.graph_id.slice(0, 8) : "—"}
+            </span>
             {activeToolCall ? (
               <>
                 <span>Tool</span>

@@ -8,12 +8,14 @@ export type AgentState =
   | "terminated";
 
 export type DisplayEventType =
+  | "graph_created"
   | "node_created"
   | "node_state_changed"
   | "node_todos_changed"
   | "node_message"
   | "node_terminated"
   | "node_connected"
+  | "node_disconnected"
   | "assistant_content"
   | "tool_called";
 
@@ -32,6 +34,7 @@ export interface TodoItem {
 export interface Node {
   id: string;
   node_type: NodeType;
+  graph_id: string | null;
   state: AgentState;
   connections: string[];
   name: string | null;
@@ -83,6 +86,7 @@ export type AssistantChatItem = HistoryEntry | PendingAssistantChatMessage;
 export interface NodeDetail {
   id: string;
   node_type: NodeType;
+  graph_id: string | null;
   state: AgentState;
   name: string | null;
   connections: string[];
@@ -91,7 +95,17 @@ export interface NodeDetail {
   tools: string[];
   write_dirs: string[];
   allow_network: boolean;
+  graph: Graph | null;
   history: HistoryEntry[];
+}
+
+export interface Graph {
+  id: string;
+  owner_agent_id: string;
+  parent_graph_id: string | null;
+  name: string | null;
+  goal: string;
+  entry_node_id: string | null;
 }
 
 export interface RoleModelConfig {

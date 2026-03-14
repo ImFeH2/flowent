@@ -32,10 +32,12 @@ def test_get_node_detail_includes_runtime_config(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "assistant"
+    assert data["graph_id"] is None
     assert isinstance(data["history"], list)
     assert isinstance(data["tools"], list)
     assert isinstance(data["write_dirs"], list)
     assert isinstance(data["allow_network"], bool)
+    assert data["graph"] is None
 
 
 def test_direct_node_message_api_is_not_available(client: TestClient):
@@ -53,6 +55,7 @@ def test_only_assistant_node_exists_at_startup(client: TestClient):
     assert len(nodes) == 1
     assert nodes[0]["id"] == "assistant"
     assert nodes[0]["node_type"] == "assistant"
+    assert nodes[0]["graph_id"] is None
     assert nodes[0]["name"] == "Assistant"
     assert nodes[0]["role_name"] == "Steward"
 

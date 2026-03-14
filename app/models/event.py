@@ -7,12 +7,14 @@ from typing import Any
 
 
 class EventType(StrEnum):
+    GRAPH_CREATED = "graph_created"
     NODE_CREATED = "node_created"
     NODE_STATE_CHANGED = "node_state_changed"
     NODE_TODOS_CHANGED = "node_todos_changed"
     NODE_MESSAGE = "node_message"
     NODE_TERMINATED = "node_terminated"
     NODE_CONNECTED = "node_connected"
+    NODE_DISCONNECTED = "node_disconnected"
     ASSISTANT_CONTENT = "assistant_content"
     TOOL_CALLED = "tool_called"
     HISTORY_ENTRY_ADDED = "history_entry_added"
@@ -20,12 +22,14 @@ class EventType(StrEnum):
 
 
 DISPLAY_EVENTS: set[EventType] = {
+    EventType.GRAPH_CREATED,
     EventType.NODE_CREATED,
     EventType.NODE_STATE_CHANGED,
     EventType.NODE_TODOS_CHANGED,
     EventType.NODE_MESSAGE,
     EventType.NODE_TERMINATED,
     EventType.NODE_CONNECTED,
+    EventType.NODE_DISCONNECTED,
     EventType.ASSISTANT_CONTENT,
     EventType.TOOL_CALLED,
 }

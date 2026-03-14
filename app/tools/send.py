@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from loguru import logger
 
 from app.events import event_bus
+from app.graph_runtime import resolve_node_ref
 from app.models import Event, EventType, Message
 from app.tools import Tool
 
@@ -14,11 +15,7 @@ if TYPE_CHECKING:
 
 
 def send_message(agent: Agent, target_ref: str, content: str) -> dict[str, Any]:
-    from app.registry import registry
-
-    target = registry.get(target_ref)
-    if target is None:
-        target = registry.find_by_name(target_ref)
+    target = resolve_node_ref(target_ref)
     if target is None:
         return {"error": f"Node '{target_ref}' not found"}
 
@@ -47,7 +44,9 @@ def send_message(agent: Agent, target_ref: str, content: str) -> dict[str, Any]:
 
 class SendTool(Tool):
     name = "send"
-    description = "Send a message to a connected node by UUID."
+    description = (
+        "Send a message to a node that is reachable by a direct outgoing edge."
+    )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {

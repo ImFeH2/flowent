@@ -158,6 +158,7 @@ class Agent:
                     "node_type": self.config.node_type.value,
                     "role_name": self.config.role_name,
                     "name": self.config.name,
+                    "graph_id": self.config.graph_id,
                 },
             ),
         )

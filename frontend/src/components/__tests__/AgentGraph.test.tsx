@@ -11,11 +11,12 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentGraph } from "@/components/AgentGraph";
 import { getAgentNodeWidth } from "@/lib/layout";
-import type { Node } from "@/types";
+import type { Graph, Node } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 const terminateNodeMock = vi.fn().mockResolvedValue(undefined);
 const useAgentNodesRuntimeMock = vi.fn();
+const useAgentGraphRuntimeMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
 const resizeObservers: ResizeObserverMock[] = [];
@@ -34,6 +35,7 @@ class ResizeObserverMock {
 
 vi.mock("@/context/AgentContext", () => ({
   useAgentNodesRuntime: () => useAgentNodesRuntimeMock(),
+  useAgentGraphRuntime: () => useAgentGraphRuntimeMock(),
   useAgentActivityRuntime: () => useAgentActivityRuntimeMock(),
   useAgentUI: () => useAgentUIMock(),
 }));
@@ -137,6 +139,7 @@ function buildNode(overrides: Partial<Node>): Node {
   return {
     id: "node",
     node_type: "agent",
+    graph_id: "graph-root",
     state: "idle",
     connections: [],
     name: null,
@@ -146,9 +149,24 @@ function buildNode(overrides: Partial<Node>): Node {
   };
 }
 
-function renderGraph(nodes: Node[]) {
+function buildGraph(overrides: Partial<Graph>): Graph {
+  return {
+    id: "graph-root",
+    owner_agent_id: "worker-1",
+    parent_graph_id: null,
+    name: "Research Graph",
+    goal: "Investigate sources",
+    entry_node_id: "worker-1",
+    ...overrides,
+  };
+}
+
+function renderGraph(nodes: Node[], graphs: Graph[] = []) {
   useAgentNodesRuntimeMock.mockReturnValue({
     agents: new Map(nodes.map((node) => [node.id, node])),
+  });
+  useAgentGraphRuntimeMock.mockReturnValue({
+    graphs: new Map(graphs.map((graph) => [graph.id, graph])),
   });
   useAgentActivityRuntimeMock.mockReturnValue({
     activeMessages: [],
@@ -196,6 +214,49 @@ describe("AgentGraph", () => {
       width: `${getAgentNodeWidth("Worker")}px`,
     });
     expect(workerNode).toHaveClass("h-[62px]");
+  });
+
+  it("renders nested graph containers alongside agent nodes", async () => {
+    renderGraph(
+      [
+        buildNode({
+          id: "assistant",
+          node_type: "assistant",
+          connections: ["worker-1"],
+          graph_id: null,
+        }),
+        buildNode({
+          id: "worker-1",
+          role_name: "Conductor",
+          graph_id: "graph-root",
+          connections: ["assistant", "worker-2"],
+        }),
+        buildNode({
+          id: "worker-2",
+          role_name: "Worker",
+          graph_id: "graph-child",
+          connections: ["worker-1"],
+        }),
+      ],
+      [
+        buildGraph({
+          id: "graph-root",
+          owner_agent_id: "worker-1",
+          name: "Research Graph",
+        }),
+        buildGraph({
+          id: "graph-child",
+          owner_agent_id: "worker-1",
+          parent_graph_id: "graph-root",
+          name: "Site Sweep",
+        }),
+      ],
+    );
+
+    expect(await screen.findByText("Research Graph")).toBeInTheDocument();
+    expect(screen.getByText("Site Sweep")).toBeInTheDocument();
+    expect(screen.getByText("Conductor")).toBeInTheDocument();
+    expect(screen.getByText("Worker")).toBeInTheDocument();
   });
 
   it("protects only assistant termination and allows stopping regular agents", async () => {

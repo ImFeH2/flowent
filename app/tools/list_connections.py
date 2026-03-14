@@ -11,7 +11,9 @@ if TYPE_CHECKING:
 
 class ListConnectionsTool(Tool):
     name = "list_connections"
-    description = "List all nodes connected to the current node."
+    description = (
+        "List all nodes reachable from the current node by direct outgoing edges."
+    )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {},

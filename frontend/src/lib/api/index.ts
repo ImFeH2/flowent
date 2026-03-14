@@ -1,4 +1,5 @@
 export { fetchNodes, fetchNodeDetail, terminateNode } from "./nodes";
+export { fetchGraphs } from "./graphs";
 export {
   fetchRoles,
   fetchRolesBootstrap,

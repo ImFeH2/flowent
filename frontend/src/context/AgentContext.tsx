@@ -9,10 +9,12 @@ import {
 } from "react";
 import { sendAssistantMessageRequest } from "@/lib/api";
 import { useAgents } from "@/hooks/useAgents";
+import { useGraphs } from "@/hooks/useGraphs";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import type {
   AgentEvent,
   AssistantChatMessage,
+  Graph,
   HistoryEntry,
   Node,
   PendingAssistantChatMessage,
@@ -36,6 +38,7 @@ export type PageId =
 
 interface AgentRuntimeContextValue {
   agents: Map<string, Node>;
+  graphs: Map<string, Graph>;
   connected: boolean;
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
@@ -46,6 +49,10 @@ interface AgentRuntimeContextValue {
 
 interface AgentNodesContextValue {
   agents: Map<string, Node>;
+}
+
+interface AgentGraphsContextValue {
+  graphs: Map<string, Graph>;
 }
 
 interface AgentConnectionContextValue {
@@ -75,6 +82,7 @@ interface AgentUIContextValue {
 }
 
 const AgentNodesContext = createContext<AgentNodesContextValue | null>(null);
+const AgentGraphsContext = createContext<AgentGraphsContextValue | null>(null);
 const AgentConnectionContext =
   createContext<AgentConnectionContextValue | null>(null);
 const AgentHistoryContext = createContext<AgentHistoryContextValue | null>(
@@ -91,6 +99,7 @@ const ASSISTANT_ID = "assistant";
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const { agents, handleUpdateEvent } = useAgents();
+  const { graphs, handleUpdateEvent: handleGraphEvent } = useGraphs();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [agentHistories, setAgentHistories] = useState<
@@ -181,6 +190,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const onUpdateEvent = useCallback(
     (event: AgentEvent) => {
       handleUpdateEvent(event);
+      handleGraphEvent(event);
 
       if (event.type === "node_message") {
         const fromId = event.agent_id;
@@ -327,7 +337,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [handleUpdateEvent],
+    [handleGraphEvent, handleUpdateEvent],
   );
 
   const { connected } = useWebSocket({ onDisplayEvent, onUpdateEvent });
@@ -341,6 +351,13 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       agents,
     }),
     [agents],
+  );
+
+  const graphsValue = useMemo(
+    () => ({
+      graphs,
+    }),
+    [graphs],
   );
 
   const connectionValue = useMemo(
@@ -390,15 +407,17 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   return (
     <AgentNodesContext.Provider value={nodesValue}>
-      <AgentConnectionContext.Provider value={connectionValue}>
-        <AgentHistoryContext.Provider value={historyValue}>
-          <AgentActivityContext.Provider value={activityValue}>
-            <AgentUIContext.Provider value={uiValue}>
-              {children}
-            </AgentUIContext.Provider>
-          </AgentActivityContext.Provider>
-        </AgentHistoryContext.Provider>
-      </AgentConnectionContext.Provider>
+      <AgentGraphsContext.Provider value={graphsValue}>
+        <AgentConnectionContext.Provider value={connectionValue}>
+          <AgentHistoryContext.Provider value={historyValue}>
+            <AgentActivityContext.Provider value={activityValue}>
+              <AgentUIContext.Provider value={uiValue}>
+                {children}
+              </AgentUIContext.Provider>
+            </AgentActivityContext.Provider>
+          </AgentHistoryContext.Provider>
+        </AgentConnectionContext.Provider>
+      </AgentGraphsContext.Provider>
     </AgentNodesContext.Provider>
   );
 }
@@ -417,6 +436,14 @@ export function useAgentConnectionRuntime() {
     throw new Error(
       "useAgentConnectionRuntime must be used within AgentProvider",
     );
+  }
+  return ctx;
+}
+
+export function useAgentGraphRuntime() {
+  const ctx = useContext(AgentGraphsContext);
+  if (!ctx) {
+    throw new Error("useAgentGraphRuntime must be used within AgentProvider");
   }
   return ctx;
 }
@@ -441,6 +468,7 @@ export function useAgentActivityRuntime() {
 
 export function useAgentRuntime(): AgentRuntimeContextValue {
   const { agents } = useAgentNodesRuntime();
+  const { graphs } = useAgentGraphRuntime();
   const { connected } = useAgentConnectionRuntime();
   const { agentHistories, clearAgentHistory, streamingDeltas } =
     useAgentHistoryRuntime();
@@ -449,6 +477,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
   return useMemo(
     () => ({
       agents,
+      graphs,
       connected,
       agentHistories,
       clearAgentHistory,
@@ -458,6 +487,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
     }),
     [
       agents,
+      graphs,
       connected,
       agentHistories,
       clearAgentHistory,

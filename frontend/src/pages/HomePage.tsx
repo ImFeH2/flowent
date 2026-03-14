@@ -275,6 +275,7 @@ function AgentDetailPanel({
   const detailTools = detail?.tools ?? [];
   const detailWriteDirs = detail?.write_dirs ?? [];
   const detailAllowNetwork = detail?.allow_network ?? false;
+  const detailGraph = detail?.graph ?? null;
   const label = getNodeLabel({
     name: agent.name,
     roleName: agent.role_name,
@@ -347,13 +348,62 @@ function AgentDetailPanel({
 
             <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Role
+                Graph
               </p>
               <p className="mt-2 text-sm text-foreground">
-                {detailRoleName ?? "None"}
+                {detailGraph?.name ?? detailGraph?.id.slice(0, 8) ?? "None"}
               </p>
             </div>
           </div>
+
+          <DetailSection title="Graph">
+            {detailGraph ? (
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    ID
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-foreground">
+                    {detailGraph.id}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Owner
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-foreground">
+                    {detailGraph.owner_agent_id.slice(0, 8)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Parent
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-foreground">
+                    {detailGraph.parent_graph_id?.slice(0, 8) ?? "None"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Role
+                  </p>
+                  <p className="mt-1 text-foreground">
+                    {detailRoleName ?? "None"}
+                  </p>
+                </div>
+                {detailGraph.goal ? (
+                  <div className="sm:col-span-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Goal
+                    </p>
+                    <p className="mt-1 text-foreground">{detailGraph.goal}</p>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No graph metadata</p>
+            )}
+          </DetailSection>
 
           <DetailSection title="Connections">
             {connectionItems.length === 0 ? (

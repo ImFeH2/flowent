@@ -12,6 +12,101 @@ from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
 
+REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+REASONING_DELTA_EVENT_TYPES = {
+    "response.reasoning.delta",
+    "response.reasoning_text.delta",
+    "response.reasoning_summary_text.delta",
+}
+
+
+def _supports_reasoning(model: str) -> bool:
+    return model.startswith(REASONING_MODEL_PREFIXES)
+
+
+def _build_reasoning_config(model: str) -> dict[str, str] | None:
+    if not _supports_reasoning(model):
+        return None
+
+    return {
+        "effort": "medium",
+        "summary": "detailed",
+    }
+
+
+def _extract_reasoning_text_from_item(item: dict[str, Any]) -> str | None:
+    parts: list[str] = []
+
+    for key in ("summary", "content"):
+        raw_value = item.get(key)
+
+        if isinstance(raw_value, str):
+            if raw_value.strip():
+                parts.append(raw_value)
+            continue
+
+        if not isinstance(raw_value, list):
+            continue
+
+        for entry in raw_value:
+            if not isinstance(entry, dict):
+                continue
+            text = entry.get("text")
+            if isinstance(text, str) and text.strip():
+                parts.append(text)
+
+    if not parts:
+        return None
+
+    return "".join(parts)
+
+
+def _extract_reasoning_text_from_output(output: Any) -> str | None:
+    if not isinstance(output, list):
+        return None
+
+    parts: list[str] = []
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "reasoning":
+            continue
+        text = _extract_reasoning_text_from_item(item)
+        if text:
+            parts.append(text)
+
+    if not parts:
+        return None
+
+    return "\n\n".join(parts)
+
+
+def _extract_reasoning_tokens(response: dict[str, Any]) -> int:
+    usage = response.get("usage")
+    if not isinstance(usage, dict):
+        return 0
+
+    output_tokens_details = usage.get("output_tokens_details")
+    if not isinstance(output_tokens_details, dict):
+        return 0
+
+    tokens = output_tokens_details.get("reasoning_tokens")
+    return tokens if isinstance(tokens, int) and tokens > 0 else 0
+
+
+def _format_reasoning_fallback(reasoning_tokens: int) -> str:
+    if reasoning_tokens > 0:
+        return (
+            "The model used internal reasoning, but this Responses-compatible "
+            f"endpoint did not expose a readable summary ({reasoning_tokens} "
+            "reasoning tokens)."
+        )
+
+    return (
+        "The model used internal reasoning, but this Responses-compatible "
+        "endpoint did not expose a readable summary."
+    )
+
 
 class OpenAIResponsesProvider(LLMProvider):
     def __init__(
@@ -103,6 +198,9 @@ class OpenAIResponsesProvider(LLMProvider):
             "input": input_items,
             "stream": True,
         }
+        reasoning = _build_reasoning_config(self._model)
+        if reasoning:
+            payload["reasoning"] = reasoning
         if system_prompt:
             payload["instructions"] = system_prompt
         if tools:
@@ -119,8 +217,12 @@ class OpenAIResponsesProvider(LLMProvider):
 
         t0 = time.perf_counter()
         content_parts: list[str] = []
+        thinking_parts: list[str] = []
         tool_calls: list[ToolCall] = []
         chunk_count = 0
+        saw_reasoning_item = False
+        saw_reasoning_text = False
+        reasoning_tokens = 0
 
         current_tool: dict[str, Any] = {}
 
@@ -168,7 +270,15 @@ class OpenAIResponsesProvider(LLMProvider):
                 chunk_count += 1
                 event_type = event.get("type", "")
 
-                if event_type == "response.output_text.delta":
+                if event_type in REASONING_DELTA_EVENT_TYPES:
+                    text = event.get("delta", "")
+                    if text:
+                        saw_reasoning_text = True
+                        thinking_parts.append(text)
+                        if on_chunk:
+                            on_chunk("thinking", text)
+
+                elif event_type == "response.output_text.delta":
                     text = event.get("delta", "")
                     if text:
                         content_parts.append(text)
@@ -182,7 +292,9 @@ class OpenAIResponsesProvider(LLMProvider):
 
                 elif event_type == "response.output_item.added":
                     item = event.get("item", {})
-                    if item.get("type") == "function_call":
+                    if item.get("type") == "reasoning":
+                        saw_reasoning_item = True
+                    elif item.get("type") == "function_call":
                         current_tool = {
                             "id": item.get("call_id", ""),
                             "name": item.get("name", ""),
@@ -191,7 +303,16 @@ class OpenAIResponsesProvider(LLMProvider):
 
                 elif event_type == "response.output_item.done":
                     item = event.get("item", {})
-                    if item.get("type") == "function_call":
+                    if item.get("type") == "reasoning":
+                        saw_reasoning_item = True
+                        if not saw_reasoning_text:
+                            reasoning_text = _extract_reasoning_text_from_item(item)
+                            if reasoning_text:
+                                saw_reasoning_text = True
+                                thinking_parts.append(reasoning_text)
+                                if on_chunk:
+                                    on_chunk("thinking", reasoning_text)
+                    elif item.get("type") == "function_call":
                         call_id = item.get("call_id") or current_tool.get("id", "")
                         name = item.get("name") or current_tool.get("name", "")
                         args_str = item.get("arguments") or current_tool.get(
@@ -206,22 +327,42 @@ class OpenAIResponsesProvider(LLMProvider):
                         )
                         current_tool = {}
 
+                elif event_type == "response.completed":
+                    response_data = event.get("response", {})
+                    if isinstance(response_data, dict):
+                        reasoning_tokens = _extract_reasoning_tokens(response_data)
+                        if not saw_reasoning_text:
+                            reasoning_text = _extract_reasoning_text_from_output(
+                                response_data.get("output")
+                            )
+                            if reasoning_text:
+                                saw_reasoning_text = True
+                                thinking_parts.append(reasoning_text)
+                                if on_chunk:
+                                    on_chunk("thinking", reasoning_text)
+
         elapsed = time.perf_counter() - t0
         content = "".join(content_parts) or None
+        thinking = "".join(thinking_parts) or None
+        if thinking is None and (saw_reasoning_item or reasoning_tokens > 0):
+            thinking = _format_reasoning_fallback(reasoning_tokens)
 
         logger.debug(
-            "[{}] OpenAI Responses chat done: {:.2f}s, chunks={}, content_len={}, tool_calls={}",
+            "[{}] OpenAI Responses chat done: {:.2f}s, chunks={}, content_len={}, thinking_len={}, tool_calls={}",
             self._provider_name,
             elapsed,
             chunk_count,
             len(content) if content else 0,
+            len(thinking) if thinking else 0,
             len(tool_calls),
         )
 
         if tool_calls:
-            return LLMResponse(content=content, tool_calls=tool_calls, thinking=None)
+            return LLMResponse(
+                content=content, tool_calls=tool_calls, thinking=thinking
+            )
 
-        return LLMResponse(content=content or "", thinking=None)
+        return LLMResponse(content=content or "", thinking=thinking)
 
     def list_models(self) -> list[ModelInfo]:
         url = f"{self._api_base_url}/models"

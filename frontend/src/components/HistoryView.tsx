@@ -130,21 +130,19 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "ReceivedMessage":
       return (
-        <div className="group relative rounded border border-muted-foreground/25 bg-muted-foreground/10 px-2.5 py-1.5">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <MessageSquare className="size-3 text-foreground/70" />
-            <span className="text-[10px] font-medium text-foreground/70">
-              From {entry.from_id ? entry.from_id.slice(0, 8) : "unknown"}
-            </span>
-            <span className="ml-auto">
-              <CopyButton text={entry.content ?? ""} />
-            </span>
-          </div>
+        <CollapsibleBlock
+          label={`From ${entry.from_id ? entry.from_id.slice(0, 8) : "unknown"}`}
+          icon={<MessageSquare className="size-3 text-foreground/70" />}
+          className="border-muted-foreground/25 bg-muted-foreground/10"
+          labelClassName="text-foreground/70"
+          actions={<CopyButton text={entry.content ?? ""} />}
+          defaultOpen={false}
+        >
           <MarkdownContent
             content={entry.content ?? ""}
             className="text-xs text-foreground/90"
           />
-        </div>
+        </CollapsibleBlock>
       );
 
     case "AssistantThinking":
@@ -153,7 +151,8 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
           label="Thinking"
           icon={<Brain className="size-3 text-amber-400" />}
           className="border-amber-500/20 bg-amber-500/5"
-          defaultOpen={entry.streaming ?? false}
+          labelClassName="text-amber-300/90"
+          defaultOpen={false}
         >
           <MarkdownOrJsonBlock
             content={entry.content}
@@ -166,22 +165,20 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "AssistantText":
       return (
-        <div className="group relative rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <Bot className="size-3 text-emerald-400" />
-            <span className="text-[10px] font-medium text-emerald-400">
-              Assistant
-            </span>
-            <span className="ml-auto">
-              <CopyButton text={entry.content ?? ""} />
-            </span>
-          </div>
+        <CollapsibleBlock
+          label="Assistant"
+          icon={<Bot className="size-3 text-emerald-400" />}
+          className="border-emerald-500/20 bg-emerald-500/5"
+          labelClassName="text-emerald-400"
+          actions={<CopyButton text={entry.content ?? ""} />}
+          defaultOpen={false}
+        >
           <MarkdownContent
             content={entry.content ?? ""}
             className="text-xs text-emerald-200"
           />
           {entry.streaming && <span className="streaming-cursor" />}
-        </div>
+        </CollapsibleBlock>
       );
 
     case "ToolCall": {
@@ -192,21 +189,19 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
         const toId = entry.arguments?.to as string | undefined;
         const content = entry.arguments?.content as string | undefined;
         return (
-          <div className="group relative rounded border border-purple-500/20 bg-purple-500/5 px-2.5 py-1.5">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <Send className="size-3 text-purple-400" />
-              <span className="text-[10px] font-medium text-purple-400">
-                To {toId ? toId.slice(0, 8) : "unknown"}
-              </span>
-              <span className="ml-auto">
-                <CopyButton text={content ?? ""} />
-              </span>
-            </div>
+          <CollapsibleBlock
+            label={`To ${toId ? toId.slice(0, 8) : "unknown"}`}
+            icon={<Send className="size-3 text-purple-400" />}
+            className="border-purple-500/20 bg-purple-500/5"
+            labelClassName="text-purple-400"
+            actions={<CopyButton text={content ?? ""} />}
+            defaultOpen={false}
+          >
             <MarkdownContent
               content={content ?? ""}
               className="text-xs text-purple-200"
             />
-          </div>
+          </CollapsibleBlock>
         );
       }
       return (
@@ -214,7 +209,8 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
           label={entry.tool_name ?? "tool"}
           icon={<Wrench className="size-3 text-teal-400" />}
           className="border-teal-500/20 bg-teal-500/5"
-          defaultOpen={entry.streaming ?? false}
+          labelClassName="text-teal-300/90"
+          defaultOpen={false}
         >
           <div className="space-y-2">
             <div>
@@ -245,18 +241,18 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 
     case "ErrorEntry":
       return (
-        <div className="group relative rounded border border-red-500/30 bg-red-500/5 px-2.5 py-1.5">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <AlertCircle className="size-3 text-red-400" />
-            <span className="text-[10px] font-medium text-red-400">Error</span>
-            <span className="ml-auto">
-              <CopyButton text={entry.content ?? ""} />
-            </span>
-          </div>
+        <CollapsibleBlock
+          label="Error"
+          icon={<AlertCircle className="size-3 text-red-400" />}
+          className="border-red-500/30 bg-red-500/5"
+          labelClassName="text-red-400"
+          actions={<CopyButton text={entry.content ?? ""} />}
+          defaultOpen={false}
+        >
           <p className="text-xs text-red-200 whitespace-pre-wrap break-words">
             {entry.content}
           </p>
-        </div>
+        </CollapsibleBlock>
       );
 
     default:
@@ -265,15 +261,21 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
 }
 
 function CollapsibleBlock({
+  actions,
   label,
+  labelClassName,
   icon,
   className,
+  contentClassName,
   defaultOpen = false,
   children,
 }: {
+  actions?: ReactNode;
   label: string;
+  labelClassName?: string;
   icon: ReactNode;
   className?: string;
+  contentClassName?: string;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
@@ -282,23 +284,33 @@ function CollapsibleBlock({
 
   return (
     <div className={cn("rounded border", className)}>
-      <button
-        type="button"
-        onClick={toggle}
-        className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left hover:bg-surface-3/50 transition-colors"
-      >
-        <ChevronRight
-          className={cn(
-            "size-3 text-muted-foreground transition-transform",
-            open && "rotate-90",
-          )}
-        />
-        {icon}
-        <span className="text-[10px] font-medium text-muted-foreground">
-          {label}
-        </span>
-      </button>
-      {open && <div className="px-2.5 pb-2">{children}</div>}
+      <div className="flex items-center gap-2 px-2.5 py-1.5">
+        <button
+          type="button"
+          onClick={toggle}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:bg-surface-3/50 transition-colors"
+        >
+          <ChevronRight
+            className={cn(
+              "size-3 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-90",
+            )}
+          />
+          <span className="shrink-0">{icon}</span>
+          <span
+            className={cn(
+              "truncate text-[10px] font-medium text-muted-foreground",
+              labelClassName,
+            )}
+          >
+            {label}
+          </span>
+        </button>
+        {actions ? <span className="ml-auto shrink-0">{actions}</span> : null}
+      </div>
+      {open && (
+        <div className={cn("px-2.5 pb-2", contentClassName)}>{children}</div>
+      )}
     </div>
   );
 }

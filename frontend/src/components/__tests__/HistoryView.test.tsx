@@ -19,13 +19,13 @@ describe("HistoryView", () => {
       },
     ];
 
-    render(<HistoryView history={history} />);
+    render(<HistoryView history={history} agentLabel="Project Planner" />);
 
     expect(
       screen.getByRole("button", { name: /From agent-12/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Assistant/i }),
+      screen.getByRole("button", { name: /Project Planner/i }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("Review the workshop notes."),
@@ -34,7 +34,7 @@ describe("HistoryView", () => {
       screen.queryByText("The notes cover schedule, speakers, and logistics."),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Assistant/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Project Planner/i }));
 
     expect(
       screen.getByText("The notes cover schedule, speakers, and logistics."),

@@ -523,7 +523,7 @@ function AgentDetailPanel({
                 No history yet.
               </div>
             ) : (
-              <HistoryView history={detailHistory} />
+              <HistoryView history={detailHistory} agentLabel={label} />
             )}
           </div>
         </div>

@@ -15,15 +15,20 @@ import { MarkdownContent } from "@/components/MarkdownContent";
 import { CopyButton } from "@/components/CopyButton";
 
 interface HistoryViewProps {
+  agentLabel?: string;
   history: HistoryEntry[];
 }
 
-export function HistoryView({ history }: HistoryViewProps) {
+export function HistoryView({
+  agentLabel = "Agent",
+  history,
+}: HistoryViewProps) {
   return (
     <div className="space-y-1.5 p-3">
       {history.map((entry) => (
         <HistoryItem
           key={`${entry.timestamp}-${entry.type}-${entry.tool_call_id ?? ""}`}
+          agentLabel={agentLabel}
           entry={entry}
         />
       ))}
@@ -109,7 +114,13 @@ function StreamingText({
   );
 }
 
-function HistoryItem({ entry }: { entry: HistoryEntry }) {
+function HistoryItem({
+  agentLabel,
+  entry,
+}: {
+  agentLabel: string;
+  entry: HistoryEntry;
+}) {
   switch (entry.type) {
     case "SystemEntry":
     case "SystemInjection":
@@ -166,7 +177,7 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
     case "AssistantText":
       return (
         <CollapsibleBlock
-          label="Assistant"
+          label={agentLabel}
           icon={<Bot className="size-3 text-emerald-400" />}
           className="border-emerald-500/20 bg-emerald-500/5"
           labelClassName="text-emerald-400"

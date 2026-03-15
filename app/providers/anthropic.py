@@ -13,6 +13,7 @@ from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
 from app.providers.sse import iter_sse_json
+from app.settings import ModelParams
 
 
 class AnthropicProvider(LLMProvider):
@@ -148,6 +149,7 @@ class AnthropicProvider(LLMProvider):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        model_params: ModelParams | None = None,
     ) -> LLMResponse:
         url = f"{self._api_base_url}/v1/messages"
         system, converted_messages = self._convert_messages(messages)
@@ -155,9 +157,19 @@ class AnthropicProvider(LLMProvider):
         payload: dict[str, Any] = {
             "model": self._model,
             "messages": converted_messages,
-            "max_tokens": 8192,
+            "max_tokens": (
+                model_params.max_output_tokens
+                if model_params is not None
+                and model_params.max_output_tokens is not None
+                else 8192
+            ),
             "stream": True,
         }
+        if model_params is not None:
+            if model_params.temperature is not None:
+                payload["temperature"] = model_params.temperature
+            if model_params.top_p is not None:
+                payload["top_p"] = model_params.top_p
         if system:
             payload["system"] = system
         if tools:

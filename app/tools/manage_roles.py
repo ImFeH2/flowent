@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from app.agent import Agent
-    from app.settings import RoleConfig, RoleModelConfig
+    from app.settings import ModelParams, RoleConfig, RoleModelConfig
 
 from app.tools import Tool
 
@@ -67,6 +67,23 @@ def _resolve_role_model(
     )
 
 
+def _resolve_role_model_params(
+    requested: object,
+    *,
+    current: ModelParams | None,
+    provided: bool,
+) -> tuple[ModelParams | None, str | None]:
+    from app.settings import build_model_params_from_mapping
+
+    if not provided:
+        return current, None
+
+    try:
+        return build_model_params_from_mapping(requested), None
+    except ValueError as exc:
+        return None, str(exc)
+
+
 def _enforce_builtin_role_guards(
     role: RoleConfig,
     *,
@@ -82,12 +99,18 @@ def _enforce_builtin_role_guards(
     if new_name is not None and new_name != role.name:
         return f"Cannot rename built-in role '{role.name}'"
     if system_prompt is not None and system_prompt != role.system_prompt:
-        return f"Cannot modify built-in role '{role.name}' fields other than model"
+        return (
+            f"Cannot modify built-in role '{role.name}' fields other than "
+            "model or model_params"
+        )
     if (
         next_included_tools != role.included_tools
         or next_excluded_tools != role.excluded_tools
     ):
-        return f"Cannot modify built-in role '{role.name}' fields other than model"
+        return (
+            f"Cannot modify built-in role '{role.name}' fields other than "
+            "model or model_params"
+        )
     return None
 
 
@@ -97,7 +120,7 @@ class ManageRolesTool(Tool):
     description = (
         "Manage Role configuration. Supports listing, creating, updating, "
         "and deleting roles. Built-in roles cannot be deleted, renamed, "
-        "or modified except for model configuration."
+        "or modified except for model and model_params configuration."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -127,6 +150,24 @@ class ManageRolesTool(Tool):
                     "model": {"type": "string"},
                 },
                 "required": ["provider_id", "model"],
+                "additionalProperties": False,
+            },
+            "model_params": {
+                "type": ["object", "null"],
+                "description": "Optional canonical model parameter overrides",
+                "properties": {
+                    "reasoning_effort": {
+                        "type": "string",
+                        "enum": ["none", "low", "medium", "high"],
+                    },
+                    "verbosity": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high"],
+                    },
+                    "max_output_tokens": {"type": "integer"},
+                    "temperature": {"type": "number"},
+                    "top_p": {"type": "number"},
+                },
                 "additionalProperties": False,
             },
             "included_tools": {
@@ -162,6 +203,7 @@ class ManageRolesTool(Tool):
         new_name = args.get("new_name")
         system_prompt = args.get("system_prompt")
         role_model = args.get("model")
+        role_model_params = args.get("model_params")
         included_tools = args.get("included_tools")
         excluded_tools = args.get("excluded_tools")
 
@@ -214,11 +256,19 @@ class ManageRolesTool(Tool):
             )
             if role_model_error is not None:
                 return json.dumps({"error": role_model_error})
+            next_model_params, role_model_params_error = _resolve_role_model_params(
+                role_model_params,
+                current=None,
+                provided="model_params" in args,
+            )
+            if role_model_params_error is not None:
+                return json.dumps({"error": role_model_params_error})
 
             new_role = RoleConfig(
                 name=role_name.strip(),
                 system_prompt=system_prompt,
                 model=next_model,
+                model_params=next_model_params,
                 included_tools=next_included,
                 excluded_tools=next_excluded,
             )
@@ -257,6 +307,13 @@ class ManageRolesTool(Tool):
             )
             if role_model_error is not None:
                 return json.dumps({"error": role_model_error})
+            next_model_params, role_model_params_error = _resolve_role_model_params(
+                role_model_params,
+                current=target_role.model_params,
+                provided="model_params" in args,
+            )
+            if role_model_params_error is not None:
+                return json.dumps({"error": role_model_params_error})
 
             stripped_name = None
             if new_name is not None:
@@ -289,6 +346,8 @@ class ManageRolesTool(Tool):
                 target_role.system_prompt = system_prompt
             if "model" in args:
                 target_role.model = next_model
+            if "model_params" in args:
+                target_role.model_params = next_model_params
             target_role.included_tools = next_included
             target_role.excluded_tools = next_excluded
             save_settings(settings)

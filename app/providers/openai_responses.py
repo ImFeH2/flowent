@@ -11,8 +11,10 @@ from loguru import logger
 from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
+from app.settings import ModelParams
 
 REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+VERBOSITY_MODEL_PREFIXES = ("gpt-5",)
 REASONING_DELTA_EVENT_TYPES = {
     "response.reasoning.delta",
     "response.reasoning_text.delta",
@@ -24,13 +26,34 @@ def _supports_reasoning(model: str) -> bool:
     return model.startswith(REASONING_MODEL_PREFIXES)
 
 
-def _build_reasoning_config(model: str) -> dict[str, str] | None:
-    if not _supports_reasoning(model):
+def _build_reasoning_config(
+    model: str,
+    model_params: ModelParams | None,
+) -> dict[str, str] | None:
+    if not _supports_reasoning(model) or model_params is None:
+        return None
+    effort = model_params.reasoning_effort
+    if effort is None or effort == "none":
         return None
 
     return {
-        "effort": "medium",
+        "effort": effort,
         "summary": "detailed",
+    }
+
+
+def _build_text_config(
+    model: str,
+    model_params: ModelParams | None,
+) -> dict[str, object] | None:
+    if model_params is None or not model.startswith(VERBOSITY_MODEL_PREFIXES):
+        return None
+    if not model_params.verbosity:
+        return None
+
+    return {
+        "format": {"type": "text"},
+        "verbosity": model_params.verbosity,
     }
 
 
@@ -189,6 +212,7 @@ class OpenAIResponsesProvider(LLMProvider):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        model_params: ModelParams | None = None,
     ) -> LLMResponse:
         url = f"{self._api_base_url}/responses"
         system_prompt, input_items = self._convert_messages(messages)
@@ -198,9 +222,20 @@ class OpenAIResponsesProvider(LLMProvider):
             "input": input_items,
             "stream": True,
         }
-        reasoning = _build_reasoning_config(self._model)
+        reasoning = _build_reasoning_config(self._model, model_params)
         if reasoning:
             payload["reasoning"] = reasoning
+        text_config = _build_text_config(self._model, model_params)
+        if text_config:
+            payload["text"] = text_config
+        if model_params is not None:
+            if model_params.max_output_tokens is not None:
+                payload["max_output_tokens"] = model_params.max_output_tokens
+            if reasoning is None:
+                if model_params.temperature is not None:
+                    payload["temperature"] = model_params.temperature
+                if model_params.top_p is not None:
+                    payload["top_p"] = model_params.top_p
         if system_prompt:
             payload["instructions"] = system_prompt
         if tools:

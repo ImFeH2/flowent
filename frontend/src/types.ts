@@ -113,6 +113,14 @@ export interface RoleModelConfig {
   model: string;
 }
 
+export interface ModelParams {
+  reasoning_effort: "none" | "low" | "medium" | "high" | null;
+  verbosity: "low" | "medium" | "high" | null;
+  max_output_tokens: number | null;
+  temperature: number | null;
+  top_p: number | null;
+}
+
 export type StreamingDelta =
   | { type: "ContentDelta"; text: string }
   | { type: "ThinkingDelta"; text: string }
@@ -122,6 +130,7 @@ export interface Role {
   name: string;
   system_prompt: string;
   model: RoleModelConfig | null;
+  model_params: ModelParams | null;
   included_tools: string[];
   excluded_tools: string[];
   is_builtin: boolean;

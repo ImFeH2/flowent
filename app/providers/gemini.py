@@ -13,6 +13,7 @@ from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
 from app.providers.sse import iter_sse_json
+from app.settings import ModelParams
 
 
 class GeminiProvider(LLMProvider):
@@ -145,6 +146,7 @@ class GeminiProvider(LLMProvider):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        model_params: ModelParams | None = None,
     ) -> LLMResponse:
         url = (
             f"{self._api_base_url}/v1beta/models/{self._model}"
@@ -154,6 +156,16 @@ class GeminiProvider(LLMProvider):
         system_instruction, contents = self._convert_messages(messages)
 
         payload: dict[str, Any] = {"contents": contents}
+        if model_params is not None:
+            generation_config: dict[str, Any] = {}
+            if model_params.max_output_tokens is not None:
+                generation_config["maxOutputTokens"] = model_params.max_output_tokens
+            if model_params.temperature is not None:
+                generation_config["temperature"] = model_params.temperature
+            if model_params.top_p is not None:
+                generation_config["topP"] = model_params.top_p
+            if generation_config:
+                payload["generationConfig"] = generation_config
         if system_instruction:
             payload["system_instruction"] = system_instruction
         if tools:

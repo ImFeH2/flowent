@@ -8,6 +8,7 @@ from loguru import logger
 
 from app.models import LLMResponse, ModelInfo
 from app.providers import LLMProvider
+from app.settings import merge_model_params
 
 
 class ProviderGateway:
@@ -26,8 +27,16 @@ class ProviderGateway:
         on_chunk: Callable[[str, str], None] | None = None,
         role_name: str | None = None,
     ) -> LLMResponse:
-        provider = self._resolve(role_name=role_name)
-        return provider.chat(messages, tools, on_chunk)
+        from app.settings import find_role, get_settings
+
+        settings = get_settings()
+        role_cfg = find_role(settings, role_name) if role_name else None
+        provider = self._resolve(settings=settings, role_cfg=role_cfg)
+        model_params = merge_model_params(
+            settings.model.params,
+            role_cfg.model_params if role_cfg is not None else None,
+        )
+        return provider.chat(messages, tools, on_chunk, model_params)
 
     def list_models_for(self, provider_id: str) -> list[ModelInfo]:
         from app.providers.registry import create_provider
@@ -47,15 +56,23 @@ class ProviderGateway:
         )
         return provider.list_models()
 
-    def _resolve(self, role_name: str | None = None) -> LLMProvider:
+    def _resolve(
+        self,
+        *,
+        settings=None,
+        role_cfg=None,
+        role_name: str | None = None,
+    ) -> LLMProvider:
         from app.providers.registry import create_provider
         from app.settings import find_provider, find_role, get_settings
 
-        settings = get_settings()
+        if settings is None:
+            settings = get_settings()
         provider_id = settings.model.active_provider_id
         model = settings.model.active_model
 
-        role_cfg = find_role(settings, role_name) if role_name else None
+        if role_cfg is None and role_name:
+            role_cfg = find_role(settings, role_name)
         if (
             role_cfg is not None
             and role_cfg.model is not None

@@ -5,6 +5,7 @@ import os
 import tempfile
 import threading
 from dataclasses import asdict, dataclass, field
+from math import isfinite
 from pathlib import Path
 
 from loguru import logger
@@ -95,6 +96,8 @@ CONDUCTOR_ROLE_INCLUDED_TOOLS = [
     "list_roles",
     "list_tools",
 ]
+MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high"})
+MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
 
 
 @dataclass
@@ -118,10 +121,27 @@ class RoleModelConfig:
 
 
 @dataclass
+class ModelParams:
+    reasoning_effort: str | None = None
+    verbosity: str | None = None
+    max_output_tokens: int | None = None
+    temperature: float | None = None
+    top_p: float | None = None
+
+
+def build_default_model_params() -> ModelParams:
+    return ModelParams(
+        reasoning_effort="medium",
+        verbosity="medium",
+    )
+
+
+@dataclass
 class RoleConfig:
     name: str
     system_prompt: str
     model: RoleModelConfig | None = None
+    model_params: ModelParams | None = None
     included_tools: list[str] = field(default_factory=list)
     excluded_tools: list[str] = field(default_factory=list)
 
@@ -130,6 +150,7 @@ class RoleConfig:
 class ModelSettings:
     active_provider_id: str = ""
     active_model: str = ""
+    params: ModelParams = field(default_factory=build_default_model_params)
 
 
 @dataclass
@@ -192,6 +213,117 @@ def serialize_role_model(
     }
 
 
+def serialize_model_params(
+    model_params: ModelParams | None,
+) -> dict[str, object] | None:
+    if model_params is None:
+        return None
+    return {
+        "reasoning_effort": model_params.reasoning_effort,
+        "verbosity": model_params.verbosity,
+        "max_output_tokens": model_params.max_output_tokens,
+        "temperature": model_params.temperature,
+        "top_p": model_params.top_p,
+    }
+
+
+def is_empty_model_params(model_params: ModelParams | None) -> bool:
+    return model_params is None or all(
+        value is None for value in asdict(model_params).values()
+    )
+
+
+def merge_model_params(
+    defaults: ModelParams,
+    override: ModelParams | None,
+) -> ModelParams:
+    if override is None:
+        return ModelParams(**asdict(defaults))
+
+    merged = asdict(defaults)
+    for key, value in asdict(override).items():
+        if value is not None:
+            merged[key] = value
+    return ModelParams(**merged)
+
+
+def build_model_params_from_mapping(raw_model_params: object) -> ModelParams | None:
+    if raw_model_params is None:
+        return None
+    if not isinstance(raw_model_params, dict):
+        raise ValueError("model_params must be an object or null")
+
+    raw_reasoning_effort = raw_model_params.get("reasoning_effort")
+    raw_verbosity = raw_model_params.get("verbosity")
+    raw_max_output_tokens = raw_model_params.get("max_output_tokens")
+    raw_temperature = raw_model_params.get("temperature")
+    raw_top_p = raw_model_params.get("top_p")
+
+    if raw_reasoning_effort is not None:
+        if not isinstance(raw_reasoning_effort, str):
+            raise ValueError("model_params.reasoning_effort must be a string")
+        reasoning_effort = raw_reasoning_effort.strip().lower()
+        if reasoning_effort and reasoning_effort not in MODEL_REASONING_EFFORT_OPTIONS:
+            raise ValueError(
+                "model_params.reasoning_effort must be one of: "
+                + ", ".join(sorted(MODEL_REASONING_EFFORT_OPTIONS))
+            )
+    else:
+        reasoning_effort = None
+
+    if raw_verbosity is not None:
+        if not isinstance(raw_verbosity, str):
+            raise ValueError("model_params.verbosity must be a string")
+        verbosity = raw_verbosity.strip().lower()
+        if verbosity and verbosity not in MODEL_VERBOSITY_OPTIONS:
+            raise ValueError(
+                "model_params.verbosity must be one of: "
+                + ", ".join(sorted(MODEL_VERBOSITY_OPTIONS))
+            )
+    else:
+        verbosity = None
+
+    if raw_max_output_tokens is not None:
+        if isinstance(raw_max_output_tokens, bool) or not isinstance(
+            raw_max_output_tokens, int
+        ):
+            raise ValueError("model_params.max_output_tokens must be an integer")
+        if raw_max_output_tokens <= 0:
+            raise ValueError("model_params.max_output_tokens must be greater than 0")
+        max_output_tokens = raw_max_output_tokens
+    else:
+        max_output_tokens = None
+
+    if raw_temperature is not None:
+        if isinstance(raw_temperature, bool) or not isinstance(
+            raw_temperature, (int, float)
+        ):
+            raise ValueError("model_params.temperature must be a number")
+        temperature = float(raw_temperature)
+        if not isfinite(temperature) or temperature < 0 or temperature > 2:
+            raise ValueError("model_params.temperature must be between 0 and 2")
+    else:
+        temperature = None
+
+    if raw_top_p is not None:
+        if isinstance(raw_top_p, bool) or not isinstance(raw_top_p, (int, float)):
+            raise ValueError("model_params.top_p must be a number")
+        top_p = float(raw_top_p)
+        if not isfinite(top_p) or top_p <= 0 or top_p > 1:
+            raise ValueError("model_params.top_p must be greater than 0 and at most 1")
+    else:
+        top_p = None
+
+    params = ModelParams(
+        reasoning_effort=reasoning_effort or None,
+        verbosity=verbosity or None,
+        max_output_tokens=max_output_tokens,
+        temperature=temperature,
+        top_p=top_p,
+    )
+    return None if is_empty_model_params(params) else params
+
+
 def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
     return {
         "id": provider.id,
@@ -207,6 +339,7 @@ def serialize_role(role: RoleConfig) -> dict[str, object]:
         "name": role.name,
         "system_prompt": role.system_prompt,
         "model": serialize_role_model(role.model),
+        "model_params": serialize_model_params(role.model_params),
         "included_tools": list(role.included_tools),
         "excluded_tools": list(role.excluded_tools),
         "is_builtin": is_builtin_role_name(role.name),
@@ -245,6 +378,119 @@ def _normalize_role_model(
     return None, True
 
 
+def _normalize_model_param_choice(
+    raw_value: object,
+    *,
+    allowed: frozenset[str],
+) -> tuple[str | None, bool]:
+    if raw_value is None:
+        return None, False
+    if not isinstance(raw_value, str):
+        return None, True
+
+    value = raw_value.strip().lower()
+    if not value:
+        return None, raw_value != ""
+    if value not in allowed:
+        return None, True
+    return value, value != raw_value
+
+
+def _normalize_positive_int(raw_value: object) -> tuple[int | None, bool]:
+    if raw_value is None:
+        return None, False
+    if isinstance(raw_value, bool):
+        return None, True
+    if isinstance(raw_value, int):
+        return (raw_value, False) if raw_value > 0 else (None, True)
+    if isinstance(raw_value, float) and raw_value.is_integer():
+        value = int(raw_value)
+        return (value, True) if value > 0 else (None, True)
+    return None, True
+
+
+def _normalize_temperature(raw_value: object) -> tuple[float | None, bool]:
+    if raw_value is None:
+        return None, False
+    if isinstance(raw_value, bool):
+        return None, True
+    if not isinstance(raw_value, (int, float)):
+        return None, True
+
+    value = float(raw_value)
+    if not isfinite(value) or value < 0 or value > 2:
+        return None, True
+    return value, False
+
+
+def _normalize_top_p(raw_value: object) -> tuple[float | None, bool]:
+    if raw_value is None:
+        return None, False
+    if isinstance(raw_value, bool):
+        return None, True
+    if not isinstance(raw_value, (int, float)):
+        return None, True
+
+    value = float(raw_value)
+    if not isfinite(value) or value <= 0 or value > 1:
+        return None, True
+    return value, False
+
+
+def _normalize_optional_model_params(
+    raw_model_params: object,
+) -> tuple[ModelParams | None, bool]:
+    if raw_model_params is None:
+        return None, False
+    if not isinstance(raw_model_params, dict):
+        return None, True
+
+    reasoning_effort, migrated_reasoning = _normalize_model_param_choice(
+        raw_model_params.get("reasoning_effort"),
+        allowed=MODEL_REASONING_EFFORT_OPTIONS,
+    )
+    verbosity, migrated_verbosity = _normalize_model_param_choice(
+        raw_model_params.get("verbosity"),
+        allowed=MODEL_VERBOSITY_OPTIONS,
+    )
+    max_output_tokens, migrated_max_output_tokens = _normalize_positive_int(
+        raw_model_params.get("max_output_tokens")
+    )
+    temperature, migrated_temperature = _normalize_temperature(
+        raw_model_params.get("temperature")
+    )
+    top_p, migrated_top_p = _normalize_top_p(raw_model_params.get("top_p"))
+
+    params = ModelParams(
+        reasoning_effort=reasoning_effort,
+        verbosity=verbosity,
+        max_output_tokens=max_output_tokens,
+        temperature=temperature,
+        top_p=top_p,
+    )
+    migrated = (
+        migrated_reasoning
+        or migrated_verbosity
+        or migrated_max_output_tokens
+        or migrated_temperature
+        or migrated_top_p
+    )
+
+    if is_empty_model_params(params):
+        return None, migrated or bool(raw_model_params)
+
+    return params, migrated
+
+
+def _normalize_model_params_with_defaults(
+    raw_model_params: object,
+) -> tuple[ModelParams, bool]:
+    params, migrated = _normalize_optional_model_params(raw_model_params)
+    if params is not None:
+        return params, migrated
+    return build_default_model_params(), migrated or raw_model_params is None
+
+
 def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     migrated = False
 
@@ -273,9 +519,15 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     model_data = data.get("model", {})
     if not isinstance(model_data, dict):
         model_data = {}
+        migrated = True
+    model_params, model_params_migrated = _normalize_model_params_with_defaults(
+        model_data.get("params")
+    )
+    migrated = migrated or model_params_migrated
     model_settings = ModelSettings(
         active_provider_id=str(model_data.get("active_provider_id", "")),
         active_model=str(model_data.get("active_model", "")),
+        params=model_params,
     )
     custom_prompt = str(data.get("custom_prompt", ""))
 
@@ -337,6 +589,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
             excluded_tools_raw = []
 
         role_model: RoleModelConfig | None = None
+        role_model_params: ModelParams | None = None
         if "model" in role:
             role_model, role_model_migrated = _normalize_role_model(
                 role.get("model"),
@@ -349,12 +602,18 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
                 default_provider_id=model_settings.active_provider_id.strip(),
             )
             migrated = migrated or role_model_migrated or True
+        if "model_params" in role:
+            role_model_params, role_model_params_migrated = (
+                _normalize_optional_model_params(role.get("model_params"))
+            )
+            migrated = migrated or role_model_params_migrated
 
         roles.append(
             RoleConfig(
                 name=role_name,
                 system_prompt=str(role.get("system_prompt", "")),
                 model=role_model,
+                model_params=role_model_params,
                 included_tools=normalize_tool_names(
                     [name for name in included_tools_raw if isinstance(name, str)]
                 ),

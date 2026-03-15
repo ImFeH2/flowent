@@ -8,6 +8,7 @@ from app.providers.openai_responses import (
     OpenAIResponsesProvider,
     _extract_reasoning_text_from_item,
 )
+from app.settings import ModelParams
 
 
 class _FakeStreamResponse:
@@ -103,6 +104,10 @@ def test_openai_responses_requests_reasoning_and_returns_summary_text():
     response = provider.chat(
         messages=[{"role": "user", "content": "What is 13 * 17?"}],
         on_chunk=lambda chunk_type, text: chunks.append((chunk_type, text)),
+        model_params=ModelParams(
+            reasoning_effort="medium",
+            verbosity="medium",
+        ),
     )
 
     assert provider._client.last_payload is not None
@@ -160,7 +165,13 @@ def test_openai_responses_falls_back_when_reasoning_is_encrypted_only():
         )
     )
 
-    response = provider.chat(messages=[{"role": "user", "content": "Solve this."}])
+    response = provider.chat(
+        messages=[{"role": "user", "content": "Solve this."}],
+        model_params=ModelParams(
+            reasoning_effort="medium",
+            verbosity="medium",
+        ),
+    )
 
     assert response.content == "Done"
     assert response.thinking is not None

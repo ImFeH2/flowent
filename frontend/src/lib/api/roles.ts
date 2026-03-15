@@ -1,4 +1,4 @@
-import type { Provider, Role, RoleModelConfig } from "@/types";
+import type { ModelParams, Provider, Role, RoleModelConfig } from "@/types";
 import type { ToolInfo } from "./meta";
 import { requestJson, requestVoid } from "./shared";
 
@@ -6,6 +6,7 @@ type RolePayload = {
   name: string;
   system_prompt: string;
   model: RoleModelConfig | null;
+  model_params: ModelParams | null;
   included_tools: string[];
   excluded_tools: string[];
 };

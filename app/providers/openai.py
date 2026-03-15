@@ -13,6 +13,7 @@ from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
 from app.providers.sse import iter_sse_json
 from app.providers.thinking import ThinkTagParser
+from app.settings import ModelParams
 
 
 def _extract_delta_parts(delta: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -70,6 +71,7 @@ class OpenAIProvider(LLMProvider):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        model_params: ModelParams | None = None,
     ) -> LLMResponse:
         url = f"{self._api_base_url}/chat/completions"
         payload: dict[str, Any] = {
@@ -77,6 +79,13 @@ class OpenAIProvider(LLMProvider):
             "messages": messages,
             "stream": True,
         }
+        if model_params is not None:
+            if model_params.max_output_tokens is not None:
+                payload["max_tokens"] = model_params.max_output_tokens
+            if model_params.temperature is not None:
+                payload["temperature"] = model_params.temperature
+            if model_params.top_p is not None:
+                payload["top_p"] = model_params.top_p
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"

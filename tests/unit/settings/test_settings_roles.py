@@ -63,6 +63,7 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
             "name": "Worker",
             "system_prompt": "Do work.",
             "model": None,
+            "model_params": None,
             "included_tools": ["read"],
             "excluded_tools": [],
         }
@@ -175,6 +176,7 @@ def test_load_settings_migrates_legacy_model_override(monkeypatch, tmp_path):
                 "provider_id": "provider-1",
                 "model": "gpt-4.1-mini",
             },
+            "model_params": None,
             "included_tools": ["read", "exec"],
             "excluded_tools": ["fetch"],
         }

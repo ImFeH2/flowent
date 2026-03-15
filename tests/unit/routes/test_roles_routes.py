@@ -63,6 +63,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 "name": "Worker",
                 "system_prompt": "Do work.",
                 "model": None,
+                "model_params": None,
                 "included_tools": ["read", "exec"],
                 "excluded_tools": [],
                 "is_builtin": True,
@@ -71,6 +72,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 "name": CONDUCTOR_ROLE_NAME,
                 "system_prompt": "Coordinate tasks.",
                 "model": None,
+                "model_params": None,
                 "included_tools": [
                     "spawn",
                     "create_graph",
@@ -88,6 +90,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 "name": "Reviewer",
                 "system_prompt": "Review code carefully",
                 "model": None,
+                "model_params": None,
                 "included_tools": ["read"],
                 "excluded_tools": ["fetch"],
                 "is_builtin": False,
@@ -120,6 +123,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
         "name": "Reviewer",
         "system_prompt": "Review code carefully",
         "model": None,
+        "model_params": None,
         "included_tools": ["read"],
         "excluded_tools": [],
         "is_builtin": False,
@@ -185,6 +189,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
         "name": "Architect",
         "system_prompt": "Design systems",
         "model": None,
+        "model_params": None,
         "included_tools": ["read"],
         "excluded_tools": ["fetch"],
         "is_builtin": False,
@@ -252,7 +257,7 @@ def test_update_role_rejects_builtin_prompt_change(monkeypatch):
     assert excinfo.value.status_code == 400
     assert (
         excinfo.value.detail
-        == "Cannot modify built-in role 'Worker' fields other than model"
+        == "Cannot modify built-in role 'Worker' fields other than model or model_params"
     )
 
 

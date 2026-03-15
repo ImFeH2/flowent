@@ -7,6 +7,7 @@ import {
   saveSettings,
   type ModelOption,
 } from "@/lib/api";
+import { ModelParamsFields } from "@/components/ModelParamsFields";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import {
   Select,
@@ -15,9 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
-import type { Provider, Role } from "@/types";
+import type { ModelParams, Provider, Role } from "@/types";
 
 interface UserSettings {
   assistant: {
@@ -26,6 +28,7 @@ interface UserSettings {
   model: {
     active_provider_id: string;
     active_model: string;
+    params: ModelParams;
   };
 }
 
@@ -300,6 +303,32 @@ export function SettingsPage() {
                   className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                 />
               )}
+            </div>
+
+            <div className="space-y-3 border-t border-white/6 pt-5">
+              <div>
+                <h3 className="text-sm font-medium">
+                  Default Model Parameters
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  These canonical parameters are merged into each request first.
+                  Roles can override selected fields. Unsupported parameters are
+                  ignored by the active provider.
+                </p>
+              </div>
+              <ModelParamsFields
+                value={cloneModelParams(settings.model.params)}
+                onChange={(params) =>
+                  setSettings({
+                    ...settings,
+                    model: {
+                      ...settings.model,
+                      params,
+                    },
+                  })
+                }
+                helperText="Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
+              />
             </div>
           </section>
         </SoftPanel>

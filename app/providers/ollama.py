@@ -13,6 +13,7 @@ from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
 from app.providers.thinking import ThinkTagParser
+from app.settings import ModelParams
 
 
 class OllamaProvider(LLMProvider):
@@ -32,6 +33,7 @@ class OllamaProvider(LLMProvider):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        model_params: ModelParams | None = None,
     ) -> LLMResponse:
         url = f"{self._api_base_url}/api/chat"
 
@@ -40,6 +42,16 @@ class OllamaProvider(LLMProvider):
             "messages": messages,
             "stream": True,
         }
+        if model_params is not None:
+            options: dict[str, Any] = {}
+            if model_params.max_output_tokens is not None:
+                options["num_predict"] = model_params.max_output_tokens
+            if model_params.temperature is not None:
+                options["temperature"] = model_params.temperature
+            if model_params.top_p is not None:
+                options["top_p"] = model_params.top_p
+            if options:
+                payload["options"] = options
         if tools:
             payload["tools"] = tools
 

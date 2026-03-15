@@ -30,6 +30,7 @@ def test_manage_roles_list_includes_builtin_flags(monkeypatch):
             "name": "Worker",
             "system_prompt": "Do work.",
             "model": None,
+            "model_params": None,
             "included_tools": [],
             "excluded_tools": [],
             "is_builtin": True,
@@ -38,6 +39,7 @@ def test_manage_roles_list_includes_builtin_flags(monkeypatch):
             "name": "Reviewer",
             "system_prompt": "Review work.",
             "model": None,
+            "model_params": None,
             "included_tools": [],
             "excluded_tools": [],
             "is_builtin": False,
@@ -89,6 +91,7 @@ def test_manage_roles_create_adds_custom_role(monkeypatch):
             "provider_id": "provider-1",
             "model": "gpt-4.1-mini",
         },
+        "model_params": None,
         "included_tools": ["read", "exec"],
         "excluded_tools": ["fetch"],
         "is_builtin": False,
@@ -194,6 +197,7 @@ def test_manage_roles_update_renames_and_updates_role(monkeypatch):
             "provider_id": "provider-1",
             "model": "gpt-4.1-mini",
         },
+        "model_params": None,
         "included_tools": ["read"],
         "excluded_tools": ["fetch"],
         "is_builtin": False,
@@ -251,7 +255,7 @@ def test_manage_roles_update_rejects_builtin_prompt_change(monkeypatch):
     )
 
     assert result == {
-        "error": "Cannot modify built-in role 'Worker' fields other than model"
+        "error": "Cannot modify built-in role 'Worker' fields other than model or model_params"
     }
 
 

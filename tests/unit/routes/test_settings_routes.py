@@ -47,7 +47,17 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
         "settings": {
             "event_log": {"timestamp_format": "absolute"},
             "assistant": {"role_name": "Steward"},
-            "model": {"active_provider_id": "", "active_model": ""},
+            "model": {
+                "active_provider_id": "",
+                "active_model": "",
+                "params": {
+                    "reasoning_effort": "medium",
+                    "verbosity": "medium",
+                    "max_output_tokens": None,
+                    "temperature": None,
+                    "top_p": None,
+                },
+            },
             "custom_prompt": "",
             "root_boundary": {"write_dirs": [], "allow_network": False},
             "providers": [
@@ -64,6 +74,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                     "name": "Steward",
                     "system_prompt": "Default assistant role.",
                     "model": None,
+                    "model_params": None,
                     "included_tools": [],
                     "excluded_tools": [],
                 }
@@ -83,6 +94,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "name": "Steward",
                 "system_prompt": "Default assistant role.",
                 "model": None,
+                "model_params": None,
                 "included_tools": [],
                 "excluded_tools": [],
                 "is_builtin": True,

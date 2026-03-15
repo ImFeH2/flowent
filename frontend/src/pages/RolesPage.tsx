@@ -11,7 +11,14 @@ import {
   type ModelOption,
   type ToolInfo,
 } from "@/lib/api";
+import { ModelParamsFields } from "@/components/ModelParamsFields";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
+import {
+  cloneModelParams,
+  describeModelParams,
+  isEmptyModelParams,
+  modelParamsToPayload,
+} from "@/lib/modelParams";
 import { cn } from "@/lib/utils";
 import type { Provider, Role, RoleModelConfig } from "@/types";
 
@@ -31,6 +38,7 @@ const emptyDraft = (): RoleDraft => ({
   name: "",
   system_prompt: "",
   model: null,
+  model_params: null,
   included_tools: [],
   excluded_tools: [],
 });
@@ -147,6 +155,9 @@ export function RolesPage() {
             model: role.model.model,
           }
         : null,
+      model_params: role.model_params
+        ? cloneModelParams(role.model_params)
+        : null,
       included_tools: [...role.included_tools],
       excluded_tools: [...role.excluded_tools],
     });
@@ -163,6 +174,9 @@ export function RolesPage() {
             provider_id: role.model.provider_id,
             model: role.model.model,
           }
+        : null,
+      model_params: role.model_params
+        ? cloneModelParams(role.model_params)
         : null,
       included_tools: [...role.included_tools],
       excluded_tools: [...role.excluded_tools],
@@ -207,6 +221,13 @@ export function RolesPage() {
     }));
   };
 
+  const handleModelParamsModeChange = (enabled: boolean) => {
+    setDraft((current) => ({
+      ...current,
+      model_params: enabled ? cloneModelParams(current.model_params) : null,
+    }));
+  };
+
   const handleSave = async () => {
     const nextName = draft.name.trim();
 
@@ -248,6 +269,7 @@ export function RolesPage() {
               model: draft.model.model.trim(),
             }
           : null,
+        model_params: modelParamsToPayload(draft.model_params),
         included_tools: draft.included_tools,
         excluded_tools: draft.excluded_tools,
       };
@@ -256,7 +278,10 @@ export function RolesPage() {
         const activeRole =
           roles.find((role) => role.name === activeRoleName) ?? null;
         const updates = activeRole?.is_builtin
-          ? { model: nextDraft.model }
+          ? {
+              model: nextDraft.model,
+              model_params: nextDraft.model_params,
+            }
           : nextDraft;
         const updated = await updateRole(activeRoleName, updates);
         setRoles((prev) =>
@@ -613,6 +638,63 @@ export function RolesPage() {
                   )}
                 </div>
 
+                <div className="space-y-4 border-t border-white/6 pt-5">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Model Parameters
+                    </label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={isReadOnly}
+                        onClick={() => handleModelParamsModeChange(false)}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                          isEmptyModelParams(draft.model_params)
+                            ? "border-white/10 bg-white/[0.075] text-foreground"
+                            : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
+                          isReadOnly && "cursor-default hover:bg-black/[0.18]",
+                        )}
+                      >
+                        Inherit Settings Defaults
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isReadOnly}
+                        onClick={() => handleModelParamsModeChange(true)}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                          !isEmptyModelParams(draft.model_params)
+                            ? "border-white/10 bg-white/[0.075] text-foreground"
+                            : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
+                          isReadOnly && "cursor-default hover:bg-black/[0.18]",
+                        )}
+                      >
+                        Set Role Parameter Override
+                      </button>
+                    </div>
+                  </div>
+
+                  {!isEmptyModelParams(draft.model_params) ? (
+                    <ModelParamsFields
+                      value={cloneModelParams(draft.model_params)}
+                      onChange={(params) =>
+                        setDraft((current) => ({
+                          ...current,
+                          model_params: params,
+                        }))
+                      }
+                      disabled={isReadOnly}
+                      helperText="These canonical parameters override Settings only for this role. Unsupported fields are ignored by the resolved provider."
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      This role inherits the default model parameters from
+                      Settings.
+                    </p>
+                  )}
+                </div>
+
                 <div className="space-y-3">
                   <div>
                     <h3 className="text-sm font-medium">Tool Configuration</h3>
@@ -752,6 +834,9 @@ export function RolesPage() {
                               ) : (
                                 <span>Model: Settings default</span>
                               )}
+                              <span>
+                                Params: {describeModelParams(role.model_params)}
+                              </span>
                             </div>
                             {(role.included_tools.length > 0 ||
                               role.excluded_tools.length > 0) && (

@@ -10,6 +10,8 @@ from app.settings import (
     AssistantSettings,
     EventLogSettings,
     ModelSettings,
+    build_default_model_params,
+    build_model_params_from_mapping,
     find_role,
     get_settings,
     save_settings,
@@ -77,6 +79,13 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             "active_provider_id", current.model.active_provider_id
         )
         active_model = req.model.get("active_model", current.model.active_model)
+        params = current.model.params
+        if "params" in req.model:
+            try:
+                parsed_params = build_model_params_from_mapping(req.model.get("params"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            params = parsed_params or build_default_model_params()
         current.model = ModelSettings(
             active_provider_id=active_provider_id
             if isinstance(active_provider_id, str)
@@ -84,6 +93,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             active_model=active_model
             if isinstance(active_model, str)
             else current.model.active_model,
+            params=params,
         )
 
     save_settings(current)

@@ -2,6 +2,7 @@ import pytest
 
 from app.providers.gateway import ProviderGateway
 from app.settings import (
+    ModelParams,
     ModelSettings,
     ProviderConfig,
     RoleConfig,
@@ -38,6 +39,10 @@ def test_gateway_prefers_role_model(monkeypatch):
             model=ModelSettings(
                 active_provider_id="provider-1",
                 active_model="gpt-default",
+                params=ModelParams(
+                    reasoning_effort="medium",
+                    verbosity="medium",
+                ),
             ),
             providers=[
                 ProviderConfig(
@@ -63,14 +68,19 @@ def test_gateway_prefers_role_model(monkeypatch):
                         provider_id="provider-2",
                         model="gpt-role",
                     ),
+                    model_params=ModelParams(
+                        reasoning_effort="high",
+                    ),
                 )
             ],
         ),
     )
 
     class ProviderStub:
-        def chat(self, messages, tools=None, on_chunk=None):
+        def chat(self, messages, tools=None, on_chunk=None, model_params=None):
             captured["message_count"] = str(len(messages))
+            captured["reasoning_effort"] = str(model_params.reasoning_effort)
+            captured["verbosity"] = str(model_params.verbosity)
             return type(
                 "Response",
                 (),
@@ -97,3 +107,5 @@ def test_gateway_prefers_role_model(monkeypatch):
 
     assert captured["provider_name"] == "Role Provider"
     assert captured["model"] == "gpt-role"
+    assert captured["reasoning_effort"] == "high"
+    assert captured["verbosity"] == "medium"

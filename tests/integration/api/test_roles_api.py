@@ -112,6 +112,7 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
         "name": "Researcher",
         "system_prompt": "investigate",
         "model": None,
+        "model_params": None,
         "included_tools": [],
         "excluded_tools": [],
         "is_builtin": False,

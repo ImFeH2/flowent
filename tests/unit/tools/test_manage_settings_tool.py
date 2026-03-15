@@ -35,6 +35,13 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
         "model": {
             "active_provider_id": "provider-1",
             "active_model": "gpt-4o",
+            "params": {
+                "reasoning_effort": "medium",
+                "verbosity": "medium",
+                "max_output_tokens": None,
+                "temperature": None,
+                "top_p": None,
+            },
         },
         "event_log": {
             "timestamp_format": "relative",
@@ -75,6 +82,13 @@ def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
     assert result["model"] == {
         "active_provider_id": "provider-2",
         "active_model": "gpt-4.1",
+        "params": {
+            "reasoning_effort": "medium",
+            "verbosity": "medium",
+            "max_output_tokens": None,
+            "temperature": None,
+            "top_p": None,
+        },
     }
     assert settings.model.active_provider_id == "provider-2"
     assert settings.model.active_model == "gpt-4.1"

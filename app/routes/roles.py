@@ -4,9 +4,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.settings import (
+    ModelParams,
     RoleConfig,
     RoleModelConfig,
     Settings,
+    build_model_params_from_mapping,
     clear_role_references,
     find_provider,
     get_settings,
@@ -31,6 +33,7 @@ class CreateRoleRequest(BaseModel):
     name: str
     system_prompt: str
     model: RoleModelRequest | None = None
+    model_params: dict[str, object] | None = None
     included_tools: list[str] = Field(default_factory=list)
     excluded_tools: list[str] = Field(default_factory=list)
 
@@ -39,6 +42,7 @@ class UpdateRoleRequest(BaseModel):
     name: str | None = None
     system_prompt: str | None = None
     model: RoleModelRequest | None = None
+    model_params: dict[str, object] | None = None
     included_tools: list[str] | None = None
     excluded_tools: list[str] | None = None
 
@@ -99,6 +103,20 @@ def _resolve_role_model(
     return RoleModelConfig(provider_id=provider_id, model=model)
 
 
+def _resolve_role_model_params(
+    requested: dict[str, object] | None,
+    *,
+    current: ModelParams | None,
+    provided: bool,
+) -> ModelParams | None:
+    if not provided:
+        return current
+    try:
+        return build_model_params_from_mapping(requested)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 def _sync_running_assistant_role(role_name: str) -> None:
     from app.models import ASSISTANT_NODE_ID
     from app.registry import registry
@@ -133,7 +151,10 @@ def _enforce_builtin_role_guards(
     if next_system_prompt is not None and next_system_prompt != role.system_prompt:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot modify built-in role '{role.name}' fields other than model",
+            detail=(
+                f"Cannot modify built-in role '{role.name}' fields other than "
+                "model or model_params"
+            ),
         )
     if (
         next_included_tools != role.included_tools
@@ -141,7 +162,10 @@ def _enforce_builtin_role_guards(
     ):
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot modify built-in role '{role.name}' fields other than model",
+            detail=(
+                f"Cannot modify built-in role '{role.name}' fields other than "
+                "model or model_params"
+            ),
         )
 
 
@@ -187,6 +211,11 @@ async def create_role(req: CreateRoleRequest) -> dict:
             settings=settings,
             current=None,
             provided="model" in req.model_fields_set,
+        ),
+        model_params=_resolve_role_model_params(
+            req.model_params,
+            current=None,
+            provided="model_params" in req.model_fields_set,
         ),
         included_tools=included_tools,
         excluded_tools=excluded_tools,
@@ -243,6 +272,12 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
                 req.model,
                 settings=settings,
                 current=role.model,
+                provided=True,
+            )
+        if "model_params" in req.model_fields_set:
+            role.model_params = _resolve_role_model_params(
+                req.model_params,
+                current=role.model_params,
                 provided=True,
             )
         role.included_tools = included_tools

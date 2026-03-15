@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from app.models import LLMResponse, ModelInfo
+from app.settings import ModelParams
 
 
 class LLMProvider(Protocol):
@@ -12,6 +13,7 @@ class LLMProvider(Protocol):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        model_params: ModelParams | None = None,
     ) -> LLMResponse: ...
 
     def list_models(self) -> list[ModelInfo]: ...

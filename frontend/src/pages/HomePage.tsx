@@ -45,6 +45,8 @@ const MIN_PANEL_WIDTH = 320;
 const MIN_GRAPH_WIDTH = 320;
 const MAX_PANEL_WIDTH = 1400;
 const ASSISTANT_ID = "assistant";
+const DEFAULT_PANEL_RATIO = 2 / 5;
+const DEFAULT_PANEL_WIDTH = 560;
 
 export function HomePage() {
   const { agents } = useAgentNodesRuntime();
@@ -54,7 +56,7 @@ export function HomePage() {
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setStoredPanelWidth] = usePanelWidth(
     WORKSPACE_PANEL_ID,
-    520,
+    DEFAULT_PANEL_WIDTH,
     MIN_PANEL_WIDTH,
     MAX_PANEL_WIDTH,
   );
@@ -85,7 +87,7 @@ export function HomePage() {
     if (!containerWidth) {
       return;
     }
-    setPanelWidth(containerWidth / 2);
+    setPanelWidth(containerWidth * DEFAULT_PANEL_RATIO);
   }, [setPanelWidth]);
 
   useEffect(() => {

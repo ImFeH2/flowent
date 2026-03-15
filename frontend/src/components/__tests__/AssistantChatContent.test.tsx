@@ -11,12 +11,13 @@ describe("AssistantChatMessages", () => {
         type: "PendingHumanMessage",
         id: "pending-1",
         from: "human",
-        content: "看看当前目录",
+        content: "Plan a weekend trip",
         timestamp: 1,
       },
       {
         type: "AssistantThinking",
-        content: "先判断是否需要创建 root agent。",
+        content:
+          "First, decide whether this needs a dedicated planning worker.",
         timestamp: 2,
         streaming: true,
       },
@@ -39,7 +40,7 @@ describe("AssistantChatMessages", () => {
       },
       {
         type: "AssistantText",
-        content: "当前目录包含 frontend、app 和 tests。",
+        content: "Here is a draft plan with priorities and next steps.",
         timestamp: 5,
       },
     ];
@@ -57,7 +58,9 @@ describe("AssistantChatMessages", () => {
       screen.getByRole("button", { name: /Thinking/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("先判断是否需要创建 root agent。"),
+      screen.getByText(
+        "First, decide whether this needs a dedicated planning worker.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Create Root/i }),
@@ -66,7 +69,7 @@ describe("AssistantChatMessages", () => {
       screen.queryByRole("button", { name: /idle/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByText("当前目录包含 frontend、app 和 tests。"),
+      screen.getByText("Here is a draft plan with priorities and next steps."),
     ).toBeInTheDocument();
   });
 });

@@ -9,12 +9,12 @@ describe("HistoryView", () => {
       {
         type: "ReceivedMessage",
         from_id: "agent-12345678",
-        content: "请检查当前目录。",
+        content: "Review the workshop notes.",
         timestamp: 1,
       },
       {
         type: "AssistantText",
-        content: "当前目录包含 frontend、app 和 tests。",
+        content: "The notes cover schedule, speakers, and logistics.",
         timestamp: 2,
       },
     ];
@@ -27,15 +27,17 @@ describe("HistoryView", () => {
     expect(
       screen.getByRole("button", { name: /Assistant/i }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("请检查当前目录。")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("当前目录包含 frontend、app 和 tests。"),
+      screen.queryByText("Review the workshop notes."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("The notes cover schedule, speakers, and logistics."),
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Assistant/i }));
 
     expect(
-      screen.getByText("当前目录包含 frontend、app 和 tests。"),
+      screen.getByText("The notes cover schedule, speakers, and logistics."),
     ).toBeInTheDocument();
   });
 });

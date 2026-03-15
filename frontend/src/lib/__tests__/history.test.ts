@@ -13,7 +13,7 @@ describe("history utilities", () => {
       {
         type: "ReceivedMessage",
         from_id: "human",
-        content: "帮我看一下目录",
+        content: "Review the workshop notes.",
         timestamp: 10,
       },
       {
@@ -29,17 +29,20 @@ describe("history utilities", () => {
       {
         type: "ReceivedMessage",
         from_id: "human",
-        content: "另外总结一下",
+        content: "Then draft a brief summary.",
         timestamp: 12,
       },
     ];
     const deltas: StreamingDelta[] = [
-      { type: "ThinkingDelta", text: "先检查目录结构。" },
-      { type: "ContentDelta", text: "当前目录包含 app 和 frontend。" },
+      { type: "ThinkingDelta", text: "First, extract the key takeaways." },
+      {
+        type: "ContentDelta",
+        text: "The notes cover schedule, speakers, and logistics.",
+      },
       {
         type: "ToolResultDelta",
         tool_call_id: "call-1",
-        text: "app\nfrontend",
+        text: "schedule\nspeakers\nlogistics",
       },
     ];
 
@@ -54,18 +57,18 @@ describe("history utilities", () => {
       history[0],
       {
         ...history[1],
-        result: "app\nfrontend",
+        result: "schedule\nspeakers\nlogistics",
       },
       incremental[0],
       {
         type: "AssistantThinking",
-        content: "先检查目录结构。",
+        content: "First, extract the key takeaways.",
         timestamp: 15,
         streaming: true,
       },
       {
         type: "AssistantText",
-        content: "当前目录包含 app 和 frontend。",
+        content: "The notes cover schedule, speakers, and logistics.",
         timestamp: 15,
         streaming: true,
       },

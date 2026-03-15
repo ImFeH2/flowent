@@ -332,7 +332,10 @@ export function SettingsPage() {
                       },
                     })
                   }
-                  helperText="Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
+                  emptyLabel="Not set"
+                  numberPlaceholder="Not set"
+                  reasoningDisableLabel={null}
+                  helperText="Empty fields are omitted from outgoing provider requests. Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
                 />
               </div>
             </section>

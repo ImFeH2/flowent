@@ -70,7 +70,7 @@ class ManageSettingsTool(Tool):
                 "properties": {
                     "reasoning_effort": {
                         "type": "string",
-                        "enum": ["none", "low", "medium", "high"],
+                        "enum": ["none", "low", "medium", "high", "xhigh"],
                     },
                     "verbosity": {
                         "type": "string",

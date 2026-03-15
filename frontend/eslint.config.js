@@ -21,9 +21,34 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXOpeningElement[name.name='select']",
+          message:
+            "Use the shared Select components from src/components/ui/select.tsx instead of a native <select>.",
+        },
+        {
+          selector: "JSXOpeningElement[name.name='option']",
+          message:
+            "Use the shared Select components from src/components/ui/select.tsx instead of a native <option>.",
+        },
+      ],
       "react-refresh/only-export-components": [
         "warn",
-        { allowConstantExport: true },
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            "useAgentNodesRuntime",
+            "useAgentConnectionRuntime",
+            "useAgentGraphRuntime",
+            "useAgentHistoryRuntime",
+            "useAgentActivityRuntime",
+            "useAgentRuntime",
+            "useAgentUI",
+            "useAgent",
+          ],
+        },
       ],
     },
   },

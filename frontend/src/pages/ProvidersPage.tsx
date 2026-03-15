@@ -22,6 +22,13 @@ import type { Provider } from "@/types";
 import { cn } from "@/lib/utils";
 import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ProviderDraft = Omit<Provider, "id">;
 
@@ -324,19 +331,23 @@ export function ProvidersPage() {
 
                 <div className="space-y-2 border-t border-white/6 pt-6">
                   <label className="text-sm font-medium">Provider Type</label>
-                  <select
+                  <Select
                     value={draft.type}
-                    onChange={(e) =>
-                      setDraft({ ...draft, type: e.target.value })
+                    onValueChange={(value) =>
+                      setDraft({ ...draft, type: value })
                     }
-                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 focus:border-white/16 focus:outline-none"
                   >
-                    {providerTypeOptions.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {providerTypeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground">
                     {draft.type === "openai_compatible"
                       ? "Any OpenAI-compatible API endpoint"

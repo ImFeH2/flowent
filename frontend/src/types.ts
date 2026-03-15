@@ -114,7 +114,7 @@ export interface RoleModelConfig {
 }
 
 export interface ModelParams {
-  reasoning_effort: "none" | "low" | "medium" | "high" | null;
+  reasoning_effort: "none" | "low" | "medium" | "high" | "xhigh" | null;
   verbosity: "low" | "medium" | "high" | null;
   max_output_tokens: number | null;
   temperature: number | null;

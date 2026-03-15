@@ -14,6 +14,13 @@ import {
 import { ModelParamsFields } from "@/components/ModelParamsFields";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   cloneModelParams,
   describeModelParams,
   isEmptyModelParams,
@@ -532,71 +539,75 @@ export function RolesPage() {
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Provider</label>
-                        <select
-                          value={draft.model.provider_id}
-                          onChange={(e) => handleProviderChange(e.target.value)}
+                        <Select
+                          value={draft.model.provider_id || undefined}
+                          onValueChange={handleProviderChange}
                           disabled={isReadOnly}
-                          className={cn(
-                            "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200",
-                            isReadOnly
-                              ? "cursor-default text-muted-foreground focus:outline-none"
-                              : "focus:border-white/16 focus:outline-none",
-                          )}
                         >
-                          <option value="">Select a provider</option>
-                          {providers.map((provider) => (
-                            <option key={provider.id} value={provider.id}>
-                              {provider.name}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                            <SelectValue placeholder="Select a provider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {providers.map((provider) => (
+                              <SelectItem key={provider.id} value={provider.id}>
+                                {provider.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">
                         <label className="text-sm font-medium">
                           Provider Models
                         </label>
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            if (!draft.model) {
-                              return;
-                            }
+                        <Select
+                          value={
+                            activeProviderModelOptions.some(
+                              (option) => option.id === draft.model?.model,
+                            )
+                              ? draft.model?.model
+                              : undefined
+                          }
+                          onValueChange={(value) =>
                             setDraft((current) => ({
                               ...current,
                               model: current.model
                                 ? {
                                     ...current.model,
-                                    model: e.target.value,
+                                    model: value,
                                   }
                                 : null,
-                            }));
-                          }}
+                            }))
+                          }
                           disabled={
                             isReadOnly ||
                             !draft.model.provider_id ||
-                            loadingModelProviderId === draft.model.provider_id
+                            loadingModelProviderId ===
+                              draft.model.provider_id ||
+                            activeProviderModelOptions.length === 0
                           }
-                          className={cn(
-                            "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200",
-                            isReadOnly
-                              ? "cursor-default text-muted-foreground focus:outline-none"
-                              : "focus:border-white/16 focus:outline-none",
-                          )}
                         >
-                          <option value="">
-                            {loadingModelProviderId === draft.model.provider_id
-                              ? "Loading models..."
-                              : activeProviderModelOptions.length > 0
-                                ? "Pick a discovered model"
-                                : "No discovered models"}
-                          </option>
-                          {activeProviderModelOptions.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.id}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                            <SelectValue
+                              placeholder={
+                                loadingModelProviderId ===
+                                draft.model.provider_id
+                                  ? "Loading models..."
+                                  : activeProviderModelOptions.length > 0
+                                    ? "Pick a discovered model"
+                                    : "No discovered models"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activeProviderModelOptions.map((option) => (
+                              <SelectItem key={option.id} value={option.id}>
+                                {option.id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2 md:col-span-2">
@@ -685,6 +696,9 @@ export function RolesPage() {
                         }))
                       }
                       disabled={isReadOnly}
+                      emptyLabel="Inherit settings default"
+                      numberPlaceholder="Inherit settings default"
+                      reasoningDisableLabel="Disable"
                       helperText="These canonical parameters override Settings only for this role. Unsupported fields are ignored by the resolved provider."
                     />
                   ) : (

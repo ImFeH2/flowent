@@ -96,7 +96,7 @@ CONDUCTOR_ROLE_INCLUDED_TOOLS = [
     "list_roles",
     "list_tools",
 ]
-MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high"})
+MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high", "xhigh"})
 MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
 
 
@@ -130,10 +130,7 @@ class ModelParams:
 
 
 def build_default_model_params() -> ModelParams:
-    return ModelParams(
-        reasoning_effort="medium",
-        verbosity="medium",
-    )
+    return ModelParams()
 
 
 @dataclass
@@ -234,17 +231,16 @@ def is_empty_model_params(model_params: ModelParams | None) -> bool:
 
 
 def merge_model_params(
-    defaults: ModelParams,
+    defaults: ModelParams | None,
     override: ModelParams | None,
-) -> ModelParams:
-    if override is None:
-        return ModelParams(**asdict(defaults))
-
-    merged = asdict(defaults)
-    for key, value in asdict(override).items():
-        if value is not None:
-            merged[key] = value
-    return ModelParams(**merged)
+) -> ModelParams | None:
+    merged = asdict(defaults) if defaults is not None else asdict(ModelParams())
+    if override is not None:
+        for key, value in asdict(override).items():
+            if value is not None:
+                merged[key] = value
+    params = ModelParams(**merged)
+    return None if is_empty_model_params(params) else params
 
 
 def build_model_params_from_mapping(raw_model_params: object) -> ModelParams | None:

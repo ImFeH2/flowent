@@ -109,3 +109,49 @@ def test_gateway_prefers_role_model(monkeypatch):
     assert captured["model"] == "gpt-role"
     assert captured["reasoning_effort"] == "high"
     assert captured["verbosity"] == "medium"
+
+
+def test_gateway_omits_model_params_when_all_values_are_empty(monkeypatch):
+    gateway = ProviderGateway()
+    captured: dict[str, bool] = {}
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-default",
+                params=ModelParams(),
+            ),
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Default Provider",
+                    type="openai_compatible",
+                    base_url="https://default.invalid",
+                    api_key="secret",
+                )
+            ],
+        ),
+    )
+
+    class ProviderStub:
+        def chat(self, messages, tools=None, on_chunk=None, model_params=None):
+            captured["is_none"] = model_params is None
+            return type(
+                "Response",
+                (),
+                {"content": "", "thinking": "", "tool_calls": []},
+            )()
+
+        def list_models(self):
+            return []
+
+    monkeypatch.setattr(
+        "app.providers.registry.create_provider",
+        lambda **kwargs: ProviderStub(),
+    )
+
+    gateway.chat(messages=[])
+
+    assert captured["is_none"] is True

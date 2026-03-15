@@ -36,8 +36,8 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
             "active_provider_id": "provider-1",
             "active_model": "gpt-4o",
             "params": {
-                "reasoning_effort": "medium",
-                "verbosity": "medium",
+                "reasoning_effort": None,
+                "verbosity": None,
                 "max_output_tokens": None,
                 "temperature": None,
                 "top_p": None,
@@ -83,8 +83,8 @@ def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
         "active_provider_id": "provider-2",
         "active_model": "gpt-4.1",
         "params": {
-            "reasoning_effort": "medium",
-            "verbosity": "medium",
+            "reasoning_effort": None,
+            "verbosity": None,
             "max_output_tokens": None,
             "temperature": None,
             "top_p": None,
@@ -175,3 +175,25 @@ def test_manage_settings_update_merges_root_boundary(monkeypatch):
     }
     assert settings.root_boundary.write_dirs == ["/project/workspace"]
     assert settings.root_boundary.allow_network is True
+
+
+def test_manage_settings_update_accepts_xhigh_reasoning_effort(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "model_params": {"reasoning_effort": "xhigh"},
+            },
+        )
+    )
+
+    assert result["model"]["params"]["reasoning_effort"] == "xhigh"
+    assert settings.model.params.reasoning_effort == "xhigh"

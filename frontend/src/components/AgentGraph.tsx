@@ -272,11 +272,13 @@ function useTransientGraphElements(
   }, [edges]);
 
   useEffect(() => {
+    const nodeTimersMap = nodeTimers.current;
+    const edgeTimersMap = edgeTimers.current;
     return () => {
-      for (const timer of nodeTimers.current.values()) {
+      for (const timer of nodeTimersMap.values()) {
         clearTimeout(timer);
       }
-      for (const timer of edgeTimers.current.values()) {
+      for (const timer of edgeTimersMap.values()) {
         clearTimeout(timer);
       }
     };

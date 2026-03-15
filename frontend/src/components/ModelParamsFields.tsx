@@ -1,13 +1,25 @@
 import { cn } from "@/lib/utils";
 import type { ModelParams } from "@/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ModelParamsFieldsProps {
   className?: string;
   disabled?: boolean;
+  emptyLabel?: string;
   helperText?: string;
+  numberPlaceholder?: string;
   onChange: (next: ModelParams) => void;
+  reasoningDisableLabel?: string | null;
   value: ModelParams;
 }
+
+const EMPTY_OPTION_VALUE = "__empty__";
 
 function parseNumberInput(value: string) {
   if (!value.trim()) {
@@ -21,8 +33,11 @@ function parseNumberInput(value: string) {
 export function ModelParamsFields({
   className,
   disabled = false,
+  emptyLabel = "Inherit / provider default",
   helperText,
+  numberPlaceholder = emptyLabel,
   onChange,
+  reasoningDisableLabel = "None",
   value,
 }: ModelParamsFieldsProps) {
   return (
@@ -30,57 +45,60 @@ export function ModelParamsFields({
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <label className="text-sm font-medium">Reasoning Effort</label>
-          <select
-            value={value.reasoning_effort ?? ""}
-            onChange={(event) =>
+          <Select
+            value={value.reasoning_effort ?? EMPTY_OPTION_VALUE}
+            onValueChange={(nextValue) =>
               onChange({
                 ...value,
-                reasoning_effort: event.target.value
-                  ? (event.target.value as ModelParams["reasoning_effort"])
-                  : null,
+                reasoning_effort:
+                  nextValue !== EMPTY_OPTION_VALUE
+                    ? (nextValue as ModelParams["reasoning_effort"])
+                    : null,
               })
             }
             disabled={disabled}
-            className={cn(
-              "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200",
-              disabled
-                ? "cursor-default text-muted-foreground focus:outline-none"
-                : "focus:border-white/16 focus:outline-none",
-            )}
           >
-            <option value="">Inherit / provider default</option>
-            <option value="none">None</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
+            <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+              <SelectValue placeholder={emptyLabel} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EMPTY_OPTION_VALUE}>{emptyLabel}</SelectItem>
+              {reasoningDisableLabel ? (
+                <SelectItem value="none">{reasoningDisableLabel}</SelectItem>
+              ) : null}
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="xhigh">XHigh</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Verbosity</label>
-          <select
-            value={value.verbosity ?? ""}
-            onChange={(event) =>
+          <Select
+            value={value.verbosity ?? EMPTY_OPTION_VALUE}
+            onValueChange={(nextValue) =>
               onChange({
                 ...value,
-                verbosity: event.target.value
-                  ? (event.target.value as ModelParams["verbosity"])
-                  : null,
+                verbosity:
+                  nextValue !== EMPTY_OPTION_VALUE
+                    ? (nextValue as ModelParams["verbosity"])
+                    : null,
               })
             }
             disabled={disabled}
-            className={cn(
-              "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200",
-              disabled
-                ? "cursor-default text-muted-foreground focus:outline-none"
-                : "focus:border-white/16 focus:outline-none",
-            )}
           >
-            <option value="">Inherit / provider default</option>
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
+            <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+              <SelectValue placeholder={emptyLabel} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={EMPTY_OPTION_VALUE}>{emptyLabel}</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-2">
@@ -97,7 +115,7 @@ export function ModelParamsFields({
               })
             }
             disabled={disabled}
-            placeholder="Inherit / provider default"
+            placeholder={numberPlaceholder}
             className={cn(
               "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
               disabled
@@ -122,7 +140,7 @@ export function ModelParamsFields({
               })
             }
             disabled={disabled}
-            placeholder="Inherit / provider default"
+            placeholder={numberPlaceholder}
             className={cn(
               "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
               disabled
@@ -147,7 +165,7 @@ export function ModelParamsFields({
               })
             }
             disabled={disabled}
-            placeholder="Inherit / provider default"
+            placeholder={numberPlaceholder}
             className={cn(
               "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
               disabled

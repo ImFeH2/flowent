@@ -51,8 +51,8 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "active_provider_id": "",
                 "active_model": "",
                 "params": {
-                    "reasoning_effort": "medium",
-                    "verbosity": "medium",
+                    "reasoning_effort": None,
+                    "verbosity": None,
                     "max_output_tokens": None,
                     "temperature": None,
                     "top_p": None,
@@ -102,6 +102,31 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
         ],
         "version": "1.2.3",
     }
+
+
+def test_update_settings_accepts_xhigh_reasoning_effort(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                model={"params": {"reasoning_effort": "xhigh"}},
+            )
+        )
+    )
+
+    assert settings.model.params.reasoning_effort == "xhigh"
+    assert result["settings"]["model"]["params"]["reasoning_effort"] == "xhigh"
+    assert saved == [settings]
 
 
 def test_update_settings_persists_assistant_role(monkeypatch):

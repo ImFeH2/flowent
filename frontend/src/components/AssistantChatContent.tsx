@@ -13,7 +13,6 @@ import {
   LoaderCircle,
   MessageSquare,
   Send,
-  Shield,
   Sparkles,
   Wrench,
 } from "lucide-react";
@@ -230,26 +229,12 @@ function AssistantBubble({
   variant: AssistantChatVariant;
 }) {
   const isWorkspace = variant === "workspace";
-  const isFloating = variant === "floating";
 
   return (
     <div className="flex min-w-0 justify-start">
       <div
-        className={cn(
-          "flex min-w-0 items-start gap-2",
-          isWorkspace ? "max-w-[85%]" : "max-w-[80%]",
-        )}
+        className={cn("min-w-0", isWorkspace ? "max-w-[85%]" : "max-w-[80%]")}
       >
-        <Shield
-          className={cn(
-            "mt-1 size-4 shrink-0",
-            isWorkspace
-              ? "text-primary"
-              : isFloating
-                ? "text-amber-300"
-                : "text-muted-foreground",
-          )}
-        />
         <div
           className={cn(
             "group min-w-0 max-w-full overflow-hidden px-3 py-2 text-sm text-foreground",

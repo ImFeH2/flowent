@@ -548,9 +548,6 @@ function AssistantChatPanel() {
   return (
     <>
       <div className="flex items-center gap-3 border-b border-white/6 px-4 py-3">
-        <div className="flex size-8 items-center justify-center rounded-md bg-primary/8">
-          <Shield className="size-4 text-primary" />
-        </div>
         <div className="flex-1">
           <p className="font-semibold">Assistant</p>
           <p className="text-[11px] text-muted-foreground">

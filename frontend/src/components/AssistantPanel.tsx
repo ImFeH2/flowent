@@ -1,4 +1,3 @@
-import { Shield } from "lucide-react";
 import {
   AssistantChatComposer,
   AssistantChatMessages,
@@ -67,12 +66,6 @@ function PanelHeader({
         floating ? "border-glass-border" : "border-glass-border bg-surface-2",
       )}
     >
-      <Shield
-        className={cn(
-          "size-4",
-          floating ? "text-amber-300" : "text-muted-foreground",
-        )}
-      />
       <span className="text-sm font-semibold text-foreground">
         Assistant Chat
       </span>

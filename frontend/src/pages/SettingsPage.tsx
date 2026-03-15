@@ -161,181 +161,189 @@ export function SettingsPage() {
         </button>
       }
     >
-      <div className="mx-auto max-w-3xl space-y-5">
-        <SoftPanel className="space-y-5">
-          <section className="space-y-3">
-            <div>
-              <h2 className="text-lg font-semibold">Assistant Configuration</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Choose the role that powers the system assistant.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Assistant Role</label>
-              <Select
-                value={settings.assistant.role_name}
-                onValueChange={(value) =>
-                  setSettings({
-                    ...settings,
-                    assistant: {
-                      role_name: value,
-                    },
-                  })
-                }
-              >
-                <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.name} value={role.name}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                The Assistant uses this role&apos;s prompt and model
-                configuration. The default system role is Steward.
-              </p>
-            </div>
-          </section>
-
-          <section className="space-y-5 border-t border-white/6 pt-5">
-            <div>
-              <h2 className="text-lg font-semibold">Model Configuration</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Set the default provider and model used when a role does not
-                define its own override.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Active Provider</label>
-              <Select
-                value={settings.model.active_provider_id}
-                onValueChange={(value) =>
-                  setSettings({
-                    ...settings,
-                    model: {
-                      ...settings.model,
-                      active_provider_id: value,
-                      active_model: "",
-                    },
-                  })
-                }
-              >
-                <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
-                  <SelectValue placeholder="Select a provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} ({providerTypeLabel(p.type)})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {activeProvider && (
-                <p className="text-xs text-muted-foreground">
-                  Using {activeProvider.name} ({activeProvider.base_url})
+      <div className="h-full min-h-0 overflow-y-auto pr-2">
+        <div className="mx-auto max-w-3xl space-y-5 pb-6">
+          <SoftPanel className="space-y-5">
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  Assistant Configuration
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Choose the role that powers the system assistant.
                 </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">Model</label>
-                <button
-                  onClick={refreshModels}
-                  disabled={!settings.model.active_provider_id || loadingModels}
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={cn("size-3", loadingModels && "animate-spin")}
-                  />
-                  Refresh
-                </button>
               </div>
-
-              {models.length > 0 ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Assistant Role</label>
                 <Select
-                  value={settings.model.active_model}
+                  value={settings.assistant.role_name}
                   onValueChange={(value) =>
                     setSettings({
                       ...settings,
-                      model: {
-                        ...settings.model,
-                        active_model: value,
+                      assistant: {
+                        role_name: value,
                       },
                     })
                   }
                 >
                   <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
-                    <SelectValue placeholder="Select a model" />
+                    <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {models.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.id}
+                    {roles.map((role) => (
+                      <SelectItem key={role.name} value={role.name}>
+                        {role.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (
-                <input
-                  type="text"
-                  value={settings.model.active_model}
-                  onChange={(e) =>
+                <p className="text-xs text-muted-foreground">
+                  The Assistant uses this role&apos;s prompt and model
+                  configuration. The default system role is Steward.
+                </p>
+              </div>
+            </section>
+
+            <section className="space-y-5 border-t border-white/6 pt-5">
+              <div>
+                <h2 className="text-lg font-semibold">Model Configuration</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Set the default provider and model used when a role does not
+                  define its own override.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Active Provider</label>
+                <Select
+                  value={settings.model.active_provider_id}
+                  onValueChange={(value) =>
                     setSettings({
                       ...settings,
                       model: {
                         ...settings.model,
-                        active_model: e.target.value,
+                        active_provider_id: value,
+                        active_model: "",
                       },
                     })
                   }
-                  placeholder={
-                    loadingModels
-                      ? "Loading models..."
-                      : "Enter model ID manually"
-                  }
-                  className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
-                />
-              )}
-            </div>
-
-            <div className="space-y-3 border-t border-white/6 pt-5">
-              <div>
-                <h3 className="text-sm font-medium">
-                  Default Model Parameters
-                </h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  These canonical parameters are merged into each request first.
-                  Roles can override selected fields. Unsupported parameters are
-                  ignored by the active provider.
-                </p>
+                >
+                  <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                    <SelectValue placeholder="Select a provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providers.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({providerTypeLabel(p.type)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {activeProvider && (
+                  <p className="text-xs text-muted-foreground">
+                    Using {activeProvider.name} ({activeProvider.base_url})
+                  </p>
+                )}
               </div>
-              <ModelParamsFields
-                value={cloneModelParams(settings.model.params)}
-                onChange={(params) =>
-                  setSettings({
-                    ...settings,
-                    model: {
-                      ...settings.model,
-                      params,
-                    },
-                  })
-                }
-                helperText="Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
-              />
-            </div>
-          </section>
-        </SoftPanel>
 
-        <div className="border-t border-white/6 pt-4 text-sm text-muted-foreground">
-          <p>Autopoe Agent Studio v{appVersion ?? "—"}</p>
-          <p className="mt-1 text-xs">A multi-agent collaboration framework.</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Model</label>
+                  <button
+                    onClick={refreshModels}
+                    disabled={
+                      !settings.model.active_provider_id || loadingModels
+                    }
+                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={cn("size-3", loadingModels && "animate-spin")}
+                    />
+                    Refresh
+                  </button>
+                </div>
+
+                {models.length > 0 ? (
+                  <Select
+                    value={settings.model.active_model}
+                    onValueChange={(value) =>
+                      setSettings({
+                        ...settings,
+                        model: {
+                          ...settings.model,
+                          active_model: value,
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <input
+                    type="text"
+                    value={settings.model.active_model}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        model: {
+                          ...settings.model,
+                          active_model: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder={
+                      loadingModels
+                        ? "Loading models..."
+                        : "Enter model ID manually"
+                    }
+                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                  />
+                )}
+              </div>
+
+              <div className="space-y-3 border-t border-white/6 pt-5">
+                <div>
+                  <h3 className="text-sm font-medium">
+                    Default Model Parameters
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    These canonical parameters are merged into each request
+                    first. Roles can override selected fields. Unsupported
+                    parameters are ignored by the active provider.
+                  </p>
+                </div>
+                <ModelParamsFields
+                  value={cloneModelParams(settings.model.params)}
+                  onChange={(params) =>
+                    setSettings({
+                      ...settings,
+                      model: {
+                        ...settings.model,
+                        params,
+                      },
+                    })
+                  }
+                  helperText="Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
+                />
+              </div>
+            </section>
+          </SoftPanel>
+
+          <div className="border-t border-white/6 pt-4 text-sm text-muted-foreground">
+            <p>Autopoe Agent Studio v{appVersion ?? "—"}</p>
+            <p className="mt-1 text-xs">
+              A multi-agent collaboration framework.
+            </p>
+          </div>
         </div>
       </div>
     </PageScaffold>

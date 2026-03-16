@@ -52,7 +52,7 @@ export function Sidebar({
     <aside
       style={{ width: `${width}px` }}
       className={cn(
-        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border border-white/6 bg-[linear-gradient(180deg,rgba(7,7,8,0.96),rgba(5,5,6,0.94))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl [contain:paint]",
+        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border border-white/6 border-r-white/[0.11] bg-[linear-gradient(180deg,rgba(7,7,8,0.96),rgba(5,5,6,0.94))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl [contain:paint]",
         autoHide ? "h-full" : "fixed inset-y-0 left-0 h-auto",
         className,
       )}
@@ -61,7 +61,7 @@ export function Sidebar({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="flex h-full flex-col overflow-hidden">
         <div
-          className="shrink-0 border-b border-white/6 px-4"
+          className="shrink-0 border-b border-white/[0.1] px-4"
           style={{
             paddingTop: `${headerPaddingY}px`,
             paddingBottom: `${headerPaddingY}px`,
@@ -104,7 +104,7 @@ export function Sidebar({
           </div>
         </div>
 
-        <div className="mb-2 mt-5 shrink-0 px-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/60">
+        <div className="mb-2 mt-5 shrink-0 border-t border-white/[0.05] px-4 pt-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/60">
           Navigation
         </div>
 
@@ -149,7 +149,7 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-white/6 px-4 py-3">
+        <div className="shrink-0 border-t border-white/[0.1] px-4 py-3">
           <SidebarActivityTicker width={width} />
         </div>
       </div>

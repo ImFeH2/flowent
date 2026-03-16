@@ -74,6 +74,7 @@ def test_spawn_creates_connected_child_without_task_delivery(monkeypatch):
     child = registry.get(child_id)
     assert child is not None
     assert child.config.graph_id == "graph-parent"
+    assert child.config.parent_id == "parent"
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert call_order == [("start", child_id)]
 
@@ -238,6 +239,7 @@ def test_spawn_allows_child_security_boundary_within_parent(monkeypatch, tmp_pat
     assert child is not None
     assert child.config.write_dirs == [str(child_dir)]
     assert child.config.allow_network is True
+    assert child.config.parent_id == "parent"
 
 
 def test_spawn_rejects_write_dir_escalation(monkeypatch, tmp_path):

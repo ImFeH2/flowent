@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from app.agent import Agent
 
 MINIMUM_TOOLS = (
-    "send",
     "idle",
     "todo",
     "list_connections",
@@ -21,6 +20,7 @@ class Tool(ABC):
     description: str
     parameters: ClassVar[dict[str, Any]]
     agent_visible: ClassVar[bool] = True
+    llm_visible: ClassVar[bool] = True
 
     @abstractmethod
     def execute(
@@ -56,7 +56,7 @@ class ToolRegistry:
 
     def get_tools_for_agent(self, agent: Agent) -> list[Tool]:
         allowed = set(agent.config.tools) | set(MINIMUM_TOOLS)
-        return [t for t in self.list_tools() if t.name in allowed]
+        return [t for t in self.list_tools() if t.name in allowed and t.llm_visible]
 
     def get_tools_schema(self, agent: Agent) -> list[dict[str, Any]]:
         return [t.to_schema() for t in self.get_tools_for_agent(agent)]

@@ -3,7 +3,7 @@ import threading
 
 from loguru import logger
 
-from app.agent import Agent
+from app.agent import Agent, extract_routed_content
 from app.events import event_bus
 from app.models import (
     AgentState,
@@ -168,9 +168,9 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
             content="Working on it",
             tool_calls=[
                 ToolCallResult(
-                    id="call-send",
-                    name="send",
-                    arguments={"to": "agent-b", "content": "done"},
+                    id="call-exit",
+                    name="exit",
+                    arguments={"reason": "done"},
                 )
             ],
         )
@@ -190,6 +190,170 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
         event for event in events if event.type == EventType.ASSISTANT_CONTENT
     ]
     assert [event.data for event in assistant_events] == [{"content": "Working on it"}]
+
+
+def test_extract_routed_content_parses_single_target_block():
+    parent_content, routed = extract_routed_content("@worker: review the diff")
+
+    assert parent_content == ""
+    assert routed == [(["worker"], "review the diff")]
+
+
+def test_extract_routed_content_parses_multiple_targets_and_parent_content():
+    parent_content, routed = extract_routed_content(
+        "@alice, bob: check the latest output\nand confirm",
+    )
+
+    assert parent_content == ""
+    assert routed == [(["alice", "bob"], "check the latest output\nand confirm")]
+
+
+def test_extract_routed_content_returns_plain_content_without_target_header():
+    parent_content, routed = extract_routed_content(
+        "Need a quick follow-up.\nStill investigating.",
+    )
+
+    assert parent_content == "Need a quick follow-up.\nStill investigating."
+    assert routed == []
+
+
+def test_extract_routed_content_treats_non_header_target_as_plain_content():
+    parent_content, routed = extract_routed_content(
+        "Need a quick follow-up.\n@alice: check the latest output",
+    )
+
+    assert parent_content == "Need a quick follow-up.\n@alice: check the latest output"
+    assert routed == []
+
+
+def test_route_content_output_delivers_to_targets_when_header_present(monkeypatch):
+    registry.reset()
+    parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
+    child = Agent(
+        NodeConfig(node_type=NodeType.AGENT, parent_id="parent"),
+        uuid="child",
+    )
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
+    helper = Agent(
+        NodeConfig(node_type=NodeType.AGENT, name="Helper"),
+        uuid="helper",
+    )
+    registry.register(parent)
+    registry.register(child)
+    registry.register(peer)
+    registry.register(helper)
+    child.add_connection(peer.uuid)
+    child.add_connection(helper.uuid)
+    events = []
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        child._route_content_output(
+            "@peer, Helper: investigate the error\nwith the latest logs",
+        )
+    finally:
+        registry.reset()
+
+    peer_signal = peer._wake_queue.get_nowait()
+    helper_signal = helper._wake_queue.get_nowait()
+
+    assert peer_signal.payload == {
+        "message": {
+            "from": "child",
+            "content": "investigate the error\nwith the latest logs",
+        }
+    }
+    assert helper_signal.payload == {
+        "message": {
+            "from": "child",
+            "content": "investigate the error\nwith the latest logs",
+        }
+    }
+    assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
+        {"to_id": "peer", "content": "investigate the error\nwith the latest logs"},
+        {"to_id": "helper", "content": "investigate the error\nwith the latest logs"},
+    ]
+
+
+def test_route_content_output_routes_plain_content_to_parent(monkeypatch):
+    registry.reset()
+    parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
+    agent = Agent(
+        NodeConfig(node_type=NodeType.AGENT, parent_id="parent"), uuid="child"
+    )
+    events = []
+    registry.register(parent)
+    registry.register(agent)
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        agent._route_content_output("Status update.")
+    finally:
+        registry.reset()
+
+    parent_signal = parent._wake_queue.get_nowait()
+    assert parent_signal.payload == {
+        "message": {"from": "child", "content": "Status update."}
+    }
+    assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
+        {"to_id": "parent", "content": "Status update."},
+    ]
+
+
+def test_route_content_output_routes_non_header_target_text_to_parent(monkeypatch):
+    registry.reset()
+    parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
+    agent = Agent(
+        NodeConfig(node_type=NodeType.AGENT, parent_id="parent"), uuid="child"
+    )
+    events = []
+    registry.register(parent)
+    registry.register(agent)
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        agent._route_content_output("Status update.\n@peer: investigate the error")
+    finally:
+        registry.reset()
+
+    parent_signal = parent._wake_queue.get_nowait()
+    assert parent_signal.payload == {
+        "message": {
+            "from": "child",
+            "content": "Status update.\n@peer: investigate the error",
+        }
+    }
+    assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
+        {"to_id": "parent", "content": "Status update.\n@peer: investigate the error"},
+    ]
+
+
+def test_route_content_output_skips_parent_delivery_without_parent(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
+    events = []
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    agent._route_content_output("Status update.")
+
+    assert not any(event.type == EventType.NODE_MESSAGE for event in events)
+
+
+def test_route_content_output_skips_parent_delivery_for_assistant(monkeypatch):
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, parent_id="human"),
+        uuid="assistant",
+    )
+    events = []
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    assistant._route_content_output("Reply to human")
+
+    assert not any(event.type == EventType.NODE_MESSAGE for event in events)
 
 
 def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):

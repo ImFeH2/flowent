@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time as _time
 import traceback
@@ -50,6 +51,28 @@ class WakeSignal:
     reason: str
     payload: dict[str, Any]
     resume_reason: str = ""
+
+
+_HEADER_RE = re.compile(r"^@([^:\n]+):[ \t]*(.*)$", re.DOTALL)
+
+
+def extract_routed_content(content: str) -> tuple[str, list[tuple[list[str], str]]]:
+    first_line_end = content.find("\n")
+    first_line = content[:first_line_end] if first_line_end != -1 else content
+    rest = content[first_line_end + 1 :] if first_line_end != -1 else ""
+
+    match = _HEADER_RE.match(first_line)
+    if not match:
+        return content, []
+
+    targets = [target.strip() for target in match.group(1).split(",") if target.strip()]
+    body_first_line = match.group(2).strip()
+    body = (body_first_line + ("\n" + rest if rest else "")).strip()
+
+    if not targets or not body:
+        return content, []
+
+    return "", [(targets, body)]
 
 
 class Agent:
@@ -278,8 +301,9 @@ class Agent:
                                     ),
                                 )
                             self._append_history(
-                                AssistantText(content=response.content),
+                                AssistantText(content=response.content)
                             )
+                            self._route_content_output(response.content)
                         for tc in response.tool_calls:
                             self._handle_tool_call(tc.name, tc.arguments, tc.id)
                             if self._terminate.is_set():
@@ -298,6 +322,7 @@ class Agent:
                             )
                         entry = AssistantText(content=response.content)
                         self._append_history(entry)
+                        self._route_content_output(response.content)
                         self._log.debug(
                             "No tool calls, continuing execution after text response"
                         )
@@ -346,6 +371,51 @@ class Agent:
                     self.history.pop(i)
                     break
         self._append_history(SystemInjection(content=todo_text))
+
+    def _deliver_message(self, target: Agent, content: str) -> None:
+        target.enqueue_message(
+            Message(from_id=self.uuid, to_id=target.uuid, content=content)
+        )
+        self._log.debug(
+            "Message routed: {} -> {} ({} chars)",
+            self.uuid[:8],
+            target.uuid[:8],
+            len(content),
+        )
+        event_bus.emit(
+            Event(
+                type=EventType.NODE_MESSAGE,
+                agent_id=self.uuid,
+                data={"to_id": target.uuid, "content": content},
+            ),
+        )
+
+    def _route_content_output(self, content: str) -> None:
+        from app.graph_runtime import resolve_node_ref
+        from app.registry import registry
+
+        parent_content, routed_messages = extract_routed_content(content)
+
+        for target_refs, body in routed_messages:
+            for target_ref in target_refs:
+                target = resolve_node_ref(target_ref)
+                if target is None or not self.is_connected_to(target.uuid):
+                    self._log.warning("@target routing failed: {}", target_ref)
+                    continue
+                self._deliver_message(target, body)
+
+        if not parent_content:
+            return
+
+        parent_id = self.config.parent_id
+        if not parent_id or parent_id == "human":
+            return
+
+        parent = registry.get(parent_id)
+        if parent is None:
+            return
+
+        self._deliver_message(parent, parent_content)
 
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = [

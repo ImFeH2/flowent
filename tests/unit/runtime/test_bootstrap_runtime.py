@@ -59,6 +59,7 @@ def test_bootstrap_runtime_creates_only_assistant_with_create_root(
         ]
         assert assistant.config.write_dirs == []
         assert assistant.config.allow_network is True
+        assert assistant.config.parent_id == "human"
     finally:
         registry.reset()
 
@@ -201,6 +202,7 @@ def test_bootstrap_runtime_keeps_assistant_boundary_independent_of_root_boundary
         assert assistant.config.role_name == STEWARD_ROLE_NAME
         assert assistant.config.write_dirs == []
         assert assistant.config.allow_network is True
+        assert assistant.config.parent_id == "human"
     finally:
         registry.reset()
 

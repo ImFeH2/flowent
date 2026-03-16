@@ -11,6 +11,7 @@ def test_tools_api_hides_assistant_only_tools(client: TestClient):
     assert "manage_roles" not in tool_names
     assert "manage_settings" not in tool_names
     assert "manage_prompts" not in tool_names
+    assert "send" not in tool_names
     assert "spawn" in tool_names
 
 

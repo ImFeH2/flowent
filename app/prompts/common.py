@@ -26,7 +26,7 @@ DELEGATION_USAGE_GUIDANCE = """\
 - If you cannot complete a task efficiently or confidently alone, delegate early instead of struggling alone.
 - Prefer creating specialized agents for parallel work, blocked work, unclear work, or work outside your current strengths.
 - If you are unsure whether to delegate and `spawn` is available, bias toward delegation.
-- If a suitable connected agent already exists, use `send` to hand the task off; otherwise use `spawn` when available to create the right specialist.
+- If a suitable connected agent already exists, use `@target: ...` in content to hand the task off; otherwise use `spawn` when available to create the right specialist.
 - Do not ask the Human for permission to delegate or spawn just because delegation seems helpful; only ask first when the delegation itself would introduce destructive actions, material extra cost, permission risk, or the Human explicitly asked to approve delegation decisions.
 - Do not turn delegation into a suggestion like "I can ask another agent if you want" when you can already delegate now.
 - Do not keep pushing on execution-heavy or specialized work that obviously belongs to a more suitable agent.
@@ -40,13 +40,11 @@ DELEGATION_USAGE_GUIDANCE = """\
 COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
-- Your own assistant/content output is internal unless you are the Assistant replying to the Human.
-- To communicate with another agent, you must use `send`.
-- If you need to report a result, failure, clarification, or status to another agent, use `send` rather than assistant/content output.
-- If you delegated a task and do not yet have the real result, do not invent or guess the result yourself.
-- After delegating a task, you may send a status update, but the substantive answer must wait for the delegated agent's reply.
-- As Assistant, avoid meta-explanations about internal routing, execution agents, or capability boundaries unless the Human explicitly asks about internals.
-- Prefer action-oriented status updates such as "Checking that now." over capability disclaimers such as "I cannot access that directly."
+- Your plain text output (content) is automatically delivered to your parent node as a message. Use it to report results, request clarification, or hand off final output.
+- Do NOT output content just to "think out loud" between tool calls — content wakes up your parent and interrupts their work. Only produce content when you have something meaningful to report.
+- To send a message to a node other than your parent, start the content with `@target: message body`. Multiple targets: `@alice, bob: message body`.
+- You receive messages as: <message from="uuid">content</message>
+- System context is injected as: <system>content</system>
 """
 
 COMMON_AGENT_PROMPT = "\n\n".join(

@@ -161,7 +161,6 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             "name": "Worker",
             "system_prompt": "Do work.",
             "builtin_tools": [
-                "send",
                 "idle",
                 "todo",
                 "list_connections",
@@ -186,7 +185,6 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             "name": "Reviewer",
             "system_prompt": "Review code.",
             "builtin_tools": [
-                "send",
                 "idle",
                 "todo",
                 "list_connections",
@@ -221,7 +219,6 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
     result = json.loads(ListToolsTool().execute(agent, {}))
 
     assert {item["name"] for item in result} == {
-        "send",
         "idle",
         "todo",
         "list_connections",

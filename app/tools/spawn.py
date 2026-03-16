@@ -116,6 +116,7 @@ class SpawnTool(Tool):
             tools=final_tools,
             write_dirs=write_dirs,
             allow_network=allow_network,
+            parent_id=agent.uuid,
         )
 
         parent_write_dirs = [Path(path).resolve() for path in agent.config.write_dirs]

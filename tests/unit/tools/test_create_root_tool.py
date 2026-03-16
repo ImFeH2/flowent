@@ -74,6 +74,7 @@ def test_create_root_registers_root_agent_and_connects_to_assistant(
     assert child.config.role_name == "Worker"
     assert child.config.graph_id == graph_id
     assert child.config.name == "Root Worker"
+    assert child.config.parent_id == "assistant"
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert child.config.write_dirs == [str(notes_dir)]
     assert assistant.is_connected_to(child_id) is True
@@ -205,6 +206,7 @@ def test_create_root_delivers_initial_task_after_idle(monkeypatch):
     assert result == {"agent_id": child_id, "graph_id": graph_id, "role_name": "Worker"}
     assert child is not None
     assert child.config.graph_id == graph_id
+    assert child.config.parent_id == "assistant"
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert call_order == [
         ("start", child_id),

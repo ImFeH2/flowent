@@ -47,6 +47,8 @@ class SendTool(Tool):
     description = (
         "Send a message to a node that is reachable by a direct outgoing edge."
     )
+    agent_visible = False
+    llm_visible = False
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {

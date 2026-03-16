@@ -30,6 +30,7 @@ def bootstrap_runtime() -> None:
             ],
             write_dirs=[],
             allow_network=True,
+            parent_id="human",
         ),
         uuid=ASSISTANT_NODE_ID,
     )

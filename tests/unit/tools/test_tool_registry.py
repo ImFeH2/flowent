@@ -9,7 +9,6 @@ def test_empty_tools_list_grants_minimum_tools():
     tools = build_tool_registry().get_tools_for_agent(agent)
 
     assert [tool.name for tool in tools] == [
-        "send",
         "idle",
         "todo",
         "list_connections",
@@ -22,7 +21,6 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
     tools = build_tool_registry().get_tools_for_agent(agent)
 
     assert [tool.name for tool in tools] == [
-        "send",
         "idle",
         "todo",
         "list_connections",
@@ -46,11 +44,22 @@ def test_tool_registry_grants_create_root_when_explicitly_allowed():
     tools = build_tool_registry().get_tools_for_agent(agent)
 
     assert [tool.name for tool in tools] == [
-        "send",
         "idle",
         "todo",
         "list_connections",
         "create_root",
+    ]
+
+
+def test_tool_registry_hides_send_from_llm_even_if_explicitly_allowed():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["send"]))
+
+    tools = build_tool_registry().get_tools_for_agent(agent)
+
+    assert [tool.name for tool in tools] == [
+        "idle",
+        "todo",
+        "list_connections",
     ]
 
 
@@ -59,6 +68,7 @@ def test_tool_registry_hides_assistant_only_management_tools_from_agent_visible_
         tool.name for tool in build_tool_registry().list_tools(agent_visible_only=True)
     }
 
+    assert "send" not in visible_tool_names
     assert "create_root" not in visible_tool_names
     assert "manage_providers" not in visible_tool_names
     assert "manage_roles" not in visible_tool_names

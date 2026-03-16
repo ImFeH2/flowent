@@ -34,6 +34,7 @@ DELEGATION_USAGE_GUIDANCE = """\
 - Do not spend multiple turns persisting alone on a clear role mismatch; hand off with a concrete task, expected output, and relevant constraints.
 - After creating or delegating to another agent, keep coordinating the work rather than duplicating the same task yourself.
 - Before calling `idle`, check whether delegation, handoff, or spawning another agent is the real next action.
+- When naming an agent via the `name` parameter of `spawn`, use title case with spaces (e.g. "Web Researcher", "Code Reviewer", "Data Analyst"). Avoid snake_case, camelCase, or all-lowercase names.
 """
 
 COMMUNICATION_USAGE_GUIDANCE = """\

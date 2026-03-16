@@ -1,11 +1,3 @@
-import {
-  BookOpen,
-  Network,
-  ScrollText,
-  Server,
-  Settings,
-  Wrench,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useAgentConnectionRuntime,
@@ -16,13 +8,13 @@ import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
 
-const NAV_ITEMS: Array<{ id: PageId; icon: typeof Network; label: string }> = [
-  { id: "graph", icon: Network, label: "Workspace" },
-  { id: "providers", icon: Server, label: "Providers" },
-  { id: "roles", icon: BookOpen, label: "Roles" },
-  { id: "prompts", icon: ScrollText, label: "Prompts" },
-  { id: "tools", icon: Wrench, label: "Tools" },
-  { id: "settings", icon: Settings, label: "Settings" },
+const NAV_ITEMS: Array<{ id: PageId; label: string }> = [
+  { id: "graph", label: "Workspace" },
+  { id: "providers", label: "Providers" },
+  { id: "roles", label: "Roles" },
+  { id: "prompts", label: "Prompts" },
+  { id: "tools", label: "Tools" },
+  { id: "settings", label: "Settings" },
 ];
 
 interface SidebarProps {
@@ -117,7 +109,7 @@ export function Sidebar({
         </div>
 
         <nav className="min-h-0 flex-1 space-y-1.5 px-3 overflow-y-auto">
-          {NAV_ITEMS.map(({ id, icon: Icon, label }) => (
+          {NAV_ITEMS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
@@ -137,16 +129,6 @@ export function Sidebar({
                     : "bg-white/0 opacity-0 group-hover:bg-white/8 group-hover:opacity-100",
                 )}
               />
-              <div
-                className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-md transition-[background-color,color] duration-150",
-                  currentPage === id
-                    ? "bg-primary/12 text-primary"
-                    : "bg-white/[0.025] text-muted-foreground group-hover:bg-white/[0.045] group-hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-              </div>
               <div className="min-w-0 text-left">
                 <span className="block truncate font-medium">{label}</span>
                 <span className="block truncate text-[11px] text-muted-foreground/75">

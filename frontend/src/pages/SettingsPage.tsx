@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -8,7 +8,7 @@ import {
   type ModelOption,
 } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
-import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
+import { PageScaffold } from "@/components/layout/PageScaffold";
 import {
   Select,
   SelectContent,
@@ -30,6 +30,48 @@ interface UserSettings {
     active_model: string;
     params: ModelParams;
   };
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-6">
+      <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+        {eyebrow}
+      </p>
+      <h2 className="text-base font-semibold">{title}</h2>
+      <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function SettingsRow({
+  children,
+  description,
+  label,
+  valueClassName,
+}: {
+  children: ReactNode;
+  description: string;
+  label: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-8 border-b border-white/[0.04] py-3 last:border-0">
+      <div className="min-w-0 flex-1">
+        <label className="text-sm font-medium">{label}</label>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className={cn("w-64 shrink-0", valueClassName)}>{children}</div>
+    </div>
+  );
 }
 
 export function SettingsPage() {
@@ -162,19 +204,18 @@ export function SettingsPage() {
       }
     >
       <div className="h-full min-h-0 overflow-y-auto pr-2">
-        <div className="mx-auto max-w-3xl space-y-5 pb-6">
-          <SoftPanel className="space-y-5">
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  Assistant Configuration
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Choose the role that powers the system assistant.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Assistant Role</label>
+        <div className="mx-auto max-w-3xl pb-6">
+          <section>
+            <SectionHeader
+              eyebrow="Assistant"
+              title="Assistant Configuration"
+              description="Choose the role that powers the system assistant."
+            />
+            <div>
+              <SettingsRow
+                label="Assistant Role"
+                description="The Assistant uses this role's prompt and model configuration. The default system role is Steward."
+              >
                 <Select
                   value={settings.assistant.role_name}
                   onValueChange={(value) =>
@@ -186,7 +227,7 @@ export function SettingsPage() {
                     })
                   }
                 >
-                  <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                  <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -197,24 +238,21 @@ export function SettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  The Assistant uses this role&apos;s prompt and model
-                  configuration. The default system role is Steward.
-                </p>
-              </div>
-            </section>
+              </SettingsRow>
+            </div>
+          </section>
 
-            <section className="space-y-5 border-t border-white/6 pt-5">
-              <div>
-                <h2 className="text-lg font-semibold">Model Configuration</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Set the default provider and model used when a role does not
-                  define its own override.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Active Provider</label>
+          <section className="mt-8 border-t border-white/6 pt-8">
+            <SectionHeader
+              eyebrow="Model"
+              title="Model Configuration"
+              description="Set the default provider and model used when a role does not define its own override."
+            />
+            <div>
+              <SettingsRow
+                label="Active Provider"
+                description="Choose the provider used for roles that do not define their own model override."
+              >
                 <Select
                   value={settings.model.active_provider_id}
                   onValueChange={(value) =>
@@ -228,7 +266,7 @@ export function SettingsPage() {
                     })
                   }
                 >
-                  <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                  <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
                     <SelectValue placeholder="Select a provider" />
                   </SelectTrigger>
                   <SelectContent>
@@ -239,22 +277,24 @@ export function SettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {activeProvider && (
-                  <p className="text-xs text-muted-foreground">
+                {activeProvider ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
                     Using {activeProvider.name} ({activeProvider.base_url})
                   </p>
-                )}
-              </div>
+                ) : null}
+              </SettingsRow>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Model</label>
+              <SettingsRow
+                label="Model"
+                description="Select a catalog model when available, or enter a model ID manually."
+              >
+                <div className="mb-1.5 flex justify-end">
                   <button
                     onClick={refreshModels}
                     disabled={
                       !settings.model.active_provider_id || loadingModels
                     }
-                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground disabled:opacity-50"
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                   >
                     <RefreshCw
                       className={cn("size-3", loadingModels && "animate-spin")}
@@ -276,7 +316,7 @@ export function SettingsPage() {
                       })
                     }
                   >
-                    <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                    <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
                       <SelectValue placeholder="Select a model" />
                     </SelectTrigger>
                     <SelectContent>
@@ -308,20 +348,15 @@ export function SettingsPage() {
                     className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                   />
                 )}
-              </div>
+              </SettingsRow>
 
-              <div className="space-y-3 border-t border-white/6 pt-5">
-                <div>
-                  <h3 className="text-sm font-medium">
-                    Default Model Parameters
-                  </h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    These canonical parameters are merged into each request
-                    first. Roles can override selected fields. Unsupported
-                    parameters are ignored by the active provider.
-                  </p>
-                </div>
+              <SettingsRow
+                label="Default Model Parameters"
+                description="These canonical parameters are merged into each request first. Roles can override selected fields. Unsupported parameters are ignored by the active provider."
+                valueClassName="w-72"
+              >
                 <ModelParamsFields
+                  className="w-full"
                   value={cloneModelParams(settings.model.params)}
                   onChange={(params) =>
                     setSettings({
@@ -337,11 +372,11 @@ export function SettingsPage() {
                   reasoningDisableLabel={null}
                   helperText="Empty fields are omitted from outgoing provider requests. Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
                 />
-              </div>
-            </section>
-          </SoftPanel>
+              </SettingsRow>
+            </div>
+          </section>
 
-          <div className="border-t border-white/6 pt-4 text-sm text-muted-foreground">
+          <div className="mt-8 border-t border-white/6 pt-4 text-sm text-muted-foreground">
             <p>Autopoe Agent Studio v{appVersion ?? "—"}</p>
             <p className="mt-1 text-xs">
               A multi-agent collaboration framework.

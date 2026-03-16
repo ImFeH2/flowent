@@ -1,22 +1,20 @@
 import {
   BookOpen,
-  Bot,
   Network,
   ScrollText,
   Server,
   Settings,
-  Sparkles,
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useAgentConnectionRuntime,
-  useAgentNodesRuntime,
   useAgentUI,
   type PageId,
 } from "@/context/AgentContext";
 import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
+import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
 
 const NAV_ITEMS: Array<{ id: PageId; icon: typeof Network; label: string }> = [
   { id: "graph", icon: Network, label: "Workspace" },
@@ -42,7 +40,6 @@ export function Sidebar({
   width,
   onWidthChange,
 }: SidebarProps) {
-  const { agents } = useAgentNodesRuntime();
   const { connected } = useAgentConnectionRuntime();
   const { currentPage, setCurrentPage } = useAgentUI();
 
@@ -53,10 +50,6 @@ export function Sidebar({
   const subtitleFontSizePx = 10.5 + widthProgress * 1.25;
   const subtitleMarginTopPx = 3 + widthProgress * 2;
   const statusFontSizePx = 10.5 + widthProgress * 0.5;
-
-  const runningCount = Array.from(agents.values()).filter(
-    (agent) => agent.state === "running",
-  ).length;
 
   const navigate = (page: PageId) => {
     setCurrentPage(page);
@@ -174,22 +167,8 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-white/6 px-4 py-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-              <Bot className="size-4 text-primary" />
-              <span>Runtime Snapshot</span>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              {agents.size} total nodes · {runningCount} running
-            </p>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <Sparkles className="size-3.5 shrink-0 text-primary" />
-              <span className="truncate">
-                Select a node to inspect its live context
-              </span>
-            </div>
-          </div>
+        <div className="shrink-0 border-t border-white/6 px-4 py-3">
+          <SidebarActivityTicker width={width} />
         </div>
       </div>
       <PanelResizer

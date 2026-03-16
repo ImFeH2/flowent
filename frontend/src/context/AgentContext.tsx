@@ -11,6 +11,12 @@ import { sendAssistantMessageRequest } from "@/lib/api";
 import { useAgents } from "@/hooks/useAgents";
 import { useGraphs } from "@/hooks/useGraphs";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import {
+  AgentFeedContext,
+  MAX_ACTIVITY_FEED_ITEMS,
+  normalizeEventTimestampMs,
+  type ActivityFeedEntry,
+} from "@/context/AgentFeedContext";
 import type {
   AgentEvent,
   AssistantChatMessage,
@@ -96,6 +102,17 @@ const AgentUIContext = createContext<AgentUIContextValue | null>(null);
 const MESSAGE_ANIMATION_MS = 2000;
 const TOOL_CALL_ANIMATION_MS = 2000;
 const ASSISTANT_ID = "assistant";
+const MAX_TRACKED_TOOL_CALL_IDS = 256;
+
+function shouldTrackFeedEntry(entry: HistoryEntry): boolean {
+  return (
+    entry.type === "ReceivedMessage" ||
+    entry.type === "AssistantText" ||
+    entry.type === "AssistantThinking" ||
+    entry.type === "ToolCall" ||
+    entry.type === "ErrorEntry"
+  );
+}
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const { agents, handleUpdateEvent } = useAgents();
@@ -112,6 +129,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, string>>(
     () => new Map(),
   );
+  const [recentActivities, setRecentActivities] = useState<ActivityFeedEntry[]>(
+    [],
+  );
   const [pendingAssistantMessages, setPendingAssistantMessages] = useState<
     PendingAssistantChatMessage[]
   >([]);
@@ -123,6 +143,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     new Map(),
   );
   const assistantMessageCounterRef = useRef(0);
+  const activityEntryCounterRef = useRef(0);
+  const seenToolCallIdsRef = useRef<Set<string>>(new Set());
 
   const nextAssistantMessageId = useCallback(
     (from: AssistantChatMessage["from"], timestamp: number) =>
@@ -245,6 +267,39 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
       if (event.type === "history_entry_added") {
         const entry = event.data as unknown as HistoryEntry;
+        if (shouldTrackFeedEntry(entry)) {
+          let shouldAppendActivity = true;
+
+          if (entry.type === "ToolCall" && entry.tool_call_id) {
+            if (seenToolCallIdsRef.current.has(entry.tool_call_id)) {
+              shouldAppendActivity = false;
+            } else {
+              seenToolCallIdsRef.current.add(entry.tool_call_id);
+              if (seenToolCallIdsRef.current.size > MAX_TRACKED_TOOL_CALL_IDS) {
+                const oldestId = seenToolCallIdsRef.current
+                  .values()
+                  .next().value;
+                if (oldestId) {
+                  seenToolCallIdsRef.current.delete(oldestId);
+                }
+              }
+            }
+          }
+
+          if (shouldAppendActivity) {
+            const timestampMs = normalizeEventTimestampMs(event.timestamp);
+            const activityEntry: ActivityFeedEntry = {
+              id: `activity-${timestampMs}-${activityEntryCounterRef.current++}`,
+              agentId: event.agent_id,
+              entry,
+              timestampMs,
+            };
+            setRecentActivities((prev) => {
+              const next = [...prev, activityEntry];
+              return next.slice(-MAX_ACTIVITY_FEED_ITEMS);
+            });
+          }
+        }
 
         if (
           event.agent_id === ASSISTANT_ID &&
@@ -384,6 +439,13 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     [activeMessages, activeToolCalls],
   );
 
+  const feedValue = useMemo(
+    () => ({
+      recentActivities,
+    }),
+    [recentActivities],
+  );
+
   const uiValue = useMemo(
     () => ({
       selectedAgentId,
@@ -411,9 +473,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         <AgentConnectionContext.Provider value={connectionValue}>
           <AgentHistoryContext.Provider value={historyValue}>
             <AgentActivityContext.Provider value={activityValue}>
-              <AgentUIContext.Provider value={uiValue}>
-                {children}
-              </AgentUIContext.Provider>
+              <AgentFeedContext.Provider value={feedValue}>
+                <AgentUIContext.Provider value={uiValue}>
+                  {children}
+                </AgentUIContext.Provider>
+              </AgentFeedContext.Provider>
             </AgentActivityContext.Provider>
           </AgentHistoryContext.Provider>
         </AgentConnectionContext.Provider>

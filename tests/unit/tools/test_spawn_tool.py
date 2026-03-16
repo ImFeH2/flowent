@@ -93,9 +93,72 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert call_order == [
         ("start", child_id),
-        ("wait_until_idle", child_id, 5.0),
+        ("wait_until_idle", child_id, 30.0),
         ("send_message", "parent", child_id, "handle this task"),
     ]
+
+
+def test_spawn_allows_custom_task_delivery_timeout(monkeypatch):
+    parent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            graph_id="graph-parent",
+            role_name="Conductor",
+            tools=["spawn", "send", "read"],
+        ),
+        uuid="parent",
+    )
+    registry.register_graph(
+        Graph(
+            id="graph-parent",
+            owner_agent_id="parent",
+            name="Parent Graph",
+            entry_node_id="parent",
+        )
+    )
+    registry.register(parent)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="...",
+                    included_tools=["read"],
+                )
+            ]
+        ),
+    )
+
+    timeouts: list[float | None] = []
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+
+    def fake_wait_until_idle(self: Agent, timeout: float | None = None) -> bool:
+        timeouts.append(timeout)
+        self.state = AgentState.IDLE
+        return True
+
+    monkeypatch.setattr(Agent, "wait_until_idle", fake_wait_until_idle)
+    monkeypatch.setattr(
+        "app.tools.spawn.send_message",
+        lambda *_args, **_kwargs: {"status": "sent"},
+    )
+
+    result = json.loads(
+        SpawnTool().execute(
+            parent,
+            {
+                "role_name": "Worker",
+                "task_prompt": "handle this task",
+                "task_delivery_timeout": 12.5,
+            },
+        )
+    )
+
+    assert result["role_name"] == "Worker"
+    assert timeouts == [12.5]
 
 
 @pytest.mark.parametrize("task_prompt", [None, ""])

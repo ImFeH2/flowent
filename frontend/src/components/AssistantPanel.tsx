@@ -84,7 +84,7 @@ function StatusBadge({ connected }: { connected: boolean }) {
           : "bg-amber-400/20 text-amber-300",
       )}
     >
-      {connected ? "Live" : "Syncing"}
+      {connected ? "Online" : "Offline"}
     </span>
   );
 }

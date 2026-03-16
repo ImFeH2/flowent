@@ -59,6 +59,10 @@ class SpawnTool(Tool):
                 "type": "string",
                 "description": "Graph to add the new node to. Defaults to the caller's current graph.",
             },
+            "task_delivery_timeout": {
+                "type": "number",
+                "description": "Seconds to wait for the spawned agent to reach idle before sending task_prompt (default 30)",
+            },
         },
         "required": ["role_name"],
     }
@@ -75,6 +79,7 @@ class SpawnTool(Tool):
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
         graph_id = args.get("graph_id") or agent.config.graph_id
+        task_delivery_timeout = args.get("task_delivery_timeout", 30)
 
         if not isinstance(tools, list) or not all(
             isinstance(tool_name, str) for tool_name in tools
@@ -86,6 +91,10 @@ class SpawnTool(Tool):
             return json.dumps({"error": "write_dirs must be an array of strings"})
         if not isinstance(allow_network, bool):
             return json.dumps({"error": "allow_network must be a boolean"})
+        if not isinstance(task_delivery_timeout, (int, float)) or (
+            isinstance(task_delivery_timeout, bool)
+        ):
+            return json.dumps({"error": "task_delivery_timeout must be a number"})
 
         settings = get_settings()
         role_cfg = find_role(settings, role_name)
@@ -175,7 +184,7 @@ class SpawnTool(Tool):
             connected = True
 
             if isinstance(task_prompt, str) and task_prompt != "":
-                if not child.wait_until_idle(timeout=5.0):
+                if not child.wait_until_idle(timeout=float(task_delivery_timeout)):
                     raise TimeoutError(
                         "Spawned agent did not reach idle before task delivery"
                     )
@@ -191,7 +200,7 @@ class SpawnTool(Tool):
             )
 
             if started:
-                child.terminate_and_wait(timeout=5.0)
+                child.terminate_and_wait(timeout=float(task_delivery_timeout))
             if registered:
                 registry.unregister(agent_uuid)
             if connected:

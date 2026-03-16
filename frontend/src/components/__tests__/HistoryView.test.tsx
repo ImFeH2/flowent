@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { HistoryView } from "@/components/HistoryView";
-import type { HistoryEntry } from "@/types";
+import type { HistoryEntry, Node } from "@/types";
 
 describe("HistoryView", () => {
   it("renders message and assistant entries collapsed by default and expands on demand", () => {
@@ -18,11 +18,32 @@ describe("HistoryView", () => {
         timestamp: 2,
       },
     ];
+    const nodes = new Map<string, Node>([
+      [
+        "agent-12345678",
+        {
+          id: "agent-12345678",
+          node_type: "agent",
+          graph_id: "graph-1",
+          state: "idle",
+          connections: [],
+          name: "Directory Analyzer",
+          todos: [],
+          role_name: "Worker",
+        },
+      ],
+    ]);
 
-    render(<HistoryView history={history} agentLabel="Project Planner" />);
+    render(
+      <HistoryView
+        history={history}
+        agentLabel="Project Planner"
+        nodes={nodes}
+      />,
+    );
 
     expect(
-      screen.getByRole("button", { name: /From agent-12/i }),
+      screen.getByRole("button", { name: /From Directory Analyzer/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Project Planner/i }),
@@ -38,6 +59,25 @@ describe("HistoryView", () => {
 
     expect(
       screen.getByText("The notes cover schedule, speakers, and logistics."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows Human for received messages from the user", () => {
+    render(
+      <HistoryView
+        history={[
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Need a quick summary.",
+            timestamp: 1,
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /From Human/i }),
     ).toBeInTheDocument();
   });
 });

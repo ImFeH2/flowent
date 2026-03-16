@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useAgentNodesRuntime } from "@/context/AgentContext";
 import { useAgentFeedRuntime } from "@/context/AgentFeedContext";
@@ -7,6 +7,16 @@ import type { HistoryEntry, Node } from "@/types";
 
 const RECENT_ACTIVITY_WINDOW_MS = 8000;
 const MAX_VISIBLE_ACTIVITY_ITEMS = 24;
+const LABEL_FONT_SIZE =
+  "clamp(9.5px, calc(9.5px + (var(--sidebar-activity-width) - 180px) * 0.003636), 10.3px)";
+const TICKER_FONT_SIZE =
+  "clamp(10.5px, calc(10.5px + (var(--sidebar-activity-width) - 180px) * 0.002273), 11px)";
+const ROW_HEIGHT =
+  "clamp(22px, calc(22px + (var(--sidebar-activity-width) - 180px) * 0.018182), 26px)";
+const ITEM_GAP =
+  "clamp(7px, calc(7px + (var(--sidebar-activity-width) - 180px) * 0.013636), 10px)";
+const EVENT_DOT_SIZE =
+  "clamp(4px, calc(4px + (var(--sidebar-activity-width) - 180px) * 0.004545), 5px)";
 
 type ActivityTone = "active" | "quiet" | "alert" | "thinking";
 
@@ -133,14 +143,11 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
   const { agents } = useAgentNodesRuntime();
   const { recentActivities } = useAgentFeedRuntime();
   const [now, setNow] = useState(() => Date.now());
-  const widthProgress = Math.max(0, Math.min(1, (width - 180) / 220));
   const labelMaxLength = width < 220 ? 12 : width < 280 ? 16 : 22;
   const toolMaxLength = width < 220 ? 10 : width < 280 ? 14 : 18;
-  const labelFontSizePx = 9.5 + widthProgress * 0.8;
-  const tickerFontSizePx = 10.5 + widthProgress * 0.5;
-  const rowHeightPx = 22 + widthProgress * 4;
-  const itemGapPx = 7 + widthProgress * 3;
-  const eventDotSizePx = 4 + widthProgress * 1;
+  const responsiveStyles = {
+    "--sidebar-activity-width": `${width}px`,
+  } as CSSProperties;
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -179,7 +186,10 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
   const currentItem = items[items.length - 1] ?? null;
 
   return (
-    <div className="flex items-center gap-3 overflow-hidden">
+    <div
+      className="flex items-center gap-3 overflow-hidden"
+      style={responsiveStyles}
+    >
       <div className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/62">
         <span
           className={cn(
@@ -189,9 +199,7 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
               : "bg-white/20",
           )}
         />
-        <span style={{ fontSize: `${labelFontSizePx.toFixed(2)}px` }}>
-          Live
-        </span>
+        <span style={{ fontSize: LABEL_FONT_SIZE }}>Live</span>
       </div>
 
       <div className="min-w-0 flex-1 overflow-hidden">
@@ -199,8 +207,8 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
           <div
             className="flex min-w-0 items-center text-muted-foreground/72"
             style={{
-              height: `${rowHeightPx.toFixed(2)}px`,
-              fontSize: `${tickerFontSizePx.toFixed(2)}px`,
+              height: ROW_HEIGHT,
+              fontSize: TICKER_FONT_SIZE,
             }}
           >
             <span className="block truncate">Waiting for agent activity</span>
@@ -209,23 +217,23 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
           <div
             className="relative min-w-0 overflow-hidden"
             style={{
-              height: `${rowHeightPx.toFixed(2)}px`,
+              height: ROW_HEIGHT,
             }}
           >
             <AnimatePresence initial={false}>
               <motion.div
                 key={currentItem.id}
-                initial={{ y: rowHeightPx * 0.65, opacity: 0 }}
+                initial={{ y: 16, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -rowHeightPx * 0.65, opacity: 0 }}
+                exit={{ y: -16, opacity: 0 }}
                 transition={{
                   duration: 0.24,
                   ease: [0.22, 1, 0.36, 1],
                 }}
                 className="absolute inset-0 flex min-w-0 items-center text-muted-foreground/84"
                 style={{
-                  fontSize: `${tickerFontSizePx.toFixed(2)}px`,
-                  gap: `${itemGapPx.toFixed(2)}px`,
+                  fontSize: TICKER_FONT_SIZE,
+                  gap: ITEM_GAP,
                 }}
               >
                 <span
@@ -240,8 +248,8 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
                           : "bg-white/28",
                   )}
                   style={{
-                    width: `${eventDotSizePx.toFixed(2)}px`,
-                    height: `${eventDotSizePx.toFixed(2)}px`,
+                    width: EVENT_DOT_SIZE,
+                    height: EVENT_DOT_SIZE,
                   }}
                 />
                 <span className="block min-w-0 truncate">

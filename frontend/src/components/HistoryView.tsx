@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "motion/react";
 import { useState, useCallback, type ReactNode } from "react";
 import {
   ChevronRight,
@@ -10,30 +11,53 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { HistoryEntry } from "@/types";
+import type { HistoryEntry, Node } from "@/types";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { CopyButton } from "@/components/CopyButton";
 
 interface HistoryViewProps {
   agentLabel?: string;
   history: HistoryEntry[];
+  nodes?: Map<string, Node>;
 }
 
 export function HistoryView({
   agentLabel = "Agent",
   history,
+  nodes,
 }: HistoryViewProps) {
   return (
     <div className="space-y-1.5 p-3">
-      {history.map((entry) => (
+      {history.map((entry, index) => (
         <HistoryItem
-          key={`${entry.timestamp}-${entry.type}-${entry.tool_call_id ?? ""}`}
+          key={`${index}-${entry.timestamp}-${entry.type}-${entry.tool_call_id ?? ""}`}
           agentLabel={agentLabel}
           entry={entry}
+          nodes={nodes}
         />
       ))}
     </div>
   );
+}
+
+function getHistoryNodeLabel(
+  fromId: string | null | undefined,
+  nodes?: Map<string, Node>,
+): string {
+  if (!fromId) {
+    return "unknown";
+  }
+  if (fromId === "human") {
+    return "Human";
+  }
+  const node = nodes?.get(fromId);
+  if (node?.name) {
+    return node.name;
+  }
+  if (node?.role_name) {
+    return node.role_name;
+  }
+  return fromId.slice(0, 8);
 }
 
 function formatJsonOutput(value: unknown): string | null {
@@ -117,9 +141,11 @@ function StreamingText({
 function HistoryItem({
   agentLabel,
   entry,
+  nodes,
 }: {
   agentLabel: string;
   entry: HistoryEntry;
+  nodes?: Map<string, Node>;
 }) {
   switch (entry.type) {
     case "SystemEntry":
@@ -142,7 +168,7 @@ function HistoryItem({
     case "ReceivedMessage":
       return (
         <CollapsibleBlock
-          label={`From ${entry.from_id ? entry.from_id.slice(0, 8) : "unknown"}`}
+          label={`From ${getHistoryNodeLabel(entry.from_id, nodes)}`}
           icon={<MessageSquare className="size-3 text-foreground/70" />}
           className="border-muted-foreground/25 bg-muted-foreground/10"
           labelClassName="text-foreground/70"
@@ -319,9 +345,21 @@ function CollapsibleBlock({
         </button>
         {actions ? <span className="ml-auto shrink-0">{actions}</span> : null}
       </div>
-      {open && (
-        <div className={cn("px-2.5 pb-2", contentClassName)}>{children}</div>
-      )}
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className={cn("px-2.5 pb-2", contentClassName)}>
+              {children}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

@@ -362,12 +362,12 @@ class Agent:
 
             elif isinstance(entry, ReceivedMessage):
                 self._flush_tool_calls(messages, pending_tool_calls)
-                payload = json.dumps({"from": entry.from_id, "content": entry.content})
+                payload = f'<message from="{entry.from_id}">{entry.content}</message>'
                 messages.append({"role": "user", "content": payload})
 
             elif isinstance(entry, SystemInjection):
                 self._flush_tool_calls(messages, pending_tool_calls)
-                payload = json.dumps({"system": entry.content})
+                payload = f"<system>{entry.content}</system>"
                 messages.append({"role": "user", "content": payload})
 
             elif isinstance(entry, AssistantText):

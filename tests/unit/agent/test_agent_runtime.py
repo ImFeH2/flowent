@@ -258,8 +258,7 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
     )
     assert any(
         msg.get("role") == "user"
-        and msg.get("content")
-        == json.dumps({"from": "human", "content": "wake up now"})
+        and msg.get("content") == '<message from="human">wake up now</message>'
         for msg in second_round
     )
 

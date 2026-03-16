@@ -47,6 +47,12 @@ export function Sidebar({
   const { currentPage, setCurrentPage } = useAgentUI();
 
   const { isDragging, startDrag } = usePanelDrag(width, onWidthChange, "right");
+  const widthProgress = Math.max(0, Math.min(1, (width - 180) / 220));
+  const headerPaddingY = 16 + widthProgress * 6;
+  const titleFontSizeRem = 1.08 + widthProgress * 0.24;
+  const subtitleFontSizePx = 10.5 + widthProgress * 1.25;
+  const subtitleMarginTopPx = 3 + widthProgress * 2;
+  const statusFontSizePx = 10.5 + widthProgress * 0.5;
 
   const runningCount = Array.from(agents.values()).filter(
     (agent) => agent.state === "running",
@@ -69,38 +75,47 @@ export function Sidebar({
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.022),transparent_22%,transparent_82%,rgba(255,255,255,0.01))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="shrink-0 border-b border-white/6 px-4 py-[1.125rem]">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/[0.04]">
-              <Bot className="size-4 text-primary" />
-            </div>
+        <div
+          className="shrink-0 border-b border-white/6 px-4"
+          style={{
+            paddingTop: `${headerPaddingY}px`,
+            paddingBottom: `${headerPaddingY}px`,
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/75">
+              <h1
+                className="truncate font-semibold tracking-[-0.03em] text-foreground"
+                style={{ fontSize: `${titleFontSizeRem.toFixed(3)}rem` }}
+              >
                 Autopoe
-              </p>
-              <h1 className="mt-1 truncate text-[1.05rem] font-semibold tracking-[-0.03em] text-foreground">
-                Agent Studio
               </h1>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                Multi-agent orchestration workspace
+              <p
+                className="truncate font-medium tracking-[0.02em] text-muted-foreground"
+                style={{
+                  marginTop: `${subtitleMarginTopPx.toFixed(2)}px`,
+                  fontSize: `${subtitleFontSizePx.toFixed(2)}px`,
+                }}
+              >
+                Agent Studio
               </p>
             </div>
-          </div>
-          <div className="mt-4 flex items-center gap-2 text-[11px]">
-            <span
-              className={cn(
-                "size-2 rounded-full shadow-[0_0_10px_currentColor]",
-                connected
-                  ? "bg-emerald-400 text-emerald-400"
-                  : "bg-amber-400 text-amber-400",
-              )}
-            />
-            <span className="font-medium text-foreground">
-              {connected ? "Connected" : "Reconnecting"}
-            </span>
-            <span className="text-muted-foreground">
-              {agents.size} nodes online
-            </span>
+            <div
+              className="flex shrink-0 items-center gap-2 self-center"
+              style={{ fontSize: `${statusFontSizePx.toFixed(2)}px` }}
+            >
+              <span
+                className={cn(
+                  "size-2 rounded-full shadow-[0_0_10px_currentColor]",
+                  connected
+                    ? "bg-emerald-400 text-emerald-400"
+                    : "bg-amber-400 text-amber-400",
+                )}
+              />
+              <span className="font-medium text-foreground">
+                {connected ? "Connected" : "Reconnecting"}
+              </span>
+            </div>
           </div>
         </div>
 

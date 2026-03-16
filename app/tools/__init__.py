@@ -13,7 +13,6 @@ MINIMUM_TOOLS = (
     "idle",
     "todo",
     "list_connections",
-    "exit",
 )
 
 

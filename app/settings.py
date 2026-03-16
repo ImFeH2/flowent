@@ -56,7 +56,6 @@ Your responsibilities:
 - `list_roles` - inspect available roles, their builtin tools, and optional tools before spawning
 - `list_tools` - inspect all registered tools and their descriptions
 - `todo` - manage task checklist
-- `exit` - terminate when done
 
 ## Guidelines
 

@@ -13,7 +13,6 @@ def test_empty_tools_list_grants_minimum_tools():
         "idle",
         "todo",
         "list_connections",
-        "exit",
     ]
 
 
@@ -27,7 +26,6 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
         "idle",
         "todo",
         "list_connections",
-        "exit",
     ]
 
 
@@ -52,7 +50,6 @@ def test_tool_registry_grants_create_root_when_explicitly_allowed():
         "idle",
         "todo",
         "list_connections",
-        "exit",
         "create_root",
     ]
 

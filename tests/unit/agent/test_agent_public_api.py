@@ -165,11 +165,11 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "idle",
                 "todo",
                 "list_connections",
-                "exit",
                 "read",
                 "exec",
             ],
             "optional_tools": [
+                "exit",
                 "create_graph",
                 "connect_nodes",
                 "disconnect_nodes",
@@ -190,9 +190,9 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "idle",
                 "todo",
                 "list_connections",
-                "exit",
             ],
             "optional_tools": [
+                "exit",
                 "create_graph",
                 "connect_nodes",
                 "disconnect_nodes",

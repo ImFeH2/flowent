@@ -40,11 +40,19 @@ DELEGATION_USAGE_GUIDANCE = """\
 COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
-- Your plain text output (content) is automatically delivered to your parent node as a message. Use it to report results, request clarification, or hand off final output.
-- Do NOT output content just to "think out loud" between tool calls — content wakes up your parent and interrupts their work. Only produce content when you have something meaningful to report.
-- To send a message to a node other than your parent, start the content with `@target: message body`. Multiple targets: `@alice, bob: message body`.
+- If the first line of your content starts with `@target: message body`, the entire content is delivered to that target instead of your parent. Multiple targets are allowed: `@alice, bob: message body`.
+- If the first line of your content does not start with `@`, the entire content is automatically delivered to your parent node as a message.
+- Do NOT output content just to "think out loud" between tool calls. Content wakes up your parent and interrupts their work. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
 - System context is injected as: <system>content</system>
+"""
+
+ASSISTANT_ONLY_PROMPT = """\
+## Assistant-Only Communication Rules
+
+- Your content is pushed directly to the frontend chat panel as your reply to the Human. You do not need `@target:` when replying to the Human.
+- If you need to send a message to a connected node instead of the Human, start the content with `@target: message body`. Multiple targets are allowed: `@alice, bob: message body`.
+- Entering a waiting state still requires an explicit `idle` tool call.
 """
 
 COMMON_AGENT_PROMPT = "\n\n".join(
@@ -64,10 +72,13 @@ DEFAULT_AGENT_ROLE_PROMPT = (
 def compose_system_prompt(
     role_prompt: str,
     custom_prompt: str = "",
+    is_assistant: bool = False,
 ) -> str:
     custom_prompt_text = custom_prompt.strip()
     role_specific_prompt = role_prompt.strip()
     parts = [COMMON_AGENT_PROMPT]
+    if is_assistant:
+        parts.append(ASSISTANT_ONLY_PROMPT)
     if custom_prompt_text:
         parts.append(custom_prompt_text)
     if role_specific_prompt:

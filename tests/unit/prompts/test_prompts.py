@@ -1,6 +1,7 @@
 from app.models import NodeConfig, NodeType
 from app.prompts import get_system_prompt
 from app.prompts.common import (
+    ASSISTANT_ONLY_PROMPT,
     COMMON_AGENT_PROMPT,
     DEFAULT_AGENT_ROLE_PROMPT,
     compose_system_prompt,
@@ -24,6 +25,23 @@ def test_compose_system_prompt_inserts_custom_prompt_between_common_and_role():
     assert result == "\n\n".join(
         [
             COMMON_AGENT_PROMPT,
+            "Global custom instructions.",
+            "Role-specific instructions.",
+        ]
+    )
+
+
+def test_compose_system_prompt_inserts_assistant_layer_before_custom_prompt():
+    result = compose_system_prompt(
+        "Role-specific instructions.",
+        custom_prompt="Global custom instructions.",
+        is_assistant=True,
+    )
+
+    assert result == "\n\n".join(
+        [
+            COMMON_AGENT_PROMPT,
+            ASSISTANT_ONLY_PROMPT,
             "Global custom instructions.",
             "Role-specific instructions.",
         ]
@@ -91,7 +109,9 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert prompt == compose_system_prompt(
         STEWARD_ROLE_SYSTEM_PROMPT,
         custom_prompt="",
+        is_assistant=True,
     )
+    assert ASSISTANT_ONLY_PROMPT in prompt
     assert "create_root" in prompt
     assert "manage_providers" in prompt
     assert "manage_roles" in prompt
@@ -117,6 +137,7 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
         CONDUCTOR_ROLE_SYSTEM_PROMPT,
         custom_prompt="",
     )
+    assert ASSISTANT_ONLY_PROMPT not in prompt
 
 
 def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
@@ -128,6 +149,7 @@ def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
     prompt = get_system_prompt(NodeConfig(node_type=NodeType.AGENT, role_name="Ghost"))
 
     assert prompt == compose_system_prompt(DEFAULT_AGENT_ROLE_PROMPT, custom_prompt="")
+    assert ASSISTANT_ONLY_PROMPT not in prompt
 
 
 def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch):
@@ -143,4 +165,6 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
     assert prompt == compose_system_prompt(
         STEWARD_ROLE_SYSTEM_PROMPT,
         custom_prompt="",
+        is_assistant=True,
     )
+    assert ASSISTANT_ONLY_PROMPT in prompt

@@ -26,4 +26,5 @@ def get_system_prompt(config: NodeConfig) -> str:
     return compose_system_prompt(
         prompt,
         custom_prompt=settings.custom_prompt,
+        is_assistant=config.node_type == NodeType.ASSISTANT,
     )

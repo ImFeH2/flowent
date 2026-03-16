@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { Edit2, Eye, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -12,7 +12,11 @@ import {
   type ToolInfo,
 } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
-import { PageScaffold } from "@/components/layout/PageScaffold";
+import {
+  PageScaffold,
+  SectionHeader,
+  SettingsRow,
+} from "@/components/layout/PageScaffold";
 import {
   Select,
   SelectContent,
@@ -48,48 +52,6 @@ const emptyDraft = (): RoleDraft => ({
   included_tools: [],
   excluded_tools: [],
 });
-
-function SectionHeader({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="mb-6">
-      <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
-        {eyebrow}
-      </p>
-      <h3 className="text-base font-semibold">{title}</h3>
-      <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function SettingsRow({
-  children,
-  description,
-  label,
-  valueClassName,
-}: {
-  children: ReactNode;
-  description: string;
-  label: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-8 border-b border-white/[0.04] py-3 last:border-0">
-      <div className="min-w-0 flex-1">
-        <label className="text-sm font-medium">{label}</label>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className={cn("w-64 shrink-0", valueClassName)}>{children}</div>
-    </div>
-  );
-}
 
 export function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);

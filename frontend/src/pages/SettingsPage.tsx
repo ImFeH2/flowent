@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -8,7 +8,11 @@ import {
   type ModelOption,
 } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
-import { PageScaffold } from "@/components/layout/PageScaffold";
+import {
+  PageScaffold,
+  SectionHeader,
+  SettingsRow,
+} from "@/components/layout/PageScaffold";
 import {
   Select,
   SelectContent,
@@ -30,48 +34,6 @@ interface UserSettings {
     active_model: string;
     params: ModelParams;
   };
-}
-
-function SectionHeader({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="mb-6">
-      <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
-        {eyebrow}
-      </p>
-      <h2 className="text-base font-semibold">{title}</h2>
-      <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
-function SettingsRow({
-  children,
-  description,
-  label,
-  valueClassName,
-}: {
-  children: ReactNode;
-  description: string;
-  label: string;
-  valueClassName?: string;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-8 border-b border-white/[0.04] py-3 last:border-0">
-      <div className="min-w-0 flex-1">
-        <label className="text-sm font-medium">{label}</label>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className={cn("w-64 shrink-0", valueClassName)}>{children}</div>
-    </div>
-  );
 }
 
 export function SettingsPage() {

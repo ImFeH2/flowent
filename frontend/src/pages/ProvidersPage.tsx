@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import {
   Check,
@@ -38,6 +38,48 @@ const emptyDraft = (): ProviderDraft => ({
   base_url: "",
   api_key: "",
 });
+
+function SectionHeader({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-6">
+      <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+        {eyebrow}
+      </p>
+      <h2 className="text-base font-semibold">{title}</h2>
+      <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function SettingsRow({
+  label,
+  description,
+  children,
+  valueClassName,
+}: {
+  label: string;
+  description: string;
+  children: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-8 border-b border-white/[0.04] py-3 last:border-0">
+      <div className="min-w-0 flex-1">
+        <label className="text-sm font-medium">{label}</label>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className={cn("w-64 shrink-0", valueClassName)}>{children}</div>
+    </div>
+  );
+}
 
 export function ProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -314,10 +356,17 @@ export function ProvidersPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="mx-auto max-w-xl space-y-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Provider Name</label>
+            <div className="flex-1 overflow-y-auto">
+              <div className="mx-auto max-w-xl py-6">
+                <SectionHeader
+                  eyebrow="Provider"
+                  title="Identity"
+                  description="Display name and API type"
+                />
+                <SettingsRow
+                  label="Name"
+                  description="Display name for this provider"
+                >
                   <input
                     type="text"
                     value={draft.name}
@@ -325,19 +374,20 @@ export function ProvidersPage() {
                       setDraft({ ...draft, name: e.target.value })
                     }
                     placeholder="e.g., OpenAI Production"
-                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                   />
-                </div>
-
-                <div className="space-y-2 border-t border-white/6 pt-6">
-                  <label className="text-sm font-medium">Provider Type</label>
+                </SettingsRow>
+                <SettingsRow
+                  label="Type"
+                  description="API format used by this provider"
+                >
                   <Select
                     value={draft.type}
                     onValueChange={(value) =>
                       setDraft({ ...draft, type: value })
                     }
                   >
-                    <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
+                    <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -348,66 +398,60 @@ export function ProvidersPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {draft.type === "openai_compatible"
-                      ? "Any OpenAI-compatible API endpoint"
-                      : draft.type === "anthropic"
-                        ? "Anthropic Claude API"
-                        : "Google Gemini API"}
-                  </p>
-                </div>
+                </SettingsRow>
 
-                <div className="space-y-2 border-t border-white/6 pt-6">
-                  <label className="text-sm font-medium">Base URL</label>
-                  <input
-                    type="text"
-                    value={draft.base_url}
-                    onChange={(e) =>
-                      setDraft({ ...draft, base_url: e.target.value })
-                    }
-                    placeholder="https://api.openai.com/v1"
-                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm font-mono transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                <div className="mt-8 border-t border-white/6 pt-8">
+                  <SectionHeader
+                    eyebrow="Connection"
+                    title="Endpoint"
+                    description="API endpoint and authentication"
                   />
-                </div>
-
-                <div className="space-y-2 border-t border-white/6 pt-6">
-                  <label className="text-sm font-medium">API Key</label>
-                  <div className="relative">
+                  <SettingsRow label="Base URL" description="API endpoint URL">
                     <input
-                      type={showKey ? "text" : "password"}
-                      value={draft.api_key}
+                      type="text"
+                      value={draft.base_url}
                       onChange={(e) =>
-                        setDraft({ ...draft, api_key: e.target.value })
+                        setDraft({ ...draft, base_url: e.target.value })
                       }
-                      placeholder="sk-..."
-                      className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-10 text-sm font-mono transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                      placeholder="https://api.openai.com/v1"
+                      className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowKey(!showKey)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
-                    >
-                      {showKey ? (
-                        <EyeOff className="size-4" />
-                      ) : (
-                        <Eye className="size-4" />
-                      )}
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Your API key is encrypted and stored securely.
-                  </p>
+                  </SettingsRow>
+                  <SettingsRow
+                    label="API Key"
+                    description="Authentication key (optional)"
+                  >
+                    <div className="relative">
+                      <input
+                        type={showKey ? "text" : "password"}
+                        value={draft.api_key}
+                        onChange={(e) =>
+                          setDraft({ ...draft, api_key: e.target.value })
+                        }
+                        placeholder="sk-..."
+                        className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-9 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKey(!showKey)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                      >
+                        {showKey ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
+                      </button>
+                    </div>
+                  </SettingsRow>
                 </div>
 
                 {!isCreating && selectedProvider && (
-                  <div className="border-t border-white/6 pt-6">
-                    <button
-                      onClick={() => handleDelete(selectedProvider.id)}
-                      className="flex items-center gap-2 rounded-md border border-destructive/50 px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
-                    >
-                      <Trash2 className="size-4" />
-                      Delete Provider
-                    </button>
+                  <div className="mt-8 border-t border-white/6 pt-4">
+                    <p className="text-xs text-muted-foreground">
+                      ID:{" "}
+                      <code className="font-mono">{selectedProvider.id}</code>
+                    </p>
                   </div>
                 )}
               </div>

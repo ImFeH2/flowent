@@ -50,6 +50,36 @@ def test_idle_tool_blocks_until_message_and_returns_no_result():
     assert agent.history[-1].content == "hello from queue"
 
 
+def test_enqueue_message_enqueues_wake_signal_immediately():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+
+    agent.enqueue_message(
+        Message(from_id="tester", to_id=agent.uuid, content="hello from queue")
+    )
+
+    signal = agent._wake_queue.get_nowait()
+
+    assert signal.reason == "message"
+    assert signal.payload == {
+        "message": {"from": "tester", "content": "hello from queue"}
+    }
+    assert signal.resume_reason == "received message from tester"
+
+
+def test_request_termination_enqueues_wake_signal_immediately():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+
+    agent.request_termination("stop")
+
+    signal = agent._wake_queue.get_nowait()
+
+    assert agent._terminate.is_set()
+    assert agent._termination_reason == "stop"
+    assert signal.reason == "termination"
+    assert signal.payload == {}
+    assert signal.resume_reason == "termination requested"
+
+
 def test_list_connections_tool_uses_agent_public_api(monkeypatch):
     agent = Agent(
         NodeConfig(node_type=NodeType.AGENT, tools=["list_connections"]),

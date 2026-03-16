@@ -66,11 +66,9 @@ class Agent:
         self.todos: list[TodoItem] = []
         self.connections: list[str] = []
         self.history: list[HistoryEntry] = []
-        self._message_queue: Queue[Message] = Queue()
         self._terminate = threading.Event()
         self._idle_state_event = threading.Event()
         self._wake_queue: Queue[WakeSignal] = Queue()
-        self._wake_waiting = threading.Event()
         self._thread: threading.Thread | None = None
         self._termination_reason: str = ""
         self._connections_lock = threading.Lock()
@@ -430,24 +428,35 @@ class Agent:
         pending.clear()
 
     def _drain_messages(self) -> None:
-        drained: list[Message] = []
+        drained: list[WakeSignal] = []
         while True:
             try:
-                drained.append(self._message_queue.get_nowait())
+                signal = self._wake_queue.get_nowait()
             except Empty:
+                break
+            if signal.reason == "message":
+                drained.append(signal)
+                continue
+            if signal.reason == "termination":
+                self._terminate.set()
                 break
 
         if drained:
             self._log.debug("Drained {} message(s) from queue", len(drained))
 
-        for msg in drained:
+        for signal in drained:
+            message = signal.payload.get("message", {})
+            content = message.get("content", "")
+            from_id = message.get("from", "")
+            if not isinstance(content, str) or not isinstance(from_id, str):
+                continue
             self._log.debug(
                 "Message from {}: {}",
-                msg.from_id,
-                (msg.content[:100] + "...") if len(msg.content) > 100 else msg.content,
+                from_id,
+                (content[:100] + "...") if len(content) > 100 else content,
             )
             self._append_history(
-                ReceivedMessage(content=msg.content, from_id=msg.from_id),
+                ReceivedMessage(content=content, from_id=from_id),
             )
 
     def _wait_for_input(self) -> None:
@@ -472,48 +481,16 @@ class Agent:
             )
 
     def _wait_for_wakeup(self) -> WakeSignal:
-        pending_message = self._consume_pending_message()
-        if pending_message is not None:
-            return pending_message
+        while not self._terminate.is_set():
+            try:
+                return self._wake_queue.get(timeout=2.0)
+            except Empty:
+                continue
 
-        self._wake_waiting.set()
-        try:
-            while not self._terminate.is_set():
-                try:
-                    signal = self._wake_queue.get(timeout=2.0)
-                except Empty:
-                    pending_message = self._consume_pending_message()
-                    if pending_message is not None:
-                        return pending_message
-                    continue
-
-                if signal.reason == "message":
-                    pending_message = self._consume_pending_message()
-                    if pending_message is not None:
-                        return pending_message
-                    continue
-
-                return signal
-
-            return WakeSignal(
-                reason="termination",
-                payload={"reason": "termination"},
-                resume_reason="termination requested",
-            )
-        finally:
-            self._wake_waiting.clear()
-
-    def _consume_pending_message(self) -> WakeSignal | None:
-        msg = self.try_get_message(timeout=0)
-        if msg is None:
-            return None
         return WakeSignal(
-            reason="message",
-            payload={
-                "reason": "message",
-                "message": {"from": msg.from_id, "content": msg.content},
-            },
-            resume_reason=f"received message from {msg.from_id}",
+            reason="termination",
+            payload={},
+            resume_reason="termination requested",
         )
 
     def _handle_tool_call(
@@ -645,19 +622,13 @@ class Agent:
             )
 
     def enqueue_message(self, msg: Message) -> None:
-        self._message_queue.put(msg)
-        if self._wake_waiting.is_set():
-            self._wake_queue.put(WakeSignal(reason="message", payload={}))
-
-    def try_get_message(self, timeout: float = 0) -> Message | None:
-        try:
-            return (
-                self._message_queue.get(timeout=timeout)
-                if timeout > 0
-                else self._message_queue.get_nowait()
+        self._wake_queue.put(
+            WakeSignal(
+                reason="message",
+                payload={"message": {"from": msg.from_id, "content": msg.content}},
+                resume_reason=f"received message from {msg.from_id}",
             )
-        except Empty:
-            return None
+        )
 
     def inject_system_message(self, content: str) -> None:
         self._append_history(SystemInjection(content=content))
@@ -699,14 +670,13 @@ class Agent:
     def request_termination(self, reason: str = "") -> None:
         self._termination_reason = reason
         self._terminate.set()
-        if self._wake_waiting.is_set():
-            self._wake_queue.put(
-                WakeSignal(
-                    reason="termination",
-                    payload={"reason": "termination"},
-                    resume_reason="termination requested",
-                )
+        self._wake_queue.put(
+            WakeSignal(
+                reason="termination",
+                payload={},
+                resume_reason="termination requested",
             )
+        )
 
     def terminate_and_wait(self, timeout: float = 10.0) -> None:
         self.request_termination("shutdown")

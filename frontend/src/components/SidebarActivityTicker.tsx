@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useAgentNodesRuntime } from "@/context/AgentContext";
 import { useAgentFeedRuntime } from "@/context/AgentFeedContext";
+import { getNodeLabel } from "@/lib/nodeLabel";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, Node } from "@/types";
 
@@ -28,31 +29,6 @@ interface ActivityTickerItem {
 
 interface SidebarActivityTickerProps {
   width: number;
-}
-
-function clampLabel(value: string, maxLength: number): string {
-  if (value.length <= maxLength) {
-    return value;
-  }
-  return `${value.slice(0, Math.max(0, maxLength - 3))}...`;
-}
-
-function getNodeLabel(
-  nodeId: string,
-  agents: Map<string, Node>,
-  maxLength: number,
-): string {
-  const node = agents.get(nodeId);
-  const preferred = node?.name?.trim() || node?.role_name?.trim();
-  if (preferred) {
-    return clampLabel(preferred, maxLength);
-  }
-  if (nodeId === "assistant") {
-    return "Assistant";
-  }
-  const fallback =
-    nodeId.includes("-") && nodeId.length > 12 ? nodeId.slice(0, 8) : nodeId;
-  return clampLabel(fallback || "unknown", maxLength);
 }
 
 function buildTickerItem(
@@ -90,6 +66,10 @@ function buildTickerItem(
       };
     case "ToolCall": {
       const toolName = entry.tool_name ?? "tool";
+      const toolLabel =
+        toolName.length > toolMaxLength
+          ? `${toolName.slice(0, Math.max(0, toolMaxLength - 3))}...`
+          : toolName;
       if (toolName === "send") {
         const toId = String(entry.arguments?.to ?? "");
         const toLabel = toId
@@ -124,7 +104,7 @@ function buildTickerItem(
       }
       return {
         id: `${agentId}-${entry.timestamp}-tool-${toolName}`,
-        text: `${agentLabel} · ${clampLabel(toolName, toolMaxLength)}`,
+        text: `${agentLabel} · ${toolLabel}`,
         tone: toolName === "exit" ? "quiet" : "active",
       };
     }

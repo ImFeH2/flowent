@@ -80,4 +80,41 @@ describe("HistoryView", () => {
       screen.getByRole("button", { name: /From Human/i }),
     ).toBeInTheDocument();
   });
+
+  it("shows readable labels for send tool targets", () => {
+    const nodes = new Map<string, Node>([
+      [
+        "assistant",
+        {
+          id: "assistant",
+          node_type: "assistant",
+          graph_id: null,
+          state: "idle",
+          connections: [],
+          name: null,
+          todos: [],
+          role_name: "Steward",
+        },
+      ],
+    ]);
+
+    render(
+      <HistoryView
+        history={[
+          {
+            type: "ToolCall",
+            tool_name: "send",
+            tool_call_id: "tool-1",
+            arguments: { to: "assistant", content: "Done." },
+            timestamp: 1,
+          },
+        ]}
+        nodes={nodes}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /To Assistant/i }),
+    ).toBeInTheDocument();
+  });
 });

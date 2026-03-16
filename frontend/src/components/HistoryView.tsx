@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { HistoryEntry, Node } from "@/types";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { CopyButton } from "@/components/CopyButton";
+import { getNodeLabel } from "@/lib/nodeLabel";
 
 interface HistoryViewProps {
   agentLabel?: string;
@@ -38,26 +39,6 @@ export function HistoryView({
       ))}
     </div>
   );
-}
-
-function getHistoryNodeLabel(
-  fromId: string | null | undefined,
-  nodes?: Map<string, Node>,
-): string {
-  if (!fromId) {
-    return "unknown";
-  }
-  if (fromId === "human") {
-    return "Human";
-  }
-  const node = nodes?.get(fromId);
-  if (node?.name) {
-    return node.name;
-  }
-  if (node?.role_name) {
-    return node.role_name;
-  }
-  return fromId.slice(0, 8);
 }
 
 function formatJsonOutput(value: unknown): string | null {
@@ -168,7 +149,7 @@ function HistoryItem({
     case "ReceivedMessage":
       return (
         <CollapsibleBlock
-          label={`From ${getHistoryNodeLabel(entry.from_id, nodes)}`}
+          label={`From ${getNodeLabel(entry.from_id ?? "", nodes)}`}
           icon={<MessageSquare className="size-3 text-foreground/70" />}
           className="border-muted-foreground/25 bg-muted-foreground/10"
           labelClassName="text-foreground/70"
@@ -227,7 +208,7 @@ function HistoryItem({
         const content = entry.arguments?.content as string | undefined;
         return (
           <CollapsibleBlock
-            label={`To ${toId ? toId.slice(0, 8) : "unknown"}`}
+            label={`To ${getNodeLabel(toId ?? "", nodes)}`}
             icon={<Send className="size-3 text-purple-400" />}
             className="border-purple-500/20 bg-purple-500/5"
             labelClassName="text-purple-400"

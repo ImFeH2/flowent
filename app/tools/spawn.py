@@ -10,7 +10,6 @@ from loguru import logger
 from app.graph_runtime import connect_nodes
 from app.models import NodeConfig, NodeType
 from app.tools import MINIMUM_TOOLS, Tool
-from app.tools.send import send_message
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -23,7 +22,7 @@ class SpawnTool(Tool):
         "This is a low-cost delegation mechanism: you may create specialized agents whenever parallelism or task handoff would help. "
         "If the work is outside your role, expertise, or ownership, spawning a better-suited agent should usually be your first move. "
         "Once you determine that spawning is the better path, do it directly instead of asking the Human for permission, unless the spawn would enable destructive work, material extra cost, or elevated permissions. "
-        "The agent is created, connected to the spawner, and task_prompt is sent as the first message after the new agent reaches idle."
+        "The agent is created and connected to the spawner. To assign a task, send a message after spawning."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -31,10 +30,6 @@ class SpawnTool(Tool):
             "role_name": {
                 "type": "string",
                 "description": "Name of the Role to assign to the new agent",
-            },
-            "task_prompt": {
-                "type": "string",
-                "description": "Task description sent as the initial message to the new agent",
             },
             "name": {
                 "type": "string",
@@ -59,10 +54,6 @@ class SpawnTool(Tool):
                 "type": "string",
                 "description": "Graph to add the new node to. Defaults to the caller's current graph.",
             },
-            "task_delivery_timeout": {
-                "type": "number",
-                "description": "Seconds to wait for the spawned agent to reach idle before sending task_prompt (default 30)",
-            },
         },
         "required": ["role_name"],
     }
@@ -73,13 +64,11 @@ class SpawnTool(Tool):
         from app.settings import find_role, get_settings
 
         role_name = args["role_name"]
-        task_prompt = args.get("task_prompt")
         name = args.get("name")
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
         graph_id = args.get("graph_id") or agent.config.graph_id
-        task_delivery_timeout = args.get("task_delivery_timeout", 30)
 
         if not isinstance(tools, list) or not all(
             isinstance(tool_name, str) for tool_name in tools
@@ -91,10 +80,6 @@ class SpawnTool(Tool):
             return json.dumps({"error": "write_dirs must be an array of strings"})
         if not isinstance(allow_network, bool):
             return json.dumps({"error": "allow_network must be a boolean"})
-        if not isinstance(task_delivery_timeout, (int, float)) or (
-            isinstance(task_delivery_timeout, bool)
-        ):
-            return json.dumps({"error": "task_delivery_timeout must be a number"})
 
         settings = get_settings()
         role_cfg = find_role(settings, role_name)
@@ -182,15 +167,6 @@ class SpawnTool(Tool):
             connect_nodes(agent.uuid, agent_uuid)
             connect_nodes(agent_uuid, agent.uuid)
             connected = True
-
-            if isinstance(task_prompt, str) and task_prompt != "":
-                if not child.wait_until_idle(timeout=float(task_delivery_timeout)):
-                    raise TimeoutError(
-                        "Spawned agent did not reach idle before task delivery"
-                    )
-                payload = send_message(agent, agent_uuid, task_prompt)
-                if "error" in payload:
-                    raise RuntimeError(str(payload["error"]))
         except Exception as exc:
             logger.exception(
                 "Failed to spawn agent {} (role={}) by {}",
@@ -200,7 +176,7 @@ class SpawnTool(Tool):
             )
 
             if started:
-                child.terminate_and_wait(timeout=float(task_delivery_timeout))
+                child.terminate_and_wait(timeout=30.0)
             if registered:
                 registry.unregister(agent_uuid)
             if connected:

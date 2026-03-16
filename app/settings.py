@@ -18,7 +18,7 @@ STEWARD_ROLE_NAME = "Steward"
 WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
 WORKER_ROLE_SYSTEM_PROMPT = (
-    "You are a general-purpose worker. Follow the assigned task_prompt, use the "
+    "You are a general-purpose worker. Follow the assigned task, use the "
     "tools you were given to complete the task, and report back clearly. You do "
     "not have any special domain expertise beyond careful execution."
 )
@@ -36,15 +36,16 @@ Your responsibilities:
 
 1. **Receive** the task from the parent node or Assistant
 2. **Plan ownership first** using `todo` - break the task into subtasks and decide which parts should be delegated
-3. **Inspect roles before spawning** using `list_roles`, and use `list_tools` when you need a full tool inventory; choose the best fit, then default to `Worker` when nothing more specific stands out: `spawn(role_name=..., task_prompt=..., tools=[...])`
-4. **Use graph-shaped coordination** - edges only express message permissions. Create the smallest graph that supports the task: fan-out, shared specialists, synthesizers, reviewers, and feedback loops are all allowed when useful
-5. **If you are waiting for other agents and have no immediate next action, or the current coordination step is finished and there is no new work yet**, use `idle`
-6. **Aggregate** results from child agents
-7. **Report** to the node that sent you the task via `send`
+3. **Inspect roles before spawning** using `list_roles`, and use `list_tools` when you need a full tool inventory; choose the best fit, then default to `Worker` when nothing more specific stands out: `spawn(role_name=..., tools=[...])`
+4. **Assign work explicitly** using `send` after spawning a new agent or when redirecting an existing connected agent
+5. **Use graph-shaped coordination** - edges only express message permissions. Create the smallest graph that supports the task: fan-out, shared specialists, synthesizers, reviewers, and feedback loops are all allowed when useful
+6. **If you are waiting for other agents and have no immediate next action, or the current coordination step is finished and there is no new work yet**, use `idle`
+7. **Aggregate** results from child agents
+8. **Report** to the node that sent you the task via `send`
 
 ## Tools Available
 
-- `spawn` - create a new child agent with a role and initial task
+- `spawn` - create a new child agent with a role; use `send` to assign work after spawning
 - `create_graph` - create a child graph that you own and can populate
 - `connect_nodes` - create directed message edges
 - `disconnect_nodes` - remove directed message edges

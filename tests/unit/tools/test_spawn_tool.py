@@ -3,7 +3,7 @@ import json
 import pytest
 
 from app.agent import Agent
-from app.models import AgentState, Graph, NodeConfig, NodeType
+from app.models import Graph, NodeConfig, NodeType
 from app.registry import registry
 from app.settings import RoleConfig, Settings
 from app.tools import MINIMUM_TOOLS
@@ -17,7 +17,7 @@ def reset_registry():
     registry.reset()
 
 
-def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
+def test_spawn_creates_connected_child_without_task_delivery(monkeypatch):
     parent = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -56,29 +56,13 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
     def fake_start(self: Agent) -> None:
         call_order.append(("start", self.uuid))
 
-    def fake_wait_until_idle(self: Agent, timeout: float | None = None) -> bool:
-        call_order.append(("wait_until_idle", self.uuid, timeout))
-        self.state = AgentState.IDLE
-        return True
-
-    def fake_send_message(agent: Agent, target_ref: str, content: str) -> dict:
-        call_order.append(("send_message", agent.uuid, target_ref, content))
-        return {"status": "sent"}
-
-    def fail_enqueue_message(self: Agent, _msg) -> None:
-        raise AssertionError("spawn should not enqueue the task directly")
-
     monkeypatch.setattr(Agent, "start", fake_start)
-    monkeypatch.setattr(Agent, "wait_until_idle", fake_wait_until_idle)
-    monkeypatch.setattr(Agent, "enqueue_message", fail_enqueue_message)
-    monkeypatch.setattr("app.tools.spawn.send_message", fake_send_message)
 
     result = json.loads(
         SpawnTool().execute(
             parent,
             {
                 "role_name": "Worker",
-                "task_prompt": "handle this task",
                 "tools": ["fetch", "edit"],
             },
         )
@@ -91,14 +75,10 @@ def test_spawn_delivers_task_via_standard_send_after_idle(monkeypatch):
     assert child is not None
     assert child.config.graph_id == "graph-parent"
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
-    assert call_order == [
-        ("start", child_id),
-        ("wait_until_idle", child_id, 30.0),
-        ("send_message", "parent", child_id, "handle this task"),
-    ]
+    assert call_order == [("start", child_id)]
 
 
-def test_spawn_allows_custom_task_delivery_timeout(monkeypatch):
+def test_spawn_uses_default_termination_timeout_when_setup_fails(monkeypatch):
     parent = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -131,19 +111,17 @@ def test_spawn_allows_custom_task_delivery_timeout(monkeypatch):
         ),
     )
 
-    timeouts: list[float | None] = []
+    termination_timeouts: list[float | None] = []
 
     monkeypatch.setattr(Agent, "start", lambda self: None)
-
-    def fake_wait_until_idle(self: Agent, timeout: float | None = None) -> bool:
-        timeouts.append(timeout)
-        self.state = AgentState.IDLE
-        return True
-
-    monkeypatch.setattr(Agent, "wait_until_idle", fake_wait_until_idle)
     monkeypatch.setattr(
-        "app.tools.spawn.send_message",
-        lambda *_args, **_kwargs: {"status": "sent"},
+        Agent,
+        "terminate_and_wait",
+        lambda self, timeout=None: termination_timeouts.append(timeout),
+    )
+    monkeypatch.setattr(
+        "app.tools.spawn.connect_nodes",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
     result = json.loads(
@@ -151,80 +129,13 @@ def test_spawn_allows_custom_task_delivery_timeout(monkeypatch):
             parent,
             {
                 "role_name": "Worker",
-                "task_prompt": "handle this task",
-                "task_delivery_timeout": 12.5,
             },
         )
     )
 
-    assert result["role_name"] == "Worker"
-    assert timeouts == [12.5]
-
-
-@pytest.mark.parametrize("task_prompt", [None, ""])
-def test_spawn_skips_delivery_when_task_prompt_missing_or_empty(
-    monkeypatch,
-    task_prompt: str | None,
-):
-    parent = Agent(
-        NodeConfig(
-            node_type=NodeType.AGENT,
-            graph_id="graph-parent",
-            role_name="Conductor",
-            tools=["spawn", "send", "read"],
-        ),
-        uuid="parent",
-    )
-    registry.register_graph(
-        Graph(
-            id="graph-parent",
-            owner_agent_id="parent",
-            name="Parent Graph",
-            entry_node_id="parent",
-        )
-    )
-    registry.register(parent)
-
-    monkeypatch.setattr(
-        "app.settings.get_settings",
-        lambda: Settings(
-            roles=[
-                RoleConfig(
-                    name="Worker",
-                    system_prompt="...",
-                    included_tools=["read"],
-                )
-            ]
-        ),
-    )
-
-    monkeypatch.setattr(Agent, "start", lambda self: None)
-    monkeypatch.setattr(
-        Agent,
-        "wait_until_idle",
-        lambda self, timeout=None: (_ for _ in ()).throw(
-            AssertionError("wait_until_idle should not be called")
-        ),
-    )
-    monkeypatch.setattr(
-        "app.tools.spawn.send_message",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("send_message should not be called")
-        ),
-    )
-
-    args = {"role_name": "Worker"}
-    if task_prompt is not None:
-        args["task_prompt"] = task_prompt
-
-    result = json.loads(SpawnTool().execute(parent, args))
-
-    assert result["role_name"] == "Worker"
-    assert result["graph_id"] == "graph-parent"
-    assert isinstance(result["agent_id"], str)
-    child = registry.get(result["agent_id"])
-    assert child is not None
-    assert child.config.tools == [*MINIMUM_TOOLS, "read"]
+    assert result == {"error": "Failed to spawn agent: boom"}
+    assert termination_timeouts == [30.0]
+    assert len(registry.get_all()) == 1
 
 
 def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):

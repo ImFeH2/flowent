@@ -59,7 +59,7 @@ export function AssistantChatMessages({
       ref={scrollRef}
       onScroll={onScroll}
       className={cn(
-        "flex-1 space-y-4 overflow-y-auto",
+        "flex-1 space-y-3 overflow-y-auto",
         isWorkspace ? "p-3.5" : "px-4 py-4",
       )}
     >
@@ -189,7 +189,7 @@ function HumanBubble({
   const isWorkspace = variant === "workspace";
 
   return (
-    <div className="flex min-w-0 justify-end">
+    <div className="mt-2 flex min-w-0 justify-end">
       <div
         className={cn(
           "min-w-0 overflow-hidden px-3 py-2 text-sm [overflow-wrap:anywhere]",
@@ -314,26 +314,24 @@ function ErrorCard({
   const isWorkspace = variant === "workspace";
 
   return (
-    <div className="flex min-w-0 justify-start">
-      <div
-        className={cn(
-          "min-w-0 space-y-2 border-l-2 border-red-500/40 bg-red-500/5 px-3 py-2",
-          isWorkspace ? "max-w-[85%]" : "max-w-[80%] rounded-xl",
-        )}
-      >
-        <div className="flex items-center gap-2">
-          <AlertCircle className="size-3.5 text-red-500" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-red-500">
-            Error
-          </span>
-          <span className="ml-auto">
-            <CopyButton text={content} />
-          </span>
-        </div>
-        <p className="whitespace-pre-wrap break-words text-[13px] text-red-950/80 dark:text-red-200">
-          {content}
-        </p>
+    <div
+      className={cn(
+        "min-w-0 w-full space-y-2 border-l-2 border-red-500/30 bg-red-500/[0.045] px-2.5 py-1.5",
+        !isWorkspace && "rounded-xl",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <AlertCircle className="size-3.5 text-red-500" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-red-500">
+          Error
+        </span>
+        <span className="ml-auto">
+          <CopyButton text={content} />
+        </span>
       </div>
+      <p className="whitespace-pre-wrap break-words text-[13px] text-red-950/80 dark:text-red-200">
+        {content}
+      </p>
     </div>
   );
 }
@@ -349,7 +347,7 @@ function ActivityDisclosure({
 }: {
   label: string;
   icon: ReactNode;
-  tone: "thinking" | "tool" | "send";
+  tone: "thinking" | "tool";
   streaming?: boolean;
   variant: AssistantChatVariant;
   defaultOpen: boolean;
@@ -359,67 +357,61 @@ function ActivityDisclosure({
   const isWorkspace = variant === "workspace";
 
   return (
-    <div className="flex min-w-0 justify-start">
-      <div
-        className={cn(
-          "min-w-0 px-3 py-2",
-          isWorkspace
-            ? "max-w-[82%] border-l border-white/8 pl-4"
-            : "max-w-[78%] rounded-xl",
-          tone === "thinking" &&
-            "border-amber-500/30 bg-[linear-gradient(180deg,rgba(245,158,11,0.04),rgba(245,158,11,0.014))]",
-          tone === "tool" &&
-            "border-teal-500/30 bg-[linear-gradient(180deg,rgba(20,184,166,0.04),rgba(20,184,166,0.014))]",
-          tone === "send" &&
-            "border-sky-500/30 bg-[linear-gradient(180deg,rgba(14,165,233,0.04),rgba(14,165,233,0.014))]",
-        )}
+    <div
+      className={cn(
+        "min-w-0 w-full px-2.5 py-1.5",
+        isWorkspace ? "border-l border-white/8 pl-3.5" : "rounded-xl",
+        tone === "thinking" &&
+          "border-amber-500/20 bg-[linear-gradient(180deg,rgba(245,158,11,0.03),rgba(245,158,11,0.01))]",
+        tone === "tool" &&
+          "border-teal-500/20 bg-[linear-gradient(180deg,rgba(20,184,166,0.03),rgba(20,184,166,0.01))]",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center gap-2 text-left"
       >
-        <button
-          type="button"
-          onClick={() => setOpen((current) => !current)}
-          className="flex w-full items-center gap-2 text-left"
+        <span className="flex size-5 items-center justify-center text-current">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12px] font-semibold text-foreground/90">
+            {label}
+          </span>
+          <span className="block text-[11px] text-muted-foreground">
+            {streaming ? "In progress" : "Completed"}
+          </span>
+        </span>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+            streaming
+              ? "bg-white/[0.04] text-foreground/75"
+              : "bg-white/[0.04] text-muted-foreground",
+          )}
         >
-          <span className="flex size-5 items-center justify-center text-current">
-            {icon}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[12px] font-semibold text-foreground/90">
-              {label}
-            </span>
-            <span className="block text-[11px] text-muted-foreground">
-              {streaming ? "In progress" : "Completed"}
-            </span>
-          </span>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-              streaming
-                ? "bg-white/[0.04] text-foreground/75"
-                : "bg-white/[0.04] text-muted-foreground",
-            )}
-          >
-            {streaming ? (
-              <>
-                <LoaderCircle className="size-3 animate-spin" />
-                Live
-              </>
-            ) : (
-              <>
-                <Check className="size-3" />
-                Done
-              </>
-            )}
-          </span>
-          <ChevronRight
-            className={cn(
-              "size-4 shrink-0 text-muted-foreground transition-transform",
-              open && "rotate-90",
-            )}
-          />
-        </button>
+          {streaming ? (
+            <>
+              <LoaderCircle className="size-3 animate-spin" />
+              Live
+            </>
+          ) : (
+            <>
+              <Check className="size-3" />
+              Done
+            </>
+          )}
+        </span>
+        <ChevronRight
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform",
+            open && "rotate-90",
+          )}
+        />
+      </button>
 
-        {open ? <div className="mt-3 min-w-0">{children}</div> : null}
-      </div>
+      {open ? <div className="mt-3 min-w-0">{children}</div> : null}
     </div>
   );
 }

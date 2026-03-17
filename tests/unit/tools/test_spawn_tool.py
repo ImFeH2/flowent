@@ -70,7 +70,12 @@ def test_spawn_creates_connected_child_without_task_delivery(monkeypatch):
 
     child_id = result["agent_id"]
     graph_id = result["graph_id"]
-    assert result == {"agent_id": child_id, "graph_id": graph_id, "role_name": "Worker"}
+    assert result == {
+        "agent_id": child_id,
+        "name": "Worker",
+        "graph_id": graph_id,
+        "role_name": "Worker",
+    }
     child = registry.get(child_id)
     assert child is not None
     assert child.config.graph_id == "graph-parent"

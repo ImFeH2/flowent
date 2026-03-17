@@ -62,7 +62,10 @@ def test_compose_system_prompt_ignores_empty_custom_prompt():
 
 
 def test_common_communication_guidance_requires_explicit_target_routing():
-    assert "must start with `@target: message body`" in COMMUNICATION_USAGE_GUIDANCE
+    assert (
+        "must start with `@<name-or-uuid>: message body`"
+        in COMMUNICATION_USAGE_GUIDANCE
+    )
     assert "automatically delivered to your parent" not in COMMUNICATION_USAGE_GUIDANCE
 
 

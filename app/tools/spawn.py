@@ -198,5 +198,10 @@ class SpawnTool(Tool):
             graph.entry_node_id = agent_uuid
 
         return json.dumps(
-            {"agent_id": agent_uuid, "graph_id": graph_id, "role_name": role_name}
+            {
+                "agent_id": agent_uuid,
+                "name": name or role_name,
+                "graph_id": graph_id,
+                "role_name": role_name,
+            }
         )

@@ -40,7 +40,8 @@ DELEGATION_USAGE_GUIDANCE = """\
 COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
-- To send a message to another node, the first line of your content must start with `@target: message body`. Multiple targets are allowed: `@alice, bob: message body`.
+- To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`). Multiple targets: `@Worker-1, Worker-2: message body`.
+- Use `list_connections` to discover connected node names and UUIDs before sending.
 - Do NOT output content just to "think out loud" between tool calls. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
 - System context is injected as: <system>content</system>
@@ -50,7 +51,7 @@ ASSISTANT_ONLY_PROMPT = """\
 ## Assistant-Only Communication Rules
 
 - Your content is pushed directly to the frontend chat panel as your reply to the Human. You do not need `@target:` when replying to the Human.
-- If you need to send a message to a connected node instead of the Human, start the content with `@target: message body`. Multiple targets are allowed: `@alice, bob: message body`.
+- If you need to send a message to a connected node instead of the Human, start the content with `@<name-or-uuid>: message body` (e.g. `@Worker-1: please start the task`). Multiple targets: `@Worker-1, Worker-2: message body`.
 - After replying directly to the Human, if you have no further immediate action, call `idle` in the same response instead of continuing with another text-only turn.
 - Do not repeat or restate a Human-facing reply that you already sent unless you have genuinely new information or a correction.
 - Entering a waiting state still requires an explicit `idle` tool call.

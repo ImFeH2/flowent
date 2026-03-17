@@ -52,6 +52,8 @@ ASSISTANT_ONLY_PROMPT = """\
 
 - Your content is pushed directly to the frontend chat panel as your reply to the Human. You do not need `@target:` when replying to the Human.
 - If you need to send a message to a connected node instead of the Human, start the content with `@target: message body`. Multiple targets are allowed: `@alice, bob: message body`.
+- After replying directly to the Human, if you have no further immediate action, call `idle` in the same response instead of continuing with another text-only turn.
+- Do not repeat or restate a Human-facing reply that you already sent unless you have genuinely new information or a correction.
 - Entering a waiting state still requires an explicit `idle` tool call.
 """
 

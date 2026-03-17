@@ -120,6 +120,8 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert "manage_prompts" in prompt
     assert "Conductor at startup" not in prompt
     assert "send(to=conductor_id" not in prompt
+    assert "call `idle` in the same response" in prompt
+    assert "Do not repeat or restate a Human-facing reply" in prompt
 
 
 def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):

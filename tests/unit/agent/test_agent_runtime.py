@@ -10,6 +10,7 @@ from app.models import (
     AssistantText,
     ErrorEntry,
     EventType,
+    Graph,
     LLMResponse,
     Message,
     NodeConfig,
@@ -110,6 +111,85 @@ def test_agent_unregisters_from_registry_after_exit_tool(monkeypatch):
         EventType.NODE_TERMINATED,
     ]
     assert events[-1].data == {"reason": "done"}
+
+
+def test_finalize_termination_removes_bidirectional_connections():
+    registry.reset()
+    try:
+        assistant = Agent(
+            NodeConfig(node_type=NodeType.ASSISTANT),
+            uuid="assistant",
+        )
+        worker = Agent(
+            NodeConfig(node_type=NodeType.AGENT),
+            uuid="worker",
+        )
+        registry.register(assistant)
+        registry.register(worker)
+        assistant.add_connection(worker.uuid)
+        worker.add_connection(assistant.uuid)
+
+        worker._finalize_termination("done")
+
+        assert registry.get(worker.uuid) is None
+        assert assistant.get_connections_snapshot() == []
+        assert worker.get_connections_snapshot() == []
+    finally:
+        registry.reset()
+
+
+def test_finalize_termination_unregisters_empty_graph():
+    registry.reset()
+    try:
+        graph = Graph(
+            id="graph-1",
+            owner_agent_id="worker",
+            name="Test Graph",
+            entry_node_id="worker",
+        )
+        worker = Agent(
+            NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),
+            uuid="worker",
+        )
+        registry.register_graph(graph)
+        registry.register(worker)
+
+        worker._finalize_termination("done")
+
+        assert registry.get(worker.uuid) is None
+        assert registry.get_graph(graph.id) is None
+    finally:
+        registry.reset()
+
+
+def test_finalize_termination_keeps_graph_when_other_nodes_remain():
+    registry.reset()
+    try:
+        graph = Graph(
+            id="graph-1",
+            owner_agent_id="worker-1",
+            name="Shared Graph",
+            entry_node_id="worker-1",
+        )
+        worker_1 = Agent(
+            NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),
+            uuid="worker-1",
+        )
+        worker_2 = Agent(
+            NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),
+            uuid="worker-2",
+        )
+        registry.register_graph(graph)
+        registry.register(worker_1)
+        registry.register(worker_2)
+
+        worker_1._finalize_termination("done")
+
+        assert registry.get(worker_1.uuid) is None
+        assert registry.get(worker_2.uuid) is worker_2
+        assert registry.get_graph(graph.id) is graph
+    finally:
+        registry.reset()
 
 
 def test_provider_resolution_error_is_recorded_in_history(monkeypatch):

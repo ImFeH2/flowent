@@ -752,3 +752,14 @@ class Agent:
             ),
         )
         registry.unregister(self.uuid)
+
+        peer_ids = self.get_connections_snapshot()
+        for peer_id in peer_ids:
+            peer = registry.get(peer_id)
+            if peer is not None:
+                peer.remove_connection(self.uuid)
+            self.remove_connection(peer_id)
+
+        graph_id = self.config.graph_id
+        if graph_id and not registry.get_graph_nodes(graph_id):
+            registry.unregister_graph(graph_id)

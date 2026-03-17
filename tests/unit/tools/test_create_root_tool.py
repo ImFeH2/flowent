@@ -5,7 +5,7 @@ import pytest
 from app.agent import Agent
 from app.models import AgentState, NodeConfig, NodeType
 from app.registry import registry
-from app.settings import RoleConfig, RootBoundary, Settings
+from app.settings import RoleConfig, Settings
 from app.tools import MINIMUM_TOOLS
 from app.tools.create_root import CreateRootTool
 
@@ -39,7 +39,6 @@ def test_create_root_registers_root_agent_and_connects_to_assistant(
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
-            root_boundary=RootBoundary(write_dirs=[str(workspace)]),
             roles=[
                 RoleConfig(
                     name="Worker",
@@ -68,7 +67,12 @@ def test_create_root_registers_root_agent_and_connects_to_assistant(
     graph_id = result["graph_id"]
     child = registry.get(child_id)
 
-    assert result == {"agent_id": child_id, "graph_id": graph_id, "role_name": "Worker"}
+    assert result == {
+        "agent_id": child_id,
+        "name": "Root Worker",
+        "graph_id": graph_id,
+        "role_name": "Worker",
+    }
     assert child is not None
     assert child.config.node_type == NodeType.AGENT
     assert child.config.role_name == "Worker"
@@ -79,71 +83,6 @@ def test_create_root_registers_root_agent_and_connects_to_assistant(
     assert child.config.write_dirs == [str(notes_dir)]
     assert assistant.is_connected_to(child_id) is True
     assert child.is_connected_to("assistant") is True
-
-
-def test_create_root_rejects_write_dir_outside_root_boundary(monkeypatch, tmp_path):
-    assistant = Agent(
-        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
-        uuid="assistant",
-    )
-    registry.register(assistant)
-
-    allowed_dir = tmp_path / "allowed"
-    blocked_dir = tmp_path / "blocked"
-    allowed_dir.mkdir()
-    blocked_dir.mkdir()
-
-    monkeypatch.setattr(
-        "app.settings.get_settings",
-        lambda: Settings(
-            root_boundary=RootBoundary(write_dirs=[str(allowed_dir)]),
-            roles=[RoleConfig(name="Worker", system_prompt="...")],
-        ),
-    )
-
-    result = json.loads(
-        CreateRootTool().execute(
-            assistant,
-            {
-                "role_name": "Worker",
-                "write_dirs": [str(blocked_dir)],
-            },
-        )
-    )
-
-    assert result == {"error": f"write_dirs boundary exceeded: {blocked_dir}"}
-    assert len(registry.get_all()) == 1
-
-
-def test_create_root_rejects_network_outside_root_boundary(monkeypatch):
-    assistant = Agent(
-        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
-        uuid="assistant",
-    )
-    registry.register(assistant)
-
-    monkeypatch.setattr(
-        "app.settings.get_settings",
-        lambda: Settings(
-            root_boundary=RootBoundary(allow_network=False),
-            roles=[RoleConfig(name="Worker", system_prompt="...")],
-        ),
-    )
-
-    result = json.loads(
-        CreateRootTool().execute(
-            assistant,
-            {
-                "role_name": "Worker",
-                "allow_network": True,
-            },
-        )
-    )
-
-    assert result == {
-        "error": "allow_network boundary exceeded: root boundary disallows network access"
-    }
-    assert len(registry.get_all()) == 1
 
 
 def test_create_root_delivers_initial_task_after_idle(monkeypatch):
@@ -203,7 +142,12 @@ def test_create_root_delivers_initial_task_after_idle(monkeypatch):
     graph_id = result["graph_id"]
     child = registry.get(child_id)
 
-    assert result == {"agent_id": child_id, "graph_id": graph_id, "role_name": "Worker"}
+    assert result == {
+        "agent_id": child_id,
+        "name": "Worker",
+        "graph_id": graph_id,
+        "role_name": "Worker",
+    }
     assert child is not None
     assert child.config.graph_id == graph_id
     assert child.config.parent_id == "assistant"
@@ -215,7 +159,7 @@ def test_create_root_delivers_initial_task_after_idle(monkeypatch):
     ]
 
 
-def test_create_root_ignores_caller_boundary_and_uses_root_boundary(
+def test_create_root_allows_requested_boundary_even_if_assistant_is_more_restricted(
     monkeypatch,
     tmp_path,
 ):
@@ -236,13 +180,7 @@ def test_create_root_ignores_caller_boundary_and_uses_root_boundary(
 
     monkeypatch.setattr(
         "app.settings.get_settings",
-        lambda: Settings(
-            root_boundary=RootBoundary(
-                write_dirs=[str(workspace)],
-                allow_network=True,
-            ),
-            roles=[RoleConfig(name="Worker", system_prompt="...")],
-        ),
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
     )
     monkeypatch.setattr(Agent, "start", lambda self: None)
 

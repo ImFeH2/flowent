@@ -7,7 +7,6 @@ from app.settings import (
     EventLogSettings,
     ModelSettings,
     RoleConfig,
-    RootBoundary,
     Settings,
 )
 from app.tools.manage_settings import ManageSettingsTool
@@ -19,9 +18,6 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
         assistant=AssistantSettings(role_name="Steward"),
         event_log=EventLogSettings(timestamp_format="relative"),
         model=ModelSettings(active_provider_id="provider-1", active_model="gpt-4o"),
-        root_boundary=RootBoundary(
-            write_dirs=["/project/workspace"], allow_network=True
-        ),
     )
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -45,10 +41,6 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
         },
         "event_log": {
             "timestamp_format": "relative",
-        },
-        "root_boundary": {
-            "write_dirs": ["/project/workspace"],
-            "allow_network": True,
         },
     }
 
@@ -144,37 +136,6 @@ def test_manage_settings_update_rejects_unknown_assistant_role(monkeypatch):
     )
 
     assert result == {"error": "Role 'Ghost' not found"}
-
-
-def test_manage_settings_update_merges_root_boundary(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
-    settings = Settings(
-        root_boundary=RootBoundary(
-            write_dirs=["/project/workspace"],
-            allow_network=False,
-        )
-    )
-
-    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
-    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
-
-    result = json.loads(
-        ManageSettingsTool().execute(
-            agent,
-            {
-                "action": "update",
-                "root_boundary": {"allow_network": True},
-            },
-        )
-    )
-
-    assert result["root_boundary"] == {
-        "write_dirs": ["/project/workspace"],
-        "allow_network": True,
-    }
-    assert settings.root_boundary.write_dirs == ["/project/workspace"]
-    assert settings.root_boundary.allow_network is True
 
 
 def test_manage_settings_update_accepts_xhigh_reasoning_effort(monkeypatch):

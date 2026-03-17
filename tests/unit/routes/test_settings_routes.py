@@ -59,7 +59,6 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 },
             },
             "custom_prompt": "",
-            "root_boundary": {"write_dirs": [], "allow_network": False},
             "providers": [
                 {
                     "id": "provider-1",

@@ -29,10 +29,6 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
         "event_log": {
             "timestamp_format": settings.event_log.timestamp_format,
         },
-        "root_boundary": {
-            "write_dirs": list(settings.root_boundary.write_dirs),
-            "allow_network": settings.root_boundary.allow_network,
-        },
     }
 
 
@@ -42,7 +38,7 @@ class ManageSettingsTool(Tool):
     description = (
         "Read and update system settings, including the Assistant role, active "
         "provider and model, default model params, event log timestamp format, "
-        "and root boundary."
+        "and other runtime defaults."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -86,19 +82,6 @@ class ManageSettingsTool(Tool):
                 "type": "string",
                 "description": "Event log timestamp format for update",
             },
-            "root_boundary": {
-                "type": "object",
-                "properties": {
-                    "write_dirs": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                    },
-                    "allow_network": {
-                        "type": "boolean",
-                    },
-                },
-                "description": "Root boundary updates",
-            },
         },
         "required": ["action"],
     }
@@ -121,7 +104,6 @@ class ManageSettingsTool(Tool):
         active_model = args.get("active_model")
         model_params = args.get("model_params")
         timestamp_format = args.get("timestamp_format")
-        root_boundary = args.get("root_boundary")
 
         if not isinstance(action, str):
             return json.dumps({"error": "action must be a string"})
@@ -138,8 +120,6 @@ class ManageSettingsTool(Tool):
             return json.dumps({"error": "model_params must be an object or null"})
         if timestamp_format is not None and not isinstance(timestamp_format, str):
             return json.dumps({"error": "timestamp_format must be a string"})
-        if root_boundary is not None and not isinstance(root_boundary, dict):
-            return json.dumps({"error": "root_boundary must be an object"})
 
         settings = get_settings()
 
@@ -171,27 +151,6 @@ class ManageSettingsTool(Tool):
                 return json.dumps({"error": str(exc)})
         if timestamp_format is not None:
             settings.event_log.timestamp_format = timestamp_format
-
-        if root_boundary is not None:
-            write_dirs = root_boundary.get("write_dirs")
-            allow_network = root_boundary.get("allow_network")
-
-            if write_dirs is not None and (
-                not isinstance(write_dirs, list)
-                or not all(isinstance(path, str) for path in write_dirs)
-            ):
-                return json.dumps(
-                    {"error": "root_boundary.write_dirs must be an array of strings"}
-                )
-            if allow_network is not None and not isinstance(allow_network, bool):
-                return json.dumps(
-                    {"error": "root_boundary.allow_network must be a boolean"}
-                )
-
-            if write_dirs is not None:
-                settings.root_boundary.write_dirs = list(write_dirs)
-            if allow_network is not None:
-                settings.root_boundary.allow_network = allow_network
 
         save_settings(settings)
         assistant = registry.get(ASSISTANT_NODE_ID)

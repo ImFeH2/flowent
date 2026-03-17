@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
@@ -91,32 +90,6 @@ class CreateRootTool(Tool):
         role_cfg = find_role(settings, role_name)
         if role_cfg is None:
             return json.dumps({"error": f"Role '{role_name}' not found"})
-
-        root_write_dirs = [
-            Path(path).resolve() for path in settings.root_boundary.write_dirs
-        ]
-        invalid_write_dirs = sorted(
-            path
-            for path in write_dirs
-            if not any(
-                Path(path).resolve().is_relative_to(root_path)
-                for root_path in root_write_dirs
-            )
-        )
-        if invalid_write_dirs:
-            return json.dumps(
-                {
-                    "error": "write_dirs boundary exceeded: "
-                    + ", ".join(invalid_write_dirs)
-                }
-            )
-
-        if allow_network and not settings.root_boundary.allow_network:
-            return json.dumps(
-                {
-                    "error": "allow_network boundary exceeded: root boundary disallows network access"
-                }
-            )
 
         final_tools: list[str] = []
         seen_tools: set[str] = set()
@@ -212,5 +185,10 @@ class CreateRootTool(Tool):
         )
 
         return json.dumps(
-            {"agent_id": agent_uuid, "graph_id": graph_id, "role_name": role_name}
+            {
+                "agent_id": agent_uuid,
+                "name": name or role_name,
+                "graph_id": graph_id,
+                "role_name": role_name,
+            }
         )

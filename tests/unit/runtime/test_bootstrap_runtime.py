@@ -164,49 +164,6 @@ def test_bootstrap_runtime_reconciles_existing_builtin_roles(monkeypatch, tmp_pa
         registry.reset()
 
 
-def test_bootstrap_runtime_keeps_assistant_boundary_independent_of_root_boundary(
-    monkeypatch,
-    tmp_path,
-):
-    registry.reset()
-    settings_file = tmp_path / "settings.json"
-    settings_file.write_text(
-        json.dumps(
-            {
-                "event_log": {"timestamp_format": "absolute"},
-                "model": {"active_provider_id": "", "active_model": ""},
-                "root_boundary": {
-                    "write_dirs": [str(tmp_path / "workspace")],
-                    "allow_network": False,
-                },
-                "providers": [],
-                "roles": [],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(Agent, "start", lambda self: None)
-    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
-    monkeypatch.setattr(settings_module, "_cached_settings", None)
-
-    bootstrap_runtime()
-
-    try:
-        nodes = registry.get_all()
-        assistant = registry.get("assistant")
-
-        assert len(nodes) == 1
-        assert assistant is not None
-        assert assistant.config.name == "Assistant"
-        assert assistant.config.role_name == STEWARD_ROLE_NAME
-        assert assistant.config.write_dirs == []
-        assert assistant.config.allow_network is True
-        assert assistant.config.parent_id == "human"
-    finally:
-        registry.reset()
-
-
 def test_bootstrap_runtime_uses_configured_assistant_role(monkeypatch, tmp_path):
     registry.reset()
     settings_file = tmp_path / "settings.json"

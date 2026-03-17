@@ -13,7 +13,6 @@ from app.settings import (
     AssistantSettings,
     RoleConfig,
     RoleModelConfig,
-    RootBoundary,
     Settings,
 )
 
@@ -92,36 +91,6 @@ def test_load_settings_preserves_custom_prompt(monkeypatch, tmp_path):
 
     assert loaded.custom_prompt == "Apply extra guardrails."
     assert loaded.assistant == AssistantSettings()
-    assert loaded.root_boundary == RootBoundary()
-
-
-def test_load_settings_parses_root_boundary(monkeypatch, tmp_path):
-    settings_file = tmp_path / "settings.json"
-    settings_file.write_text(
-        json.dumps(
-            {
-                "event_log": {"timestamp_format": "absolute"},
-                "model": {"active_provider_id": "", "active_model": ""},
-                "root_boundary": {
-                    "write_dirs": ["/project/workspace"],
-                    "allow_network": True,
-                },
-                "providers": [],
-                "roles": [],
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
-    monkeypatch.setattr(settings_module, "_cached_settings", None)
-
-    loaded = settings_module.load_settings()
-
-    assert loaded.root_boundary == RootBoundary(
-        write_dirs=["/project/workspace"],
-        allow_network=True,
-    )
 
 
 def test_load_settings_migrates_legacy_model_override(monkeypatch, tmp_path):

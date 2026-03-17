@@ -10,6 +10,7 @@ from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
 from app.settings import (
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
     STEWARD_ROLE_NAME,
+    WORKER_ROLE_SYSTEM_PROMPT,
     RoleConfig,
     Settings,
     build_conductor_role,
@@ -138,6 +139,10 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
         custom_prompt="",
     )
     assert ASSISTANT_ONLY_PROMPT not in prompt
+    assert "@target:" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    assert "plain text output" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    assert "plain content" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    assert "your parent" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
 
 
 def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
@@ -150,6 +155,8 @@ def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
 
     assert prompt == compose_system_prompt(DEFAULT_AGENT_ROLE_PROMPT, custom_prompt="")
     assert ASSISTANT_ONLY_PROMPT not in prompt
+    assert "@target:" not in WORKER_ROLE_SYSTEM_PROMPT
+    assert "your parent" not in WORKER_ROLE_SYSTEM_PROMPT
 
 
 def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch):

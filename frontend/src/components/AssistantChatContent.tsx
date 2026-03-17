@@ -302,31 +302,8 @@ function ToolCallCard({
   item: HistoryEntry & { type: "ToolCall" };
   variant: AssistantChatVariant;
 }) {
-  const isSend = item.tool_name === "send";
-  const toId = item.arguments?.to as string | undefined;
-  const content = item.arguments?.content as string | undefined;
   const formattedArguments = formatJsonOutput(item.arguments) ?? "";
   const formattedResult = formatJsonOutput(item.result);
-
-  if (isSend) {
-    return (
-      <ActivityDisclosure
-        label={toId ? `Delegating to ${toId.slice(0, 8)}` : "Delegating"}
-        icon={<Send className="size-3.5 text-sky-500" />}
-        tone="send"
-        streaming={item.streaming}
-        variant={variant}
-        defaultOpen={item.streaming ?? false}
-      >
-        <RichContentBlock
-          content={content ?? ""}
-          streaming={item.streaming}
-          markdownClassName="text-[13px] text-foreground/80"
-          preClassName="text-foreground/75"
-        />
-      </ActivityDisclosure>
-    );
-  }
 
   return (
     <ActivityDisclosure

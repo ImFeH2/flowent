@@ -74,4 +74,88 @@ describe("history utilities", () => {
       },
     ]);
   });
+
+  it("dedupes overlapping fetched and incremental history entries", () => {
+    const sharedReceived: HistoryEntry = {
+      type: "ReceivedMessage",
+      from_id: "human",
+      content: "Summarize the current workspace.",
+      timestamp: 20,
+    };
+    const sharedAssistant: HistoryEntry = {
+      type: "AssistantText",
+      content: "I will inspect the workspace and report back.",
+      timestamp: 21,
+    };
+    const sharedIdle: HistoryEntry = {
+      type: "ToolCall",
+      tool_name: "idle",
+      tool_call_id: "idle-1",
+      arguments: {},
+      timestamp: 22,
+    };
+    const uniqueIncremental: HistoryEntry = {
+      type: "ReceivedMessage",
+      from_id: "human",
+      content: "Also include any recent file changes.",
+      timestamp: 23,
+    };
+
+    const result = mergeHistoryWithDeltas({
+      history: [sharedReceived, sharedAssistant, sharedIdle],
+      incremental: [
+        sharedReceived,
+        sharedAssistant,
+        sharedIdle,
+        uniqueIncremental,
+      ],
+      fetchedAt: 24_000,
+    });
+
+    expect(result).toEqual([
+      sharedReceived,
+      sharedAssistant,
+      sharedIdle,
+      uniqueIncremental,
+    ]);
+  });
+
+  it("prefers the richer tool call entry when duplicate tool call ids overlap", () => {
+    const result = mergeHistoryWithDeltas({
+      history: [
+        {
+          type: "ToolCall",
+          tool_name: "idle",
+          tool_call_id: "idle-2",
+          arguments: {},
+          timestamp: 30,
+          streaming: true,
+        },
+      ],
+      incremental: [
+        {
+          type: "ToolCall",
+          tool_name: "idle",
+          tool_call_id: "idle-2",
+          arguments: {},
+          result: "Waiting for the next message.",
+          timestamp: 30,
+          streaming: false,
+        },
+      ],
+      fetchedAt: 31_000,
+    });
+
+    expect(result).toEqual([
+      {
+        type: "ToolCall",
+        tool_name: "idle",
+        tool_call_id: "idle-2",
+        arguments: {},
+        result: "Waiting for the next message.",
+        timestamp: 30,
+        streaming: false,
+      },
+    ]);
+  });
 });

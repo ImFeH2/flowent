@@ -127,4 +127,31 @@ describe("useAgentDetail", () => {
     });
     expect(clearAgentHistory).toHaveBeenCalledWith("agent-1");
   });
+
+  it("dedupes overlapping fetched and incremental history entries", async () => {
+    const sharedEntry: HistoryEntry = {
+      type: "AssistantText",
+      content: "summarized result",
+      timestamp: 3,
+    };
+    const agentHistories = new Map<string, HistoryEntry[]>([
+      ["assistant", [sharedEntry]],
+    ]);
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map<string, Node>([["assistant", buildNode()]]),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
+      agentHistories,
+      clearAgentHistory: vi.fn(),
+      streamingDeltas: new Map(),
+    });
+    fetchNodeDetailMock.mockResolvedValue(buildDetail([sharedEntry]));
+
+    const { result } = renderHook(() => useAgentDetail("assistant", true));
+
+    await waitFor(() => {
+      expect(result.current.detail?.history).toEqual([sharedEntry]);
+    });
+  });
 });

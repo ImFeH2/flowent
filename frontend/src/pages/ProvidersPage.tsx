@@ -23,6 +23,17 @@ import type { Provider } from "@/types";
 import { cn } from "@/lib/utils";
 import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -48,6 +59,9 @@ export function ProvidersPage() {
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [providerToDelete, setProviderToDelete] = useState<Provider | null>(
+    null,
+  );
   const [panelWidth, setPanelWidth] = usePanelWidth(
     "providers-panel-width",
     300,
@@ -144,8 +158,10 @@ export function ProvidersPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this provider?")) return;
+  const handleDelete = async () => {
+    if (!providerToDelete) return;
+    const id = providerToDelete.id;
+    setProviderToDelete(null);
     try {
       await deleteProvider(id);
       setProviders((prev) => prev.filter((p) => p.id !== id));
@@ -180,23 +196,25 @@ export function ProvidersPage() {
             <span className="font-semibold truncate">Providers</span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <button
+            <Button
               onClick={() => void refreshProviders()}
               disabled={loading}
-              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
               title="Refresh"
             >
               <RefreshCw
                 className={cn("size-3.5", loading && "animate-spin")}
               />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleCreateNew}
-              className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90"
+              size="icon-sm"
               title="Add Provider"
             >
               <Plus className="size-3.5" />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -214,23 +232,28 @@ export function ProvidersPage() {
               className="py-10 text-center"
             >
               <p className="text-sm text-muted-foreground">No providers</p>
-              <button
-                onClick={handleCreateNew}
-                className="mt-3 inline-flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
+              <Button onClick={handleCreateNew} size="sm" className="mt-3">
                 <Plus className="size-3.5" />
                 Add your first provider
-              </button>
+              </Button>
             </motion.div>
           ) : (
             <div className="space-y-1">
               {providers.map((provider, i) => (
-                <motion.button
+                <motion.div
                   key={provider.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelect(provider)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleSelect(provider);
+                    }
+                  }}
                   className={cn(
                     "group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-all",
                     selectedId === provider.id
@@ -255,18 +278,20 @@ export function ProvidersPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(provider.id);
+                    <Button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setProviderToDelete(provider);
                       }}
-                      className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="size-3" />
-                    </button>
+                    </Button>
                     <ChevronRight className="size-4 text-muted-foreground" />
                   </div>
-                </motion.button>
+                </motion.div>
               ))}
             </div>
           )}
@@ -295,21 +320,18 @@ export function ProvidersPage() {
               <div className="flex items-center gap-2">
                 {hasChanges && (
                   <>
-                    <button
+                    <Button
                       onClick={handleCancel}
                       disabled={saving}
-                      className="rounded-md border border-white/8 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-white/[0.05]"
+                      variant="ghost"
+                      className="border border-white/8 text-foreground hover:bg-white/[0.05]"
                     >
                       Cancel
-                    </button>
-                    <button
-                      onClick={() => void handleSave()}
-                      disabled={saving}
-                      className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
-                    >
+                    </Button>
+                    <Button onClick={() => void handleSave()} disabled={saving}>
                       <Check className="size-4" />
                       {saving ? "Saving..." : "Save"}
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -390,17 +412,19 @@ export function ProvidersPage() {
                         placeholder="sk-..."
                         className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-9 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                       />
-                      <button
+                      <Button
                         type="button"
                         onClick={() => setShowKey(!showKey)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                        variant="ghost"
+                        size="icon-xs"
+                        className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
                       >
                         {showKey ? (
                           <EyeOff className="size-4" />
                         ) : (
                           <Eye className="size-4" />
                         )}
-                      </button>
+                      </Button>
                     </div>
                   </SettingsRow>
                 </div>
@@ -428,16 +452,42 @@ export function ProvidersPage() {
               Select a provider from the list to edit, or create a new one to
               get started.
             </p>
-            <button
-              onClick={handleCreateNew}
-              className="mt-4 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90"
-            >
+            <Button onClick={handleCreateNew} className="mt-4">
               <Plus className="size-4" />
               Add Provider
-            </button>
+            </Button>
           </motion.div>
         )}
       </div>
+      <AlertDialog
+        open={providerToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setProviderToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete provider?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {providerToDelete
+                ? `This will permanently remove ${providerToDelete.name}.`
+                : "This will permanently remove the selected provider."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="ghost">Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" onClick={() => void handleDelete()}>
+                Delete
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

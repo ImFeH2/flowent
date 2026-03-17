@@ -48,7 +48,7 @@ export function SoftPanel({ children, className }: SoftPanelProps) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-white/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.032),rgba(255,255,255,0.018))] p-4 backdrop-blur-xl md:p-5",
+        "rounded-lg border border-white/6 bg-surface-2/80 p-4 backdrop-blur-xl md:p-5",
         className,
       )}
     >

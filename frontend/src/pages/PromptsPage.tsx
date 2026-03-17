@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageScaffold } from "@/components/layout/PageScaffold";
+import { Button } from "@/components/ui/button";
 import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
 
 export function PromptsPage() {
@@ -63,14 +64,10 @@ export function PromptsPage() {
           <span className="text-xs text-muted-foreground/60">
             {customPrompt.length} characters
           </span>
-          <button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
-          >
+          <Button onClick={() => void handleSave()} disabled={saving}>
             <Save className="size-4" />
             {saving ? "Saving..." : "Save"}
-          </button>
+          </Button>
         </div>
         <div className="relative flex min-h-0 flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px] rounded-full bg-white/8" />

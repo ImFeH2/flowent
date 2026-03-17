@@ -81,23 +81,7 @@ describe("HistoryView", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows readable labels for send tool targets", () => {
-    const nodes = new Map<string, Node>([
-      [
-        "assistant",
-        {
-          id: "assistant",
-          node_type: "assistant",
-          graph_id: null,
-          state: "idle",
-          connections: [],
-          name: null,
-          todos: [],
-          role_name: "Steward",
-        },
-      ],
-    ]);
-
+  it("renders send tool calls with the generic tool label", () => {
     render(
       <HistoryView
         history={[
@@ -109,12 +93,9 @@ describe("HistoryView", () => {
             timestamp: 1,
           },
         ]}
-        nodes={nodes}
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: /To Assistant/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeInTheDocument();
   });
 });

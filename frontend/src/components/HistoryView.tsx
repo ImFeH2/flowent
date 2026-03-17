@@ -6,7 +6,6 @@ import {
   Brain,
   Wrench,
   Terminal,
-  Send,
   Bot,
   AlertCircle,
 } from "lucide-react";
@@ -15,6 +14,7 @@ import type { HistoryEntry, Node } from "@/types";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { CopyButton } from "@/components/CopyButton";
 import { getNodeLabel } from "@/lib/nodeLabel";
+import { Button } from "@/components/ui/button";
 
 interface HistoryViewProps {
   agentLabel?: string;
@@ -200,28 +200,8 @@ function HistoryItem({
       );
 
     case "ToolCall": {
-      const isSendMessage = entry.tool_name === "send";
       const formattedArguments = formatJsonOutput(entry.arguments) ?? "";
       const formattedResult = formatJsonOutput(entry.result);
-      if (isSendMessage) {
-        const toId = entry.arguments?.to as string | undefined;
-        const content = entry.arguments?.content as string | undefined;
-        return (
-          <CollapsibleBlock
-            label={`To ${getNodeLabel(toId ?? "", nodes)}`}
-            icon={<Send className="size-3 text-purple-400" />}
-            className="border-purple-500/20 bg-purple-500/5"
-            labelClassName="text-purple-400"
-            actions={<CopyButton text={content ?? ""} />}
-            defaultOpen={false}
-          >
-            <MarkdownContent
-              content={content ?? ""}
-              className="text-xs text-purple-200"
-            />
-          </CollapsibleBlock>
-        );
-      }
       return (
         <CollapsibleBlock
           label={entry.tool_name ?? "tool"}
@@ -303,10 +283,12 @@ function CollapsibleBlock({
   return (
     <div className={cn("rounded border", className)}>
       <div className="flex items-center gap-2 px-2.5 py-1.5">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={toggle}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:bg-surface-3/50 transition-colors"
+          className="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left font-normal hover:bg-surface-3/50 hover:text-inherit"
         >
           <ChevronRight
             className={cn(
@@ -323,7 +305,7 @@ function CollapsibleBlock({
           >
             {label}
           </span>
-        </button>
+        </Button>
         {actions ? <span className="ml-auto shrink-0">{actions}</span> : null}
       </div>
       <AnimatePresence initial={false}>

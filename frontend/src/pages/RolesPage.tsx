@@ -24,6 +24,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   cloneModelParams,
   isEmptyModelParams,
@@ -36,13 +47,7 @@ type RoleDraft = Omit<Role, "is_builtin">;
 type ToolState = "allowed" | "included" | "excluded";
 type PanelMode = "create" | "edit" | "view";
 
-const MINIMUM_TOOLS = new Set([
-  "send",
-  "idle",
-  "todo",
-  "list_connections",
-  "exit",
-]);
+const MINIMUM_TOOLS = new Set(["idle", "todo", "list_connections", "exit"]);
 
 const emptyDraft = (): RoleDraft => ({
   name: "",
@@ -62,6 +67,7 @@ export function RolesPage() {
   const [activeRoleName, setActiveRoleName] = useState<string | null>(null);
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [modelOptionsByProvider, setModelOptionsByProvider] = useState<
     Record<string, ModelOption[]>
   >({});
@@ -313,10 +319,10 @@ export function RolesPage() {
     }
   };
 
-  const handleDelete = async (name: string) => {
-    if (!confirm("Are you sure you want to delete this role?")) {
-      return;
-    }
+  const handleDelete = async () => {
+    if (!roleToDelete) return;
+    const name = roleToDelete.name;
+    setRoleToDelete(null);
     try {
       await deleteRole(name);
       setRoles((prev) => prev.filter((role) => role.name !== name));
@@ -420,21 +426,19 @@ export function RolesPage() {
       description="Define reusable agent behaviors"
       actions={
         <div className="flex items-center gap-2">
-          <button
+          <Button
             onClick={() => void refreshRoles()}
             disabled={loading}
-            className="flex size-9 items-center justify-center rounded-md border border-white/8 bg-white/[0.024] text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+            variant="ghost"
+            size="icon"
+            className="border border-white/8 bg-white/[0.024] text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
           >
             <RefreshCw className={cn("size-4", loading && "animate-spin")} />
-          </button>
-          <button
-            onClick={handleCreate}
-            disabled={isPanelOpen}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={handleCreate} disabled={isPanelOpen}>
             <Plus className="size-4" />
             New Role
-          </button>
+          </Button>
         </div>
       }
     >
@@ -448,12 +452,14 @@ export function RolesPage() {
                 </p>
                 <h2 className="text-base font-semibold">{panelTitle}</h2>
               </div>
-              <button
+              <Button
                 onClick={handleCancel}
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
               >
                 <X className="size-4" />
-              </button>
+              </Button>
             </div>
 
             <section>
@@ -526,12 +532,13 @@ export function RolesPage() {
 
               <div className="space-y-4">
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <button
+                  <Button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(false)}
+                    variant="outline"
                     className={cn(
-                      "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
                       draft.model === null
                         ? "border-white/10 bg-white/[0.075] text-foreground"
                         : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
@@ -539,13 +546,14 @@ export function RolesPage() {
                     )}
                   >
                     Use Settings Default
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(true)}
+                    variant="outline"
                     className={cn(
-                      "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
                       draft.model !== null
                         ? "border-white/10 bg-white/[0.075] text-foreground"
                         : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
@@ -553,7 +561,7 @@ export function RolesPage() {
                     )}
                   >
                     Set Role Override
-                  </button>
+                  </Button>
                 </div>
 
                 {draft.model ? (
@@ -677,12 +685,13 @@ export function RolesPage() {
 
               <div className="space-y-4">
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <button
+                  <Button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(false)}
+                    variant="outline"
                     className={cn(
-                      "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
                       isEmptyModelParams(draft.model_params)
                         ? "border-white/10 bg-white/[0.075] text-foreground"
                         : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
@@ -690,13 +699,14 @@ export function RolesPage() {
                     )}
                   >
                     Use Settings Default
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(true)}
+                    variant="outline"
                     className={cn(
-                      "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
                       !isEmptyModelParams(draft.model_params)
                         ? "border-white/10 bg-white/[0.075] text-foreground"
                         : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
@@ -704,7 +714,7 @@ export function RolesPage() {
                     )}
                   >
                     Set Parameter Overrides
-                  </button>
+                  </Button>
                 </div>
 
                 {!isEmptyModelParams(draft.model_params) ? (
@@ -752,12 +762,14 @@ export function RolesPage() {
                           {tool.description}
                         </p>
                       </div>
-                      <button
+                      <Button
                         type="button"
                         onClick={() => cycleToolState(tool.name)}
                         disabled={isReadOnly || lockBuiltinFields}
+                        variant="outline"
+                        size="xs"
                         className={cn(
-                          "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                          "shrink-0 rounded-full transition-colors",
                           state === "included" &&
                             "border-emerald-500/30 bg-emerald-500/8 text-emerald-300",
                           state === "excluded" &&
@@ -773,7 +785,7 @@ export function RolesPage() {
                           : state === "included"
                             ? "Included"
                             : "Excluded"}
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
@@ -781,33 +793,25 @@ export function RolesPage() {
             </section>
 
             <div className="mt-6 flex items-center justify-end gap-3 border-t border-white/6 pt-5">
-              <button
+              <Button
                 onClick={handleCancel}
                 disabled={saving}
-                className="rounded-md border border-white/8 bg-white/[0.024] px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/[0.05] hover:text-foreground"
+                variant="ghost"
+                className="border border-white/8 bg-white/[0.024] text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
               >
                 Cancel
-              </button>
+              </Button>
               {!isReadOnly && (
-                <button
-                  onClick={() => void handleSave()}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
-                >
+                <Button onClick={() => void handleSave()} disabled={saving}>
                   {saving
                     ? "Saving..."
                     : panelMode === "create"
                       ? "Create Role"
                       : "Save Changes"}
-                </button>
+                </Button>
               )}
               {isReadOnly && activeRole && !activeRole.is_builtin && (
-                <button
-                  onClick={() => handleEdit(activeRole)}
-                  className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90"
-                >
-                  Edit
-                </button>
+                <Button onClick={() => handleEdit(activeRole)}>Edit</Button>
               )}
             </div>
           </div>
@@ -886,31 +890,37 @@ export function RolesPage() {
                     </div>
 
                     <div className="flex w-20 items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <button
+                      <Button
                         onClick={() => handleView(role)}
                         aria-label={`View ${role.name}`}
                         title={`View ${role.name}`}
-                        className="flex size-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
                       >
                         <Eye className="size-3.5" />
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => handleEdit(role)}
                         aria-label={`Edit ${role.name}`}
                         title={`Edit ${role.name}`}
-                        className="flex size-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
                       >
                         <Edit2 className="size-3.5" />
-                      </button>
+                      </Button>
                       {!role.is_builtin && (
-                        <button
-                          onClick={() => handleDelete(role.name)}
+                        <Button
+                          onClick={() => setRoleToDelete(role)}
                           aria-label={`Delete ${role.name}`}
                           title={`Delete ${role.name}`}
-                          className="flex size-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-red-400"
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground hover:bg-white/[0.06] hover:text-red-400"
                         >
                           <Trash2 className="size-3.5" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </motion.div>
@@ -920,6 +930,35 @@ export function RolesPage() {
           </div>
         </div>
       )}
+      <AlertDialog
+        open={roleToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRoleToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete role?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {roleToDelete
+                ? `This will permanently remove ${roleToDelete.name}.`
+                : "This will permanently remove the selected role."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="ghost">Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button variant="destructive" onClick={() => void handleDelete()}>
+                Delete
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageScaffold>
   );
 }

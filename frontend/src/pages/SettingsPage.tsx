@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
@@ -155,14 +156,10 @@ export function SettingsPage() {
       title="Settings"
       description="Configure Assistant and AI model preferences"
       actions={
-        <button
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all active:scale-[0.98] hover:bg-primary/90 disabled:opacity-50"
-        >
+        <Button onClick={() => void handleSave()} disabled={saving}>
           <Save className="size-4" />
           {saving ? "Saving..." : "Save Changes"}
-        </button>
+        </Button>
       }
     >
       <div className="h-full min-h-0 overflow-y-auto pr-2">
@@ -251,18 +248,20 @@ export function SettingsPage() {
                 description="Select a catalog model when available, or enter a model ID manually."
               >
                 <div className="mb-1.5 flex justify-end">
-                  <button
+                  <Button
                     onClick={refreshModels}
                     disabled={
                       !settings.model.active_provider_id || loadingModels
                     }
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                    variant="ghost"
+                    size="xs"
+                    className="h-auto px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
                   >
                     <RefreshCw
                       className={cn("size-3", loadingModels && "animate-spin")}
                     />
                     Refresh
-                  </button>
+                  </Button>
                 </div>
 
                 {models.length > 0 ? (

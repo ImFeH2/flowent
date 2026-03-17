@@ -155,13 +155,7 @@ function TimelineItem({
       if (!item.content) {
         return null;
       }
-      return (
-        <AssistantBubble
-          content={item.content}
-          streaming={item.streaming}
-          variant={variant}
-        />
-      );
+      return <AssistantBubble content={item.content} variant={variant} />;
     case "AssistantThinking":
       return (
         <ThinkingCard
@@ -221,11 +215,9 @@ function HumanBubble({
 
 function AssistantBubble({
   content,
-  streaming,
   variant,
 }: {
   content: string;
-  streaming?: boolean;
   variant: AssistantChatVariant;
 }) {
   const isWorkspace = variant === "workspace";
@@ -233,36 +225,27 @@ function AssistantBubble({
   return (
     <div className="flex min-w-0 justify-start">
       <div
-        className={cn("min-w-0", isWorkspace ? "max-w-[85%]" : "max-w-[80%]")}
+        className={cn(
+          "group min-w-0",
+          isWorkspace ? "max-w-[85%]" : "max-w-[80%]",
+        )}
       >
         <div
           className={cn(
-            "group min-w-0 max-w-full overflow-hidden px-3 py-2 text-sm text-foreground",
+            "min-w-0 max-w-full overflow-hidden px-3 py-2 text-sm text-foreground",
             isWorkspace
               ? "rounded-md bg-white/[0.04]"
               : "rounded-xl border-glass-border bg-surface-2",
           )}
         >
-          <div className="mb-2 flex items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-primary/80">
-              Assistant
-            </span>
-            {streaming ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                <LoaderCircle className="size-3 animate-spin" />
-                Live
-              </span>
-            ) : null}
-            <span className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
-              <CopyButton text={content} />
-            </span>
-          </div>
           <RichContentBlock
             content={content}
-            streaming={streaming}
             markdownClassName="text-sm text-foreground"
             preClassName="text-foreground/90"
           />
+        </div>
+        <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <CopyButton text={content} />
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@ from app.prompts import get_system_prompt
 from app.prompts.common import (
     ASSISTANT_ONLY_PROMPT,
     COMMON_AGENT_PROMPT,
+    COMMUNICATION_USAGE_GUIDANCE,
     DEFAULT_AGENT_ROLE_PROMPT,
     compose_system_prompt,
 )
@@ -58,6 +59,11 @@ def test_compose_system_prompt_ignores_empty_custom_prompt():
             "Role-specific instructions.",
         ]
     )
+
+
+def test_common_communication_guidance_requires_explicit_target_routing():
+    assert "must start with `@target: message body`" in COMMUNICATION_USAGE_GUIDANCE
+    assert "automatically delivered to your parent" not in COMMUNICATION_USAGE_GUIDANCE
 
 
 def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):

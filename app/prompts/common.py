@@ -40,9 +40,8 @@ DELEGATION_USAGE_GUIDANCE = """\
 COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
-- If the first line of your content starts with `@target: message body`, the entire content is delivered to that target instead of your parent. Multiple targets are allowed: `@alice, bob: message body`.
-- If the first line of your content does not start with `@`, the entire content is automatically delivered to your parent node as a message.
-- Do NOT output content just to "think out loud" between tool calls. Content wakes up your parent and interrupts their work. Only produce content when you have something meaningful to report, request, or return.
+- To send a message to another node, the first line of your content must start with `@target: message body`. Multiple targets are allowed: `@alice, bob: message body`.
+- Do NOT output content just to "think out loud" between tool calls. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
 - System context is injected as: <system>content</system>
 """

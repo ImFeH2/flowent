@@ -276,7 +276,7 @@ def test_route_content_output_delivers_to_targets_when_header_present(monkeypatc
     ]
 
 
-def test_route_content_output_routes_plain_content_to_parent(monkeypatch):
+def test_route_content_output_does_not_deliver_plain_content(monkeypatch):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
     agent = Agent(
@@ -293,16 +293,13 @@ def test_route_content_output_routes_plain_content_to_parent(monkeypatch):
     finally:
         registry.reset()
 
-    parent_signal = parent._wake_queue.get_nowait()
-    assert parent_signal.payload == {
-        "message": {"from": "child", "content": "Status update."}
-    }
-    assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
-        {"to_id": "parent", "content": "Status update."},
-    ]
+    assert parent._wake_queue.empty()
+    assert not any(event.type == EventType.NODE_MESSAGE for event in events)
 
 
-def test_route_content_output_routes_non_header_target_text_to_parent(monkeypatch):
+def test_route_content_output_treats_non_header_target_text_as_plain_content(
+    monkeypatch,
+):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
     agent = Agent(
@@ -319,40 +316,7 @@ def test_route_content_output_routes_non_header_target_text_to_parent(monkeypatc
     finally:
         registry.reset()
 
-    parent_signal = parent._wake_queue.get_nowait()
-    assert parent_signal.payload == {
-        "message": {
-            "from": "child",
-            "content": "Status update.\n@peer: investigate the error",
-        }
-    }
-    assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
-        {"to_id": "parent", "content": "Status update.\n@peer: investigate the error"},
-    ]
-
-
-def test_route_content_output_skips_parent_delivery_without_parent(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
-    events = []
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
-
-    agent._route_content_output("Status update.")
-
-    assert not any(event.type == EventType.NODE_MESSAGE for event in events)
-
-
-def test_route_content_output_skips_parent_delivery_for_assistant(monkeypatch):
-    assistant = Agent(
-        NodeConfig(node_type=NodeType.ASSISTANT, parent_id="human"),
-        uuid="assistant",
-    )
-    events = []
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
-
-    assistant._route_content_output("Reply to human")
-
+    assert parent._wake_queue.empty()
     assert not any(event.type == EventType.NODE_MESSAGE for event in events)
 
 

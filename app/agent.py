@@ -392,9 +392,8 @@ class Agent:
 
     def _route_content_output(self, content: str) -> None:
         from app.graph_runtime import resolve_node_ref
-        from app.registry import registry
 
-        parent_content, routed_messages = extract_routed_content(content)
+        _, routed_messages = extract_routed_content(content)
 
         for target_refs, body in routed_messages:
             for target_ref in target_refs:
@@ -403,19 +402,6 @@ class Agent:
                     self._log.warning("@target routing failed: {}", target_ref)
                     continue
                 self._deliver_message(target, body)
-
-        if not parent_content:
-            return
-
-        parent_id = self.config.parent_id
-        if not parent_id or parent_id == "human":
-            return
-
-        parent = registry.get(parent_id)
-        if parent is None:
-            return
-
-        self._deliver_message(parent, parent_content)
 
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = [

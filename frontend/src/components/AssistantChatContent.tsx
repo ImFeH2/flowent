@@ -155,7 +155,7 @@ function TimelineItem({
       if (!item.content) {
         return null;
       }
-      return <AssistantBubble content={item.content} variant={variant} />;
+      return <AssistantBubble content={item.content} />;
     case "AssistantThinking":
       return (
         <ThinkingCard
@@ -213,40 +213,16 @@ function HumanBubble({
   );
 }
 
-function AssistantBubble({
-  content,
-  variant,
-}: {
-  content: string;
-  variant: AssistantChatVariant;
-}) {
-  const isWorkspace = variant === "workspace";
-
+function AssistantBubble({ content }: { content: string }) {
   return (
-    <div className="flex min-w-0 justify-start">
-      <div
-        className={cn(
-          "group min-w-0",
-          isWorkspace ? "max-w-[85%]" : "max-w-[80%]",
-        )}
-      >
-        <div
-          className={cn(
-            "min-w-0 max-w-full overflow-hidden px-3 py-2 text-sm text-foreground",
-            isWorkspace
-              ? "rounded-md bg-white/[0.04]"
-              : "rounded-xl border-glass-border bg-surface-2",
-          )}
-        >
-          <RichContentBlock
-            content={content}
-            markdownClassName="text-sm text-foreground"
-            preClassName="text-foreground/90"
-          />
-        </div>
-        <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <CopyButton text={content} />
-        </div>
+    <div className="group min-w-0 w-full">
+      <RichContentBlock
+        content={content}
+        markdownClassName="text-sm text-foreground"
+        preClassName="text-foreground/90"
+      />
+      <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <CopyButton text={content} />
       </div>
     </div>
   );

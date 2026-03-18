@@ -143,3 +143,9 @@ export interface Provider {
   base_url: string;
   api_key: string;
 }
+
+export interface TelegramSettings {
+  bot_token: string;
+  allowed_user_ids: number[];
+  registered_chat_ids: number[];
+}

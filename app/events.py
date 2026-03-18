@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from collections.abc import Callable
 
 from loguru import logger
@@ -17,9 +18,22 @@ class EventBus:
         self._display_connections: set[WebSocket] = set()
         self._update_connections: set[WebSocket] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._subscribers: set[Callable[[Event], None]] = set()
+        self._subscribers_lock = threading.Lock()
 
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
+
+    def get_loop(self) -> asyncio.AbstractEventLoop | None:
+        return self._loop
+
+    def subscribe(self, callback: Callable[[Event], None]) -> None:
+        with self._subscribers_lock:
+            self._subscribers.add(callback)
+
+    def unsubscribe(self, callback: Callable[[Event], None]) -> None:
+        with self._subscribers_lock:
+            self._subscribers.discard(callback)
 
     async def connect_display(self, ws: WebSocket) -> None:
         await self._connect(ws, self._display_connections, "Display")
@@ -94,6 +108,15 @@ class EventBus:
             )
 
     def emit(self, event: Event) -> None:
+        with self._subscribers_lock:
+            subscribers = tuple(self._subscribers)
+
+        for subscriber in subscribers:
+            try:
+                subscriber(event)
+            except Exception:
+                logger.exception("EventBus subscriber failed for {}", event.type)
+
         if self._loop is None or self._loop.is_closed():
             logger.warning("EventBus loop not set, dropping event: {}", event.type)
             return

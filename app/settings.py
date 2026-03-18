@@ -149,9 +149,17 @@ class AssistantSettings:
 
 
 @dataclass
+class TelegramSettings:
+    bot_token: str = ""
+    allowed_user_ids: list[int] = field(default_factory=list)
+    registered_chat_ids: list[int] = field(default_factory=list)
+
+
+@dataclass
 class Settings:
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
     assistant: AssistantSettings = field(default_factory=AssistantSettings)
+    telegram: TelegramSettings = field(default_factory=TelegramSettings)
     model: ModelSettings = field(default_factory=ModelSettings)
     custom_prompt: str = ""
     providers: list[ProviderConfig] = field(default_factory=list)
@@ -328,6 +336,39 @@ def serialize_role(role: RoleConfig) -> dict[str, object]:
     }
 
 
+def mask_secret(secret: str) -> str:
+    if not secret:
+        return ""
+    return f"sk-...{secret[-4:]}"
+
+
+def serialize_telegram_settings(
+    telegram: TelegramSettings,
+    *,
+    mask_token: bool = True,
+) -> dict[str, object]:
+    return {
+        "bot_token": mask_secret(telegram.bot_token)
+        if mask_token
+        else telegram.bot_token,
+        "allowed_user_ids": list(telegram.allowed_user_ids),
+        "registered_chat_ids": list(telegram.registered_chat_ids),
+    }
+
+
+def serialize_settings(
+    settings: Settings,
+    *,
+    mask_telegram_token: bool = True,
+) -> dict[str, object]:
+    data = asdict(settings)
+    data["telegram"] = serialize_telegram_settings(
+        settings.telegram,
+        mask_token=mask_telegram_token,
+    )
+    return data
+
+
 def _normalize_role_model(
     raw_role_model: object,
     *,
@@ -473,6 +514,46 @@ def _normalize_model_params_with_defaults(
     return build_default_model_params(), migrated or raw_model_params is None
 
 
+def _normalize_int_list(raw_values: object) -> tuple[list[int], bool]:
+    if raw_values is None:
+        return [], False
+    if not isinstance(raw_values, list):
+        return [], True
+
+    normalized: list[int] = []
+    migrated = False
+    for raw_value in raw_values:
+        if isinstance(raw_value, bool):
+            migrated = True
+            continue
+        if isinstance(raw_value, int):
+            value = raw_value
+        elif isinstance(raw_value, float) and raw_value.is_integer():
+            value = int(raw_value)
+            migrated = True
+        elif isinstance(raw_value, str):
+            stripped = raw_value.strip()
+            if not stripped:
+                migrated = True
+                continue
+            try:
+                value = int(stripped)
+            except ValueError:
+                migrated = True
+                continue
+            migrated = True
+        else:
+            migrated = True
+            continue
+
+        if value in normalized:
+            migrated = True
+            continue
+        normalized.append(value)
+
+    return normalized, migrated
+
+
 def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     migrated = False
 
@@ -496,6 +577,28 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     if assistant.role_name == STEWARD_ROLE_NAME and (
         not isinstance(assistant_role_name, str) or not assistant_role_name.strip()
     ):
+        migrated = True
+
+    telegram_data = data.get("telegram", {})
+    if not isinstance(telegram_data, dict):
+        telegram_data = {}
+        migrated = True
+    if "telegram" not in data:
+        migrated = True
+    allowed_user_ids, allowed_user_ids_migrated = _normalize_int_list(
+        telegram_data.get("allowed_user_ids")
+    )
+    registered_chat_ids, registered_chat_ids_migrated = _normalize_int_list(
+        telegram_data.get("registered_chat_ids")
+    )
+    migrated = migrated or allowed_user_ids_migrated or registered_chat_ids_migrated
+    bot_token = telegram_data.get("bot_token", "")
+    telegram = TelegramSettings(
+        bot_token=bot_token.strip() if isinstance(bot_token, str) else "",
+        allowed_user_ids=allowed_user_ids,
+        registered_chat_ids=registered_chat_ids,
+    )
+    if bot_token is not None and not isinstance(bot_token, str):
         migrated = True
 
     model_data = data.get("model", {})
@@ -593,6 +696,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         Settings(
             event_log=event_log,
             assistant=assistant,
+            telegram=telegram,
             model=model_settings,
             custom_prompt=custom_prompt,
             providers=providers,

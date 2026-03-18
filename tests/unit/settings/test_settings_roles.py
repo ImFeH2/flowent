@@ -14,6 +14,7 @@ from app.settings import (
     RoleConfig,
     RoleModelConfig,
     Settings,
+    TelegramSettings,
 )
 
 
@@ -54,9 +55,15 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
         )
     ]
     assert loaded.assistant == AssistantSettings()
+    assert loaded.telegram == TelegramSettings()
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
     assert persisted["assistant"] == {"role_name": STEWARD_ROLE_NAME}
+    assert persisted["telegram"] == {
+        "bot_token": "",
+        "allowed_user_ids": [],
+        "registered_chat_ids": [],
+    }
     assert persisted["roles"] == [
         {
             "name": "Worker",
@@ -91,6 +98,7 @@ def test_load_settings_preserves_custom_prompt(monkeypatch, tmp_path):
 
     assert loaded.custom_prompt == "Apply extra guardrails."
     assert loaded.assistant == AssistantSettings()
+    assert loaded.telegram == TelegramSettings()
 
 
 def test_load_settings_migrates_legacy_model_override(monkeypatch, tmp_path):
@@ -193,6 +201,45 @@ def test_load_settings_parses_role_model_object(monkeypatch, tmp_path):
             ),
         )
     ]
+
+
+def test_load_settings_parses_telegram_settings(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "assistant": {"role_name": STEWARD_ROLE_NAME},
+                "telegram": {
+                    "bot_token": "123456:ABCDE",
+                    "allowed_user_ids": [123, "456", 123],
+                    "registered_chat_ids": ["-1001", 2002],
+                },
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+
+    assert loaded.telegram == TelegramSettings(
+        bot_token="123456:ABCDE",
+        allowed_user_ids=[123, 456],
+        registered_chat_ids=[-1001, 2002],
+    )
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["telegram"] == {
+        "bot_token": "123456:ABCDE",
+        "allowed_user_ids": [123, 456],
+        "registered_chat_ids": [-1001, 2002],
+    }
 
 
 def test_ensure_builtin_roles_repairs_and_creates_builtin_roles():

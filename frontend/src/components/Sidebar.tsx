@@ -14,6 +14,7 @@ const NAV_ITEMS: Array<{ id: PageId; label: string }> = [
   { id: "roles", label: "Roles" },
   { id: "prompts", label: "Prompts" },
   { id: "tools", label: "Tools" },
+  { id: "channels", label: "Channels" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -142,7 +143,9 @@ export function Sidebar({
                           ? "Global system guidance"
                           : id === "tools"
                             ? "Available runtime capabilities"
-                            : "Runtime defaults and event log"}
+                            : id === "channels"
+                              ? "External messaging integrations"
+                              : "Runtime defaults and event log"}
                 </span>
               </div>
             </button>

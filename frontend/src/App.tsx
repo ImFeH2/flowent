@@ -32,6 +32,10 @@ const PromptsPage = lazyPage(
   "PromptsPage",
 );
 const ToolsPage = lazyPage(() => import("@/pages/ToolsPage"), "ToolsPage");
+const ChannelsPage = lazyPage(
+  () => import("@/pages/ChannelsPage"),
+  "ChannelsPage",
+);
 const SettingsPage = lazyPage(
   () => import("@/pages/SettingsPage"),
   "SettingsPage",
@@ -42,6 +46,7 @@ const lazyPageMap: Partial<Record<PageId, ComponentType>> = {
   roles: RolesPage,
   prompts: PromptsPage,
   tools: ToolsPage,
+  channels: ChannelsPage,
   settings: SettingsPage,
 };
 

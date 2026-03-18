@@ -22,6 +22,8 @@ export {
   saveSettings,
 } from "./settings";
 export {
+  approveTelegramChat,
+  deletePendingTelegramChat,
   deleteTelegramChat,
   fetchTelegramSettings,
   updateTelegramSettings,

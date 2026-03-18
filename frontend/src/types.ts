@@ -144,8 +144,23 @@ export interface Provider {
   api_key: string;
 }
 
+export interface TelegramPendingChat {
+  chat_id: number;
+  username: string | null;
+  display_name: string;
+  first_seen_at: number;
+  last_seen_at: number;
+}
+
+export interface TelegramApprovedChat {
+  chat_id: number;
+  username: string | null;
+  display_name: string;
+  approved_at: number;
+}
+
 export interface TelegramSettings {
   bot_token: string;
-  allowed_user_ids: number[];
-  registered_chat_ids: number[];
+  pending_chats: TelegramPendingChat[];
+  approved_chats: TelegramApprovedChat[];
 }

@@ -149,10 +149,27 @@ class AssistantSettings:
 
 
 @dataclass
+class TelegramPendingChat:
+    chat_id: int
+    username: str | None = None
+    display_name: str = ""
+    first_seen_at: float = 0.0
+    last_seen_at: float = 0.0
+
+
+@dataclass
+class TelegramApprovedChat:
+    chat_id: int
+    username: str | None = None
+    display_name: str = ""
+    approved_at: float = 0.0
+
+
+@dataclass
 class TelegramSettings:
     bot_token: str = ""
-    allowed_user_ids: list[int] = field(default_factory=list)
-    registered_chat_ids: list[int] = field(default_factory=list)
+    pending_chats: list[TelegramPendingChat] = field(default_factory=list)
+    approved_chats: list[TelegramApprovedChat] = field(default_factory=list)
 
 
 @dataclass
@@ -351,8 +368,8 @@ def serialize_telegram_settings(
         "bot_token": mask_secret(telegram.bot_token)
         if mask_token
         else telegram.bot_token,
-        "allowed_user_ids": list(telegram.allowed_user_ids),
-        "registered_chat_ids": list(telegram.registered_chat_ids),
+        "pending_chats": [asdict(chat) for chat in telegram.pending_chats],
+        "approved_chats": [asdict(chat) for chat in telegram.approved_chats],
     }
 
 
@@ -554,6 +571,146 @@ def _normalize_int_list(raw_values: object) -> tuple[list[int], bool]:
     return normalized, migrated
 
 
+def _normalize_float(raw_value: object) -> tuple[float, bool]:
+    if isinstance(raw_value, bool):
+        return 0.0, True
+    if isinstance(raw_value, (int, float)):
+        value = float(raw_value)
+        return value, False
+    if isinstance(raw_value, str):
+        stripped = raw_value.strip()
+        if not stripped:
+            return 0.0, True
+        try:
+            return float(stripped), True
+        except ValueError:
+            return 0.0, True
+    return 0.0, raw_value is not None
+
+
+def _normalize_optional_string(raw_value: object) -> tuple[str | None, bool]:
+    if raw_value is None:
+        return None, False
+    if not isinstance(raw_value, str):
+        return None, True
+    stripped = raw_value.strip()
+    if not stripped:
+        return None, raw_value != ""
+    return stripped, stripped != raw_value
+
+
+def _normalize_required_string(raw_value: object) -> tuple[str, bool]:
+    if not isinstance(raw_value, str):
+        return "", raw_value is not None
+    stripped = raw_value.strip()
+    return stripped, stripped != raw_value
+
+
+def _build_pending_chat(raw_chat: object) -> tuple[TelegramPendingChat | None, bool]:
+    if not isinstance(raw_chat, dict):
+        return None, True
+
+    chat_id_value = raw_chat.get("chat_id")
+    if isinstance(chat_id_value, bool) or not isinstance(chat_id_value, int):
+        return None, True
+
+    username, username_migrated = _normalize_optional_string(raw_chat.get("username"))
+    display_name, display_name_migrated = _normalize_required_string(
+        raw_chat.get("display_name")
+    )
+    first_seen_at, first_seen_migrated = _normalize_float(raw_chat.get("first_seen_at"))
+    last_seen_at, last_seen_migrated = _normalize_float(raw_chat.get("last_seen_at"))
+
+    pending_chat = TelegramPendingChat(
+        chat_id=chat_id_value,
+        username=username,
+        display_name=display_name,
+        first_seen_at=first_seen_at,
+        last_seen_at=last_seen_at,
+    )
+    migrated = (
+        username_migrated
+        or display_name_migrated
+        or first_seen_migrated
+        or last_seen_migrated
+    )
+    return pending_chat, migrated
+
+
+def _build_approved_chat(
+    raw_chat: object,
+) -> tuple[TelegramApprovedChat | None, bool]:
+    if not isinstance(raw_chat, dict):
+        return None, True
+
+    chat_id_value = raw_chat.get("chat_id")
+    if isinstance(chat_id_value, bool) or not isinstance(chat_id_value, int):
+        return None, True
+
+    username, username_migrated = _normalize_optional_string(raw_chat.get("username"))
+    display_name, display_name_migrated = _normalize_required_string(
+        raw_chat.get("display_name")
+    )
+    approved_at, approved_at_migrated = _normalize_float(raw_chat.get("approved_at"))
+
+    approved_chat = TelegramApprovedChat(
+        chat_id=chat_id_value,
+        username=username,
+        display_name=display_name,
+        approved_at=approved_at,
+    )
+    migrated = username_migrated or display_name_migrated or approved_at_migrated
+    return approved_chat, migrated
+
+
+def _normalize_pending_chats(
+    raw_chats: object,
+) -> tuple[list[TelegramPendingChat], bool]:
+    if raw_chats is None:
+        return [], False
+    if not isinstance(raw_chats, list):
+        return [], True
+
+    normalized: list[TelegramPendingChat] = []
+    seen_chat_ids: set[int] = set()
+    migrated = False
+    for raw_chat in raw_chats:
+        chat, chat_migrated = _build_pending_chat(raw_chat)
+        migrated = migrated or chat_migrated
+        if chat is None:
+            continue
+        if chat.chat_id in seen_chat_ids:
+            migrated = True
+            continue
+        seen_chat_ids.add(chat.chat_id)
+        normalized.append(chat)
+    return normalized, migrated
+
+
+def _normalize_approved_chats(
+    raw_chats: object,
+) -> tuple[list[TelegramApprovedChat], bool]:
+    if raw_chats is None:
+        return [], False
+    if not isinstance(raw_chats, list):
+        return [], True
+
+    normalized: list[TelegramApprovedChat] = []
+    seen_chat_ids: set[int] = set()
+    migrated = False
+    for raw_chat in raw_chats:
+        chat, chat_migrated = _build_approved_chat(raw_chat)
+        migrated = migrated or chat_migrated
+        if chat is None:
+            continue
+        if chat.chat_id in seen_chat_ids:
+            migrated = True
+            continue
+        seen_chat_ids.add(chat.chat_id)
+        normalized.append(chat)
+    return normalized, migrated
+
+
 def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     migrated = False
 
@@ -585,18 +742,34 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         migrated = True
     if "telegram" not in data:
         migrated = True
-    allowed_user_ids, allowed_user_ids_migrated = _normalize_int_list(
-        telegram_data.get("allowed_user_ids")
-    )
-    registered_chat_ids, registered_chat_ids_migrated = _normalize_int_list(
-        telegram_data.get("registered_chat_ids")
-    )
-    migrated = migrated or allowed_user_ids_migrated or registered_chat_ids_migrated
     bot_token = telegram_data.get("bot_token", "")
+    pending_chats, pending_chats_migrated = _normalize_pending_chats(
+        telegram_data.get("pending_chats")
+    )
+    approved_chats, approved_chats_migrated = _normalize_approved_chats(
+        telegram_data.get("approved_chats")
+    )
+    migrated = migrated or pending_chats_migrated or approved_chats_migrated
+    if "pending_links" in telegram_data:
+        migrated = True
+    if "allowed_user_ids" in telegram_data or "registered_chat_ids" in telegram_data:
+        migrated = True
+        legacy_registered_chat_ids, _ = _normalize_int_list(
+            telegram_data.get("registered_chat_ids")
+        )
+        for chat_id in legacy_registered_chat_ids:
+            if any(chat.chat_id == chat_id for chat in approved_chats):
+                continue
+            approved_chats.append(
+                TelegramApprovedChat(
+                    chat_id=chat_id,
+                    approved_at=0.0,
+                )
+            )
     telegram = TelegramSettings(
         bot_token=bot_token.strip() if isinstance(bot_token, str) else "",
-        allowed_user_ids=allowed_user_ids,
-        registered_chat_ids=registered_chat_ids,
+        pending_chats=pending_chats,
+        approved_chats=approved_chats,
     )
     if bot_token is not None and not isinstance(bot_token, str):
         migrated = True

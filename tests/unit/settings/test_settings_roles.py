@@ -14,6 +14,7 @@ from app.settings import (
     RoleConfig,
     RoleModelConfig,
     Settings,
+    TelegramApprovedChat,
     TelegramSettings,
 )
 
@@ -61,8 +62,8 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
     assert persisted["assistant"] == {"role_name": STEWARD_ROLE_NAME}
     assert persisted["telegram"] == {
         "bot_token": "",
-        "allowed_user_ids": [],
-        "registered_chat_ids": [],
+        "pending_chats": [],
+        "approved_chats": [],
     }
     assert persisted["roles"] == [
         {
@@ -212,7 +213,6 @@ def test_load_settings_parses_telegram_settings(monkeypatch, tmp_path):
                 "assistant": {"role_name": STEWARD_ROLE_NAME},
                 "telegram": {
                     "bot_token": "123456:ABCDE",
-                    "allowed_user_ids": [123, "456", 123],
                     "registered_chat_ids": ["-1001", 2002],
                 },
                 "model": {"active_provider_id": "", "active_model": ""},
@@ -230,15 +230,31 @@ def test_load_settings_parses_telegram_settings(monkeypatch, tmp_path):
 
     assert loaded.telegram == TelegramSettings(
         bot_token="123456:ABCDE",
-        allowed_user_ids=[123, 456],
-        registered_chat_ids=[-1001, 2002],
+        pending_chats=[],
+        approved_chats=[
+            TelegramApprovedChat(chat_id=-1001, approved_at=0.0),
+            TelegramApprovedChat(chat_id=2002, approved_at=0.0),
+        ],
     )
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
     assert persisted["telegram"] == {
         "bot_token": "123456:ABCDE",
-        "allowed_user_ids": [123, 456],
-        "registered_chat_ids": [-1001, 2002],
+        "pending_chats": [],
+        "approved_chats": [
+            {
+                "chat_id": -1001,
+                "username": None,
+                "display_name": "",
+                "approved_at": 0.0,
+            },
+            {
+                "chat_id": 2002,
+                "username": None,
+                "display_name": "",
+                "approved_at": 0.0,
+            },
+        ],
     }
 
 

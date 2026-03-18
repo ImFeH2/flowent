@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Save, Trash2 } from "lucide-react";
+import { Check, Eye, EyeOff, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  approveTelegramChat,
+  deletePendingTelegramChat,
   deleteTelegramChat,
   fetchTelegramSettings,
   updateTelegramSettings,
@@ -9,33 +11,29 @@ import {
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { TelegramSettings } from "@/types";
+import type {
+  TelegramApprovedChat,
+  TelegramPendingChat,
+  TelegramSettings,
+} from "@/types";
 
-function parseAllowedUserIds(rawValue: string): number[] | null {
-  const parts = rawValue
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-  if (parts.length === 0) {
-    return [];
+function formatTimestamp(timestampSeconds: number): string {
+  if (!timestampSeconds) {
+    return "—";
   }
+  return new Date(timestampSeconds * 1000).toLocaleString();
+}
 
-  const parsed: number[] = [];
-  for (const part of parts) {
-    if (!/^\d+$/.test(part)) {
-      return null;
-    }
-    const userId = Number(part);
-    if (
-      !Number.isSafeInteger(userId) ||
-      userId <= 0 ||
-      parsed.includes(userId)
-    ) {
-      return null;
-    }
-    parsed.push(userId);
+function getChatLabel(
+  chat: TelegramPendingChat | TelegramApprovedChat,
+): string {
+  if (chat.display_name.trim()) {
+    return chat.display_name.trim();
   }
-  return parsed;
+  if (chat.username?.trim()) {
+    return `@${chat.username.trim()}`;
+  }
+  return "Unknown chat";
 }
 
 export function ChannelsPage() {
@@ -45,7 +43,6 @@ export function ChannelsPage() {
   const [showToken, setShowToken] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
   const [tokenDirty, setTokenDirty] = useState(false);
-  const [allowedUserInput, setAllowedUserInput] = useState("");
 
   useEffect(() => {
     void fetchTelegramSettings()
@@ -65,51 +62,14 @@ export function ChannelsPage() {
     [settings?.bot_token],
   );
 
-  const commitAllowedUserInput = (): number[] | null => {
-    if (!settings) {
-      return null;
-    }
-    const trimmed = allowedUserInput.trim();
-    if (!trimmed) {
-      return settings.allowed_user_ids;
-    }
-
-    const parsed = parseAllowedUserIds(trimmed);
-    if (!parsed) {
-      toast.error(
-        "Allowed user IDs must be positive integers separated by commas",
-      );
-      return null;
-    }
-
-    const nextAllowedUserIds = [
-      ...settings.allowed_user_ids,
-      ...parsed.filter((userId) => !settings.allowed_user_ids.includes(userId)),
-    ];
-    setSettings({
-      ...settings,
-      allowed_user_ids: nextAllowedUserIds,
-    });
-    setAllowedUserInput("");
-    return nextAllowedUserIds;
-  };
-
   const handleSave = async () => {
     if (!settings) {
-      return;
-    }
-    const nextAllowedUserIds = commitAllowedUserInput();
-    if (!nextAllowedUserIds) {
       return;
     }
 
     setSaving(true);
     try {
-      const payload: Partial<
-        Pick<TelegramSettings, "bot_token" | "allowed_user_ids">
-      > = {
-        allowed_user_ids: nextAllowedUserIds,
-      };
+      const payload: Partial<Pick<TelegramSettings, "bot_token">> = {};
       if (tokenDirty) {
         payload.bot_token = tokenInput.trim();
       }
@@ -126,26 +86,34 @@ export function ChannelsPage() {
     }
   };
 
-  const handleDeleteChat = async (chatId: number) => {
+  const handleApprove = async (chatId: number) => {
     try {
-      const result = await deleteTelegramChat(chatId);
+      const result = await approveTelegramChat(chatId);
       setSettings(result.telegram);
-      toast.success("Registered chat removed");
+      toast.success("Telegram chat approved");
     } catch {
-      toast.error("Failed to remove registered chat");
+      toast.error("Failed to approve Telegram chat");
     }
   };
 
-  const removeAllowedUserId = (userId: number) => {
-    if (!settings) {
-      return;
+  const handleReject = async (chatId: number) => {
+    try {
+      const result = await deletePendingTelegramChat(chatId);
+      setSettings(result.telegram);
+      toast.success("Pending Telegram chat removed");
+    } catch {
+      toast.error("Failed to remove pending Telegram chat");
     }
-    setSettings({
-      ...settings,
-      allowed_user_ids: settings.allowed_user_ids.filter(
-        (existingUserId) => existingUserId !== userId,
-      ),
-    });
+  };
+
+  const handleRevoke = async (chatId: number) => {
+    try {
+      const result = await deleteTelegramChat(chatId);
+      setSettings(result.telegram);
+      toast.success("Approved Telegram chat removed");
+    } catch {
+      toast.error("Failed to remove approved Telegram chat");
+    }
   };
 
   if (loading || !settings) {
@@ -174,8 +142,9 @@ export function ChannelsPage() {
                 </p>
                 <h2 className="mt-1 text-base font-semibold">Bot Channel</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Connect a Telegram bot so authorized users can talk to the
-                  same Assistant session outside the Web UI.
+                  Only private chats are supported in this first version.
+                  Unapproved chats are listed here by chat ID so you can approve
+                  them directly from the Web UI.
                 </p>
               </div>
               <Badge
@@ -190,136 +159,154 @@ export function ChannelsPage() {
               </Badge>
             </div>
 
-            <div className="space-y-5">
-              <section>
-                <label className="text-sm font-medium">Bot Token</label>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Token from @BotFather. Leave untouched to keep the current
-                  token.
-                </p>
-                <div className="relative mt-3">
-                  <input
-                    type={showToken ? "text" : "password"}
-                    value={tokenInput}
-                    onChange={(event) => {
-                      setTokenInput(event.target.value);
-                      setTokenDirty(true);
-                    }}
-                    placeholder={
-                      settings.bot_token || "Enter Telegram bot token"
-                    }
-                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-10 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setShowToken((current) => !current)}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
-                  >
-                    {showToken ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </Button>
-                </div>
-              </section>
+            <section>
+              <label className="text-sm font-medium">Bot Token</label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Token from @BotFather. Leave untouched to keep the current
+                token.
+              </p>
+              <div className="relative mt-3">
+                <input
+                  type={showToken ? "text" : "password"}
+                  value={tokenInput}
+                  onChange={(event) => {
+                    setTokenInput(event.target.value);
+                    setTokenDirty(true);
+                  }}
+                  placeholder={settings.bot_token || "Enter Telegram bot token"}
+                  className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-10 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowToken((current) => !current)}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
+                >
+                  {showToken ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </Button>
+              </div>
+            </section>
 
-              <section className="border-t border-white/6 pt-5">
-                <label className="text-sm font-medium">Allowed User IDs</label>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Add Telegram user IDs allowed to send messages to the
-                  Assistant.
+            <section className="border-t border-white/6 pt-5">
+              <label className="text-sm font-medium">
+                Pending Private Chats
+              </label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Private chats that contacted the bot but are not approved yet.
+              </p>
+              {settings.pending_chats.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  No pending chats.
                 </p>
-                <div className="mt-3 flex gap-2">
-                  <input
-                    value={allowedUserInput}
-                    onChange={(event) =>
-                      setAllowedUserInput(event.target.value)
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        commitAllowedUserInput();
-                      }
-                    }}
-                    placeholder="123456789, 987654321"
-                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={commitAllowedUserInput}
-                  >
-                    Add
-                  </Button>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {settings.pending_chats.map((chat) => (
+                    <div
+                      key={chat.chat_id}
+                      className="rounded-md border border-white/8 bg-white/[0.03] px-3 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">
+                            {getChatLabel(chat)}
+                          </p>
+                          <p className="mt-1 font-mono text-xs text-muted-foreground">
+                            chat_id: {chat.chat_id}
+                          </p>
+                          {chat.username ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              @{chat.username}
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            First seen: {formatTimestamp(chat.first_seen_at)}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Last seen: {formatTimestamp(chat.last_seen_at)}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => void handleApprove(chat.chat_id)}
+                          >
+                            <Check className="size-4" />
+                            Approve
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => void handleReject(chat.chat_id)}
+                            className="text-muted-foreground hover:bg-white/[0.05] hover:text-red-300"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {settings.allowed_user_ids.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    No allowed users configured.
-                  </p>
-                ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {settings.allowed_user_ids.map((userId) => (
-                      <Badge
-                        key={userId}
-                        variant="outline"
-                        className="gap-1.5 border-white/10 bg-white/[0.03] pr-1 text-foreground"
-                      >
-                        {userId}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => removeAllowedUserId(userId)}
-                          className="size-5 rounded-full text-muted-foreground hover:bg-white/[0.08] hover:text-foreground"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </section>
+              )}
+            </section>
 
-              <section className="border-t border-white/6 pt-5">
-                <label className="text-sm font-medium">
-                  Registered Chat IDs
-                </label>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Chats are registered automatically after an authorized user
-                  sends a message.
+            <section className="border-t border-white/6 pt-5">
+              <label className="text-sm font-medium">
+                Approved Private Chats
+              </label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Approved chats can send messages to the Assistant and receive
+                Assistant output.
+              </p>
+              {settings.approved_chats.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  No approved chats yet.
                 </p>
-                {settings.registered_chat_ids.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    No registered chats yet.
-                  </p>
-                ) : (
-                  <div className="mt-3 space-y-2">
-                    {settings.registered_chat_ids.map((chatId) => (
-                      <div
-                        key={chatId}
-                        className="flex items-center justify-between rounded-md border border-white/8 bg-white/[0.03] px-3 py-2"
-                      >
-                        <span className="font-mono text-sm text-foreground">
-                          {chatId}
-                        </span>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {settings.approved_chats.map((chat) => (
+                    <div
+                      key={chat.chat_id}
+                      className="rounded-md border border-white/8 bg-white/[0.03] px-3 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">
+                            {getChatLabel(chat)}
+                          </p>
+                          <p className="mt-1 font-mono text-xs text-muted-foreground">
+                            chat_id: {chat.chat_id}
+                          </p>
+                          {chat.username ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              @{chat.username}
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Approved: {formatTimestamp(chat.approved_at)}
+                          </p>
+                        </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          onClick={() => void handleDeleteChat(chatId)}
-                          className="text-muted-foreground hover:bg-white/[0.05] hover:text-red-300"
+                          onClick={() => void handleRevoke(chat.chat_id)}
+                          className="shrink-0 text-muted-foreground hover:bg-white/[0.05] hover:text-red-300"
                         >
                           <Trash2 className="size-4" />
                         </Button>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
             <div className="flex justify-end border-t border-white/6 pt-5">
               <Button onClick={() => void handleSave()} disabled={saving}>

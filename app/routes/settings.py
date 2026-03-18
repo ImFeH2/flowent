@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel
@@ -8,6 +10,7 @@ from app.settings import (
     AssistantSettings,
     EventLogSettings,
     ModelSettings,
+    TelegramApprovedChat,
     TelegramSettings,
     build_default_model_params,
     build_model_params_from_mapping,
@@ -50,26 +53,6 @@ class UpdateSettingsRequest(BaseModel):
 
 class UpdateTelegramSettingsRequest(BaseModel):
     bot_token: str | None = None
-    allowed_user_ids: list[int] | None = None
-
-
-def _normalize_allowed_user_ids(
-    raw_ids: list[int] | None,
-    current_ids: list[int],
-) -> list[int]:
-    if raw_ids is None:
-        return list(current_ids)
-
-    normalized: list[int] = []
-    for raw_id in raw_ids:
-        if raw_id <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="allowed_user_ids must contain positive integers",
-            )
-        if raw_id not in normalized:
-            normalized.append(raw_id)
-    return normalized
 
 
 @router.post("/api/settings")
@@ -154,15 +137,10 @@ async def update_telegram_settings(
     if req.bot_token is not None:
         next_token = req.bot_token.strip()
 
-    next_allowed_user_ids = _normalize_allowed_user_ids(
-        req.allowed_user_ids,
-        settings.telegram.allowed_user_ids,
-    )
-
     settings.telegram = TelegramSettings(
         bot_token=next_token,
-        allowed_user_ids=next_allowed_user_ids,
-        registered_chat_ids=list(settings.telegram.registered_chat_ids),
+        pending_chats=list(settings.telegram.pending_chats),
+        approved_chats=list(settings.telegram.approved_chats),
     )
     save_settings(settings)
 
@@ -176,13 +154,57 @@ async def update_telegram_settings(
     }
 
 
+@router.post("/api/settings/telegram/approve/{chat_id}")
+async def approve_telegram_chat(chat_id: int) -> dict[str, object]:
+    settings = get_settings()
+    pending_chat = next(
+        (chat for chat in settings.telegram.pending_chats if chat.chat_id == chat_id),
+        None,
+    )
+    if pending_chat is None:
+        raise HTTPException(status_code=404, detail="Pending Telegram chat not found")
+
+    settings.telegram.pending_chats = [
+        chat for chat in settings.telegram.pending_chats if chat.chat_id != chat_id
+    ]
+    if not any(chat.chat_id == chat_id for chat in settings.telegram.approved_chats):
+        settings.telegram.approved_chats.append(
+            TelegramApprovedChat(
+                chat_id=pending_chat.chat_id,
+                username=pending_chat.username,
+                display_name=pending_chat.display_name,
+                approved_at=time.time(),
+            )
+        )
+    save_settings(settings)
+    logger.info("Telegram chat approved: {}", chat_id)
+    return {
+        "status": "approved",
+        "telegram": serialize_telegram_settings(settings.telegram),
+    }
+
+
+@router.delete("/api/settings/telegram/pending/{chat_id}")
+async def delete_pending_telegram_chat(chat_id: int) -> dict[str, object]:
+    settings = get_settings()
+    settings.telegram.pending_chats = [
+        chat for chat in settings.telegram.pending_chats if chat.chat_id != chat_id
+    ]
+    save_settings(settings)
+    logger.info("Pending Telegram chat removed: {}", chat_id)
+    return {
+        "status": "deleted",
+        "telegram": serialize_telegram_settings(settings.telegram),
+    }
+
+
 @router.delete("/api/settings/telegram/chat/{chat_id}")
 async def delete_telegram_chat(chat_id: int) -> dict[str, object]:
     settings = get_settings()
-    settings.telegram.registered_chat_ids = [
-        existing_chat_id
-        for existing_chat_id in settings.telegram.registered_chat_ids
-        if existing_chat_id != chat_id
+    settings.telegram.approved_chats = [
+        existing_chat
+        for existing_chat in settings.telegram.approved_chats
+        if existing_chat.chat_id != chat_id
     ]
     save_settings(settings)
     logger.info("Telegram chat removed: {}", chat_id)

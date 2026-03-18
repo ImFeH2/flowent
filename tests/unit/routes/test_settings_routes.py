@@ -6,6 +6,8 @@ from fastapi import HTTPException
 from app.routes.settings import (
     UpdateSettingsRequest,
     UpdateTelegramSettingsRequest,
+    approve_telegram_chat,
+    delete_pending_telegram_chat,
     delete_telegram_chat,
     get_settings_api,
     get_settings_bootstrap,
@@ -13,7 +15,14 @@ from app.routes.settings import (
     update_settings,
     update_telegram_settings,
 )
-from app.settings import ProviderConfig, RoleConfig, Settings, TelegramSettings
+from app.settings import (
+    ProviderConfig,
+    RoleConfig,
+    Settings,
+    TelegramApprovedChat,
+    TelegramPendingChat,
+    TelegramSettings,
+)
 
 
 def test_get_settings_returns_assistant_configuration(monkeypatch):
@@ -53,8 +62,8 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
             "assistant": {"role_name": "Steward"},
             "telegram": {
                 "bot_token": "",
-                "allowed_user_ids": [],
-                "registered_chat_ids": [],
+                "pending_chats": [],
+                "approved_chats": [],
             },
             "model": {
                 "active_provider_id": "",
@@ -116,8 +125,23 @@ def test_get_telegram_settings_masks_bot_token(monkeypatch):
     settings = Settings(
         telegram=TelegramSettings(
             bot_token="123456:ABCDE",
-            allowed_user_ids=[1001],
-            registered_chat_ids=[-2002],
+            pending_chats=[
+                TelegramPendingChat(
+                    chat_id=1001,
+                    username="alice",
+                    display_name="Alice",
+                    first_seen_at=1.0,
+                    last_seen_at=2.0,
+                )
+            ],
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=-2002,
+                    username="bob",
+                    display_name="Bob",
+                    approved_at=3.0,
+                )
+            ],
         )
     )
 
@@ -127,8 +151,23 @@ def test_get_telegram_settings_masks_bot_token(monkeypatch):
 
     assert result == {
         "bot_token": "sk-...BCDE",
-        "allowed_user_ids": [1001],
-        "registered_chat_ids": [-2002],
+        "pending_chats": [
+            {
+                "chat_id": 1001,
+                "username": "alice",
+                "display_name": "Alice",
+                "first_seen_at": 1.0,
+                "last_seen_at": 2.0,
+            }
+        ],
+        "approved_chats": [
+            {
+                "chat_id": -2002,
+                "username": "bob",
+                "display_name": "Bob",
+                "approved_at": 3.0,
+            }
+        ],
     }
 
 
@@ -136,8 +175,23 @@ def test_update_telegram_settings_restarts_channel_when_token_changes(monkeypatc
     settings = Settings(
         telegram=TelegramSettings(
             bot_token="old-token",
-            allowed_user_ids=[1001],
-            registered_chat_ids=[-2002],
+            pending_chats=[
+                TelegramPendingChat(
+                    chat_id=1001,
+                    username="alice",
+                    display_name="Alice",
+                    first_seen_at=1.0,
+                    last_seen_at=2.0,
+                )
+            ],
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=-2002,
+                    username="bob",
+                    display_name="Bob",
+                    approved_at=3.0,
+                )
+            ],
         )
     )
     saved: list[Settings] = []
@@ -157,15 +211,29 @@ def test_update_telegram_settings_restarts_channel_when_token_changes(monkeypatc
         update_telegram_settings(
             UpdateTelegramSettingsRequest(
                 bot_token="new-token",
-                allowed_user_ids=[2002, 3003],
             )
         )
     )
 
     assert settings.telegram == TelegramSettings(
         bot_token="new-token",
-        allowed_user_ids=[2002, 3003],
-        registered_chat_ids=[-2002],
+        pending_chats=[
+            TelegramPendingChat(
+                chat_id=1001,
+                username="alice",
+                display_name="Alice",
+                first_seen_at=1.0,
+                last_seen_at=2.0,
+            )
+        ],
+        approved_chats=[
+            TelegramApprovedChat(
+                chat_id=-2002,
+                username="bob",
+                display_name="Bob",
+                approved_at=3.0,
+            )
+        ],
     )
     assert saved == [settings]
     assert restarted == ["restart"]
@@ -173,18 +241,136 @@ def test_update_telegram_settings_restarts_channel_when_token_changes(monkeypatc
         "status": "saved",
         "telegram": {
             "bot_token": "sk-...oken",
-            "allowed_user_ids": [2002, 3003],
-            "registered_chat_ids": [-2002],
+            "pending_chats": [
+                {
+                    "chat_id": 1001,
+                    "username": "alice",
+                    "display_name": "Alice",
+                    "first_seen_at": 1.0,
+                    "last_seen_at": 2.0,
+                }
+            ],
+            "approved_chats": [
+                {
+                    "chat_id": -2002,
+                    "username": "bob",
+                    "display_name": "Bob",
+                    "approved_at": 3.0,
+                }
+            ],
         },
     }
 
 
-def test_delete_telegram_chat_removes_registered_chat(monkeypatch):
+def test_approve_telegram_chat_moves_pending_chat_to_approved(monkeypatch):
     settings = Settings(
         telegram=TelegramSettings(
             bot_token="token",
-            allowed_user_ids=[1001],
-            registered_chat_ids=[-2002, 3003],
+            pending_chats=[
+                TelegramPendingChat(
+                    chat_id=3003,
+                    username="alice",
+                    display_name="Alice",
+                    first_seen_at=1.0,
+                    last_seen_at=2.0,
+                )
+            ],
+            approved_chats=[],
+        )
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings",
+        lambda current: saved.append(current),
+    )
+    monkeypatch.setattr("app.routes.settings.time.time", lambda: 42.0)
+
+    result = asyncio.run(approve_telegram_chat(3003))
+
+    assert settings.telegram.pending_chats == []
+    assert settings.telegram.approved_chats == [
+        TelegramApprovedChat(
+            chat_id=3003,
+            username="alice",
+            display_name="Alice",
+            approved_at=42.0,
+        )
+    ]
+    assert saved == [settings]
+    assert result == {
+        "status": "approved",
+        "telegram": {
+            "bot_token": "sk-...oken",
+            "pending_chats": [],
+            "approved_chats": [
+                {
+                    "chat_id": 3003,
+                    "username": "alice",
+                    "display_name": "Alice",
+                    "approved_at": 42.0,
+                }
+            ],
+        },
+    }
+
+
+def test_delete_pending_telegram_chat_removes_pending_chat(monkeypatch):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="token",
+            pending_chats=[
+                TelegramPendingChat(
+                    chat_id=3003,
+                    username="alice",
+                    display_name="Alice",
+                    first_seen_at=1.0,
+                    last_seen_at=2.0,
+                )
+            ],
+        )
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings",
+        lambda current: saved.append(current),
+    )
+
+    result = asyncio.run(delete_pending_telegram_chat(3003))
+
+    assert settings.telegram.pending_chats == []
+    assert saved == [settings]
+    assert result == {
+        "status": "deleted",
+        "telegram": {
+            "bot_token": "sk-...oken",
+            "pending_chats": [],
+            "approved_chats": [],
+        },
+    }
+
+
+def test_delete_telegram_chat_removes_approved_chat(monkeypatch):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="token",
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=-2002,
+                    username="bob",
+                    display_name="Bob",
+                    approved_at=3.0,
+                ),
+                TelegramApprovedChat(
+                    chat_id=3003,
+                    username="alice",
+                    display_name="Alice",
+                    approved_at=4.0,
+                ),
+            ],
         )
     )
     saved: list[Settings] = []
@@ -197,14 +383,28 @@ def test_delete_telegram_chat_removes_registered_chat(monkeypatch):
 
     result = asyncio.run(delete_telegram_chat(-2002))
 
-    assert settings.telegram.registered_chat_ids == [3003]
+    assert settings.telegram.approved_chats == [
+        TelegramApprovedChat(
+            chat_id=3003,
+            username="alice",
+            display_name="Alice",
+            approved_at=4.0,
+        )
+    ]
     assert saved == [settings]
     assert result == {
         "status": "deleted",
         "telegram": {
             "bot_token": "sk-...oken",
-            "allowed_user_ids": [1001],
-            "registered_chat_ids": [3003],
+            "pending_chats": [],
+            "approved_chats": [
+                {
+                    "chat_id": 3003,
+                    "username": "alice",
+                    "display_name": "Alice",
+                    "approved_at": 4.0,
+                }
+            ],
         },
     }
 

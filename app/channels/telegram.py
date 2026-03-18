@@ -11,7 +11,11 @@ from loguru import logger
 from app.events import event_bus
 from app.models import Event, EventType, Message
 from app.registry import registry
-from app.settings import get_settings, save_settings
+from app.settings import (
+    TelegramPendingChat,
+    get_settings,
+    save_settings,
+)
 
 TELEGRAM_API_BASE_URL = "https://api.telegram.org"
 TELEGRAM_LONG_POLL_TIMEOUT_SECONDS = 30
@@ -19,8 +23,8 @@ TELEGRAM_REQUEST_TIMEOUT_SECONDS = 35
 TELEGRAM_EDIT_INTERVAL_SECONDS = 1.0
 TELEGRAM_EDIT_THRESHOLD_CHARS = 100
 TELEGRAM_MAX_TEXT_LENGTH = 4000
-UNAUTHORIZED_MESSAGE = "⛔ You are not authorized."
 PLACEHOLDER_MESSAGE = "…"
+PRIVATE_ONLY_MESSAGE = "🔒 Telegram channel currently supports private chats only."
 
 
 class TelegramChannel:
@@ -141,33 +145,44 @@ class TelegramChannel:
 
         from_data = message.get("from")
         chat_data = message.get("chat")
-        user_id = from_data.get("id") if isinstance(from_data, dict) else None
         chat_id = chat_data.get("id") if isinstance(chat_data, dict) else None
+        chat_type = chat_data.get("type") if isinstance(chat_data, dict) else None
         text = message.get("text")
+        username = from_data.get("username") if isinstance(from_data, dict) else None
+        first_name = (
+            from_data.get("first_name") if isinstance(from_data, dict) else None
+        )
+        last_name = from_data.get("last_name") if isinstance(from_data, dict) else None
 
-        if not isinstance(user_id, int) or not isinstance(chat_id, int):
+        if not isinstance(chat_id, int):
             return
+        if chat_type != "private":
+            await self._send_message(chat_id, PRIVATE_ONLY_MESSAGE, markdown=False)
+            return
+
+        display_name = self._build_display_name(first_name, last_name, username)
 
         settings = get_settings()
-        if user_id not in settings.telegram.allowed_user_ids:
-            await self._send_message(chat_id, UNAUTHORIZED_MESSAGE, markdown=False)
+        if any(chat.chat_id == chat_id for chat in settings.telegram.approved_chats):
+            if not isinstance(text, str) or not text.strip():
+                return
+
+            assistant = registry.get_assistant()
+            if assistant is None:
+                logger.warning("Telegram message dropped: assistant not available")
+                return
+
+            assistant.enqueue_message(
+                Message(from_id="human", to_id=assistant.uuid, content=text)
+            )
             return
 
-        if chat_id not in settings.telegram.registered_chat_ids:
-            settings.telegram.registered_chat_ids.append(chat_id)
+        if self._upsert_pending_chat(settings, chat_id, username, display_name):
             save_settings(settings)
-            logger.info("Registered Telegram chat {}", chat_id)
-
-        if not isinstance(text, str) or not text.strip():
-            return
-
-        assistant = registry.get_assistant()
-        if assistant is None:
-            logger.warning("Telegram message dropped: assistant not available")
-            return
-
-        assistant.enqueue_message(
-            Message(from_id="human", to_id=assistant.uuid, content=text)
+        await self._send_message(
+            chat_id,
+            (f"⏳ This chat is pending approval in Autopoe.\nChat ID: `{chat_id}`"),
+            markdown=True,
         )
 
     def _on_event(self, event: Event) -> None:
@@ -248,14 +263,14 @@ class TelegramChannel:
 
     async def _open_stream_messages(self) -> None:
         settings = get_settings()
-        for chat_id in settings.telegram.registered_chat_ids:
+        for approved_chat in settings.telegram.approved_chats:
             message_id = await self._send_message(
-                chat_id,
+                approved_chat.chat_id,
                 PLACEHOLDER_MESSAGE,
                 markdown=False,
             )
             if message_id is not None:
-                self._stream_message_ids[chat_id] = message_id
+                self._stream_message_ids[approved_chat.chat_id] = message_id
         self._last_edit_at = time.monotonic()
         self._last_sent_length = 0
 
@@ -265,7 +280,9 @@ class TelegramChannel:
         if not self._stream_buffer and not force:
             return
 
-        current_chat_ids = set(get_settings().telegram.registered_chat_ids)
+        current_chat_ids = {
+            chat.chat_id for chat in get_settings().telegram.approved_chats
+        }
         text = self._format_text(self._stream_buffer or PLACEHOLDER_MESSAGE)
         for chat_id, message_id in list(self._stream_message_ids.items()):
             if chat_id not in current_chat_ids:
@@ -280,8 +297,8 @@ class TelegramChannel:
 
     async def _broadcast_message(self, text: str, *, markdown: bool) -> None:
         settings = get_settings()
-        for chat_id in settings.telegram.registered_chat_ids:
-            await self._send_message(chat_id, text, markdown=markdown)
+        for approved_chat in settings.telegram.approved_chats:
+            await self._send_message(approved_chat.chat_id, text, markdown=markdown)
 
     async def _send_message(
         self,
@@ -327,6 +344,61 @@ class TelegramChannel:
         if len(stripped) <= TELEGRAM_MAX_TEXT_LENGTH:
             return stripped
         return stripped[: TELEGRAM_MAX_TEXT_LENGTH - 1] + "…"
+
+    @staticmethod
+    def _build_display_name(
+        first_name: object,
+        last_name: object,
+        username: object,
+    ) -> str:
+        parts = []
+        if isinstance(first_name, str) and first_name.strip():
+            parts.append(first_name.strip())
+        if isinstance(last_name, str) and last_name.strip():
+            parts.append(last_name.strip())
+        if parts:
+            return " ".join(parts)
+        if isinstance(username, str) and username.strip():
+            return username.strip()
+        return ""
+
+    @staticmethod
+    def _upsert_pending_chat(
+        settings: Any,
+        chat_id: int,
+        username: object,
+        display_name: str,
+    ) -> bool:
+        username_value = (
+            username.strip() if isinstance(username, str) and username.strip() else None
+        )
+        now = time.time()
+        for pending_chat in settings.telegram.pending_chats:
+            if pending_chat.chat_id != chat_id:
+                continue
+
+            changed = False
+            if pending_chat.username != username_value:
+                pending_chat.username = username_value
+                changed = True
+            if pending_chat.display_name != display_name:
+                pending_chat.display_name = display_name
+                changed = True
+            if pending_chat.last_seen_at != now:
+                pending_chat.last_seen_at = now
+                changed = True
+            return changed
+
+        settings.telegram.pending_chats.append(
+            TelegramPendingChat(
+                chat_id=chat_id,
+                username=username_value,
+                display_name=display_name,
+                first_seen_at=now,
+                last_seen_at=now,
+            )
+        )
+        return True
 
     async def _call_api(
         self,

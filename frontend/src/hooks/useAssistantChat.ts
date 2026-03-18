@@ -11,14 +11,15 @@ import { fetchNodeDetail } from "@/lib/api";
 import {
   useAgentConnectionRuntime,
   useAgentHistoryRuntime,
+  useAgentNodesRuntime,
   useAgentUI,
 } from "@/context/AgentContext";
+import { getAssistantNodeId } from "@/lib/assistant";
 import { mergeHistoryWithDeltas } from "@/lib/history";
 import type { AssistantChatItem, NodeDetail } from "@/types";
 
-const ASSISTANT_ID = "assistant";
-
 export function useAssistantChat() {
+  const { agents } = useAgentNodesRuntime();
   const { connected } = useAgentConnectionRuntime();
   const { agentHistories, clearAgentHistory, streamingDeltas } =
     useAgentHistoryRuntime();
@@ -29,9 +30,11 @@ export function useAssistantChat() {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+  const assistantId = useMemo(() => getAssistantNodeId(agents), [agents]);
 
   useEffect(() => {
-    if (!connected) {
+    if (!connected || !assistantId) {
+      setDetail(null);
       return;
     }
 
@@ -39,9 +42,9 @@ export function useAssistantChat() {
     let cancelled = false;
 
     const load = async () => {
-      clearAgentHistory(ASSISTANT_ID);
+      clearAgentHistory(assistantId);
       try {
-        const data = await fetchNodeDetail(ASSISTANT_ID, controller.signal);
+        const data = await fetchNodeDetail(assistantId, controller.signal);
         if (cancelled || !data) {
           return;
         }
@@ -60,15 +63,17 @@ export function useAssistantChat() {
       cancelled = true;
       controller.abort();
     };
-  }, [clearAgentHistory, connected]);
+  }, [assistantId, clearAgentHistory, connected]);
 
   const timelineItems = useMemo<AssistantChatItem[]>(() => {
-    const history = mergeHistoryWithDeltas({
-      history: detail?.history ?? [],
-      incremental: agentHistories.get(ASSISTANT_ID),
-      deltas: streamingDeltas.get(ASSISTANT_ID),
-      fetchedAt: fetchedAt || Date.now(),
-    });
+    const history = assistantId
+      ? mergeHistoryWithDeltas({
+          history: detail?.history ?? [],
+          incremental: agentHistories.get(assistantId),
+          deltas: streamingDeltas.get(assistantId),
+          fetchedAt: fetchedAt || Date.now(),
+        })
+      : [];
 
     return [
       ...history,
@@ -80,6 +85,7 @@ export function useAssistantChat() {
     fetchedAt,
     pendingAssistantMessages,
     streamingDeltas,
+    assistantId,
   ]);
 
   useEffect(() => {

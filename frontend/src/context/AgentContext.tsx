@@ -101,7 +101,6 @@ const AgentUIContext = createContext<AgentUIContextValue | null>(null);
 
 const MESSAGE_ANIMATION_MS = 2000;
 const TOOL_CALL_ANIMATION_MS = 2000;
-const ASSISTANT_ID = "assistant";
 const MAX_TRACKED_TOOL_CALL_IDS = 256;
 
 function shouldTrackFeedEntry(entry: HistoryEntry): boolean {
@@ -302,7 +301,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         }
 
         if (
-          event.agent_id === ASSISTANT_ID &&
           entry.type === "ReceivedMessage" &&
           entry.from_id === "human" &&
           entry.content

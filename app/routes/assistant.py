@@ -3,14 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.models import ASSISTANT_NODE_ID, Message
+from app.models import Message
 from app.registry import registry
 
 router = APIRouter()
 
 
 def _get_assistant():
-    return registry.get(ASSISTANT_NODE_ID)
+    return registry.get_assistant()
 
 
 @router.get("/api/assistant")

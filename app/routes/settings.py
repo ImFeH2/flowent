@@ -49,7 +49,6 @@ class UpdateSettingsRequest(BaseModel):
 
 @router.post("/api/settings")
 async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
-    from app.models import ASSISTANT_NODE_ID
     from app.providers.gateway import gateway
     from app.registry import registry
 
@@ -97,7 +96,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         )
 
     save_settings(current)
-    assistant = registry.get(ASSISTANT_NODE_ID)
+    assistant = registry.get_assistant()
     if assistant is not None:
         assistant.config.role_name = current.assistant.role_name
         assistant._sync_system_prompt_entry()

@@ -118,7 +118,6 @@ def test_finalize_termination_removes_bidirectional_connections():
     try:
         assistant = Agent(
             NodeConfig(node_type=NodeType.ASSISTANT),
-            uuid="assistant",
         )
         worker = Agent(
             NodeConfig(node_type=NodeType.AGENT),
@@ -230,7 +229,6 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
     registry.reset()
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, tools=["exit"]),
-        uuid="assistant",
     )
     registry.register(assistant)
     events = []

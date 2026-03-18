@@ -1,4 +1,5 @@
 import json
+from uuid import UUID
 
 import app.settings as settings_module
 from app.agent import Agent
@@ -43,10 +44,11 @@ def test_bootstrap_runtime_creates_only_assistant_with_create_root(
 
     try:
         nodes = registry.get_all()
-        assistant = registry.get("assistant")
+        assistant = registry.get_assistant()
 
         assert len(nodes) == 1
         assert assistant is not None
+        assert str(UUID(assistant.uuid)) == assistant.uuid
         assert assistant.config.node_type.value == "assistant"
         assert assistant.config.name == "Assistant"
         assert assistant.config.role_name == STEWARD_ROLE_NAME
@@ -194,7 +196,7 @@ def test_bootstrap_runtime_uses_configured_assistant_role(monkeypatch, tmp_path)
     bootstrap_runtime()
 
     try:
-        assistant = registry.get("assistant")
+        assistant = registry.get_assistant()
         assert assistant is not None
         assert assistant.config.role_name == "Reviewer"
         assert settings_module.get_settings().assistant.role_name == "Reviewer"
@@ -228,7 +230,7 @@ def test_bootstrap_runtime_falls_back_to_steward_when_assistant_role_missing(
     bootstrap_runtime()
 
     try:
-        assistant = registry.get("assistant")
+        assistant = registry.get_assistant()
         assert assistant is not None
         assert assistant.config.role_name == STEWARD_ROLE_NAME
         assert settings_module.get_settings().assistant.role_name == STEWARD_ROLE_NAME

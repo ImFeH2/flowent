@@ -87,7 +87,6 @@ class ManageSettingsTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app.models import ASSISTANT_NODE_ID
         from app.providers.gateway import gateway
         from app.registry import registry
         from app.settings import (
@@ -153,7 +152,7 @@ class ManageSettingsTool(Tool):
             settings.event_log.timestamp_format = timestamp_format
 
         save_settings(settings)
-        assistant = registry.get(ASSISTANT_NODE_ID)
+        assistant = registry.get_assistant()
         if assistant is not None:
             assistant.config.role_name = settings.assistant.role_name
             assistant._sync_system_prompt_entry()

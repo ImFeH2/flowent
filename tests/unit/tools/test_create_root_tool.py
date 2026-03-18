@@ -28,7 +28,6 @@ def test_create_root_registers_root_agent_and_connects_to_assistant(
             write_dirs=[],
             allow_network=False,
         ),
-        uuid="assistant",
     )
     registry.register(assistant)
 
@@ -78,17 +77,16 @@ def test_create_root_registers_root_agent_and_connects_to_assistant(
     assert child.config.role_name == "Worker"
     assert child.config.graph_id == graph_id
     assert child.config.name == "Root Worker"
-    assert child.config.parent_id == "assistant"
+    assert child.config.parent_id == assistant.uuid
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert child.config.write_dirs == [str(notes_dir)]
     assert assistant.is_connected_to(child_id) is True
-    assert child.is_connected_to("assistant") is True
+    assert child.is_connected_to(assistant.uuid) is True
 
 
 def test_create_root_delivers_initial_task_after_idle(monkeypatch):
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
-        uuid="assistant",
     )
     registry.register(assistant)
 
@@ -150,12 +148,12 @@ def test_create_root_delivers_initial_task_after_idle(monkeypatch):
     }
     assert child is not None
     assert child.config.graph_id == graph_id
-    assert child.config.parent_id == "assistant"
+    assert child.config.parent_id == assistant.uuid
     assert child.config.tools == [*MINIMUM_TOOLS, "read", "edit"]
     assert call_order == [
         ("start", child_id),
         ("wait_until_idle", child_id, 5.0),
-        ("send_message", "assistant", child_id, "handle this task"),
+        ("send_message", assistant.uuid, child_id, "handle this task"),
     ]
 
 
@@ -170,7 +168,6 @@ def test_create_root_allows_requested_boundary_even_if_assistant_is_more_restric
             write_dirs=[],
             allow_network=False,
         ),
-        uuid="assistant",
     )
     registry.register(assistant)
 
@@ -207,7 +204,6 @@ def test_create_root_allows_requested_boundary_even_if_assistant_is_more_restric
 def test_create_root_grants_builtin_conductor_graph_tools_by_default(monkeypatch):
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]),
-        uuid="assistant",
     )
     registry.register(assistant)
 

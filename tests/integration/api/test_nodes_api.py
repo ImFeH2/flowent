@@ -1,6 +1,17 @@
+from uuid import UUID
+
 from fastapi.testclient import TestClient
 
 from app.routes.nodes import router as nodes_router
+
+
+def _get_assistant_id(client: TestClient) -> str:
+    response = client.get("/api/assistant")
+
+    assert response.status_code == 200
+    assistant_id = response.json()["id"]
+    UUID(assistant_id)
+    return assistant_id
 
 
 def test_health_check(client: TestClient):
@@ -27,11 +38,12 @@ def test_get_agent_not_found(client: TestClient):
 
 
 def test_get_node_detail_includes_runtime_config(client: TestClient):
-    response = client.get("/api/nodes/assistant")
+    assistant_id = _get_assistant_id(client)
+    response = client.get(f"/api/nodes/{assistant_id}")
 
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == "assistant"
+    assert data["id"] == assistant_id
     assert data["graph_id"] is None
     assert isinstance(data["history"], list)
     assert isinstance(data["tools"], list)
@@ -53,7 +65,7 @@ def test_only_assistant_node_exists_at_startup(client: TestClient):
     assert list_response.status_code == 200
     nodes = list_response.json()["nodes"]
     assert len(nodes) == 1
-    assert nodes[0]["id"] == "assistant"
+    UUID(nodes[0]["id"])
     assert nodes[0]["node_type"] == "assistant"
     assert nodes[0]["graph_id"] is None
     assert nodes[0]["name"] == "Assistant"
@@ -61,11 +73,12 @@ def test_only_assistant_node_exists_at_startup(client: TestClient):
 
 
 def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient):
-    response = client.get("/api/nodes/assistant")
+    assistant_id = _get_assistant_id(client)
+    response = client.get(f"/api/nodes/{assistant_id}")
 
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == "assistant"
+    assert data["id"] == assistant_id
     assert data["tools"] == [
         "create_root",
         "manage_providers",
@@ -78,7 +91,8 @@ def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient)
 
 
 def test_assistant_cannot_be_terminated_via_nodes_api(client: TestClient):
-    response = client.post("/api/nodes/assistant/terminate")
+    assistant_id = _get_assistant_id(client)
+    response = client.post(f"/api/nodes/{assistant_id}/terminate")
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Cannot terminate assistant"}

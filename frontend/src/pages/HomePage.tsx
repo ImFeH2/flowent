@@ -39,12 +39,12 @@ import {
   usePanelWidth,
 } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
+import { getAssistantNode } from "@/lib/assistant";
 
 const WORKSPACE_PANEL_ID = "workspace-panel-width";
 const MIN_PANEL_WIDTH = 320;
 const MIN_GRAPH_WIDTH = 320;
 const MAX_PANEL_WIDTH = 1400;
-const ASSISTANT_ID = "assistant";
 const DEFAULT_PANEL_RATIO = 2 / 5;
 const DEFAULT_PANEL_WIDTH = 560;
 
@@ -267,7 +267,7 @@ function AgentDetailPanel({
   const { agents } = useAgentNodesRuntime();
   const { detail, error, loading } = useAgentDetail(
     agent.id,
-    agent.id === ASSISTANT_ID,
+    agent.node_type === "assistant",
   );
   const detailState = detail?.state ?? agent.state;
   const detailConnections = detail?.connections ?? agent.connections;
@@ -549,7 +549,7 @@ function AssistantChatPanel() {
     setInput,
     timelineItems,
   } = useAssistantChat();
-  const assistantRoleName = agents.get("assistant")?.role_name ?? null;
+  const assistantRoleName = getAssistantNode(agents)?.role_name ?? null;
 
   return (
     <>

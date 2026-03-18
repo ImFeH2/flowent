@@ -6,7 +6,7 @@ from app.tools.exit import ExitTool
 
 
 def test_exit_tool_rejects_assistant():
-    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT))
 
     result = json.loads(ExitTool().execute(assistant, {}))
 

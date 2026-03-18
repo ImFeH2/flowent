@@ -1,4 +1,4 @@
-from app.models.agent import ASSISTANT_NODE_ID, AgentState, NodeConfig, NodeType
+from app.models.agent import AgentState, NodeConfig, NodeType
 from app.models.base import Serializable
 from app.models.delta import (
     ContentDelta,
@@ -23,7 +23,6 @@ from app.models.message import Message
 from app.models.todo import TodoItem
 
 __all__ = [
-    "ASSISTANT_NODE_ID",
     "DISPLAY_EVENTS",
     "AgentState",
     "AssistantText",

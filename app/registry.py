@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from app.models import Graph
+from app.models import Graph, NodeType
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -35,6 +35,13 @@ class AgentRegistry:
     def get(self, agent_id: str) -> Agent | None:
         with self._lock:
             return self._agents.get(agent_id)
+
+    def get_assistant(self) -> Agent | None:
+        with self._lock:
+            for agent in self._agents.values():
+                if agent.node_type == NodeType.ASSISTANT:
+                    return agent
+            return None
 
     def find_by_name(self, name: str) -> Agent | None:
         with self._lock:

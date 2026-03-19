@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, Node } from "@/types";
-import { MarkdownContent } from "@/components/MarkdownContent";
 import { CopyButton } from "@/components/CopyButton";
 import { getNodeLabel } from "@/lib/nodeLabel";
 
@@ -71,35 +70,24 @@ function formatJsonOutput(value: unknown): string | null {
 
 function MarkdownOrJsonBlock({
   content,
-  markdownClassName,
   preClassName,
   streaming,
 }: {
   content: string | null | undefined;
-  markdownClassName?: string;
   preClassName?: string;
   streaming?: boolean;
 }) {
-  const formattedJson = formatJsonOutput(content);
-
-  if (formattedJson) {
-    return (
-      <pre
-        className={cn(
-          "text-[11px] whitespace-pre-wrap break-words",
-          preClassName,
-        )}
-      >
-        <StreamingText text={formattedJson} streaming={streaming} />
-      </pre>
-    );
-  }
+  const formatted = formatJsonOutput(content) ?? content ?? "";
 
   return (
-    <>
-      <MarkdownContent content={content ?? ""} className={markdownClassName} />
-      {streaming && <span className="streaming-cursor" />}
-    </>
+    <pre
+      className={cn(
+        "text-[11px] whitespace-pre-wrap break-words leading-relaxed",
+        preClassName,
+      )}
+    >
+      <StreamingText text={formatted} streaming={streaming} />
+    </pre>
   );
 }
 
@@ -139,7 +127,6 @@ function HistoryItem({
         >
           <MarkdownOrJsonBlock
             content={entry.content}
-            markdownClassName="text-xs text-muted-foreground"
             preClassName="text-muted-foreground leading-relaxed"
           />
         </CollapsibleBlock>
@@ -157,7 +144,6 @@ function HistoryItem({
         >
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
-            markdownClassName="text-xs text-foreground/90"
             preClassName="text-foreground/90 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -175,7 +161,6 @@ function HistoryItem({
           <MarkdownOrJsonBlock
             content={entry.content}
             streaming={entry.streaming}
-            markdownClassName="text-xs text-amber-200/80"
             preClassName="text-amber-200/80 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -194,7 +179,6 @@ function HistoryItem({
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
             streaming={entry.streaming}
-            markdownClassName="text-xs text-emerald-200"
             preClassName="text-emerald-200 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -216,7 +200,7 @@ function HistoryItem({
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
                 Arguments
               </div>
-              <pre className="text-[11px] text-teal-200/80 whitespace-pre-wrap break-words">
+              <pre className="text-[11px] whitespace-pre-wrap break-words leading-relaxed text-teal-200/80">
                 {formattedArguments}
               </pre>
             </div>
@@ -228,8 +212,7 @@ function HistoryItem({
                 <MarkdownOrJsonBlock
                   content={formattedResult ?? entry.result}
                   streaming={entry.streaming}
-                  markdownClassName="text-xs text-muted-foreground"
-                  preClassName="text-muted-foreground"
+                  preClassName="text-muted-foreground leading-relaxed"
                 />
               </div>
             )}
@@ -248,9 +231,10 @@ function HistoryItem({
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
         >
-          <p className="text-xs text-red-200 whitespace-pre-wrap break-words">
-            {entry.content}
-          </p>
+          <MarkdownOrJsonBlock
+            content={entry.content}
+            preClassName="text-red-200 leading-relaxed"
+          />
         </CollapsibleBlock>
       );
 

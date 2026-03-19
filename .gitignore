@@ -8,7 +8,6 @@ __pycache__/
 .env*
 !.env.example
 
-worktrees/
 logs/
 settings.json
 

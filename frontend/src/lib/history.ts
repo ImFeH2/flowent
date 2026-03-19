@@ -58,6 +58,13 @@ function getHistoryEntryDedupKey(entry: HistoryEntry): string {
         entry.from_id ?? "",
         entry.content ?? "",
       ].join(":");
+    case "SentMessage":
+      return [
+        entry.type,
+        timestamp,
+        (entry.to_ids ?? []).join(","),
+        entry.content ?? "",
+      ].join(":");
     case "ToolCall":
       if (entry.tool_call_id) {
         return `${entry.type}:${entry.tool_call_id}`;

@@ -65,6 +65,7 @@ export type HistoryEntryType =
   | "SystemInjection"
   | "ReceivedMessage"
   | "AssistantText"
+  | "SentMessage"
   | "AssistantThinking"
   | "ToolCall"
   | "ErrorEntry";
@@ -73,6 +74,7 @@ export interface HistoryEntry {
   type: HistoryEntryType;
   content?: string | null;
   from_id?: string | null;
+  to_ids?: string[] | null;
   tool_name?: string | null;
   tool_call_id?: string | null;
   arguments?: Record<string, unknown> | null;

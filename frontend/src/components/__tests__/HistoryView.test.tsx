@@ -81,21 +81,22 @@ describe("HistoryView", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders send tool calls with the generic tool label", () => {
+  it("renders sent messages separately from assistant text", () => {
     render(
       <HistoryView
         history={[
           {
-            type: "ToolCall",
-            tool_name: "send",
-            tool_call_id: "tool-1",
-            arguments: { to: "assistant", content: "Done." },
+            type: "SentMessage",
+            to_ids: ["assistant"],
+            content: "Done.",
             timestamp: 1,
           },
         ]}
       />,
     );
 
-    expect(screen.getByRole("button", { name: /^send$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /To Assistant/i }),
+    ).toBeInTheDocument();
   });
 });

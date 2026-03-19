@@ -16,6 +16,7 @@ from app.models import (
     NodeConfig,
     NodeType,
     ReceivedMessage,
+    SentMessage,
     ToolCall,
     ToolCallResult,
 )
@@ -327,7 +328,7 @@ def test_route_content_output_delivers_to_targets_when_header_present(monkeypatc
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
-        child._route_content_output(
+        sent_messages = child._route_content_output(
             "@peer, Helper: investigate the error\nwith the latest logs",
         )
     finally:
@@ -348,6 +349,9 @@ def test_route_content_output_delivers_to_targets_when_header_present(monkeypatc
             "content": "investigate the error\nwith the latest logs",
         }
     }
+    assert len(sent_messages) == 1
+    assert sent_messages[0].content == "investigate the error\nwith the latest logs"
+    assert sent_messages[0].to_ids == ["peer", "helper"]
     assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
         {"to_id": "peer", "content": "investigate the error\nwith the latest logs"},
         {"to_id": "helper", "content": "investigate the error\nwith the latest logs"},
@@ -367,10 +371,11 @@ def test_route_content_output_does_not_deliver_plain_content(monkeypatch):
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
-        agent._route_content_output("Status update.")
+        sent_messages = agent._route_content_output("Status update.")
     finally:
         registry.reset()
 
+    assert sent_messages == []
     assert parent._wake_queue.empty()
     assert not any(event.type == EventType.NODE_MESSAGE for event in events)
 
@@ -390,12 +395,115 @@ def test_route_content_output_treats_non_header_target_text_as_plain_content(
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
-        agent._route_content_output("Status update.\n@peer: investigate the error")
+        sent_messages = agent._route_content_output(
+            "Status update.\n@peer: investigate the error"
+        )
     finally:
         registry.reset()
 
+    assert sent_messages == []
     assert parent._wake_queue.empty()
     assert not any(event.type == EventType.NODE_MESSAGE for event in events)
+
+
+def test_record_content_output_records_sent_message_in_history(monkeypatch):
+    registry.reset()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
+    registry.register(child)
+    registry.register(peer)
+    child.add_connection(peer.uuid)
+    events = []
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        child._record_content_output(
+            "@peer: investigate the error",
+            emitted_human_content=False,
+        )
+    finally:
+        registry.reset()
+
+    history = child.get_history_snapshot()
+    assert len(history) == 1
+    assert isinstance(history[0], SentMessage)
+    assert history[0].content == "investigate the error"
+    assert history[0].to_ids == ["peer"]
+    assert not any(isinstance(entry, AssistantText) for entry in history)
+    assert peer._wake_queue.get_nowait().payload == {
+        "message": {"from": "child", "content": "investigate the error"}
+    }
+    assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
+
+
+def test_build_messages_excludes_sent_messages():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(SentMessage(content="to peer", to_ids=["peer"]))
+    agent._append_history(AssistantText(content="final answer"))
+
+    messages = agent._build_messages()
+
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {"role": "assistant", "content": "final answer"},
+    ]
+
+
+def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
+    registry.reset()
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT),
+        uuid="assistant",
+    )
+    worker = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="worker")
+    registry.register(assistant)
+    registry.register(worker)
+    assistant.add_connection(worker.uuid)
+    events = []
+    responses = iter(
+        [
+            LLMResponse(content="@worker: investigate the error"),
+            LLMResponse(),
+        ]
+    )
+
+    def fake_wait_for_input() -> None:
+        assistant._append_history(
+            ReceivedMessage(content="please investigate", from_id="human")
+        )
+        assistant.set_state(AgentState.RUNNING, "received message from human")
+
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+        response = next(responses)
+        if response.content and on_chunk is not None:
+            on_chunk("content", response.content)
+        if response.content is None:
+            assistant.request_termination("done")
+        return response
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+    monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    try:
+        assistant._run()
+    finally:
+        registry.reset()
+
+    assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
+    assert any(
+        isinstance(entry, SentMessage)
+        and entry.content == "investigate the error"
+        and entry.to_ids == ["worker"]
+        for entry in assistant.get_history_snapshot()
+    )
+    assert not any(
+        isinstance(entry, AssistantText) and entry.content == "@worker: investigate the error"
+        for entry in assistant.get_history_snapshot()
+    )
 
 
 def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):

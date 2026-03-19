@@ -33,6 +33,13 @@ class AssistantText(Serializable):
 
 
 @dataclass
+class SentMessage(Serializable):
+    content: str
+    to_ids: list[str]
+    timestamp: float = field(default_factory=time.time)
+
+
+@dataclass
 class AssistantThinking(Serializable):
     content: str
     timestamp: float = field(default_factory=time.time)
@@ -59,6 +66,7 @@ HistoryEntry = (
     | SystemInjection
     | ReceivedMessage
     | AssistantText
+    | SentMessage
     | AssistantThinking
     | ToolCall
     | ErrorEntry

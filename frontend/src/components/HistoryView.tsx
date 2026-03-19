@@ -3,6 +3,7 @@ import { useState, useCallback, type ReactNode } from "react";
 import {
   ChevronRight,
   MessageSquare,
+  Send,
   Brain,
   Wrench,
   Terminal,
@@ -165,6 +166,25 @@ function HistoryItem({
           />
         </CollapsibleBlock>
       );
+
+    case "SentMessage": {
+      const targets = (entry.to_ids ?? []).map((id) => getNodeLabel(id, nodes));
+      return (
+        <CollapsibleBlock
+          label={`To ${targets.join(", ") || "Unknown"}`}
+          icon={<Send className="size-3 text-sky-400" />}
+          className="border-sky-500/20 bg-sky-500/5"
+          labelClassName="text-sky-300/90"
+          actions={<CopyButton text={entry.content ?? ""} />}
+          defaultOpen={false}
+        >
+          <MarkdownOrJsonBlock
+            content={entry.content ?? ""}
+            preClassName="text-sky-100/90 leading-relaxed"
+          />
+        </CollapsibleBlock>
+      );
+    }
 
     case "AssistantText":
       return (

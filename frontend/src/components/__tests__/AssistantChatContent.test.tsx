@@ -43,6 +43,12 @@ describe("AssistantChatMessages", () => {
         content: "Here is a draft plan with priorities and next steps.",
         timestamp: 5,
       },
+      {
+        type: "SentMessage",
+        content: "Worker, continue the task.",
+        to_ids: ["worker-1"],
+        timestamp: 6,
+      },
     ];
 
     render(
@@ -71,5 +77,6 @@ describe("AssistantChatMessages", () => {
     expect(
       screen.getByText("Here is a draft plan with priorities and next steps."),
     ).toBeInTheDocument();
+    expect(screen.queryByText("Worker, continue the task.")).not.toBeInTheDocument();
   });
 });

@@ -108,6 +108,7 @@ function shouldTrackFeedEntry(entry: HistoryEntry): boolean {
   return (
     entry.type === "ReceivedMessage" ||
     entry.type === "AssistantText" ||
+    entry.type === "SentMessage" ||
     entry.type === "AssistantThinking" ||
     entry.type === "ToolCall" ||
     entry.type === "ErrorEntry"

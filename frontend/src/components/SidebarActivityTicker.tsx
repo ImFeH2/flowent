@@ -58,6 +58,16 @@ function buildTickerItem(
         text: `${agentLabel} replied`,
         tone: "active",
       };
+    case "SentMessage": {
+      const targetLabels = (entry.to_ids ?? []).map((toId) =>
+        getNodeLabel(toId, agents, labelMaxLength),
+      );
+      return {
+        id: `${agentId}-${entry.timestamp}-sent-${(entry.to_ids ?? []).join(",")}`,
+        text: `${agentLabel} -> ${targetLabels.join(", ") || "unknown"}`,
+        tone: "active",
+      };
+    }
     case "AssistantThinking":
       return {
         id: `${agentId}-${entry.timestamp}-thinking`,
@@ -70,17 +80,6 @@ function buildTickerItem(
         toolName.length > toolMaxLength
           ? `${toolName.slice(0, Math.max(0, toolMaxLength - 3))}...`
           : toolName;
-      if (toolName === "send") {
-        const toId = String(entry.arguments?.to ?? "");
-        const toLabel = toId
-          ? getNodeLabel(toId, agents, labelMaxLength)
-          : "unknown";
-        return {
-          id: `${agentId}-${entry.timestamp}-send-${toId || "unknown"}`,
-          text: `${agentLabel} -> ${toLabel}`,
-          tone: "active",
-        };
-      }
       if (toolName === "idle") {
         return {
           id: `${agentId}-${entry.timestamp}-idle`,

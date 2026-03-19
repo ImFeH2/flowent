@@ -156,6 +156,8 @@ function TimelineItem({
         return null;
       }
       return <AssistantBubble content={item.content} />;
+    case "SentMessage":
+      return null;
     case "AssistantThinking":
       return (
         <ThinkingCard

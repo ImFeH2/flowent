@@ -158,4 +158,21 @@ describe("history utilities", () => {
       },
     ]);
   });
+
+  it("dedupes sent messages using targets and content", () => {
+    const sent: HistoryEntry = {
+      type: "SentMessage",
+      to_ids: ["worker-1"],
+      content: "Continue the task.",
+      timestamp: 40,
+    };
+
+    const result = mergeHistoryWithDeltas({
+      history: [sent],
+      incremental: [sent],
+      fetchedAt: 41_000,
+    });
+
+    expect(result).toEqual([sent]);
+  });
 });

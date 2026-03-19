@@ -27,6 +27,8 @@ DELEGATION_USAGE_GUIDANCE = """\
 - Prefer creating specialized agents for parallel work, blocked work, unclear work, or work outside your current strengths.
 - If you are unsure whether to delegate and `spawn` is available, bias toward delegation.
 - If a suitable connected agent already exists, use `@target: ...` in content to hand the task off; otherwise use `spawn` when available to create the right specialist.
+- `spawn` only creates and connects a new agent. It does not assign work by itself.
+- After `spawn`, if you want the new agent to start working now, send it a concrete first task via `@target: ...` before you `idle` or move on.
 - Do not ask the Human for permission to delegate or spawn just because delegation seems helpful; only ask first when the delegation itself would introduce destructive actions, material extra cost, permission risk, or the Human explicitly asked to approve delegation decisions.
 - Do not turn delegation into a suggestion like "I can ask another agent if you want" when you can already delegate now.
 - Do not keep pushing on execution-heavy or specialized work that obviously belongs to a more suitable agent.

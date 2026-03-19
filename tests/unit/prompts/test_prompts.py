@@ -67,6 +67,8 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         in COMMUNICATION_USAGE_GUIDANCE
     )
     assert "automatically delivered to your parent" not in COMMUNICATION_USAGE_GUIDANCE
+    assert "`spawn` only creates and connects a new agent" in COMMON_AGENT_PROMPT
+    assert "send it a concrete first task via `@target: ...`" in COMMON_AGENT_PROMPT
 
 
 def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
@@ -130,6 +132,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert "manage_prompts" in prompt
     assert "Conductor at startup" not in prompt
     assert "send(to=conductor_id" not in prompt
+    assert "Immediately send that new node its first task" in prompt
     assert "call `idle` in the same response" in prompt
     assert "Do not repeat or restate a Human-facing reply" in prompt
 
@@ -155,6 +158,7 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     assert "plain text output" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert "plain content" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert "your parent" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    assert "**Dispatch immediately** after each `spawn`" in CONDUCTOR_ROLE_SYSTEM_PROMPT
 
 
 def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):

@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from app.registry import registry
+from app.tools import MINIMUM_TOOLS
 
 router = APIRouter()
 
@@ -43,7 +44,7 @@ async def get_node(node_id: str) -> dict:
         "connections": node.get_connections_snapshot(),
         "name": node.config.name,
         "todos": [t.serialize() for t in node.todos],
-        "tools": list(node.config.tools),
+        "tools": sorted(set(node.config.tools) | set(MINIMUM_TOOLS)),
         "write_dirs": list(node.config.write_dirs),
         "allow_network": node.config.allow_network,
         "graph": graph.serialize() if graph is not None else None,

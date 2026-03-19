@@ -79,14 +79,17 @@ def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient)
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == assistant_id
-    assert data["tools"] == [
+    assert set(data["tools"]) == {
+        "idle",
+        "todo",
+        "list_connections",
         "create_graph",
         "spawn",
         "manage_providers",
         "manage_roles",
         "manage_settings",
         "manage_prompts",
-    ]
+    }
     assert data["write_dirs"] == []
     assert data["allow_network"] is True
 

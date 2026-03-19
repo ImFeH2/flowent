@@ -297,7 +297,7 @@ function CollapsibleBlock({
         </span>
         {actions ? (
           <span
-            className="ml-auto shrink-0"
+            className="ml-auto shrink-0 flex items-center leading-none"
             onClick={(e) => e.stopPropagation()}
           >
             {actions}

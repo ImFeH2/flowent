@@ -14,7 +14,6 @@ import type { HistoryEntry, Node } from "@/types";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { CopyButton } from "@/components/CopyButton";
 import { getNodeLabel } from "@/lib/nodeLabel";
-import { Button } from "@/components/ui/button";
 
 interface HistoryViewProps {
   agentLabel?: string;
@@ -156,9 +155,10 @@ function HistoryItem({
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
         >
-          <MarkdownContent
+          <MarkdownOrJsonBlock
             content={entry.content ?? ""}
-            className="text-xs text-foreground/90"
+            markdownClassName="text-xs text-foreground/90"
+            preClassName="text-foreground/90 leading-relaxed"
           />
         </CollapsibleBlock>
       );
@@ -191,11 +191,12 @@ function HistoryItem({
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
         >
-          <MarkdownContent
+          <MarkdownOrJsonBlock
             content={entry.content ?? ""}
-            className="text-xs text-emerald-200"
+            streaming={entry.streaming}
+            markdownClassName="text-xs text-emerald-200"
+            preClassName="text-emerald-200 leading-relaxed"
           />
-          {entry.streaming && <span className="streaming-cursor" />}
         </CollapsibleBlock>
       );
 
@@ -282,31 +283,42 @@ function CollapsibleBlock({
 
   return (
     <div className={cn("rounded border", className)}>
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={toggle}
-          className="h-auto min-w-0 flex-1 justify-start gap-1.5 px-0 py-0 text-left font-normal hover:bg-surface-3/50 hover:text-inherit"
+      <div
+        className="flex cursor-pointer items-center gap-1.5 px-2 py-1.5 select-none"
+        onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+      >
+        <ChevronRight
+          className={cn(
+            "size-3 shrink-0 text-muted-foreground transition-transform",
+            open && "rotate-90",
+          )}
+        />
+        <span className="shrink-0">{icon}</span>
+        <span
+          className={cn(
+            "flex-1 truncate text-[10px] font-medium text-muted-foreground",
+            labelClassName,
+          )}
         >
-          <ChevronRight
-            className={cn(
-              "size-3 shrink-0 text-muted-foreground transition-transform",
-              open && "rotate-90",
-            )}
-          />
-          <span className="shrink-0">{icon}</span>
+          {label}
+        </span>
+        {actions ? (
           <span
-            className={cn(
-              "truncate text-[10px] font-medium text-muted-foreground",
-              labelClassName,
-            )}
+            className="ml-auto shrink-0"
+            onClick={(e) => e.stopPropagation()}
           >
-            {label}
+            {actions}
           </span>
-        </Button>
-        {actions ? <span className="ml-auto shrink-0">{actions}</span> : null}
+        ) : null}
       </div>
       <AnimatePresence initial={false}>
         {open ? (

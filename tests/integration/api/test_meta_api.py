@@ -13,6 +13,7 @@ def test_tools_api_hides_assistant_only_tools(client: TestClient):
     assert "manage_prompts" not in tool_names
     assert "send" not in tool_names
     assert "spawn" in tool_names
+    assert "connect" in tool_names
 
 
 def test_settings_bootstrap_returns_settings_related_resources(client: TestClient):

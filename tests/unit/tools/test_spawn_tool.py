@@ -63,6 +63,7 @@ def test_spawn_creates_connected_child_without_task_delivery(monkeypatch):
             parent,
             {
                 "role_name": "Worker",
+                "graph_id": "graph-parent",
                 "tools": ["fetch", "edit"],
             },
         )
@@ -135,6 +136,7 @@ def test_spawn_uses_default_termination_timeout_when_setup_fails(monkeypatch):
             parent,
             {
                 "role_name": "Worker",
+                "graph_id": "graph-parent",
             },
         )
     )
@@ -178,7 +180,15 @@ def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
         ),
     )
 
-    result = json.loads(SpawnTool().execute(parent, {"role_name": "Worker"}))
+    result = json.loads(
+        SpawnTool().execute(
+            parent,
+            {
+                "role_name": "Worker",
+                "graph_id": "graph-parent",
+            },
+        )
+    )
 
     assert result["role_name"] == "Worker"
     assert result["graph_id"] == "graph-parent"
@@ -232,6 +242,7 @@ def test_spawn_allows_child_security_boundary_within_parent(monkeypatch, tmp_pat
             parent,
             {
                 "role_name": "Worker",
+                "graph_id": "graph-parent",
                 "write_dirs": [str(child_dir)],
                 "allow_network": True,
             },
@@ -282,6 +293,7 @@ def test_spawn_rejects_write_dir_escalation(monkeypatch, tmp_path):
             parent,
             {
                 "role_name": "Worker",
+                "graph_id": "graph-parent",
                 "write_dirs": [str(blocked_dir)],
             },
         )
@@ -322,6 +334,7 @@ def test_spawn_rejects_network_escalation(monkeypatch):
             parent,
             {
                 "role_name": "Worker",
+                "graph_id": "graph-parent",
                 "allow_network": True,
             },
         )
@@ -366,7 +379,103 @@ def test_spawn_rejects_tool_escalation(monkeypatch):
         ),
     )
 
-    result = json.loads(SpawnTool().execute(parent, {"role_name": "Worker"}))
+    result = json.loads(
+        SpawnTool().execute(
+            parent,
+            {
+                "role_name": "Worker",
+                "graph_id": "graph-parent",
+            },
+        )
+    )
 
     assert result == {"error": "tool boundary exceeded: read"}
     assert len(registry.get_all()) == 1
+
+
+def test_spawn_requires_graph_id(monkeypatch):
+    parent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            graph_id="graph-parent",
+            role_name="Conductor",
+            tools=["spawn"],
+        ),
+        uuid="parent",
+    )
+    registry.register_graph(
+        Graph(
+            id="graph-parent",
+            owner_agent_id="parent",
+            name="Parent Graph",
+            entry_node_id="parent",
+        )
+    )
+    registry.register(parent)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="...")]),
+    )
+
+    result = json.loads(SpawnTool().execute(parent, {"role_name": "Worker"}))
+
+    assert result == {"error": "graph_id is required"}
+    assert len(registry.get_all()) == 1
+
+
+def test_spawn_assistant_bypasses_inherited_boundaries(monkeypatch, tmp_path):
+    writable_dir = tmp_path / "worker"
+    writable_dir.mkdir()
+    assistant = Agent(
+        NodeConfig(
+            node_type=NodeType.ASSISTANT,
+            role_name="Steward",
+            tools=["create_graph", "spawn"],
+            allow_network=False,
+        ),
+        uuid="assistant",
+    )
+    registry.register_graph(
+        Graph(
+            id="graph-owned",
+            owner_agent_id="assistant",
+            name="Owned Graph",
+        )
+    )
+    registry.register(assistant)
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="...",
+                    included_tools=["read", "exec"],
+                )
+            ]
+        ),
+    )
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+
+    result = json.loads(
+        SpawnTool().execute(
+            assistant,
+            {
+                "role_name": "Worker",
+                "graph_id": "graph-owned",
+                "tools": ["fetch"],
+                "write_dirs": [str(writable_dir)],
+                "allow_network": True,
+            },
+        )
+    )
+
+    child = registry.get(result["agent_id"])
+
+    assert result["graph_id"] == "graph-owned"
+    assert child is not None
+    assert child.config.tools == [*MINIMUM_TOOLS, "read", "exec", "fetch"]
+    assert child.config.write_dirs == [str(writable_dir)]
+    assert child.config.allow_network is True

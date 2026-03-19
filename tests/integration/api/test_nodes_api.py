@@ -80,7 +80,8 @@ def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient)
     data = response.json()
     assert data["id"] == assistant_id
     assert data["tools"] == [
-        "create_root",
+        "create_graph",
+        "spawn",
         "manage_providers",
         "manage_roles",
         "manage_settings",

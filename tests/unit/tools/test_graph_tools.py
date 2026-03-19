@@ -5,9 +5,8 @@ import pytest
 from app.agent import Agent
 from app.models import Graph, NodeConfig, NodeType
 from app.registry import registry
-from app.tools.connect_nodes import ConnectNodesTool
+from app.tools.connect import ConnectTool
 from app.tools.create_graph import CreateGraphTool
-from app.tools.disconnect_nodes import DisconnectNodesTool
 
 
 @pytest.fixture(autouse=True)
@@ -54,12 +53,12 @@ def test_create_graph_registers_child_graph_for_owner():
     assert graph.goal == "Investigate multiple websites"
 
 
-def test_connect_and_disconnect_nodes_are_directional():
+def test_connect_is_directional_by_default():
     owner = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
             graph_id="graph-root",
-            tools=["connect_nodes", "disconnect_nodes"],
+            tools=["connect"],
         ),
         uuid="owner",
     )
@@ -84,43 +83,64 @@ def test_connect_and_disconnect_nodes_are_directional():
     registry.register(sink)
 
     connect_result = json.loads(
-        ConnectNodesTool().execute(
+        ConnectTool().execute(
             owner,
             {"from": "worker", "to": "sink"},
         )
     )
 
-    assert connect_result == {
-        "status": "connected",
-        "from_id": "worker",
-        "to_id": "sink",
-        "bidirectional": False,
-    }
+    assert connect_result == {"connected": [["worker", "sink"]]}
     assert worker.is_connected_to("sink") is True
     assert sink.is_connected_to("worker") is False
 
-    disconnect_result = json.loads(
-        DisconnectNodesTool().execute(
-            owner,
-            {"from": "worker", "to": "sink"},
-        )
-    )
 
-    assert disconnect_result == {
-        "status": "disconnected",
-        "from_id": "worker",
-        "to_id": "sink",
-        "bidirectional": False,
-    }
-    assert worker.is_connected_to("sink") is False
-
-
-def test_connect_nodes_rejects_unmanaged_targets():
+def test_connect_supports_bidirectional_edges():
     owner = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
             graph_id="graph-root",
-            tools=["connect_nodes"],
+            tools=["connect"],
+        ),
+        uuid="owner",
+    )
+    worker = Agent(
+        NodeConfig(node_type=NodeType.AGENT, graph_id="graph-root"),
+        uuid="worker",
+    )
+    sink = Agent(
+        NodeConfig(node_type=NodeType.AGENT, graph_id="graph-root"),
+        uuid="sink",
+    )
+    registry.register_graph(
+        Graph(
+            id="graph-root",
+            owner_agent_id="owner",
+            name="Root Graph",
+            entry_node_id="owner",
+        )
+    )
+    registry.register(owner)
+    registry.register(worker)
+    registry.register(sink)
+
+    connect_result = json.loads(
+        ConnectTool().execute(
+            owner,
+            {"from": "worker", "to": "sink", "bidirectional": True},
+        )
+    )
+
+    assert connect_result == {"connected": [["worker", "sink"], ["sink", "worker"]]}
+    assert worker.is_connected_to("sink") is True
+    assert sink.is_connected_to("worker") is True
+
+
+def test_connect_rejects_unmanaged_targets():
+    owner = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            graph_id="graph-root",
+            tools=["connect"],
         ),
         uuid="owner",
     )
@@ -148,7 +168,7 @@ def test_connect_nodes_rejects_unmanaged_targets():
     registry.register(foreign)
 
     result = json.loads(
-        ConnectNodesTool().execute(
+        ConnectTool().execute(
             owner,
             {"from": "owner", "to": "foreign"},
         )

@@ -27,19 +27,21 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
     ]
 
 
-def test_tool_registry_does_not_register_connect_tool():
+def test_tool_registry_registers_connect_and_removes_create_root():
     tool_names = [tool.name for tool in build_tool_registry().list_tools()]
 
-    assert "connect" not in tool_names
-    assert "create_root" in tool_names
+    assert "connect" in tool_names
+    assert "create_root" not in tool_names
     assert "manage_providers" in tool_names
     assert "manage_roles" in tool_names
     assert "manage_settings" in tool_names
     assert "manage_prompts" in tool_names
 
 
-def test_tool_registry_grants_create_root_when_explicitly_allowed():
-    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_root"]))
+def test_tool_registry_grants_graph_spawn_tools_when_explicitly_allowed():
+    agent = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_graph", "spawn"])
+    )
 
     tools = build_tool_registry().get_tools_for_agent(agent)
 
@@ -47,7 +49,8 @@ def test_tool_registry_grants_create_root_when_explicitly_allowed():
         "idle",
         "todo",
         "list_connections",
-        "create_root",
+        "create_graph",
+        "spawn",
     ]
 
 
@@ -69,7 +72,6 @@ def test_tool_registry_hides_assistant_only_management_tools_from_agent_visible_
     }
 
     assert "send" not in visible_tool_names
-    assert "create_root" not in visible_tool_names
     assert "manage_providers" not in visible_tool_names
     assert "manage_roles" not in visible_tool_names
     assert "manage_settings" not in visible_tool_names

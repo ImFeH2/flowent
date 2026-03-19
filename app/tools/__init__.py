@@ -63,18 +63,14 @@ class ToolRegistry:
 
 
 def build_tool_registry() -> ToolRegistry:
-    from app.tools.connect_nodes import ConnectNodesTool
+    from app.tools.connect import ConnectTool
     from app.tools.create_graph import CreateGraphTool
-    from app.tools.create_root import CreateRootTool
-    from app.tools.describe_graph import DescribeGraphTool
-    from app.tools.disconnect_nodes import DisconnectNodesTool
     from app.tools.edit import EditTool
     from app.tools.exec import ExecTool
     from app.tools.exit import ExitTool
     from app.tools.fetch import FetchTool
     from app.tools.idle import IdleTool
     from app.tools.list_connections import ListConnectionsTool
-    from app.tools.list_graphs import ListGraphsTool
     from app.tools.list_roles import ListRolesTool
     from app.tools.list_tools import ListToolsTool
     from app.tools.manage_prompts import ManagePromptsTool
@@ -93,12 +89,8 @@ def build_tool_registry() -> ToolRegistry:
         TodoTool,
         ListConnectionsTool,
         ExitTool,
-        CreateRootTool,
         CreateGraphTool,
-        ConnectNodesTool,
-        DisconnectNodesTool,
-        ListGraphsTool,
-        DescribeGraphTool,
+        ConnectTool,
         ManageProvidersTool,
         ManageRolesTool,
         ManageSettingsTool,

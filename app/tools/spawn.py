@@ -22,7 +22,7 @@ class SpawnTool(Tool):
         "This is a low-cost delegation mechanism: you may create specialized agents whenever parallelism or task handoff would help. "
         "If the work is outside your role, expertise, or ownership, spawning a better-suited agent should usually be your first move. "
         "Once you determine that spawning is the better path, do it directly instead of asking the Human for permission, unless the spawn would enable destructive work, material extra cost, or elevated permissions. "
-        "The agent is created and connected to the spawner. To assign a task, send a message after spawning."
+        "The agent is created and connected to the spawner. graph_id is required, and the caller must own that graph. To assign a task, send a message after spawning."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -52,10 +52,10 @@ class SpawnTool(Tool):
             },
             "graph_id": {
                 "type": "string",
-                "description": "Graph to add the new node to. Defaults to the caller's current graph.",
+                "description": "ID of the Graph to spawn the node into. The caller must be the owner of this Graph.",
             },
         },
-        "required": ["role_name"],
+        "required": ["role_name", "graph_id"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -68,7 +68,7 @@ class SpawnTool(Tool):
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
-        graph_id = args.get("graph_id") or agent.config.graph_id
+        graph_id = args.get("graph_id")
 
         if not isinstance(tools, list) or not all(
             isinstance(tool_name, str) for tool_name in tools
@@ -85,6 +85,8 @@ class SpawnTool(Tool):
         role_cfg = find_role(settings, role_name)
         if role_cfg is None:
             return json.dumps({"error": f"Role '{role_name}' not found"})
+        if graph_id is None or graph_id == "":
+            return json.dumps({"error": "graph_id is required"})
         if not isinstance(graph_id, str) or not graph_id:
             return json.dumps({"error": "graph_id must be a non-empty string"})
         graph = registry.get_graph(graph_id)
@@ -119,38 +121,41 @@ class SpawnTool(Tool):
             parent_id=agent.uuid,
         )
 
-        parent_write_dirs = [Path(path).resolve() for path in agent.config.write_dirs]
-        invalid_write_dirs = sorted(
-            path
-            for path in config.write_dirs
-            if not any(
-                Path(path).resolve().is_relative_to(parent_path)
-                for parent_path in parent_write_dirs
+        if agent.config.graph_id is not None:
+            parent_write_dirs = [
+                Path(path).resolve() for path in agent.config.write_dirs
+            ]
+            invalid_write_dirs = sorted(
+                path
+                for path in config.write_dirs
+                if not any(
+                    Path(path).resolve().is_relative_to(parent_path)
+                    for parent_path in parent_write_dirs
+                )
             )
-        )
-        if invalid_write_dirs:
-            return json.dumps(
-                {
-                    "error": "write_dirs boundary exceeded: "
-                    + ", ".join(invalid_write_dirs)
-                }
-            )
+            if invalid_write_dirs:
+                return json.dumps(
+                    {
+                        "error": "write_dirs boundary exceeded: "
+                        + ", ".join(invalid_write_dirs)
+                    }
+                )
 
-        if config.allow_network and not agent.config.allow_network:
-            return json.dumps(
-                {
-                    "error": "allow_network boundary exceeded: parent disallows network access"
-                }
-            )
+            if config.allow_network and not agent.config.allow_network:
+                return json.dumps(
+                    {
+                        "error": "allow_network boundary exceeded: parent disallows network access"
+                    }
+                )
 
-        allowed_tools = set(agent.config.tools) | set(MINIMUM_TOOLS)
-        invalid_tools = sorted(
-            tool_name for tool_name in final_tools if tool_name not in allowed_tools
-        )
-        if invalid_tools:
-            return json.dumps(
-                {"error": "tool boundary exceeded: " + ", ".join(invalid_tools)}
+            allowed_tools = set(agent.config.tools) | set(MINIMUM_TOOLS)
+            invalid_tools = sorted(
+                tool_name for tool_name in final_tools if tool_name not in allowed_tools
             )
+            if invalid_tools:
+                return json.dumps(
+                    {"error": "tool boundary exceeded: " + ", ".join(invalid_tools)}
+                )
 
         child = AgentClass(uuid=agent_uuid, config=config)
 

@@ -36,10 +36,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 included_tools=[
                     "spawn",
                     "create_graph",
-                    "connect_nodes",
-                    "disconnect_nodes",
-                    "list_graphs",
-                    "describe_graph",
+                    "connect",
                     "list_roles",
                     "list_tools",
                 ],
@@ -76,10 +73,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 "included_tools": [
                     "spawn",
                     "create_graph",
-                    "connect_nodes",
-                    "disconnect_nodes",
-                    "list_graphs",
-                    "describe_graph",
+                    "connect",
                     "list_roles",
                     "list_tools",
                 ],

@@ -10,9 +10,12 @@ if TYPE_CHECKING:
     from app.agent import Agent
 
 
-class ConnectNodesTool(Tool):
-    name = "connect_nodes"
-    description = "Create a directed message edge between two manageable nodes."
+class ConnectTool(Tool):
+    name = "connect"
+    description = (
+        "Create a directed message edge between two nodes in a Graph you own. "
+        "Use bidirectional=true to create edges in both directions."
+    )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -58,15 +61,10 @@ class ConnectNodesTool(Tool):
         if not registry.can_manage_node(agent.uuid, target.uuid):
             return json.dumps({"error": f"Cannot manage target node '{to_ref}'"})
 
+        connected = [[source.uuid, target.uuid]]
         connect_nodes(source.uuid, target.uuid)
         if bidirectional:
             connect_nodes(target.uuid, source.uuid)
+            connected.append([target.uuid, source.uuid])
 
-        return json.dumps(
-            {
-                "status": "connected",
-                "from_id": source.uuid,
-                "to_id": target.uuid,
-                "bidirectional": bidirectional,
-            }
-        )
+        return json.dumps({"connected": connected})

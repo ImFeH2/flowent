@@ -17,6 +17,7 @@ class SystemEntry(Serializable):
 class ReceivedMessage(Serializable):
     content: str
     from_id: str
+    message_id: str | None = None
     timestamp: float = field(default_factory=time.time)
 
 
@@ -30,6 +31,7 @@ class AssistantText(Serializable):
 class SentMessage(Serializable):
     content: str
     to_ids: list[str]
+    message_id: str | None = None
     timestamp: float = field(default_factory=time.time)
 
 

@@ -163,6 +163,7 @@ function TimelineItem({
           icon={<MessageSquare className="size-3.5 text-sky-400" />}
           label={`From ${getNodeLabel(item.from_id ?? "", nodes)}`}
           tone="received"
+          streaming={item.streaming}
           variant={variant}
         />
       );
@@ -184,6 +185,7 @@ function TimelineItem({
             "Unknown"
           }`}
           tone="sent"
+          streaming={item.streaming}
           variant={variant}
         />
       );
@@ -264,16 +266,18 @@ function MessageActivityCard({
   icon,
   label,
   tone,
+  streaming,
   variant,
 }: {
   content: string;
   icon: ReactNode;
   label: string;
   tone: "received" | "sent";
+  streaming?: boolean;
   variant: AssistantChatVariant;
 }) {
   const isWorkspace = variant === "workspace";
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(streaming));
 
   return (
     <div
@@ -310,6 +314,15 @@ function MessageActivityCard({
         <span className="ml-auto" onClick={(event) => event.stopPropagation()}>
           <CopyButton text={content} />
         </span>
+        {streaming ? (
+          <span className="inline-flex size-5 items-center justify-center">
+            <span className="relative flex size-2.5 items-center justify-center">
+              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-emerald-400/45" />
+              <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+            </span>
+            <span className="sr-only">Live</span>
+          </span>
+        ) : null}
         <ChevronRight
           className={cn(
             "size-4 shrink-0 text-muted-foreground transition-transform",
@@ -321,6 +334,7 @@ function MessageActivityCard({
         <div className="mt-2 min-w-0">
           <RichContentBlock
             content={content}
+            streaming={streaming}
             markdownClassName="text-[13px] text-foreground/80"
             preClassName="text-foreground/75"
           />
@@ -602,7 +616,7 @@ function getTimelineItemKey(item: AssistantChatItem, index: number) {
     return item.id;
   }
 
-  return `${item.type}-${item.timestamp}-${item.tool_call_id ?? ""}-${index}`;
+  return `${item.type}-${item.timestamp}-${item.message_id ?? ""}-${item.tool_call_id ?? ""}-${index}`;
 }
 
 function WorkspaceEmptyState() {

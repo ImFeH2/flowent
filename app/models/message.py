@@ -9,4 +9,5 @@ class Message:
     from_id: str
     to_id: str
     content: str
+    message_id: str | None = None
     timestamp: float = field(default_factory=time.time)

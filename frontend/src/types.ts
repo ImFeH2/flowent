@@ -74,6 +74,7 @@ export interface HistoryEntry {
   content?: string | null;
   from_id?: string | null;
   to_ids?: string[] | null;
+  message_id?: string | null;
   tool_name?: string | null;
   tool_call_id?: string | null;
   arguments?: Record<string, unknown> | null;
@@ -124,7 +125,19 @@ export interface ModelParams {
 export type StreamingDelta =
   | { type: "ContentDelta"; text: string }
   | { type: "ThinkingDelta"; text: string }
-  | { type: "ToolResultDelta"; tool_call_id: string; text: string };
+  | { type: "ToolResultDelta"; tool_call_id: string; text: string }
+  | {
+      type: "SentMessageDelta";
+      message_id: string;
+      to_ids: string[];
+      text: string;
+    }
+  | {
+      type: "ReceivedMessageDelta";
+      message_id: string;
+      from_id: string;
+      text: string;
+    };
 
 export interface Role {
   name: string;

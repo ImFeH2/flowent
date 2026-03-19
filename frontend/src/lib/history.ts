@@ -10,6 +10,9 @@ export function reduceDeltas(deltas: StreamingDelta[]) {
   let content = "";
   let thinking = "";
   const toolResults = new Map<string, string>();
+  const sentMessages = new Map<string, { toIds: string[]; text: string }>();
+  const receivedMessages = new Map<string, { fromId: string; text: string }>();
+  const messageOrder: Array<{ kind: "sent" | "received"; messageId: string }> = [];
 
   for (const delta of deltas) {
     switch (delta.type) {
@@ -25,10 +28,36 @@ export function reduceDeltas(deltas: StreamingDelta[]) {
           (toolResults.get(delta.tool_call_id) ?? "") + delta.text,
         );
         break;
+      case "SentMessageDelta":
+        if (!sentMessages.has(delta.message_id)) {
+          messageOrder.push({ kind: "sent", messageId: delta.message_id });
+        }
+        sentMessages.set(delta.message_id, {
+          toIds: delta.to_ids,
+          text: (sentMessages.get(delta.message_id)?.text ?? "") + delta.text,
+        });
+        break;
+      case "ReceivedMessageDelta":
+        if (!receivedMessages.has(delta.message_id)) {
+          messageOrder.push({ kind: "received", messageId: delta.message_id });
+        }
+        receivedMessages.set(delta.message_id, {
+          fromId: delta.from_id,
+          text:
+            (receivedMessages.get(delta.message_id)?.text ?? "") + delta.text,
+        });
+        break;
     }
   }
 
-  return { content, thinking, toolResults };
+  return {
+    content,
+    thinking,
+    toolResults,
+    sentMessages,
+    receivedMessages,
+    messageOrder,
+  };
 }
 
 function serializeHistoryValue(value: unknown): string {
@@ -52,6 +81,9 @@ function getHistoryEntryDedupKey(entry: HistoryEntry): string {
 
   switch (entry.type) {
     case "ReceivedMessage":
+      if (entry.message_id) {
+        return `${entry.type}:${entry.message_id}`;
+      }
       return [
         entry.type,
         timestamp,
@@ -59,6 +91,9 @@ function getHistoryEntryDedupKey(entry: HistoryEntry): string {
         entry.content ?? "",
       ].join(":");
     case "SentMessage":
+      if (entry.message_id) {
+        return `${entry.type}:${entry.message_id}`;
+      }
       return [
         entry.type,
         timestamp,
@@ -141,7 +176,14 @@ export function mergeHistoryWithDeltas({
     return base;
   }
 
-  const { content, thinking, toolResults } = reduceDeltas(deltas);
+  const {
+    content,
+    thinking,
+    toolResults,
+    sentMessages,
+    receivedMessages,
+    messageOrder,
+  } = reduceDeltas(deltas);
   const now = fetchedAt / 1000;
 
   if (thinking) {
@@ -176,6 +218,54 @@ export function mergeHistoryWithDeltas({
         }
       }
     }
+  }
+
+  for (const item of messageOrder) {
+    if (item.kind === "sent") {
+      const sent = sentMessages.get(item.messageId);
+      if (!sent) {
+        continue;
+      }
+      if (
+        base.some(
+          (entry) =>
+            entry.type === "SentMessage" && entry.message_id === item.messageId,
+        )
+      ) {
+        continue;
+      }
+      base.push({
+        type: "SentMessage",
+        message_id: item.messageId,
+        to_ids: sent.toIds,
+        content: sent.text,
+        timestamp: now,
+        streaming: true,
+      } satisfies HistoryEntry);
+      continue;
+    }
+
+    const received = receivedMessages.get(item.messageId);
+    if (!received) {
+      continue;
+    }
+    if (
+      base.some(
+        (entry) =>
+          entry.type === "ReceivedMessage" &&
+          entry.message_id === item.messageId,
+      )
+    ) {
+      continue;
+    }
+    base.push({
+      type: "ReceivedMessage",
+      message_id: item.messageId,
+      from_id: received.fromId,
+      content: received.text,
+      timestamp: now,
+      streaming: true,
+    } satisfies HistoryEntry);
   }
 
   return base;

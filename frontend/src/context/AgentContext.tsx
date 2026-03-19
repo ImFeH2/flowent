@@ -362,6 +362,30 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             }
             return next;
           });
+        } else if (
+          (entry.type === "SentMessage" || entry.type === "ReceivedMessage") &&
+          entry.message_id
+        ) {
+          setStreamingDeltas((prev) => {
+            const list = prev.get(event.agent_id);
+            if (!list || list.length === 0) return prev;
+            const next = new Map(prev);
+            const filtered = list.filter((delta) => {
+              if (delta.type === "SentMessageDelta") {
+                return delta.message_id !== entry.message_id;
+              }
+              if (delta.type === "ReceivedMessageDelta") {
+                return delta.message_id !== entry.message_id;
+              }
+              return true;
+            });
+            if (filtered.length === 0) {
+              next.delete(event.agent_id);
+            } else {
+              next.set(event.agent_id, filtered);
+            }
+            return next;
+          });
         }
 
         setAgentHistories((prev) => {

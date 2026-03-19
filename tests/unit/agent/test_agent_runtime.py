@@ -335,25 +335,37 @@ def test_route_content_output_delivers_to_targets_when_header_present(monkeypatc
 
     peer_signal = peer._wake_queue.get_nowait()
     helper_signal = helper._wake_queue.get_nowait()
+    message_id = sent_messages[0].message_id
 
     assert peer_signal.payload == {
         "message": {
             "from": "child",
             "content": "investigate the error\nwith the latest logs",
+            "message_id": message_id,
         }
     }
     assert helper_signal.payload == {
         "message": {
             "from": "child",
             "content": "investigate the error\nwith the latest logs",
+            "message_id": message_id,
         }
     }
     assert len(sent_messages) == 1
     assert sent_messages[0].content == "investigate the error\nwith the latest logs"
     assert sent_messages[0].to_ids == ["peer", "helper"]
+    assert message_id is not None
     assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
-        {"to_id": "peer", "content": "investigate the error\nwith the latest logs"},
-        {"to_id": "helper", "content": "investigate the error\nwith the latest logs"},
+        {
+            "to_id": "peer",
+            "content": "investigate the error\nwith the latest logs",
+            "message_id": message_id,
+        },
+        {
+            "to_id": "helper",
+            "content": "investigate the error\nwith the latest logs",
+            "message_id": message_id,
+        },
     ]
 
 
@@ -429,11 +441,89 @@ def test_record_content_output_records_sent_message_in_history(monkeypatch):
     assert isinstance(history[0], SentMessage)
     assert history[0].content == "investigate the error"
     assert history[0].to_ids == ["peer"]
+    assert history[0].message_id is not None
     assert not any(isinstance(entry, AssistantText) for entry in history)
     assert peer._wake_queue.get_nowait().payload == {
-        "message": {"from": "child", "content": "investigate the error"}
+        "message": {
+            "from": "child",
+            "content": "investigate the error",
+            "message_id": history[0].message_id,
+        }
     }
     assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
+
+
+def test_routed_message_emits_streaming_preview_for_sender_and_receiver(monkeypatch):
+    registry.reset()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
+    registry.register(child)
+    registry.register(peer)
+    child.add_connection(peer.uuid)
+    events = []
+    responses = iter(
+        [
+            LLMResponse(content="@peer: investigate the error"),
+            LLMResponse(),
+        ]
+    )
+
+    def fake_wait_for_input() -> None:
+        child._append_history(ReceivedMessage(content="start", from_id="human"))
+        child.set_state(AgentState.RUNNING, "received message from human")
+
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+        response = next(responses)
+        if response.content and on_chunk is not None:
+            for chunk in ["@peer: inv", "estigate", " the error"]:
+                on_chunk("content", chunk)
+        if response.content is None:
+            child.request_termination("done")
+        return response
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+    monkeypatch.setattr(child, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    try:
+        child._run()
+    finally:
+        registry.reset()
+
+    sent_deltas = [
+        event.data
+        for event in events
+        if event.type == EventType.HISTORY_ENTRY_DELTA
+        and event.agent_id == "child"
+        and event.data.get("type") == "SentMessageDelta"
+    ]
+    received_deltas = [
+        event.data
+        for event in events
+        if event.type == EventType.HISTORY_ENTRY_DELTA
+        and event.agent_id == "peer"
+        and event.data.get("type") == "ReceivedMessageDelta"
+    ]
+
+    assert "".join(delta["text"] for delta in sent_deltas) == "investigate the error"
+    assert "".join(delta["text"] for delta in received_deltas) == "investigate the error"
+    assert len({delta["message_id"] for delta in sent_deltas}) == 1
+    assert len({delta["message_id"] for delta in received_deltas}) == 1
+    assert sent_deltas[0]["message_id"] == received_deltas[0]["message_id"]
+
+    final_sent = next(
+        entry
+        for entry in child.get_history_snapshot()
+        if isinstance(entry, SentMessage)
+    )
+    assert final_sent.message_id == sent_deltas[0]["message_id"]
+    assert peer._wake_queue.get_nowait().payload == {
+        "message": {
+            "from": "child",
+            "content": "investigate the error",
+            "message_id": final_sent.message_id,
+        }
+    }
 
 
 def test_build_messages_excludes_sent_messages():

@@ -21,4 +21,24 @@ class ToolResultDelta(Serializable):
     text: str
 
 
-StreamingDelta = ContentDelta | ThinkingDelta | ToolResultDelta
+@dataclass
+class SentMessageDelta(Serializable):
+    message_id: str
+    to_ids: list[str]
+    text: str
+
+
+@dataclass
+class ReceivedMessageDelta(Serializable):
+    message_id: str
+    from_id: str
+    text: str
+
+
+StreamingDelta = (
+    ContentDelta
+    | ThinkingDelta
+    | ToolResultDelta
+    | SentMessageDelta
+    | ReceivedMessageDelta
+)

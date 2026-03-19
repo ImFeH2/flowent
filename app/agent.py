@@ -6,8 +6,8 @@ import threading
 import time as _time
 import traceback
 import uuid as _uuid
-from dataclasses import dataclass
-from functools import lru_cache
+from dataclasses import dataclass, field
+from functools import lru_cache, partial
 from queue import Empty, Queue
 from typing import Any
 
@@ -27,7 +27,9 @@ from app.models import (
     NodeConfig,
     NodeType,
     ReceivedMessage,
+    ReceivedMessageDelta,
     SentMessage,
+    SentMessageDelta,
     SystemEntry,
     ThinkingDelta,
     TodoItem,
@@ -53,6 +55,15 @@ class WakeSignal:
     resume_reason: str = ""
 
 
+@dataclass
+class StreamingContentState:
+    mode: str = "pending"
+    pending_chunks: list[str] = field(default_factory=list)
+    emitted_human_content: bool = False
+    streaming_message_id: str | None = None
+    streamed_message_body: str = ""
+
+
 _HEADER_RE = re.compile(r"^@([^:\n]+):[ \t]*(.*)$", re.DOTALL)
 
 
@@ -73,6 +84,24 @@ def extract_routed_content(content: str) -> tuple[str, list[tuple[list[str], str
         return content, []
 
     return "", [(targets, body)]
+
+
+def extract_routed_header(content: str) -> tuple[list[str], str] | None:
+    first_line_end = content.find("\n")
+    first_line = content[:first_line_end] if first_line_end != -1 else content
+    rest = content[first_line_end + 1 :] if first_line_end != -1 else ""
+
+    match = _HEADER_RE.match(first_line)
+    if not match:
+        return None
+
+    targets = [target.strip() for target in match.group(1).split(",") if target.strip()]
+    if not targets:
+        return None
+
+    body_first_line = match.group(2)
+    body = body_first_line + ("\n" + rest if rest else "")
+    return targets, body
 
 
 def classify_streaming_content(content: str) -> str:
@@ -251,81 +280,12 @@ class Agent:
                         len(tools_schema) if tools_schema else 0,
                         len(self.history),
                     )
-                    content_stream_mode = "pending"
-                    pending_content_chunks: list[str] = []
-                    emitted_human_content = False
-
-                    def _on_llm_chunk(chunk_type: str, text: str) -> None:
-                        nonlocal content_stream_mode, emitted_human_content
-                        delta: ContentDelta | ThinkingDelta
-                        if chunk_type == "content":
-                            if content_stream_mode == "plain":
-                                delta = ContentDelta(text=text)
-                                event_bus.emit(
-                                    Event(
-                                        type=EventType.HISTORY_ENTRY_DELTA,
-                                        agent_id=self.uuid,
-                                        data=delta.serialize(),
-                                    ),
-                                )
-                                if self.node_type == NodeType.ASSISTANT:
-                                    emitted_human_content = True
-                                    event_bus.emit(
-                                        Event(
-                                            type=EventType.ASSISTANT_CONTENT,
-                                            agent_id=self.uuid,
-                                            data={"content": text},
-                                        ),
-                                    )
-                                return
-
-                            if content_stream_mode == "routed":
-                                return
-
-                            pending_content_chunks.append(text)
-                            content_stream_mode = classify_streaming_content(
-                                "".join(pending_content_chunks)
-                            )
-                            if content_stream_mode != "plain":
-                                return
-
-                            buffered_text = "".join(pending_content_chunks)
-                            pending_content_chunks.clear()
-                            delta = ContentDelta(text=buffered_text)
-                            event_bus.emit(
-                                Event(
-                                    type=EventType.HISTORY_ENTRY_DELTA,
-                                    agent_id=self.uuid,
-                                    data=delta.serialize(),
-                                ),
-                            )
-                            if self.node_type == NodeType.ASSISTANT:
-                                emitted_human_content = True
-                                event_bus.emit(
-                                    Event(
-                                        type=EventType.ASSISTANT_CONTENT,
-                                        agent_id=self.uuid,
-                                        data={"content": buffered_text},
-                                    ),
-                                )
-                            return
-                        elif chunk_type == "thinking":
-                            delta = ThinkingDelta(text=text)
-                        else:
-                            return
-
-                        event_bus.emit(
-                            Event(
-                                type=EventType.HISTORY_ENTRY_DELTA,
-                                agent_id=self.uuid,
-                                data=delta.serialize(),
-                            ),
-                        )
+                    stream_state = StreamingContentState()
 
                     response = gateway.chat(
                         messages=messages,
                         tools=tools_schema or None,
-                        on_chunk=_on_llm_chunk,
+                        on_chunk=partial(self._handle_llm_chunk, stream_state),
                         role_name=self.config.role_name,
                     )
 
@@ -351,7 +311,8 @@ class Agent:
                         if response.content:
                             self._record_content_output(
                                 response.content,
-                                emitted_human_content=emitted_human_content,
+                                emitted_human_content=stream_state.emitted_human_content,
+                                message_id=stream_state.streaming_message_id,
                             )
                         for tc in response.tool_calls:
                             self._handle_tool_call(tc.name, tc.arguments, tc.id)
@@ -360,7 +321,8 @@ class Agent:
                     elif response.content:
                         self._record_content_output(
                             response.content,
-                            emitted_human_content=emitted_human_content,
+                            emitted_human_content=stream_state.emitted_human_content,
+                            message_id=stream_state.streaming_message_id,
                         )
                         self._log.debug(
                             "No tool calls, continuing execution after text response"
@@ -403,9 +365,130 @@ class Agent:
         todo_text = "Current TODO list:\n" + "\n".join(lines)
         return [{"role": "user", "content": f"<system>{todo_text}</system>"}]
 
-    def _deliver_message(self, target: Agent, content: str) -> None:
+    def _emit_routed_message_preview(
+        self,
+        state: StreamingContentState,
+        full_content: str,
+    ) -> None:
+        routed_header = extract_routed_header(full_content)
+        if routed_header is None:
+            return
+
+        target_refs, raw_body = routed_header
+        targets = self._resolve_routed_targets(
+            target_refs,
+            log_failures=False,
+        )
+        if not targets:
+            return
+
+        preview_body = raw_body.lstrip() if not state.streamed_message_body else raw_body
+        if preview_body.startswith(state.streamed_message_body):
+            delta_text = preview_body[len(state.streamed_message_body) :]
+        else:
+            delta_text = preview_body
+
+        if not delta_text:
+            return
+
+        if state.streaming_message_id is None:
+            state.streaming_message_id = str(_uuid.uuid4())
+
+        state.streamed_message_body = preview_body
+        self._emit_message_stream_deltas(
+            message_id=state.streaming_message_id,
+            target_ids=[target.uuid for target in targets],
+            text=delta_text,
+        )
+
+    def _handle_llm_chunk(
+        self,
+        state: StreamingContentState,
+        chunk_type: str,
+        text: str,
+    ) -> None:
+        delta: ContentDelta | ThinkingDelta
+        if chunk_type == "content":
+            if state.mode == "plain":
+                delta = ContentDelta(text=text)
+                event_bus.emit(
+                    Event(
+                        type=EventType.HISTORY_ENTRY_DELTA,
+                        agent_id=self.uuid,
+                        data=delta.serialize(),
+                    ),
+                )
+                if self.node_type == NodeType.ASSISTANT:
+                    state.emitted_human_content = True
+                    event_bus.emit(
+                        Event(
+                            type=EventType.ASSISTANT_CONTENT,
+                            agent_id=self.uuid,
+                            data={"content": text},
+                        ),
+                    )
+                return
+
+            if state.mode == "routed":
+                state.pending_chunks.append(text)
+                self._emit_routed_message_preview(
+                    state,
+                    "".join(state.pending_chunks),
+                )
+                return
+
+            state.pending_chunks.append(text)
+            state.mode = classify_streaming_content("".join(state.pending_chunks))
+            if state.mode == "routed":
+                self._emit_routed_message_preview(
+                    state,
+                    "".join(state.pending_chunks),
+                )
+                return
+            if state.mode != "plain":
+                return
+
+            buffered_text = "".join(state.pending_chunks)
+            state.pending_chunks.clear()
+            delta = ContentDelta(text=buffered_text)
+            event_bus.emit(
+                Event(
+                    type=EventType.HISTORY_ENTRY_DELTA,
+                    agent_id=self.uuid,
+                    data=delta.serialize(),
+                ),
+            )
+            if self.node_type == NodeType.ASSISTANT:
+                state.emitted_human_content = True
+                event_bus.emit(
+                    Event(
+                        type=EventType.ASSISTANT_CONTENT,
+                        agent_id=self.uuid,
+                        data={"content": buffered_text},
+                    ),
+                )
+            return
+        elif chunk_type == "thinking":
+            delta = ThinkingDelta(text=text)
+        else:
+            return
+
+        event_bus.emit(
+            Event(
+                type=EventType.HISTORY_ENTRY_DELTA,
+                agent_id=self.uuid,
+                data=delta.serialize(),
+            ),
+        )
+
+    def _deliver_message(self, target: Agent, content: str, message_id: str) -> None:
         target.enqueue_message(
-            Message(from_id=self.uuid, to_id=target.uuid, content=content)
+            Message(
+                from_id=self.uuid,
+                to_id=target.uuid,
+                content=content,
+                message_id=message_id,
+            )
         )
         self._log.debug(
             "Message routed: {} -> {} ({} chars)",
@@ -417,17 +500,57 @@ class Agent:
             Event(
                 type=EventType.NODE_MESSAGE,
                 agent_id=self.uuid,
-                data={"to_id": target.uuid, "content": content},
+                data={
+                    "to_id": target.uuid,
+                    "content": content,
+                    "message_id": message_id,
+                },
             ),
         )
+
+    def _emit_message_stream_deltas(
+        self,
+        *,
+        message_id: str,
+        target_ids: list[str],
+        text: str,
+    ) -> None:
+        if not target_ids or not text:
+            return
+
+        event_bus.emit(
+            Event(
+                type=EventType.HISTORY_ENTRY_DELTA,
+                agent_id=self.uuid,
+                data=SentMessageDelta(
+                    message_id=message_id,
+                    to_ids=target_ids,
+                    text=text,
+                ).serialize(),
+            ),
+        )
+
+        for target_id in target_ids:
+            event_bus.emit(
+                Event(
+                    type=EventType.HISTORY_ENTRY_DELTA,
+                    agent_id=target_id,
+                    data=ReceivedMessageDelta(
+                        message_id=message_id,
+                        from_id=self.uuid,
+                        text=text,
+                    ).serialize(),
+                ),
+            )
 
     def _record_content_output(
         self,
         content: str,
         *,
         emitted_human_content: bool,
+        message_id: str | None = None,
     ) -> None:
-        routed_entries = self._route_content_output(content)
+        routed_entries = self._route_content_output(content, message_id=message_id)
         if routed_entries:
             for entry in routed_entries:
                 self._append_history(entry)
@@ -444,28 +567,58 @@ class Agent:
 
         self._append_history(AssistantText(content=content))
 
-    def _route_content_output(self, content: str) -> list[SentMessage]:
-        from app.graph_runtime import resolve_node_ref
-
+    def _route_content_output(
+        self,
+        content: str,
+        *,
+        message_id: str | None = None,
+    ) -> list[SentMessage]:
         _, routed_messages = extract_routed_content(content)
         sent_messages: list[SentMessage] = []
 
         for target_refs, body in routed_messages:
+            resolved_targets = self._resolve_routed_targets(
+                target_refs,
+                log_failures=True,
+            )
             delivered_to: list[str] = []
-            for target_ref in target_refs:
-                target = resolve_node_ref(target_ref)
-                if target is None or not self.is_connected_to(target.uuid):
-                    self._log.warning("@target routing failed: {}", target_ref)
-                    continue
-                self._deliver_message(target, body)
+            current_message_id = message_id or str(_uuid.uuid4())
+            for target in resolved_targets:
+                self._deliver_message(target, body, current_message_id)
                 delivered_to.append(target.uuid)
 
             if delivered_to:
                 sent_messages.append(
-                    SentMessage(content=body, to_ids=delivered_to),
+                    SentMessage(
+                        content=body,
+                        to_ids=delivered_to,
+                        message_id=current_message_id,
+                    ),
                 )
 
         return sent_messages
+
+    def _resolve_routed_targets(
+        self,
+        target_refs: list[str],
+        *,
+        log_failures: bool,
+    ) -> list[Agent]:
+        from app.graph_runtime import resolve_node_ref
+
+        resolved_targets: list[Agent] = []
+        seen_target_ids: set[str] = set()
+        for target_ref in target_refs:
+            target = resolve_node_ref(target_ref)
+            if target is None or not self.is_connected_to(target.uuid):
+                if log_failures:
+                    self._log.warning("@target routing failed: {}", target_ref)
+                continue
+            if target.uuid in seen_target_ids:
+                continue
+            resolved_targets.append(target)
+            seen_target_ids.add(target.uuid)
+        return resolved_targets
 
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = [
@@ -489,10 +642,7 @@ class Agent:
                 self._flush_tool_calls(messages, pending_tool_calls)
                 messages.append({"role": "assistant", "content": entry.content})
 
-            elif isinstance(entry, SentMessage):
-                pass
-
-            elif isinstance(entry, AssistantThinking):
+            elif isinstance(entry, SentMessage | AssistantThinking):
                 pass
 
             elif isinstance(entry, ToolCall):
@@ -567,7 +717,12 @@ class Agent:
             message = signal.payload.get("message", {})
             content = message.get("content", "")
             from_id = message.get("from", "")
-            if not isinstance(content, str) or not isinstance(from_id, str):
+            message_id = message.get("message_id")
+            if (
+                not isinstance(content, str)
+                or not isinstance(from_id, str)
+                or (message_id is not None and not isinstance(message_id, str))
+            ):
                 continue
             self._log.debug(
                 "Message from {}: {}",
@@ -575,7 +730,11 @@ class Agent:
                 (content[:100] + "...") if len(content) > 100 else content,
             )
             self._append_history(
-                ReceivedMessage(content=content, from_id=from_id),
+                ReceivedMessage(
+                    content=content,
+                    from_id=from_id,
+                    message_id=message_id,
+                ),
             )
 
     def _wait_for_input(self) -> None:
@@ -588,9 +747,18 @@ class Agent:
             if isinstance(message, dict):
                 content = message.get("content")
                 from_id = message.get("from")
-                if isinstance(content, str) and isinstance(from_id, str):
+                message_id = message.get("message_id")
+                if (
+                    isinstance(content, str)
+                    and isinstance(from_id, str)
+                    and (message_id is None or isinstance(message_id, str))
+                ):
                     self._append_history(
-                        ReceivedMessage(content=content, from_id=from_id)
+                        ReceivedMessage(
+                            content=content,
+                            from_id=from_id,
+                            message_id=message_id,
+                        )
                     )
 
         if signal.reason != "termination":
@@ -741,10 +909,16 @@ class Agent:
             )
 
     def enqueue_message(self, msg: Message) -> None:
+        payload = {
+            "from": msg.from_id,
+            "content": msg.content,
+        }
+        if msg.message_id is not None:
+            payload["message_id"] = msg.message_id
         self._wake_queue.put(
             WakeSignal(
                 reason="message",
-                payload={"message": {"from": msg.from_id, "content": msg.content}},
+                payload={"message": payload},
                 resume_reason=f"received message from {msg.from_id}",
             )
         )

@@ -30,7 +30,7 @@ export function HistoryView({
     <div className="space-y-1.5 p-3">
       {history.map((entry, index) => (
         <HistoryItem
-          key={`${index}-${entry.timestamp}-${entry.type}-${entry.tool_call_id ?? ""}`}
+          key={`${index}-${entry.timestamp}-${entry.type}-${entry.message_id ?? ""}-${entry.tool_call_id ?? ""}`}
           agentLabel={agentLabel}
           entry={entry}
           nodes={nodes}
@@ -140,10 +140,11 @@ function HistoryItem({
           className="border-muted-foreground/25 bg-muted-foreground/10"
           labelClassName="text-foreground/70"
           actions={<CopyButton text={entry.content ?? ""} />}
-          defaultOpen={false}
+          defaultOpen={entry.streaming ?? false}
         >
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
+            streaming={entry.streaming}
             preClassName="text-foreground/90 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -175,10 +176,11 @@ function HistoryItem({
           className="border-sky-500/20 bg-sky-500/5"
           labelClassName="text-sky-300/90"
           actions={<CopyButton text={entry.content ?? ""} />}
-          defaultOpen={false}
+          defaultOpen={entry.streaming ?? false}
         >
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
+            streaming={entry.streaming}
             preClassName="text-sky-100/90 leading-relaxed"
           />
         </CollapsibleBlock>

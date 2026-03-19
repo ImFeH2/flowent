@@ -2,6 +2,8 @@ from app.models.agent import AgentState, NodeConfig, NodeType
 from app.models.base import Serializable
 from app.models.delta import (
     ContentDelta,
+    ReceivedMessageDelta,
+    SentMessageDelta,
     StreamingDelta,
     ThinkingDelta,
     ToolResultDelta,
@@ -39,8 +41,10 @@ __all__ = [
     "NodeConfig",
     "NodeType",
     "ReceivedMessage",
-    "Serializable",
+    "ReceivedMessageDelta",
     "SentMessage",
+    "SentMessageDelta",
+    "Serializable",
     "StreamingDelta",
     "SystemEntry",
     "ThinkingDelta",

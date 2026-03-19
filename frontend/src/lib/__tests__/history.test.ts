@@ -175,4 +175,58 @@ describe("history utilities", () => {
 
     expect(result).toEqual([sent]);
   });
+
+  it("merges sent and received message deltas into streaming history entries", () => {
+    const deltas: StreamingDelta[] = [
+      {
+        type: "SentMessageDelta",
+        message_id: "msg-1",
+        to_ids: ["worker-1"],
+        text: "Continue ",
+      },
+      {
+        type: "SentMessageDelta",
+        message_id: "msg-1",
+        to_ids: ["worker-1"],
+        text: "the task.",
+      },
+      {
+        type: "ReceivedMessageDelta",
+        message_id: "msg-2",
+        from_id: "worker-1",
+        text: "Working ",
+      },
+      {
+        type: "ReceivedMessageDelta",
+        message_id: "msg-2",
+        from_id: "worker-1",
+        text: "on it.",
+      },
+    ];
+
+    const result = mergeHistoryWithDeltas({
+      history: [],
+      deltas,
+      fetchedAt: 50_000,
+    });
+
+    expect(result).toEqual([
+      {
+        type: "SentMessage",
+        message_id: "msg-1",
+        to_ids: ["worker-1"],
+        content: "Continue the task.",
+        timestamp: 50,
+        streaming: true,
+      },
+      {
+        type: "ReceivedMessage",
+        message_id: "msg-2",
+        from_id: "worker-1",
+        content: "Working on it.",
+        timestamp: 50,
+        streaming: true,
+      },
+    ]);
+  });
 });

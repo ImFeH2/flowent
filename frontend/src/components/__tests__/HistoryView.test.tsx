@@ -99,4 +99,23 @@ describe("HistoryView", () => {
       screen.getByRole("button", { name: /To Assistant/i }),
     ).toBeInTheDocument();
   });
+
+  it("shows streaming message content immediately", () => {
+    render(
+      <HistoryView
+        history={[
+          {
+            type: "ReceivedMessage",
+            from_id: "agent-12345678",
+            message_id: "msg-1",
+            content: "Streaming update",
+            timestamp: 2,
+            streaming: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Streaming update")).toBeInTheDocument();
+  });
 });

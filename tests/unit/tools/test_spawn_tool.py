@@ -32,7 +32,6 @@ def test_spawn_creates_connected_child_without_task_delivery(monkeypatch):
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)
@@ -100,7 +99,6 @@ def test_spawn_uses_default_termination_timeout_when_setup_fails(monkeypatch):
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)
@@ -161,7 +159,6 @@ def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)
@@ -218,7 +215,6 @@ def test_spawn_allows_child_security_boundary_within_parent(monkeypatch, tmp_pat
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)
@@ -278,7 +274,6 @@ def test_spawn_rejects_write_dir_escalation(monkeypatch, tmp_path):
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)
@@ -319,7 +314,6 @@ def test_spawn_rejects_network_escalation(monkeypatch):
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)
@@ -361,7 +355,6 @@ def test_spawn_rejects_tool_escalation(monkeypatch):
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)
@@ -408,7 +401,6 @@ def test_spawn_requires_graph_id(monkeypatch):
             id="graph-parent",
             owner_agent_id="parent",
             name="Parent Graph",
-            entry_node_id="parent",
         )
     )
     registry.register(parent)

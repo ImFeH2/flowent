@@ -44,8 +44,6 @@ export function useGraphs() {
             : null,
         name: typeof data.name === "string" ? data.name : null,
         goal: typeof data.goal === "string" ? data.goal : "",
-        entry_node_id:
-          typeof data.entry_node_id === "string" ? data.entry_node_id : null,
       });
       return next;
     });

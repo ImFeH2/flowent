@@ -10,7 +10,6 @@ class Graph:
     parent_graph_id: str | None = None
     name: str | None = None
     goal: str = ""
-    entry_node_id: str | None = None
 
     def serialize(self) -> dict[str, object]:
         return {
@@ -19,5 +18,4 @@ class Graph:
             "parent_graph_id": self.parent_graph_id,
             "name": self.name,
             "goal": self.goal,
-            "entry_node_id": self.entry_node_id,
         }

@@ -31,7 +31,6 @@ def test_create_graph_registers_child_graph_for_owner():
             id="graph-root",
             owner_agent_id="owner",
             name="Root Graph",
-            entry_node_id="owner",
         )
     )
 
@@ -75,7 +74,6 @@ def test_connect_is_directional_by_default():
             id="graph-root",
             owner_agent_id="owner",
             name="Root Graph",
-            entry_node_id="owner",
         )
     )
     registry.register(owner)
@@ -116,7 +114,6 @@ def test_connect_supports_bidirectional_edges():
             id="graph-root",
             owner_agent_id="owner",
             name="Root Graph",
-            entry_node_id="owner",
         )
     )
     registry.register(owner)
@@ -153,7 +150,6 @@ def test_connect_rejects_unmanaged_targets():
             id="graph-root",
             owner_agent_id="owner",
             name="Root Graph",
-            entry_node_id="owner",
         )
     )
     registry.register_graph(
@@ -161,7 +157,6 @@ def test_connect_rejects_unmanaged_targets():
             id="graph-foreign",
             owner_agent_id="foreign",
             name="Foreign Graph",
-            entry_node_id="foreign",
         )
     )
     registry.register(owner)

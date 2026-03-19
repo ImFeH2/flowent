@@ -35,7 +35,6 @@ function buildDetail(history: HistoryEntry[] = []): NodeDetail {
       parent_graph_id: null,
       name: "Assistant Graph",
       goal: "",
-      entry_node_id: "assistant",
     },
     history,
   };

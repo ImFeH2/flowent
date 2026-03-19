@@ -199,9 +199,6 @@ class SpawnTool(Tool):
             agent.uuid[:8],
         )
 
-        if graph.entry_node_id is None:
-            graph.entry_node_id = agent_uuid
-
         return json.dumps(
             {
                 "agent_id": agent_uuid,

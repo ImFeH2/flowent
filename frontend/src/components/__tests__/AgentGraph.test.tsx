@@ -156,7 +156,6 @@ function buildGraph(overrides: Partial<Graph>): Graph {
     parent_graph_id: null,
     name: "Research Graph",
     goal: "Investigate sources",
-    entry_node_id: "worker-1",
     ...overrides,
   };
 }

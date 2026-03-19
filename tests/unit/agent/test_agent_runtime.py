@@ -145,7 +145,6 @@ def test_finalize_termination_unregisters_empty_graph():
             id="graph-1",
             owner_agent_id="worker",
             name="Test Graph",
-            entry_node_id="worker",
         )
         worker = Agent(
             NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),
@@ -169,7 +168,6 @@ def test_finalize_termination_keeps_graph_when_other_nodes_remain():
             id="graph-1",
             owner_agent_id="worker-1",
             name="Shared Graph",
-            entry_node_id="worker-1",
         )
         worker_1 = Agent(
             NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),

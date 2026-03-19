@@ -107,7 +107,6 @@ export interface Graph {
   parent_graph_id: string | null;
   name: string | null;
   goal: string;
-  entry_node_id: string | null;
 }
 
 export interface RoleModelConfig {

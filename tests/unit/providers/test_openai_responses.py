@@ -175,7 +175,7 @@ def test_openai_responses_falls_back_when_reasoning_is_encrypted_only():
 
     assert response.content == "Done"
     assert response.thinking is not None
-    assert "21 reasoning tokens" in response.thinking
+    assert response.thinking == "Internal reasoning · 21"
 
 
 def test_openai_responses_skips_reasoning_config_for_non_reasoning_models():

@@ -119,16 +119,9 @@ def _extract_reasoning_tokens(response: dict[str, Any]) -> int:
 
 def _format_reasoning_fallback(reasoning_tokens: int) -> str:
     if reasoning_tokens > 0:
-        return (
-            "The model used internal reasoning, but this Responses-compatible "
-            f"endpoint did not expose a readable summary ({reasoning_tokens} "
-            "reasoning tokens)."
-        )
+        return f"Internal reasoning · {reasoning_tokens}"
 
-    return (
-        "The model used internal reasoning, but this Responses-compatible "
-        "endpoint did not expose a readable summary."
-    )
+    return "Internal reasoning"
 
 
 class OpenAIResponsesProvider(LLMProvider):

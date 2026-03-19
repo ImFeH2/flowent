@@ -18,14 +18,16 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { getNodeLabel } from "@/lib/nodeLabel";
 import { cn } from "@/lib/utils";
-import type { AssistantChatItem, HistoryEntry } from "@/types";
+import type { AssistantChatItem, HistoryEntry, Node } from "@/types";
 
 export type AssistantChatVariant = "panel" | "floating" | "workspace";
 
 interface AssistantChatMessagesProps {
   scrollRef: RefObject<HTMLDivElement | null>;
   items: AssistantChatItem[];
+  nodes?: Map<string, Node>;
   onScroll: UIEventHandler<HTMLDivElement>;
   variant: AssistantChatVariant;
 }
@@ -42,6 +44,7 @@ interface AssistantChatComposerProps {
 export function AssistantChatMessages({
   scrollRef,
   items,
+  nodes,
   onScroll,
   variant,
 }: AssistantChatMessagesProps) {
@@ -74,6 +77,7 @@ export function AssistantChatMessages({
         <TimelineItem
           key={getTimelineItemKey(item, index)}
           item={item}
+          nodes={nodes}
           variant={variant}
         />
       ))}
@@ -136,9 +140,11 @@ export function AssistantChatComposer({
 
 function TimelineItem({
   item,
+  nodes,
   variant,
 }: {
   item: AssistantChatItem;
+  nodes?: Map<string, Node>;
   variant: AssistantChatVariant;
 }) {
   if (item.type === "PendingHumanMessage") {
@@ -147,17 +153,42 @@ function TimelineItem({
 
   switch (item.type) {
     case "ReceivedMessage":
-      if (item.from_id !== "human" || !item.content) {
+      if (!item.content) {
         return null;
       }
-      return <HumanBubble content={item.content} variant={variant} />;
+      if (item.from_id === "human") {
+        return <HumanBubble content={item.content} variant={variant} />;
+      }
+      return (
+        <MessageActivityCard
+          content={item.content}
+          icon={<MessageSquare className="size-3.5 text-sky-400" />}
+          label={`From ${getNodeLabel(item.from_id ?? "", nodes)}`}
+          tone="received"
+          variant={variant}
+        />
+      );
     case "AssistantText":
       if (!item.content) {
         return null;
       }
       return <AssistantBubble content={item.content} />;
     case "SentMessage":
-      return null;
+      if (!item.content) {
+        return null;
+      }
+      return (
+        <MessageActivityCard
+          content={item.content}
+          icon={<Send className="size-3.5 text-sky-300" />}
+          label={`To ${
+            (item.to_ids ?? []).map((id) => getNodeLabel(id, nodes)).join(", ") ||
+            "Unknown"
+          }`}
+          tone="sent"
+          variant={variant}
+        />
+      );
     case "AssistantThinking":
       return (
         <ThinkingCard
@@ -226,6 +257,80 @@ function AssistantBubble({ content }: { content: string }) {
       <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
         <CopyButton text={content} />
       </div>
+    </div>
+  );
+}
+
+function MessageActivityCard({
+  content,
+  icon,
+  label,
+  tone,
+  variant,
+}: {
+  content: string;
+  icon: ReactNode;
+  label: string;
+  tone: "received" | "sent";
+  variant: AssistantChatVariant;
+}) {
+  const isWorkspace = variant === "workspace";
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div
+      className={cn(
+        "min-w-0 w-full px-2.5 py-1.5",
+        isWorkspace ? "border-l border-white/8 pl-3.5" : "rounded-xl",
+        tone === "received" &&
+          "border-sky-500/20 bg-[linear-gradient(180deg,rgba(56,189,248,0.03),rgba(56,189,248,0.01))]",
+        tone === "sent" &&
+          "border-cyan-500/20 bg-[linear-gradient(180deg,rgba(34,211,238,0.03),rgba(34,211,238,0.01))]",
+      )}
+    >
+      <div
+        aria-expanded={open}
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen((current) => !current);
+          }
+        }}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        <span className="flex size-5 items-center justify-center text-current">
+          {icon}
+        </span>
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate text-[12px] font-semibold",
+            tone === "received" ? "text-sky-200/90" : "text-cyan-200/90",
+          )}
+        >
+          {label}
+        </span>
+        <span className="ml-auto" onClick={(event) => event.stopPropagation()}>
+          <CopyButton text={content} />
+        </span>
+        <ChevronRight
+          className={cn(
+            "size-4 shrink-0 text-muted-foreground transition-transform",
+            open && "rotate-90",
+          )}
+        />
+      </div>
+      {open ? (
+        <div className="mt-2 min-w-0">
+          <RichContentBlock
+            content={content}
+            markdownClassName="text-[13px] text-foreground/80"
+            preClassName="text-foreground/75"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

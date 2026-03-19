@@ -568,6 +568,7 @@ function AssistantChatPanel() {
 
       <AssistantChatMessages
         items={timelineItems}
+        nodes={agents}
         onScroll={onMessagesScroll}
         scrollRef={scrollRef}
         variant="workspace"

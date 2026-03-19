@@ -2,6 +2,7 @@ import {
   AssistantChatComposer,
   AssistantChatMessages,
 } from "@/components/AssistantChatContent";
+import { useAgentNodesRuntime } from "@/context/AgentContext";
 import { useAssistantChat } from "@/hooks/useAssistantChat";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +11,7 @@ interface AssistantPanelProps {
 }
 
 export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
+  const { agents } = useAgentNodesRuntime();
   const {
     connected,
     handleKeyDown,
@@ -36,6 +38,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
       <PanelHeader connected={connected} floating={isFloating} />
       <AssistantChatMessages
         items={timelineItems}
+        nodes={agents}
         onScroll={onMessagesScroll}
         scrollRef={scrollRef}
         variant={chatVariant}

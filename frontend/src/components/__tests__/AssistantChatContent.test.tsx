@@ -1,11 +1,26 @@
 import { createRef } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AssistantChatMessages } from "@/components/AssistantChatContent";
-import type { AssistantChatItem } from "@/types";
+import type { AssistantChatItem, Node } from "@/types";
 
 describe("AssistantChatMessages", () => {
   it("renders thinking and tool call activity cards in the chat timeline and hides idle tool calls", () => {
+    const nodes = new Map<string, Node>([
+      [
+        "worker-1",
+        {
+          id: "worker-1",
+          node_type: "agent",
+          graph_id: "graph-1",
+          state: "running",
+          connections: [],
+          name: "Project Analyst",
+          todos: [],
+          role_name: "Worker",
+        },
+      ],
+    ]);
     const items: AssistantChatItem[] = [
       {
         type: "PendingHumanMessage",
@@ -44,6 +59,12 @@ describe("AssistantChatMessages", () => {
         timestamp: 5,
       },
       {
+        type: "ReceivedMessage",
+        from_id: "worker-1",
+        content: "I have inspected the project root.",
+        timestamp: 5.5,
+      },
+      {
         type: "SentMessage",
         content: "Worker, continue the task.",
         to_ids: ["worker-1"],
@@ -54,6 +75,7 @@ describe("AssistantChatMessages", () => {
     render(
       <AssistantChatMessages
         items={items}
+        nodes={nodes}
         onScroll={() => {}}
         scrollRef={createRef<HTMLDivElement>()}
         variant="workspace"
@@ -77,6 +99,23 @@ describe("AssistantChatMessages", () => {
     expect(
       screen.getByText("Here is a draft plan with priorities and next steps."),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Worker, continue the task.")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("From Project Analyst"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("To Project Analyst")).toBeInTheDocument();
+    expect(
+      screen.queryByText("I have inspected the project root."),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Worker, continue the task."),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /From Project Analyst/i }));
+    fireEvent.click(screen.getByRole("button", { name: /To Project Analyst/i }));
+
+    expect(
+      screen.getByText("I have inspected the project root."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Worker, continue the task.")).toBeInTheDocument();
   });
 });

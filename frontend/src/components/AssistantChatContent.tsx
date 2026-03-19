@@ -8,7 +8,6 @@ import {
 import {
   AlertCircle,
   Brain,
-  Check,
   ChevronRight,
   LoaderCircle,
   MessageSquare,
@@ -305,10 +304,7 @@ function MessageActivityCard({
           {icon}
         </span>
         <span
-          className={cn(
-            "min-w-0 flex-1 truncate text-[12px] font-semibold",
-            tone === "received" ? "text-sky-200/90" : "text-cyan-200/90",
-          )}
+          className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground/90"
         >
           {label}
         </span>
@@ -486,30 +482,16 @@ function ActivityDisclosure({
           <span className="block truncate text-[12px] font-semibold text-foreground/90">
             {label}
           </span>
-          <span className="block text-[11px] text-muted-foreground">
-            {streaming ? "In progress" : "Completed"}
+        </span>
+        {streaming ? (
+          <span className="ml-auto inline-flex size-5 items-center justify-center">
+            <span className="relative flex size-2.5 items-center justify-center">
+              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-emerald-400/45" />
+              <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+            </span>
+            <span className="sr-only">Live</span>
           </span>
-        </span>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-            streaming
-              ? "bg-white/[0.04] text-foreground/75"
-              : "bg-white/[0.04] text-muted-foreground",
-          )}
-        >
-          {streaming ? (
-            <>
-              <LoaderCircle className="size-3 animate-spin" />
-              Live
-            </>
-          ) : (
-            <>
-              <Check className="size-3" />
-              Done
-            </>
-          )}
-        </span>
+        ) : null}
         <ChevronRight
           className={cn(
             "size-4 shrink-0 text-muted-foreground transition-transform",

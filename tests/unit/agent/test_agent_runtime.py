@@ -17,6 +17,7 @@ from app.models import (
     NodeType,
     ReceivedMessage,
     SentMessage,
+    TodoItem,
     ToolCall,
     ToolCallResult,
 )
@@ -447,6 +448,26 @@ def test_build_messages_excludes_sent_messages():
         {"role": "system", "content": messages[0]["content"]},
         {"role": "user", "content": '<message from="human">begin</message>'},
         {"role": "assistant", "content": "final answer"},
+    ]
+
+
+def test_build_messages_appends_runtime_todo_context_without_history_entry():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent.set_todos([TodoItem(text="Inspect files"), TodoItem(text="Report results")])
+
+    messages = agent._build_messages()
+    history = agent.get_history_snapshot()
+
+    assert len(history) == 1
+    assert isinstance(history[0], ReceivedMessage)
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {
+            "role": "user",
+            "content": "<system>Current TODO list:\n  - Inspect files\n  - Report results</system>",
+        },
     ]
 
 

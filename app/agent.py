@@ -29,7 +29,6 @@ from app.models import (
     ReceivedMessage,
     SentMessage,
     SystemEntry,
-    SystemInjection,
     ThinkingDelta,
     TodoItem,
     ToolCall,
@@ -242,7 +241,6 @@ class Agent:
                 try:
                     self._sync_system_prompt_entry()
                     self._drain_messages()
-                    self._inject_system_context()
 
                     tools_schema = _get_tool_registry().get_tools_schema(self)
                     messages = self._build_messages()
@@ -395,23 +393,15 @@ class Agent:
             else:
                 self.history.insert(0, SystemEntry(content=system_prompt))
 
-    def _inject_system_context(self) -> None:
+    def _build_runtime_context_messages(self) -> list[dict[str, str]]:
         todos = self.get_todos_snapshot()
         if not todos:
-            return
+            return []
         lines = []
         for t in todos:
             lines.append(f"  - {t.text}")
         todo_text = "Current TODO list:\n" + "\n".join(lines)
-        with self._history_lock:
-            for i in range(len(self.history) - 1, -1, -1):
-                entry = self.history[i]
-                if isinstance(entry, SystemInjection) and entry.content.startswith(
-                    "Current TODO list:"
-                ):
-                    self.history.pop(i)
-                    break
-        self._append_history(SystemInjection(content=todo_text))
+        return [{"role": "user", "content": f"<system>{todo_text}</system>"}]
 
     def _deliver_message(self, target: Agent, content: str) -> None:
         target.enqueue_message(
@@ -495,11 +485,6 @@ class Agent:
                 payload = f'<message from="{entry.from_id}">{entry.content}</message>'
                 messages.append({"role": "user", "content": payload})
 
-            elif isinstance(entry, SystemInjection):
-                self._flush_tool_calls(messages, pending_tool_calls)
-                payload = f"<system>{entry.content}</system>"
-                messages.append({"role": "user", "content": payload})
-
             elif isinstance(entry, AssistantText):
                 self._flush_tool_calls(messages, pending_tool_calls)
                 messages.append({"role": "assistant", "content": entry.content})
@@ -544,6 +529,7 @@ class Agent:
                 pass
 
         self._flush_tool_calls(messages, pending_tool_calls)
+        messages.extend(self._build_runtime_context_messages())
         return messages
 
     @staticmethod
@@ -762,9 +748,6 @@ class Agent:
                 resume_reason=f"received message from {msg.from_id}",
             )
         )
-
-    def inject_system_message(self, content: str) -> None:
-        self._append_history(SystemInjection(content=content))
 
     def set_state(
         self,

@@ -14,12 +14,6 @@ class SystemEntry(Serializable):
 
 
 @dataclass
-class SystemInjection(Serializable):
-    content: str
-    timestamp: float = field(default_factory=time.time)
-
-
-@dataclass
 class ReceivedMessage(Serializable):
     content: str
     from_id: str
@@ -63,7 +57,6 @@ class ErrorEntry(Serializable):
 
 HistoryEntry = (
     SystemEntry
-    | SystemInjection
     | ReceivedMessage
     | AssistantText
     | SentMessage

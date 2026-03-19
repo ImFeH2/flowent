@@ -118,10 +118,9 @@ function HistoryItem({
 }) {
   switch (entry.type) {
     case "SystemEntry":
-    case "SystemInjection":
       return (
         <CollapsibleBlock
-          label={entry.type === "SystemEntry" ? "System" : "System Injection"}
+          label="System"
           icon={<Terminal className="size-3 text-muted-foreground" />}
           className="border-border/50 bg-surface-1/30"
           defaultOpen={false}

@@ -52,7 +52,6 @@ export function AssistantChatMessages({
   const visibleItems = items.filter(
     (item) =>
       item.type !== "SystemEntry" &&
-      item.type !== "SystemInjection" &&
       !(item.type === "ToolCall" && item.tool_name === "idle"),
   );
 

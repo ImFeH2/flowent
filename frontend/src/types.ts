@@ -62,7 +62,6 @@ export interface PendingAssistantChatMessage extends AssistantChatMessage {
 
 export type HistoryEntryType =
   | "SystemEntry"
-  | "SystemInjection"
   | "ReceivedMessage"
   | "AssistantText"
   | "SentMessage"

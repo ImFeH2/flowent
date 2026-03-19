@@ -16,7 +16,6 @@ from app.models.history import (
     ReceivedMessage,
     SentMessage,
     SystemEntry,
-    SystemInjection,
     ToolCall,
 )
 from app.models.llm import LLMResponse, ModelInfo, ToolCallResult
@@ -44,7 +43,6 @@ __all__ = [
     "SentMessage",
     "StreamingDelta",
     "SystemEntry",
-    "SystemInjection",
     "ThinkingDelta",
     "TodoItem",
     "ToolCall",

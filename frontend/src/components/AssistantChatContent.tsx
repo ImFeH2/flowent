@@ -276,15 +276,15 @@ function HumanBubble({
         className={cn(
           "min-w-0 overflow-hidden px-3 py-2 text-sm [overflow-wrap:anywhere]",
           isWorkspace
-            ? "max-w-[85%] rounded-md bg-primary/[0.86] text-primary-foreground"
-            : "max-w-[80%] rounded-xl border border-glass-border bg-surface-3 text-foreground",
+            ? "max-w-[85%] rounded-md border border-white/8 bg-white/[0.12] text-white"
+            : "max-w-[80%] rounded-xl border border-white/10 bg-white/[0.08] text-white",
           pending && "opacity-80",
         )}
       >
         <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1">{content}</span>
           {pending && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-foreground/12 px-2 py-0.5 text-[10px] font-medium text-primary-foreground/80">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/80">
               <LoaderCircle className="size-3 animate-spin" />
               Sending
             </span>

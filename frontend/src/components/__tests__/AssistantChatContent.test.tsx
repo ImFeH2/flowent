@@ -141,6 +141,63 @@ describe("AssistantChatMessages", () => {
     expect(scrollRef.current?.style.paddingBottom).toBe("134px");
     expect(scrollRef.current?.style.scrollPaddingBottom).toBe("134px");
   });
+
+  it("renders human bubbles with gray surfaces and white text", () => {
+    const workspaceScrollRef = createRef<HTMLDivElement>();
+    const panelScrollRef = createRef<HTMLDivElement>();
+    const workspaceItems: AssistantChatItem[] = [
+      {
+        type: "ReceivedMessage",
+        from_id: "human",
+        content: "Workspace message",
+        timestamp: 1,
+      },
+    ];
+    const panelItems: AssistantChatItem[] = [
+      {
+        type: "ReceivedMessage",
+        from_id: "human",
+        content: "Panel message",
+        timestamp: 2,
+      },
+    ];
+
+    const { rerender } = render(
+      <AssistantChatMessages
+        items={workspaceItems}
+        onScroll={() => {}}
+        scrollRef={workspaceScrollRef}
+        variant="workspace"
+      />,
+    );
+
+    const workspaceBubble =
+      screen.getByText("Workspace message").parentElement?.parentElement;
+    expect(workspaceBubble).not.toBeNull();
+    expect(workspaceBubble).toHaveClass(
+      "bg-white/[0.12]",
+      "text-white",
+      "border-white/8",
+    );
+
+    rerender(
+      <AssistantChatMessages
+        items={panelItems}
+        onScroll={() => {}}
+        scrollRef={panelScrollRef}
+        variant="panel"
+      />,
+    );
+
+    const panelBubble =
+      screen.getByText("Panel message").parentElement?.parentElement;
+    expect(panelBubble).not.toBeNull();
+    expect(panelBubble).toHaveClass(
+      "bg-white/[0.08]",
+      "text-white",
+      "border-white/10",
+    );
+  });
 });
 
 describe("AssistantChatComposer", () => {

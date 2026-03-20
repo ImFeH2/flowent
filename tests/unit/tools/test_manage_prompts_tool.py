@@ -8,18 +8,21 @@ from app.tools.manage_prompts import ManagePromptsTool
 
 def test_manage_prompts_get_returns_current_prompt(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
-    settings = Settings(custom_prompt="Be concise.")
+    settings = Settings(custom_prompt="Be concise.", post_prompt="Stay routed.")
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
 
     result = json.loads(ManagePromptsTool().execute(agent, {"action": "get"}))
 
-    assert result == {"custom_prompt": "Be concise."}
+    assert result == {
+        "custom_prompt": "Be concise.",
+        "post_prompt": "Stay routed.",
+    }
 
 
 def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
-    settings = Settings(custom_prompt="")
+    settings = Settings(custom_prompt="", post_prompt="")
     saved: list[Settings] = []
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -33,16 +36,21 @@ def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
             {
                 "action": "update",
                 "custom_prompt": "Always prefer terse answers.",
+                "post_prompt": "Only route with @target.",
             },
         )
     )
 
-    assert result == {"custom_prompt": "Always prefer terse answers."}
+    assert result == {
+        "custom_prompt": "Always prefer terse answers.",
+        "post_prompt": "Only route with @target.",
+    }
     assert settings.custom_prompt == "Always prefer terse answers."
+    assert settings.post_prompt == "Only route with @target."
     assert saved == [settings]
 
 
-def test_manage_prompts_update_requires_custom_prompt(monkeypatch):
+def test_manage_prompts_update_requires_prompt_field(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
     monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
 
@@ -53,4 +61,29 @@ def test_manage_prompts_update_requires_custom_prompt(monkeypatch):
         )
     )
 
-    assert result == {"error": "custom_prompt is required"}
+    assert result == {"error": "custom_prompt or post_prompt is required"}
+
+
+def test_manage_prompts_update_allows_post_prompt_only(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
+    settings = Settings(custom_prompt="Keep this.", post_prompt="")
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+
+    result = json.loads(
+        ManagePromptsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "post_prompt": "Append this after history.",
+            },
+        )
+    )
+
+    assert result == {
+        "custom_prompt": "Keep this.",
+        "post_prompt": "Append this after history.",
+    }
+    assert settings.custom_prompt == "Keep this."
+    assert settings.post_prompt == "Append this after history."

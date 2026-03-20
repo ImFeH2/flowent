@@ -22,6 +22,7 @@ from app.models import (
     ToolCallResult,
 )
 from app.registry import registry
+from app.settings import Settings
 
 
 def test_agent_keeps_running_after_pure_text_response(monkeypatch):
@@ -511,7 +512,9 @@ def test_routed_message_emits_streaming_preview_for_sender_and_receiver(monkeypa
     }
 
 
-def test_build_messages_excludes_sent_messages():
+def test_build_messages_excludes_sent_messages(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
     agent._append_history(SentMessage(content="to peer", to_ids=["peer"]))
@@ -523,10 +526,16 @@ def test_build_messages_excludes_sent_messages():
         {"role": "system", "content": messages[0]["content"]},
         {"role": "user", "content": '<message from="human">begin</message>'},
         {"role": "assistant", "content": "final answer"},
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.</system>",
+        },
     ]
 
 
-def test_build_messages_appends_runtime_todo_context_without_history_entry():
+def test_build_messages_appends_runtime_todo_context_without_history_entry(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
     agent.set_todos([TodoItem(text="Inspect files"), TodoItem(text="Report results")])
@@ -542,6 +551,40 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry():
         {
             "role": "user",
             "content": "<system>Current TODO list:\n  - Inspect files\n  - Report results</system>",
+        },
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
+        },
+    ]
+
+
+def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatch):
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(post_prompt="Append this after history."),
+    )
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent.set_todos([TodoItem(text="Inspect files")])
+    agent.set_todos([])
+
+    messages = agent._build_messages()
+    history = agent.get_history_snapshot()
+
+    assert len(history) == 1
+    assert isinstance(history[0], ReceivedMessage)
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- If all TODO items are complete, after the task is finished and you have no immediate next action, call `idle`.</system>",
+        },
+        {
+            "role": "user",
+            "content": "<system>Append this after history.</system>",
         },
     ]
 

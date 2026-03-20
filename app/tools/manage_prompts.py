@@ -13,8 +13,9 @@ class ManagePromptsTool(Tool):
     name = "manage_prompts"
     agent_visible = False
     description = (
-        "Read and update the global custom prompt. The custom prompt is "
-        "appended to every node's system prompt, including the Assistant."
+        "Read and update the global custom prompt and post prompt. The custom "
+        "prompt is appended to every node's system prompt, and the post prompt "
+        "is appended to every runtime request tail."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -28,6 +29,10 @@ class ManagePromptsTool(Tool):
                 "type": "string",
                 "description": "Updated global custom prompt",
             },
+            "post_prompt": {
+                "type": "string",
+                "description": "Updated global post prompt",
+            },
         },
         "required": ["action"],
     }
@@ -37,6 +42,7 @@ class ManagePromptsTool(Tool):
 
         action = args.get("action")
         custom_prompt = args.get("custom_prompt")
+        post_prompt = args.get("post_prompt")
 
         if not isinstance(action, str):
             return json.dumps({"error": "action must be a string"})
@@ -44,16 +50,34 @@ class ManagePromptsTool(Tool):
         settings = get_settings()
 
         if action == "get":
-            return json.dumps({"custom_prompt": settings.custom_prompt})
+            return json.dumps(
+                {
+                    "custom_prompt": settings.custom_prompt,
+                    "post_prompt": settings.post_prompt,
+                }
+            )
 
         if action != "update":
             return json.dumps({"error": f"Unsupported action: {action}"})
 
-        if "custom_prompt" not in args:
-            return json.dumps({"error": "custom_prompt is required"})
-        if not isinstance(custom_prompt, str):
+        if "custom_prompt" not in args and "post_prompt" not in args:
+            return json.dumps({"error": "custom_prompt or post_prompt is required"})
+        if "custom_prompt" in args and not isinstance(custom_prompt, str):
             return json.dumps({"error": "custom_prompt must be a string"})
+        if "post_prompt" in args and not isinstance(post_prompt, str):
+            return json.dumps({"error": "post_prompt must be a string"})
 
-        settings.custom_prompt = custom_prompt
+        next_custom_prompt = custom_prompt if isinstance(custom_prompt, str) else None
+        next_post_prompt = post_prompt if isinstance(post_prompt, str) else None
+
+        if next_custom_prompt is not None:
+            settings.custom_prompt = next_custom_prompt
+        if next_post_prompt is not None:
+            settings.post_prompt = next_post_prompt
         save_settings(settings)
-        return json.dumps({"custom_prompt": settings.custom_prompt})
+        return json.dumps(
+            {
+                "custom_prompt": settings.custom_prompt,
+                "post_prompt": settings.post_prompt,
+            }
+        )

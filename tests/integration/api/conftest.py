@@ -15,6 +15,7 @@ def client(monkeypatch, tmp_path):
                 "event_log": {"timestamp_format": "absolute"},
                 "model": {"active_provider_id": "", "active_model": ""},
                 "custom_prompt": "",
+                "post_prompt": "",
                 "providers": [],
                 "roles": [],
             }

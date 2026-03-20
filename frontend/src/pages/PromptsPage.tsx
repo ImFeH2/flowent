@@ -7,6 +7,7 @@ import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
 
 export function PromptsPage() {
   const [customPrompt, setCustomPrompt] = useState("");
+  const [postPrompt, setPostPrompt] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -17,6 +18,7 @@ export function PromptsPage() {
       .then((data) => {
         if (!mounted) return;
         setCustomPrompt(data.custom_prompt);
+        setPostPrompt(data.post_prompt);
       })
       .catch(() => {
         toast.error("Failed to load prompts");
@@ -33,8 +35,12 @@ export function PromptsPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const saved = await savePromptSettings({ custom_prompt: customPrompt });
+      const saved = await savePromptSettings({
+        custom_prompt: customPrompt,
+        post_prompt: postPrompt,
+      });
       setCustomPrompt(saved.custom_prompt);
+      setPostPrompt(saved.post_prompt);
       toast.success("Prompts saved");
     } catch {
       toast.error("Failed to save prompts");
@@ -57,27 +63,60 @@ export function PromptsPage() {
   return (
     <PageScaffold
       title="Prompts"
-      description="Add a global custom prompt that is appended to every node."
+      description="Configure the global system prompt layer and the runtime post prompt layer."
     >
       <div className="mx-auto flex h-full max-w-3xl flex-col">
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground/60">
-            {customPrompt.length} characters
-          </span>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground/60">
+            <span>{customPrompt.length} custom</span>
+            <span>{postPrompt.length} post</span>
+          </div>
           <Button onClick={() => void handleSave()} disabled={saving}>
             <Save className="size-4" />
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
-        <div className="relative flex min-h-0 flex-1">
-          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px] rounded-full bg-white/8" />
-          <textarea
-            value={customPrompt}
-            onChange={(event) => setCustomPrompt(event.target.value)}
-            placeholder="Add a custom prompt appended to every agent's system prompt..."
-            rows={18}
-            className="min-h-0 w-full flex-1 resize-none rounded-r-lg bg-surface-1 pb-4 pl-5 pr-4 pt-4 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
-          />
+        <div className="grid min-h-0 flex-1 gap-4">
+          <div className="flex min-h-0 flex-col">
+            <div className="mb-2">
+              <p className="text-sm font-medium text-foreground">
+                Custom Prompt
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                Appended to every node&apos;s system prompt.
+              </p>
+            </div>
+            <div className="relative flex min-h-0 flex-1">
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px] rounded-full bg-white/8" />
+              <textarea
+                aria-label="Custom Prompt"
+                value={customPrompt}
+                onChange={(event) => setCustomPrompt(event.target.value)}
+                placeholder="Add a custom prompt appended to every agent's system prompt..."
+                rows={10}
+                className="min-h-0 w-full flex-1 resize-none rounded-r-lg bg-surface-1 pb-4 pl-5 pr-4 pt-4 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+              />
+            </div>
+          </div>
+          <div className="flex min-h-0 flex-col">
+            <div className="mb-2">
+              <p className="text-sm font-medium text-foreground">Post Prompt</p>
+              <p className="text-xs text-muted-foreground/70">
+                Appended after history on every runtime request.
+              </p>
+            </div>
+            <div className="relative flex min-h-0 flex-1">
+              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px] rounded-full bg-white/8" />
+              <textarea
+                aria-label="Post Prompt"
+                value={postPrompt}
+                onChange={(event) => setPostPrompt(event.target.value)}
+                placeholder="Add runtime instructions appended after history..."
+                rows={10}
+                className="min-h-0 w-full flex-1 resize-none rounded-r-lg bg-surface-1 pb-4 pl-5 pr-4 pt-4 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </PageScaffold>

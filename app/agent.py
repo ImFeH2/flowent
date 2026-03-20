@@ -39,6 +39,7 @@ from app.models import (
 from app.prompts import get_system_prompt
 from app.providers.gateway import gateway
 from app.security import authorize
+from app.settings import get_settings
 
 
 @lru_cache(maxsize=1)
@@ -145,6 +146,7 @@ class Agent:
         self._connections_lock = threading.Lock()
         self._history_lock = threading.Lock()
         self._todos_lock = threading.Lock()
+        self._todo_tracking_started = False
         self._log = logger.bind(
             agent_id=self.uuid[:8], node_type=self.config.node_type.value
         )
@@ -178,6 +180,7 @@ class Agent:
     def set_todos(self, todos: list[TodoItem]) -> None:
         with self._todos_lock:
             self.todos = [TodoItem(text=t.text) for t in todos]
+            self._todo_tracking_started = True
 
     def request_idle(self) -> None:
         self.set_state(AgentState.IDLE)
@@ -355,15 +358,61 @@ class Agent:
             else:
                 self.history.insert(0, SystemEntry(content=system_prompt))
 
-    def _build_runtime_context_messages(self) -> list[dict[str, str]]:
-        todos = self.get_todos_snapshot()
+    @staticmethod
+    def _build_runtime_system_message(content: str) -> dict[str, str]:
+        return {"role": "user", "content": f"<system>{content}</system>"}
+
+    def _build_runtime_tail_messages(self) -> list[dict[str, str]]:
+        with self._todos_lock:
+            todos = [TodoItem(text=t.text) for t in self.todos]
+            todo_tracking_started = self._todo_tracking_started
+        post_prompt = get_settings().post_prompt.strip()
+        messages: list[dict[str, str]] = []
+        todo_message = self._build_runtime_todo_message(todos)
+        if todo_message is not None:
+            messages.append(todo_message)
+        messages.append(
+            self._build_runtime_post_prompt_message(
+                has_todos=bool(todos),
+                todo_tracking_started=todo_tracking_started,
+            )
+        )
+        if post_prompt:
+            messages.append(self._build_runtime_system_message(post_prompt))
+        return messages
+
+    def _build_runtime_todo_message(
+        self,
+        todos: list[TodoItem],
+    ) -> dict[str, str] | None:
         if not todos:
-            return []
+            return None
         lines = []
-        for t in todos:
-            lines.append(f"  - {t.text}")
+        for todo in todos:
+            lines.append(f"  - {todo.text}")
         todo_text = "Current TODO list:\n" + "\n".join(lines)
-        return [{"role": "user", "content": f"<system>{todo_text}</system>"}]
+        return self._build_runtime_system_message(todo_text)
+
+    def _build_runtime_post_prompt_message(
+        self,
+        *,
+        has_todos: bool,
+        todo_tracking_started: bool,
+    ) -> dict[str, str]:
+        lines = [
+            "Runtime post prompt:",
+            "- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.",
+            "- Plain content is not delivered to other agents.",
+        ]
+        if has_todos:
+            lines.append(
+                "- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items."
+            )
+        elif todo_tracking_started:
+            lines.append(
+                "- If all TODO items are complete, after the task is finished and you have no immediate next action, call `idle`."
+            )
+        return self._build_runtime_system_message("\n".join(lines))
 
     def _emit_routed_message_preview(
         self,
@@ -681,7 +730,7 @@ class Agent:
                 pass
 
         self._flush_tool_calls(messages, pending_tool_calls)
-        messages.extend(self._build_runtime_context_messages())
+        messages.extend(self._build_runtime_tail_messages())
         return messages
 
     @staticmethod

@@ -76,6 +76,7 @@ def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
         "app.settings.get_settings",
         lambda: Settings(
             custom_prompt="Global custom instructions.",
+            post_prompt="Runtime-only reminder.",
             roles=[
                 RoleConfig(
                     name="Reviewer",
@@ -96,6 +97,7 @@ def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
             "Review code carefully.",
         ]
     )
+    assert "Runtime-only reminder." not in prompt
 
 
 def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_empty(

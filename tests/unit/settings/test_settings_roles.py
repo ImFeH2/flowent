@@ -125,7 +125,7 @@ def test_load_settings_drops_removed_exit_tool_from_roles(monkeypatch, tmp_path)
     ]
 
 
-def test_load_settings_preserves_custom_prompt(monkeypatch, tmp_path):
+def test_load_settings_preserves_custom_and_post_prompt(monkeypatch, tmp_path):
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
         json.dumps(
@@ -133,6 +133,7 @@ def test_load_settings_preserves_custom_prompt(monkeypatch, tmp_path):
                 "event_log": {"timestamp_format": "absolute"},
                 "model": {"active_provider_id": "", "active_model": ""},
                 "custom_prompt": "Apply extra guardrails.",
+                "post_prompt": "Append runtime guidance.",
                 "providers": [],
                 "roles": [],
             }
@@ -146,6 +147,7 @@ def test_load_settings_preserves_custom_prompt(monkeypatch, tmp_path):
     loaded = settings_module.load_settings()
 
     assert loaded.custom_prompt == "Apply extra guardrails."
+    assert loaded.post_prompt == "Append runtime guidance."
     assert loaded.assistant == AssistantSettings()
     assert loaded.telegram == TelegramSettings()
 

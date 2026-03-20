@@ -25,23 +25,10 @@ from app.registry import registry
 
 
 def test_agent_keeps_running_after_pure_text_response(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["exit"]))
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT))
     wait_calls = 0
     llm_messages: list[list[dict]] = []
-    responses = iter(
-        [
-            LLMResponse(content="working through the task"),
-            LLMResponse(
-                tool_calls=[
-                    ToolCallResult(
-                        id="call-exit",
-                        name="exit",
-                        arguments={"reason": "done"},
-                    )
-                ]
-            ),
-        ]
-    )
+    responses = iter([LLMResponse(content="working through the task"), LLMResponse()])
 
     def fake_wait_for_input() -> None:
         nonlocal wait_calls
@@ -56,6 +43,8 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
 
     def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
         llm_messages.append(messages)
+        if len(llm_messages) == 2:
+            agent.request_termination("done")
         return next(responses)
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
@@ -77,9 +66,9 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
     )
 
 
-def test_agent_unregisters_from_registry_after_exit_tool(monkeypatch):
+def test_agent_unregisters_from_registry_after_termination_request(monkeypatch):
     registry.reset()
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["exit"]), uuid="agent-x")
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-x")
     registry.register(agent)
     events = []
 
@@ -90,18 +79,12 @@ def test_agent_unregisters_from_registry_after_exit_tool(monkeypatch):
         agent.set_state(AgentState.RUNNING, "received message from tester")
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr(
-        "app.agent.gateway.chat",
-        lambda messages, tools=None, on_chunk=None, role_name=None: LLMResponse(
-            tool_calls=[
-                ToolCallResult(
-                    id="call-exit",
-                    name="exit",
-                    arguments={"reason": "done"},
-                )
-            ]
-        ),
-    )
+
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+        agent.request_termination("done")
+        return LLMResponse()
+
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     agent._run()
@@ -192,7 +175,7 @@ def test_finalize_termination_keeps_graph_when_other_nodes_remain():
 
 
 def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["exit"]), uuid="agent-y")
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-y")
     wait_calls = 0
 
     def fake_wait_for_input() -> None:
@@ -228,7 +211,7 @@ def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
 def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch):
     registry.reset()
     assistant = Agent(
-        NodeConfig(node_type=NodeType.ASSISTANT, tools=["exit"]),
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["idle"]),
     )
     registry.register(assistant)
     events = []
@@ -246,9 +229,9 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
             content="Working on it",
             tool_calls=[
                 ToolCallResult(
-                    id="call-exit",
-                    name="exit",
-                    arguments={"reason": "done"},
+                    id="call-idle",
+                    name="idle",
+                    arguments={},
                 )
             ],
         )
@@ -619,7 +602,7 @@ def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
 
 
 def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle", "exit"]))
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle"]))
     wait_calls = 0
     llm_messages: list[list[dict]] = []
     responses = iter(
@@ -633,15 +616,7 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
                     )
                 ]
             ),
-            LLMResponse(
-                tool_calls=[
-                    ToolCallResult(
-                        id="call-exit",
-                        name="exit",
-                        arguments={"reason": "done"},
-                    )
-                ]
-            ),
+            LLMResponse(),
         ]
     )
 
@@ -667,6 +642,8 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
                 ),
             )
             timer.start()
+        if len(llm_messages) == 2:
+            agent.request_termination("done")
         return next(responses)
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
@@ -690,7 +667,7 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
 
 
 def test_agent_contextualizes_plain_loguru_calls(monkeypatch):
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["exit"]), uuid="agent-z")
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-z")
     captured: list[tuple[str, str | None]] = []
     sink_id = logger.add(
         lambda message: captured.append(
@@ -704,15 +681,8 @@ def test_agent_contextualizes_plain_loguru_calls(monkeypatch):
 
     def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
         logger.info("plain log inside agent")
-        return LLMResponse(
-            tool_calls=[
-                ToolCallResult(
-                    id="call-exit",
-                    name="exit",
-                    arguments={"reason": "done"},
-                )
-            ]
-        )
+        agent.request_termination("done")
+        return LLMResponse()
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr("app.agent.gateway.chat", fake_chat)

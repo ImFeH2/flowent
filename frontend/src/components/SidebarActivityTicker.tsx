@@ -104,7 +104,7 @@ function buildTickerItem(
       return {
         id: `${agentId}-${entry.timestamp}-tool-${toolName}`,
         text: `${agentLabel} · ${toolLabel}`,
-        tone: toolName === "exit" ? "quiet" : "active",
+        tone: "active",
       };
     }
     case "ErrorEntry":

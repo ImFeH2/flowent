@@ -47,7 +47,7 @@ type RoleDraft = Omit<Role, "is_builtin">;
 type ToolState = "allowed" | "included" | "excluded";
 type PanelMode = "create" | "edit" | "view";
 
-const MINIMUM_TOOLS = new Set(["idle", "todo", "list_connections", "exit"]);
+const MINIMUM_TOOLS = new Set(["idle", "todo", "list_connections"]);
 
 const emptyDraft = (): RoleDraft => ({
   name: "",

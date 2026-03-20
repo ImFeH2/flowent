@@ -67,7 +67,6 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.create_graph import CreateGraphTool
     from app.tools.edit import EditTool
     from app.tools.exec import ExecTool
-    from app.tools.exit import ExitTool
     from app.tools.fetch import FetchTool
     from app.tools.idle import IdleTool
     from app.tools.list_connections import ListConnectionsTool
@@ -88,7 +87,6 @@ def build_tool_registry() -> ToolRegistry:
         IdleTool,
         TodoTool,
         ListConnectionsTool,
-        ExitTool,
         CreateGraphTool,
         ConnectTool,
         ManageProvidersTool,

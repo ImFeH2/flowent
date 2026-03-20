@@ -168,7 +168,6 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "exec",
             ],
             "optional_tools": [
-                "exit",
                 "create_graph",
                 "connect",
                 "edit",
@@ -187,7 +186,6 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "list_connections",
             ],
             "optional_tools": [
-                "exit",
                 "create_graph",
                 "connect",
                 "read",
@@ -216,7 +214,6 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "idle",
         "todo",
         "list_connections",
-        "exit",
         "read",
         "edit",
         "exec",

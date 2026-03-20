@@ -14,23 +14,23 @@ from app.tools.todo import TodoTool
 
 def test_idle_tool_uses_request_idle(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle"]))
-    called = []
+    called: list[str | None] = []
 
-    monkeypatch.setattr(
-        agent,
-        "request_idle",
-        lambda: called.append("idle") or None,
-    )
+    def fake_request_idle(*, tool_call_id: str | None = None) -> str:
+        called.append(tool_call_id)
+        return "idle 1.25s"
+
+    monkeypatch.setattr(agent, "request_idle", fake_request_idle)
 
     result = IdleTool().execute(agent, {})
 
-    assert result is None
-    assert called == ["idle"]
+    assert result == "idle 1.25s"
+    assert called == [None]
 
 
-def test_idle_tool_blocks_until_message_and_returns_no_result():
+def test_idle_tool_blocks_until_message_and_returns_idle_duration():
     agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle"]), uuid="agent-a")
-    result: list[None] = []
+    result: list[str] = []
 
     thread = threading.Thread(
         target=lambda: result.append(IdleTool().execute(agent, {})),
@@ -44,7 +44,9 @@ def test_idle_tool_blocks_until_message_and_returns_no_result():
     thread.join(timeout=1.0)
 
     assert not thread.is_alive()
-    assert result == [None]
+    assert len(result) == 1
+    assert result[0].startswith("idle ")
+    assert result[0].endswith("s")
     assert isinstance(agent.history[-1], ReceivedMessage)
     assert agent.history[-1].from_id == "tester"
     assert agent.history[-1].content == "hello from queue"

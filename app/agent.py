@@ -140,6 +140,8 @@ class Agent:
         self.history: list[HistoryEntry] = []
         self._terminate = threading.Event()
         self._idle_state_event = threading.Event()
+        self._idle_started_at: float | None = None
+        self._idle_started_by_tool_call_id: str | None = None
         self._wake_queue: Queue[WakeSignal] = Queue()
         self._thread: threading.Thread | None = None
         self._termination_reason: str = ""
@@ -180,10 +182,24 @@ class Agent:
         with self._todos_lock:
             self.todos = [TodoItem(text=t.text) for t in todos]
 
-    def request_idle(self) -> None:
+    def request_idle(self, *, tool_call_id: str | None = None) -> str:
+        self._idle_started_by_tool_call_id = tool_call_id
         self.set_state(AgentState.IDLE)
         signal = self._wait_for_wakeup()
+        elapsed = self._get_idle_elapsed_seconds(tool_call_id=tool_call_id)
         self._resume_from_wakeup(signal)
+        return f"idle {elapsed:.2f}s"
+
+    def _get_idle_elapsed_seconds(self, *, tool_call_id: str | None) -> float:
+        started_at = self._idle_started_at
+        if started_at is None:
+            return 0.0
+        if tool_call_id is not None and self._idle_started_by_tool_call_id not in {
+            None,
+            tool_call_id,
+        }:
+            return 0.0
+        return max(0.0, _time.perf_counter() - started_at)
 
     def get_connections_info(self) -> list[dict[str, Any]]:
         from app.registry import registry
@@ -696,7 +712,7 @@ class Agent:
                 if entry.streaming:
                     continue
 
-                if entry.tool_name == "idle" and entry.result is None:
+                if entry.tool_name == "idle":
                     continue
 
                 pending_tool_calls.append(
@@ -902,7 +918,12 @@ class Agent:
 
         t0 = _time.perf_counter()
         try:
-            result = tool.execute(self, arguments, on_output=_on_tool_output)
+            result = tool.execute(
+                self,
+                arguments,
+                on_output=_on_tool_output,
+                tool_call_id=call_id,
+            )
             elapsed = _time.perf_counter() - t0
             self._log.debug(
                 "Tool {} completed in {:.2f}s, result_len={}",
@@ -980,8 +1001,13 @@ class Agent:
         old = self.state
         self.state = state
         if state == AgentState.IDLE:
+            if old != AgentState.IDLE:
+                self._idle_started_at = _time.perf_counter()
             self._idle_state_event.set()
         else:
+            if old == AgentState.IDLE:
+                self._idle_started_at = None
+                self._idle_started_by_tool_call_id = None
             self._idle_state_event.clear()
         if old != state or force_emit:
             self._log.debug(

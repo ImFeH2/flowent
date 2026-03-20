@@ -270,10 +270,12 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         const entry = event.data as unknown as HistoryEntry;
         if (shouldTrackFeedEntry(entry)) {
           let shouldAppendActivity = true;
+          let toolCallIdToReplace: string | null = null;
 
           if (entry.type === "ToolCall" && entry.tool_call_id) {
             if (seenToolCallIdsRef.current.has(entry.tool_call_id)) {
               shouldAppendActivity = false;
+              toolCallIdToReplace = entry.tool_call_id;
             } else {
               seenToolCallIdsRef.current.add(entry.tool_call_id);
               if (seenToolCallIdsRef.current.size > MAX_TRACKED_TOOL_CALL_IDS) {
@@ -298,6 +300,26 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             setRecentActivities((prev) => {
               const next = [...prev, activityEntry];
               return next.slice(-MAX_ACTIVITY_FEED_ITEMS);
+            });
+          } else if (toolCallIdToReplace) {
+            const timestampMs = normalizeEventTimestampMs(event.timestamp);
+            setRecentActivities((prev) => {
+              const next = [...prev];
+              for (let i = next.length - 1; i >= 0; i -= 1) {
+                const activityEntry = next[i];
+                if (
+                  activityEntry.entry.type === "ToolCall" &&
+                  activityEntry.entry.tool_call_id === toolCallIdToReplace
+                ) {
+                  next[i] = {
+                    ...activityEntry,
+                    entry,
+                    timestampMs,
+                  };
+                  break;
+                }
+              }
+              return next;
             });
           }
         }

@@ -9,7 +9,7 @@ IDLE_USAGE_GUIDANCE = """\
 - Do not use `idle` if you still have an immediate action you can take now.
 - Do not use `idle` instead of replying to a newly received message.
 - After calling `idle`, you will be re-activated when a new message arrives.
-- When that happens, the new message will appear as a fresh input message; `idle` itself does not return a tool result.
+- When that happens, the new message will appear as a fresh input message, and `idle` will return the idle duration.
 """
 
 DELEGATION_USAGE_GUIDANCE = """\

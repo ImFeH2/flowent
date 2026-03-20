@@ -707,6 +707,13 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
         and msg.get("content") == '<message from="human">wake up now</message>'
         for msg in second_round
     )
+    assert any(
+        isinstance(entry, ToolCall)
+        and entry.tool_name == "idle"
+        and isinstance(entry.result, str)
+        and entry.result.startswith("idle ")
+        for entry in agent.get_history_snapshot()
+    )
 
 
 def test_agent_contextualizes_plain_loguru_calls(monkeypatch):

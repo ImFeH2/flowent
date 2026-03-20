@@ -8,7 +8,7 @@ import {
 import type { AssistantChatItem, Node } from "@/types";
 
 describe("AssistantChatMessages", () => {
-  it("renders thinking and tool call activity cards in the chat timeline and hides idle tool calls", () => {
+  it("renders idle tool calls once they have a result and keeps empty idle calls hidden", () => {
     const nodes = new Map<string, Node>([
       [
         "worker-1",
@@ -57,6 +57,15 @@ describe("AssistantChatMessages", () => {
         streaming: false,
       },
       {
+        type: "ToolCall",
+        tool_name: "idle",
+        tool_call_id: "tool-2b",
+        arguments: {},
+        result: "idle 1.25s",
+        timestamp: 4,
+        streaming: false,
+      },
+      {
         type: "AssistantText",
         content: "Here is a draft plan with priorities and next steps.",
         timestamp: 5,
@@ -96,9 +105,9 @@ describe("AssistantChatMessages", () => {
     expect(
       screen.getByRole("button", { name: /Create Root/i }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /idle/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /idle/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /idle/i }));
+    expect(screen.getByText("idle 1.25s")).toBeInTheDocument();
     expect(
       screen.getByText("Here is a draft plan with priorities and next steps."),
     ).toBeInTheDocument();

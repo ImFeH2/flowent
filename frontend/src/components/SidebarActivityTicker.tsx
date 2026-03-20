@@ -81,9 +81,13 @@ function buildTickerItem(
           ? `${toolName.slice(0, Math.max(0, toolMaxLength - 3))}...`
           : toolName;
       if (toolName === "idle") {
+        const resultLabel =
+          typeof entry.result === "string" && entry.result.trim()
+            ? entry.result.trim()
+            : "idle";
         return {
           id: `${agentId}-${entry.timestamp}-idle`,
-          text: `${agentLabel} idle`,
+          text: `${agentLabel} ${resultLabel}`,
           tone: "quiet",
         };
       }

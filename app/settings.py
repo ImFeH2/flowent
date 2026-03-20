@@ -176,7 +176,7 @@ class Settings:
     telegram: TelegramSettings = field(default_factory=TelegramSettings)
     model: ModelSettings = field(default_factory=ModelSettings)
     custom_prompt: str = ""
-    post_prompt: str = ""
+    custom_post_prompt: str = ""
     providers: list[ProviderConfig] = field(default_factory=list)
     roles: list[RoleConfig] = field(default_factory=list)
 
@@ -786,7 +786,12 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         params=model_params,
     )
     custom_prompt = str(data.get("custom_prompt", ""))
-    post_prompt = str(data.get("post_prompt", ""))
+    if "custom_post_prompt" in data:
+        custom_post_prompt = str(data.get("custom_post_prompt", ""))
+    else:
+        custom_post_prompt = str(data.get("post_prompt", ""))
+        if "post_prompt" in data:
+            migrated = True
 
     providers_raw = data.get("providers", [])
     if not isinstance(providers_raw, list):
@@ -871,7 +876,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
             telegram=telegram,
             model=model_settings,
             custom_prompt=custom_prompt,
-            post_prompt=post_prompt,
+            custom_post_prompt=custom_post_prompt,
             providers=providers,
             roles=roles,
         ),

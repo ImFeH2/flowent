@@ -261,7 +261,7 @@ def test_extract_routed_content_parses_single_target_block():
     assert routed == [(["worker"], "review the diff")]
 
 
-def test_extract_routed_content_parses_multiple_targets_and_parent_content():
+def test_extract_routed_content_parses_multiple_targets_without_parent_content():
     parent_content, routed = extract_routed_content(
         "@alice, bob: check the latest output\nand confirm",
     )
@@ -528,7 +528,7 @@ def test_build_messages_excludes_sent_messages(monkeypatch):
         {"role": "assistant", "content": "final answer"},
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 
@@ -554,7 +554,7 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry(monke
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
         },
     ]
 
@@ -562,7 +562,7 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry(monke
 def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatch):
     monkeypatch.setattr(
         "app.agent.get_settings",
-        lambda: Settings(post_prompt="Append this after history."),
+        lambda: Settings(custom_post_prompt="Append this after history."),
     )
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
@@ -580,7 +580,7 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
         {"role": "user", "content": '<message from="human">begin</message>'},
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- If all TODO items are complete, after the task is finished and you have no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
         {
             "role": "user",

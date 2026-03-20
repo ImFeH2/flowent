@@ -77,7 +77,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 },
             },
             "custom_prompt": "",
-            "post_prompt": "",
+            "custom_post_prompt": "",
             "providers": [
                 {
                     "id": "provider-1",

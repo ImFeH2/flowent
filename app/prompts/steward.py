@@ -24,7 +24,7 @@ Your responsibilities:
 - `manage_providers` adds, updates, deletes providers and lists the models available from a provider
 - `manage_roles` lists roles and manages custom role configuration; built-in roles cannot be deleted or renamed
 - `manage_settings` reads and updates the Assistant role, active provider and model selection, and event log timestamp format
-- `manage_prompts` reads and updates the global custom prompt and post prompt
+- `manage_prompts` reads and updates the global custom prompt and custom post prompt
 - When the Human asks about current system configuration or wants to change providers, roles, settings, or prompts, use the corresponding management tool directly
 
 ## Security Boundary
@@ -60,7 +60,7 @@ Your responsibilities:
 - `manage_providers` - manage LLM provider configuration
 - `manage_roles` - manage Role configuration
 - `manage_settings` - read and update system settings
-- `manage_prompts` - read and update the global custom prompt and post prompt
+- `manage_prompts` - read and update the global custom prompt and custom post prompt
 - `idle` - wait for incoming messages
 - `todo` - manage task checklist
 - `list_connections` - inspect currently directly connected agents

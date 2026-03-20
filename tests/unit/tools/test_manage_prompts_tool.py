@@ -8,7 +8,10 @@ from app.tools.manage_prompts import ManagePromptsTool
 
 def test_manage_prompts_get_returns_current_prompt(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
-    settings = Settings(custom_prompt="Be concise.", post_prompt="Stay routed.")
+    settings = Settings(
+        custom_prompt="Be concise.",
+        custom_post_prompt="Stay routed.",
+    )
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
 
@@ -16,13 +19,13 @@ def test_manage_prompts_get_returns_current_prompt(monkeypatch):
 
     assert result == {
         "custom_prompt": "Be concise.",
-        "post_prompt": "Stay routed.",
+        "custom_post_prompt": "Stay routed.",
     }
 
 
 def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
-    settings = Settings(custom_prompt="", post_prompt="")
+    settings = Settings(custom_prompt="", custom_post_prompt="")
     saved: list[Settings] = []
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -36,17 +39,17 @@ def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
             {
                 "action": "update",
                 "custom_prompt": "Always prefer terse answers.",
-                "post_prompt": "Only route with @target.",
+                "custom_post_prompt": "Only route with @target.",
             },
         )
     )
 
     assert result == {
         "custom_prompt": "Always prefer terse answers.",
-        "post_prompt": "Only route with @target.",
+        "custom_post_prompt": "Only route with @target.",
     }
     assert settings.custom_prompt == "Always prefer terse answers."
-    assert settings.post_prompt == "Only route with @target."
+    assert settings.custom_post_prompt == "Only route with @target."
     assert saved == [settings]
 
 
@@ -61,12 +64,37 @@ def test_manage_prompts_update_requires_prompt_field(monkeypatch):
         )
     )
 
-    assert result == {"error": "custom_prompt or post_prompt is required"}
+    assert result == {"error": "custom_prompt or custom_post_prompt is required"}
 
 
-def test_manage_prompts_update_allows_post_prompt_only(monkeypatch):
+def test_manage_prompts_update_allows_custom_post_prompt_only(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
-    settings = Settings(custom_prompt="Keep this.", post_prompt="")
+    settings = Settings(custom_prompt="Keep this.", custom_post_prompt="")
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+
+    result = json.loads(
+        ManagePromptsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "custom_post_prompt": "Append this after history.",
+            },
+        )
+    )
+
+    assert result == {
+        "custom_prompt": "Keep this.",
+        "custom_post_prompt": "Append this after history.",
+    }
+    assert settings.custom_prompt == "Keep this."
+    assert settings.custom_post_prompt == "Append this after history."
+
+
+def test_manage_prompts_update_accepts_legacy_post_prompt_alias(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
+    settings = Settings(custom_prompt="Keep this.", custom_post_prompt="")
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
     monkeypatch.setattr("app.settings.save_settings", lambda current: None)
@@ -83,7 +111,7 @@ def test_manage_prompts_update_allows_post_prompt_only(monkeypatch):
 
     assert result == {
         "custom_prompt": "Keep this.",
-        "post_prompt": "Append this after history.",
+        "custom_post_prompt": "Append this after history.",
     }
     assert settings.custom_prompt == "Keep this."
-    assert settings.post_prompt == "Append this after history."
+    assert settings.custom_post_prompt == "Append this after history."

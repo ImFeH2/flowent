@@ -146,7 +146,6 @@ class Agent:
         self._connections_lock = threading.Lock()
         self._history_lock = threading.Lock()
         self._todos_lock = threading.Lock()
-        self._todo_tracking_started = False
         self._log = logger.bind(
             agent_id=self.uuid[:8], node_type=self.config.node_type.value
         )
@@ -180,7 +179,6 @@ class Agent:
     def set_todos(self, todos: list[TodoItem]) -> None:
         with self._todos_lock:
             self.todos = [TodoItem(text=t.text) for t in todos]
-            self._todo_tracking_started = True
 
     def request_idle(self) -> None:
         self.set_state(AgentState.IDLE)
@@ -365,8 +363,7 @@ class Agent:
     def _build_runtime_tail_messages(self) -> list[dict[str, str]]:
         with self._todos_lock:
             todos = [TodoItem(text=t.text) for t in self.todos]
-            todo_tracking_started = self._todo_tracking_started
-        post_prompt = get_settings().post_prompt.strip()
+        custom_post_prompt = get_settings().custom_post_prompt.strip()
         messages: list[dict[str, str]] = []
         todo_message = self._build_runtime_todo_message(todos)
         if todo_message is not None:
@@ -374,11 +371,10 @@ class Agent:
         messages.append(
             self._build_runtime_post_prompt_message(
                 has_todos=bool(todos),
-                todo_tracking_started=todo_tracking_started,
             )
         )
-        if post_prompt:
-            messages.append(self._build_runtime_system_message(post_prompt))
+        if custom_post_prompt:
+            messages.append(self._build_runtime_system_message(custom_post_prompt))
         return messages
 
     def _build_runtime_todo_message(
@@ -397,20 +393,20 @@ class Agent:
         self,
         *,
         has_todos: bool,
-        todo_tracking_started: bool,
     ) -> dict[str, str]:
         lines = [
             "Runtime post prompt:",
             "- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.",
             "- Plain content is not delivered to other agents.",
+            "- Do not combine a Human-facing reply and a routed `@target` message in the same content block.",
         ]
         if has_todos:
             lines.append(
                 "- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items."
             )
-        elif todo_tracking_started:
+        else:
             lines.append(
-                "- If all TODO items are complete, after the task is finished and you have no immediate next action, call `idle`."
+                "- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`."
             )
         return self._build_runtime_system_message("\n".join(lines))
 

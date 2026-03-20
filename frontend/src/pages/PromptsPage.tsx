@@ -7,7 +7,7 @@ import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
 
 export function PromptsPage() {
   const [customPrompt, setCustomPrompt] = useState("");
-  const [postPrompt, setPostPrompt] = useState("");
+  const [customPostPrompt, setCustomPostPrompt] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -18,7 +18,7 @@ export function PromptsPage() {
       .then((data) => {
         if (!mounted) return;
         setCustomPrompt(data.custom_prompt);
-        setPostPrompt(data.post_prompt);
+        setCustomPostPrompt(data.custom_post_prompt);
       })
       .catch(() => {
         toast.error("Failed to load prompts");
@@ -37,10 +37,10 @@ export function PromptsPage() {
     try {
       const saved = await savePromptSettings({
         custom_prompt: customPrompt,
-        post_prompt: postPrompt,
+        custom_post_prompt: customPostPrompt,
       });
       setCustomPrompt(saved.custom_prompt);
-      setPostPrompt(saved.post_prompt);
+      setCustomPostPrompt(saved.custom_post_prompt);
       toast.success("Prompts saved");
     } catch {
       toast.error("Failed to save prompts");
@@ -63,13 +63,13 @@ export function PromptsPage() {
   return (
     <PageScaffold
       title="Prompts"
-      description="Configure the global system prompt layer and the runtime post prompt layer."
+      description="Configure the global system prompt layer and the custom runtime post prompt layer."
     >
       <div className="mx-auto flex h-full max-w-3xl flex-col">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-4 text-xs text-muted-foreground/60">
             <span>{customPrompt.length} custom</span>
-            <span>{postPrompt.length} post</span>
+            <span>{customPostPrompt.length} custom post</span>
           </div>
           <Button onClick={() => void handleSave()} disabled={saving}>
             <Save className="size-4" />
@@ -100,18 +100,21 @@ export function PromptsPage() {
           </div>
           <div className="flex min-h-0 flex-col">
             <div className="mb-2">
-              <p className="text-sm font-medium text-foreground">Post Prompt</p>
+              <p className="text-sm font-medium text-foreground">
+                Custom Post Prompt
+              </p>
               <p className="text-xs text-muted-foreground/70">
-                Appended after history on every runtime request.
+                Appended after the built-in runtime post prompt on every
+                request.
               </p>
             </div>
             <div className="relative flex min-h-0 flex-1">
               <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px] rounded-full bg-white/8" />
               <textarea
-                aria-label="Post Prompt"
-                value={postPrompt}
-                onChange={(event) => setPostPrompt(event.target.value)}
-                placeholder="Add runtime instructions appended after history..."
+                aria-label="Custom Post Prompt"
+                value={customPostPrompt}
+                onChange={(event) => setCustomPostPrompt(event.target.value)}
+                placeholder="Add custom runtime instructions appended after the built-in post prompt..."
                 rows={10}
                 className="min-h-0 w-full flex-1 resize-none rounded-r-lg bg-surface-1 pb-4 pl-5 pr-4 pt-4 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
               />

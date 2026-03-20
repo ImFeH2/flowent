@@ -26,29 +26,31 @@ describe("PromptsPage", () => {
   it("loads and saves both prompt layers", async () => {
     fetchPromptSettings.mockResolvedValue({
       custom_prompt: "Be concise.",
-      post_prompt: "Use @target: for routed messages.",
+      custom_post_prompt: "Use @target: for routed messages.",
     });
     savePromptSettings.mockResolvedValue({
       custom_prompt: "Stay precise.",
-      post_prompt: "Call idle when done.",
+      custom_post_prompt: "Call idle when done.",
     });
 
     render(<PromptsPage />);
 
     const customPrompt = await screen.findByLabelText("Custom Prompt");
-    const postPrompt = screen.getByLabelText("Post Prompt");
+    const customPostPrompt = screen.getByLabelText("Custom Post Prompt");
 
     expect(customPrompt).toHaveValue("Be concise.");
-    expect(postPrompt).toHaveValue("Use @target: for routed messages.");
+    expect(customPostPrompt).toHaveValue("Use @target: for routed messages.");
 
     fireEvent.change(customPrompt, { target: { value: "Stay precise." } });
-    fireEvent.change(postPrompt, { target: { value: "Call idle when done." } });
+    fireEvent.change(customPostPrompt, {
+      target: { value: "Call idle when done." },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
       expect(savePromptSettings).toHaveBeenCalledWith({
         custom_prompt: "Stay precise.",
-        post_prompt: "Call idle when done.",
+        custom_post_prompt: "Call idle when done.",
       }),
     );
 

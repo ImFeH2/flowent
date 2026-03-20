@@ -2,7 +2,7 @@ import { requestJson } from "./shared";
 
 export interface PromptSettings {
   custom_prompt: string;
-  post_prompt: string;
+  custom_post_prompt: string;
 }
 
 export async function fetchPromptSettings(): Promise<PromptSettings> {

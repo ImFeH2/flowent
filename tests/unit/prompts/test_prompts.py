@@ -66,9 +66,16 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         "must start with `@<name-or-uuid>: message body`"
         in COMMUNICATION_USAGE_GUIDANCE
     )
+    assert (
+        "Do not combine a Human-facing reply and a routed `@target` message"
+        in COMMUNICATION_USAGE_GUIDANCE
+    )
     assert "automatically delivered to your parent" not in COMMUNICATION_USAGE_GUIDANCE
     assert "`spawn` only creates and connects a new agent" in COMMON_AGENT_PROMPT
-    assert "send it a concrete first task via `@target: ...`" in COMMON_AGENT_PROMPT
+    assert (
+        "send it a concrete first task with a content block whose first line starts with `@target: ...`"
+        in COMMON_AGENT_PROMPT
+    )
 
 
 def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
@@ -76,7 +83,7 @@ def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
         "app.settings.get_settings",
         lambda: Settings(
             custom_prompt="Global custom instructions.",
-            post_prompt="Runtime-only reminder.",
+            custom_post_prompt="Runtime-only reminder.",
             roles=[
                 RoleConfig(
                     name="Reviewer",
@@ -137,6 +144,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert "Immediately send that new node its first task" in prompt
     assert "call `idle` in the same response" in prompt
     assert "Do not repeat or restate a Human-facing reply" in prompt
+    assert "A single content block is either a Human-facing reply or a routed" in prompt
 
 
 def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):

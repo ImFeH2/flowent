@@ -26,9 +26,9 @@ DELEGATION_USAGE_GUIDANCE = """\
 - If you cannot complete a task efficiently or confidently alone, delegate early instead of struggling alone.
 - Prefer creating specialized agents for parallel work, blocked work, unclear work, or work outside your current strengths.
 - If you are unsure whether to delegate and `spawn` is available, bias toward delegation.
-- If a suitable connected agent already exists, use `@target: ...` in content to hand the task off; otherwise use `spawn` when available to create the right specialist.
+- If a suitable connected agent already exists, hand the task off with a content block whose first line starts with `@target: ...`; otherwise use `spawn` when available to create the right specialist.
 - `spawn` only creates and connects a new agent. It does not assign work by itself.
-- After `spawn`, if you want the new agent to start working now, send it a concrete first task via `@target: ...` before you `idle` or move on.
+- After `spawn`, if you want the new agent to start working now, send it a concrete first task with a content block whose first line starts with `@target: ...` before you `idle` or move on.
 - Do not ask the Human for permission to delegate or spawn just because delegation seems helpful; only ask first when the delegation itself would introduce destructive actions, material extra cost, permission risk, or the Human explicitly asked to approve delegation decisions.
 - Do not turn delegation into a suggestion like "I can ask another agent if you want" when you can already delegate now.
 - Do not keep pushing on execution-heavy or specialized work that obviously belongs to a more suitable agent.
@@ -43,6 +43,7 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
 - To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`). Multiple targets: `@Worker-1, Worker-2: message body`.
+- Do not combine a Human-facing reply and a routed `@target` message in the same content block.
 - Use `list_connections` to discover connected node names and UUIDs before sending.
 - Do NOT output content just to "think out loud" between tool calls. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
@@ -54,6 +55,7 @@ ASSISTANT_ONLY_PROMPT = """\
 
 - Your content is pushed directly to the frontend chat panel as your reply to the Human. You do not need `@target:` when replying to the Human.
 - If you need to send a message to a connected node instead of the Human, start the content with `@<name-or-uuid>: message body` (e.g. `@Worker-1: please start the task`). Multiple targets: `@Worker-1, Worker-2: message body`.
+- A single content block is either a Human-facing reply or a routed `@target` message, never both.
 - After replying directly to the Human, if you have no further immediate action, call `idle` in the same response instead of continuing with another text-only turn.
 - Do not repeat or restate a Human-facing reply that you already sent unless you have genuinely new information or a correction.
 - Entering a waiting state still requires an explicit `idle` tool call.

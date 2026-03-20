@@ -16,13 +16,14 @@ To run from source, see [Development](#development).
 
 ## Prerequisites
 
-- **[Firejail](https://github.com/netblue30/firejail)** — required for agents to execute shell commands in a sandboxed environment. Install it before running Autopoe if you want agents to be able to run code.
+- **[Bubblewrap](https://github.com/containers/bubblewrap)** (`bwrap`) — required for agents to execute shell commands in a sandboxed environment. Install it before running Autopoe if you want agents to be able to run code.
 
 ## Configuration
 
-On first run, configure your LLM provider via the Settings panel (gear icon). Three API types are supported — any compatible endpoint works:
+On first run, configure your LLM provider via the Settings panel (gear icon). Four API types are supported — any compatible endpoint works:
 
 - **OpenAI-compatible** — OpenRouter, Ollama, ModelScope, vLLM, LiteLLM, or any `/v1/chat/completions` endpoint
+- **OpenAI Responses** — OpenAI or compatible `/v1/responses` endpoints
 - **Anthropic** — any endpoint following the Anthropic Messages API
 - **Google Gemini** — any endpoint following the Gemini `generateContent` API
 
@@ -37,7 +38,7 @@ cd autopoe
 
 # Backend (hot reload)
 uv sync
-uv run fastapi dev
+uv run fastapi dev app/main.py
 
 # Frontend (hot reload, separate terminal)
 cd frontend

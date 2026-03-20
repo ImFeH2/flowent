@@ -12,6 +12,17 @@ IDLE_USAGE_GUIDANCE = """\
 - When that happens, the new message will appear as a fresh input message, and `idle` will return the idle duration.
 """
 
+SLEEP_USAGE_GUIDANCE = """\
+## Sleep Usage Rules
+
+- Use `sleep(seconds)` only for deliberate fixed-duration waiting.
+- The `seconds` argument is measured in seconds and may be fractional.
+- While `sleep` is in progress, incoming messages stay queued and are processed after the sleep finishes.
+- Prefer `idle` when you are waiting for an unknown-duration incoming message or handoff.
+- `sleep` returns the actual waited duration when it finishes.
+- Do not use `sleep` instead of replying to a newly received message.
+"""
+
 DELEGATION_USAGE_GUIDANCE = """\
 ## Delegation and Spawn Rules
 
@@ -64,6 +75,7 @@ ASSISTANT_ONLY_PROMPT = """\
 COMMON_AGENT_PROMPT = "\n\n".join(
     [
         IDLE_USAGE_GUIDANCE.strip(),
+        SLEEP_USAGE_GUIDANCE.strip(),
         DELEGATION_USAGE_GUIDANCE.strip(),
         COMMUNICATION_USAGE_GUIDANCE.strip(),
     ]

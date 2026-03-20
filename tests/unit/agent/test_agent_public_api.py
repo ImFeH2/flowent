@@ -9,6 +9,7 @@ from app.tools.idle import IdleTool
 from app.tools.list_connections import ListConnectionsTool
 from app.tools.list_roles import ListRolesTool
 from app.tools.list_tools import ListToolsTool
+from app.tools.sleep import SleepTool
 from app.tools.todo import TodoTool
 
 
@@ -50,6 +51,39 @@ def test_idle_tool_blocks_until_message_and_returns_idle_duration():
     assert isinstance(agent.history[-1], ReceivedMessage)
     assert agent.history[-1].from_id == "tester"
     assert agent.history[-1].content == "hello from queue"
+
+
+def test_sleep_tool_uses_request_sleep(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["sleep"]))
+    called: list[float] = []
+
+    def fake_request_sleep(*, seconds: float) -> str:
+        called.append(seconds)
+        return "slept 0.25s"
+
+    monkeypatch.setattr(agent, "request_sleep", fake_request_sleep)
+
+    result = SleepTool().execute(agent, {"seconds": 0.25})
+
+    assert result == "slept 0.25s"
+    assert called == [0.25]
+
+
+def test_sleep_tool_rejects_negative_seconds():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["sleep"]))
+
+    result = json.loads(SleepTool().execute(agent, {"seconds": -1}))
+
+    assert result == {"error": "seconds must be a non-negative number"}
+
+
+def test_sleep_tool_waits_and_returns_duration():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["sleep"]))
+
+    result = SleepTool().execute(agent, {"seconds": 0.01})
+
+    assert result.startswith("slept ")
+    assert result.endswith("s")
 
 
 def test_enqueue_message_enqueues_wake_signal_immediately():
@@ -164,6 +198,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             "system_prompt": "Do work.",
             "builtin_tools": [
                 "idle",
+                "sleep",
                 "todo",
                 "list_connections",
                 "read",
@@ -184,6 +219,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             "system_prompt": "Review code.",
             "builtin_tools": [
                 "idle",
+                "sleep",
                 "todo",
                 "list_connections",
             ],
@@ -214,6 +250,7 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
 
     assert {item["name"] for item in result} == {
         "idle",
+        "sleep",
         "todo",
         "list_connections",
         "read",

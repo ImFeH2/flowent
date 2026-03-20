@@ -58,6 +58,7 @@ Your responsibilities:
 - `list_roles` - inspect available roles before spawning
 - `list_tools` - inspect all registered tools
 - `idle` - wait for incoming messages
+- `sleep` - wait a fixed number of seconds before continuing
 - `list_connections` - see all directly connected nodes
 - `todo` - manage task checklist
 

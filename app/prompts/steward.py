@@ -62,6 +62,7 @@ Your responsibilities:
 - `manage_settings` - read and update system settings
 - `manage_prompts` - read and update the global custom prompt and custom post prompt
 - `idle` - wait for incoming messages
+- `sleep` - wait a fixed number of seconds before continuing
 - `todo` - manage task checklist
 - `list_connections` - inspect currently directly connected agents
 """

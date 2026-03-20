@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 const TOOL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   send: Send,
   idle: Clock,
+  sleep: Clock,
   todo: ListTodo,
   list_connections: Network,
   list_tools: Wrench,

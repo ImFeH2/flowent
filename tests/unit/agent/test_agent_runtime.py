@@ -589,6 +589,47 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
     ]
 
 
+def test_build_messages_keeps_sleep_tool_results_in_context(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(
+        ReceivedMessage(content="pause before continuing", from_id="human")
+    )
+    agent._append_history(
+        ToolCall(
+            tool_name="sleep",
+            tool_call_id="call-sleep",
+            arguments={"seconds": 0.5},
+            result="slept 0.50s",
+        )
+    )
+
+    messages = agent._build_messages()
+
+    assert any(
+        msg.get("role") == "assistant"
+        and msg.get("tool_calls")
+        == [
+            {
+                "id": "call-sleep",
+                "type": "function",
+                "function": {
+                    "name": "sleep",
+                    "arguments": '{"seconds": 0.5}',
+                },
+            }
+        ]
+        for msg in messages
+    )
+    assert any(
+        msg.get("role") == "tool"
+        and msg.get("tool_call_id") == "call-sleep"
+        and msg.get("content") == "slept 0.50s"
+        for msg in messages
+    )
+
+
 def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
     registry.reset()
     assistant = Agent(

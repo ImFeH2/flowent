@@ -10,6 +10,7 @@ def test_empty_tools_list_grants_minimum_tools():
 
     assert [tool.name for tool in tools] == [
         "idle",
+        "sleep",
         "todo",
         "list_connections",
     ]
@@ -22,6 +23,7 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
 
     assert [tool.name for tool in tools] == [
         "idle",
+        "sleep",
         "todo",
         "list_connections",
     ]
@@ -47,6 +49,7 @@ def test_tool_registry_grants_graph_spawn_tools_when_explicitly_allowed():
 
     assert [tool.name for tool in tools] == [
         "idle",
+        "sleep",
         "todo",
         "list_connections",
         "create_graph",
@@ -61,6 +64,7 @@ def test_tool_registry_hides_send_from_llm_even_if_explicitly_allowed():
 
     assert [tool.name for tool in tools] == [
         "idle",
+        "sleep",
         "todo",
         "list_connections",
     ]

@@ -91,6 +91,17 @@ function buildTickerItem(
           tone: "quiet",
         };
       }
+      if (toolName === "sleep") {
+        const resultLabel =
+          typeof entry.result === "string" && entry.result.trim()
+            ? entry.result.trim()
+            : "sleep";
+        return {
+          id: `${agentId}-${entry.timestamp}-sleep`,
+          text: `${agentLabel} ${resultLabel}`,
+          tone: "quiet",
+        };
+      }
       if (toolName === "todo") {
         const todos = Array.isArray(entry.arguments?.todos)
           ? (entry.arguments?.todos as unknown[])

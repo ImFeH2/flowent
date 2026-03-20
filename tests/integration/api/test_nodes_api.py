@@ -81,6 +81,7 @@ def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient)
     assert data["id"] == assistant_id
     assert set(data["tools"]) == {
         "idle",
+        "sleep",
         "todo",
         "list_connections",
         "create_graph",

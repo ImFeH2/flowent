@@ -190,6 +190,14 @@ class Agent:
         self._resume_from_wakeup(signal)
         return f"idle {elapsed:.2f}s"
 
+    def request_sleep(self, *, seconds: float) -> str:
+        duration = max(0.0, seconds)
+        started_at = _time.perf_counter()
+        if duration > 0:
+            self._terminate.wait(timeout=duration)
+        elapsed = max(0.0, _time.perf_counter() - started_at)
+        return f"slept {elapsed:.2f}s"
+
     def _get_idle_elapsed_seconds(self, *, tool_call_id: str | None) -> float:
         started_at = self._idle_started_at
         if started_at is None:

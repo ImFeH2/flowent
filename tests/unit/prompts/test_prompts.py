@@ -77,6 +77,8 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         in COMMON_AGENT_PROMPT
     )
     assert "`idle` will return the idle duration" in COMMON_AGENT_PROMPT
+    assert "`sleep(seconds)`" in COMMON_AGENT_PROMPT
+    assert "`sleep` returns the actual waited duration" in COMMON_AGENT_PROMPT
 
 
 def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):

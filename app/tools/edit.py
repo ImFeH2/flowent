@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -55,9 +56,10 @@ class EditTool(Tool):
         "required": ["path", "edits"],
     }
 
-    def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+    def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str:
         path_str = args["path"]
         real_path = Path(path_str)
+        on_output: Callable[[str], None] | None = kwargs.get("on_output")
 
         try:
             edits = args["edits"]
@@ -67,12 +69,14 @@ class EditTool(Tool):
             if not real_path.exists():
                 os.makedirs(real_path.parent, exist_ok=True)
                 real_path.write_text("", encoding="utf-8")
+                if on_output is not None:
+                    on_output(f"Created {path_str}\n")
 
             with open(real_path, encoding="utf-8") as f:
                 lines = f.readlines()
 
             applied_edits: list[dict[str, int | str]] = []
-            for raw_edit in edits:
+            for index, raw_edit in enumerate(edits, start=1):
                 if not isinstance(raw_edit, dict):
                     return json.dumps({"error": "each edit must be an object"})
 
@@ -94,6 +98,10 @@ class EditTool(Tool):
                     )
 
                 current_end_line = min(end_line, total_lines)
+                if on_output is not None:
+                    on_output(
+                        f"Applying edit {index}/{len(edits)} at lines {start_line}-{current_end_line}\n"
+                    )
 
                 replacement = []
                 if new_content:
@@ -112,6 +120,8 @@ class EditTool(Tool):
 
             with open(real_path, "w", encoding="utf-8") as f:
                 f.writelines(lines)
+            if on_output is not None:
+                on_output(f"Wrote {path_str}\n")
 
             logger.debug(
                 "Edited file: {} ({} edit(s), new_line_count={})",

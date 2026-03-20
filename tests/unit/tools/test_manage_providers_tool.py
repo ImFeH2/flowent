@@ -1,7 +1,7 @@
 import json
 
 from app.agent import Agent
-from app.models import NodeConfig, NodeType
+from app.models import ModelInfo, NodeConfig, NodeType
 from app.settings import (
     ModelSettings,
     ProviderConfig,
@@ -264,3 +264,30 @@ def test_manage_providers_delete_clears_role_model_references(monkeypatch):
 
     assert result == {"status": "deleted"}
     assert settings.roles[0].model is None
+
+
+def test_manage_providers_list_models_streams_model_ids(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
+    chunks: list[str] = []
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr(
+        "app.providers.gateway.gateway.list_models_for",
+        lambda provider_id: [
+            ModelInfo(id=f"{provider_id}-a"),
+            ModelInfo(id=f"{provider_id}-b"),
+        ],
+    )
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {"action": "list_models", "id": "provider-1"},
+            on_output=chunks.append,
+        )
+    )
+
+    assert result == ["provider-1-a", "provider-1-b"]
+    assert "".join(chunks) == (
+        "Listing models for provider-1\nprovider-1-a\nprovider-1-b\n"
+    )

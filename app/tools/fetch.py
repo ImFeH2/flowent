@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import httpx
@@ -33,23 +34,43 @@ class FetchTool(Tool):
         "required": ["method", "url"],
     }
 
-    def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+    def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str:
         method = args["method"]
         url = args["url"]
+        on_output: Callable[[str], None] | None = kwargs.get("on_output")
         logger.debug("HTTP {} {}", method, url)
         try:
-            with httpx.Client(timeout=30.0) as client:
-                response = client.request(
+            with (
+                httpx.Client(timeout=30.0) as client,
+                client.stream(
                     method=method,
                     url=url,
                     headers=args.get("headers"),
                     content=args.get("body"),
-                )
+                ) as response,
+            ):
+                if on_output is not None:
+                    on_output(f"{method} {url}\n")
+                    on_output(f"HTTP {response.status_code}\n\n")
+
+                remaining = 5000
+                body_parts: list[str] = []
+                for chunk in response.iter_text():
+                    if not chunk or remaining <= 0:
+                        continue
+                    if len(chunk) > remaining:
+                        chunk = chunk[:remaining]
+                    body_parts.append(chunk)
+                    remaining -= len(chunk)
+                    if on_output is not None:
+                        on_output(chunk)
+
+            body = "".join(body_parts)
             logger.debug("HTTP {} {} -> {}", method, url, response.status_code)
             return json.dumps(
                 {
                     "status_code": response.status_code,
-                    "body": response.text[:5000],
+                    "body": body,
                 }
             )
         except Exception as e:

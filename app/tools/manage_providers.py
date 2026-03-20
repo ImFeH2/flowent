@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
@@ -61,7 +62,7 @@ class ManageProvidersTool(Tool):
         "required": ["action"],
     }
 
-    def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+    def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str:
         from app.providers.gateway import gateway
         from app.settings import (
             ProviderConfig,
@@ -70,6 +71,7 @@ class ManageProvidersTool(Tool):
             save_settings,
         )
 
+        on_output: Callable[[str], None] | None = kwargs.get("on_output")
         action = args.get("action")
         provider_id = args.get("id")
         name = args.get("name")
@@ -158,9 +160,13 @@ class ManageProvidersTool(Tool):
             if not isinstance(provider_id, str) or not provider_id:
                 return json.dumps({"error": "id is required"})
             try:
-                return json.dumps(
-                    [model.id for model in gateway.list_models_for(provider_id)]
-                )
+                if on_output is not None:
+                    on_output(f"Listing models for {provider_id}\n")
+                model_ids = [model.id for model in gateway.list_models_for(provider_id)]
+                if on_output is not None:
+                    for model_id in model_ids:
+                        on_output(f"{model_id}\n")
+                return json.dumps(model_ids)
             except Exception as exc:
                 logger.error(
                     "Failed to list models for provider '{}': {}",

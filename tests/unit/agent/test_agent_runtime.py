@@ -754,3 +754,44 @@ def test_agent_denies_tool_call_before_edit_execute(monkeypatch, tmp_path):
     assert result == json.dumps({"error": "Write access is disabled for this agent"})
     assert isinstance(agent.history[-1], ToolCall)
     assert agent.history[-1].result == result
+
+
+def test_handle_tool_call_emits_streaming_tool_result_deltas(monkeypatch):
+    agent = Agent(
+        NodeConfig(node_type=NodeType.AGENT, tools=["streaming_tool"]),
+        uuid="agent-stream",
+    )
+    events = []
+
+    class FakeTool:
+        def execute(self, agent, args, **kwargs):
+            on_output = kwargs.get("on_output")
+            assert on_output is not None
+            on_output("chunk 1\n")
+            on_output("chunk 2\n")
+            return json.dumps({"status": "done"})
+
+    class FakeRegistry:
+        def get(self, name):
+            if name == "streaming_tool":
+                return FakeTool()
+            return None
+
+    monkeypatch.setattr("app.agent._get_tool_registry", lambda: FakeRegistry())
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    result = agent._handle_tool_call("streaming_tool", {}, "call-stream")
+
+    assert result == json.dumps({"status": "done"})
+    assert isinstance(agent.history[-1], ToolCall)
+    assert agent.history[-1].tool_call_id == "call-stream"
+    assert agent.history[-1].result == result
+    assert agent.history[-1].streaming is False
+    assert [
+        event.data["text"]
+        for event in events
+        if event.type == EventType.HISTORY_ENTRY_DELTA
+    ] == [
+        "chunk 1\n",
+        "chunk 2\n",
+    ]

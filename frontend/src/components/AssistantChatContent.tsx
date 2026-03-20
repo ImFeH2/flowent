@@ -219,7 +219,9 @@ function TimelineItem({
       if (!item.content) {
         return null;
       }
-      return <AssistantBubble content={item.content} />;
+      return (
+        <AssistantBubble content={item.content} streaming={item.streaming} />
+      );
     case "SentMessage":
       if (!item.content) {
         return null;
@@ -295,11 +297,18 @@ function HumanBubble({
   );
 }
 
-function AssistantBubble({ content }: { content: string }) {
+function AssistantBubble({
+  content,
+  streaming,
+}: {
+  content: string;
+  streaming?: boolean;
+}) {
   return (
     <div className="group min-w-0 w-full">
       <RichContentBlock
         content={content}
+        streaming={streaming}
         markdownClassName="text-sm text-foreground"
         preClassName="text-foreground/90"
       />
@@ -352,10 +361,10 @@ function MessageActivityCard({
         }}
         className="flex w-full items-center gap-2 text-left"
       >
-        <span className="flex size-5 items-center justify-center text-current">
+        <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-current">
           {icon}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground/90">
+        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold leading-none text-foreground/90">
           {label}
         </span>
         <span className="ml-auto" onClick={(event) => event.stopPropagation()}>
@@ -535,11 +544,11 @@ function ActivityDisclosure({
         onClick={() => setOpen((current) => !current)}
         className="flex w-full items-center gap-2 text-left"
       >
-        <span className="flex size-5 items-center justify-center text-current">
+        <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-current">
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12px] font-semibold text-foreground/90">
+          <span className="block truncate text-[12px] font-semibold leading-none text-foreground/90">
             {label}
           </span>
         </span>
@@ -591,10 +600,22 @@ function RichContentBlock({
     );
   }
 
+  if (streaming) {
+    return (
+      <div
+        className={cn(
+          "min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
+          markdownClassName,
+        )}
+      >
+        <StreamingText text={content ?? ""} streaming />
+      </div>
+    );
+  }
+
   return (
     <div className="min-w-0">
       <MarkdownContent content={content ?? ""} className={markdownClassName} />
-      {streaming ? <span className="streaming-cursor" /> : null}
     </div>
   );
 }

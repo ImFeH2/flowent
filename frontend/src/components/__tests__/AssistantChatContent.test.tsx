@@ -198,6 +198,31 @@ describe("AssistantChatMessages", () => {
       "border-white/10",
     );
   });
+
+  it("renders streaming assistant text with an inline cursor", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "AssistantText",
+            content: "Streaming response",
+            timestamp: 1,
+            streaming: true,
+          },
+        ]}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    const textNode = screen.getByText("Streaming response");
+    const contentBlock = textNode.parentElement;
+    expect(contentBlock).not.toBeNull();
+    expect(contentBlock?.querySelector(".streaming-cursor")).not.toBeNull();
+  });
 });
 
 describe("AssistantChatComposer", () => {

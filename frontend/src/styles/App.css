@@ -33,8 +33,21 @@
     opacity: 0;
   }
 }
+.streaming-cursor {
+  display: inline-block;
+  vertical-align: baseline;
+  line-height: 1;
+}
+
 .streaming-cursor::after {
-  content: "\25CD";
+  content: "";
+  display: inline-block;
+  width: 0.38em;
+  height: 1em;
+  margin-left: 0.08em;
+  border-radius: 999px;
+  background: currentColor;
+  transform: translateY(1px);
   animation: blink-cursor 1s step-end infinite;
 }
 

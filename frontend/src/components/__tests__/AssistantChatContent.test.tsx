@@ -99,9 +99,7 @@ describe("AssistantChatMessages", () => {
     expect(
       screen.getByText("Here is a draft plan with priorities and next steps."),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("From Project Analyst"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("From Project Analyst")).toBeInTheDocument();
     expect(screen.getByText("To Project Analyst")).toBeInTheDocument();
     expect(
       screen.queryByText("I have inspected the project root."),
@@ -110,8 +108,12 @@ describe("AssistantChatMessages", () => {
       screen.queryByText("Worker, continue the task."),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /From Project Analyst/i }));
-    fireEvent.click(screen.getByRole("button", { name: /To Project Analyst/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /From Project Analyst/i }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /To Project Analyst/i }),
+    );
 
     expect(
       screen.getByText("I have inspected the project root."),

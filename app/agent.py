@@ -382,7 +382,9 @@ class Agent:
         if not targets:
             return
 
-        preview_body = raw_body.lstrip() if not state.streamed_message_body else raw_body
+        preview_body = (
+            raw_body.lstrip() if not state.streamed_message_body else raw_body
+        )
         if preview_body.startswith(state.streamed_message_body):
             delta_text = preview_body[len(state.streamed_message_body) :]
         else:

@@ -12,7 +12,8 @@ export function reduceDeltas(deltas: StreamingDelta[]) {
   const toolResults = new Map<string, string>();
   const sentMessages = new Map<string, { toIds: string[]; text: string }>();
   const receivedMessages = new Map<string, { fromId: string; text: string }>();
-  const messageOrder: Array<{ kind: "sent" | "received"; messageId: string }> = [];
+  const messageOrder: Array<{ kind: "sent" | "received"; messageId: string }> =
+    [];
 
   for (const delta of deltas) {
     switch (delta.type) {

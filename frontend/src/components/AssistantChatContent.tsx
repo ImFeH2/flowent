@@ -181,8 +181,9 @@ function TimelineItem({
           content={item.content}
           icon={<Send className="size-3.5 text-sky-300" />}
           label={`To ${
-            (item.to_ids ?? []).map((id) => getNodeLabel(id, nodes)).join(", ") ||
-            "Unknown"
+            (item.to_ids ?? [])
+              .map((id) => getNodeLabel(id, nodes))
+              .join(", ") || "Unknown"
           }`}
           tone="sent"
           streaming={item.streaming}
@@ -306,9 +307,7 @@ function MessageActivityCard({
         <span className="flex size-5 items-center justify-center text-current">
           {icon}
         </span>
-        <span
-          className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground/90"
-        >
+        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-foreground/90">
           {label}
         </span>
         <span className="ml-auto" onClick={(event) => event.stopPropagation()}>

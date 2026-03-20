@@ -506,7 +506,9 @@ def test_routed_message_emits_streaming_preview_for_sender_and_receiver(monkeypa
     ]
 
     assert "".join(delta["text"] for delta in sent_deltas) == "investigate the error"
-    assert "".join(delta["text"] for delta in received_deltas) == "investigate the error"
+    assert (
+        "".join(delta["text"] for delta in received_deltas) == "investigate the error"
+    )
     assert len({delta["message_id"] for delta in sent_deltas}) == 1
     assert len({delta["message_id"] for delta in received_deltas}) == 1
     assert sent_deltas[0]["message_id"] == received_deltas[0]["message_id"]
@@ -610,7 +612,8 @@ def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
         for entry in assistant.get_history_snapshot()
     )
     assert not any(
-        isinstance(entry, AssistantText) and entry.content == "@worker: investigate the error"
+        isinstance(entry, AssistantText)
+        and entry.content == "@worker: investigate the error"
         for entry in assistant.get_history_snapshot()
     )
 

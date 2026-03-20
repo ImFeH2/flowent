@@ -31,6 +31,7 @@ import {
 } from "@/components/AssistantChatContent";
 import { useAssistantChat } from "@/hooks/useAssistantChat";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
+import { useMeasuredHeight } from "@/hooks/useMeasuredHeight";
 import { Badge } from "@/components/ui/badge";
 import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
 import {
@@ -550,6 +551,8 @@ function AssistantChatPanel() {
     timelineItems,
   } = useAssistantChat();
   const assistantRoleName = getAssistantNode(agents)?.role_name ?? null;
+  const { height: composerHeight, ref: composerRef } =
+    useMeasuredHeight<HTMLDivElement>();
 
   return (
     <>
@@ -566,22 +569,31 @@ function AssistantChatPanel() {
         </div>
       </div>
 
-      <AssistantChatMessages
-        items={timelineItems}
-        nodes={agents}
-        onScroll={onMessagesScroll}
-        scrollRef={scrollRef}
-        variant="workspace"
-      />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <AssistantChatMessages
+          bottomInset={composerHeight}
+          items={timelineItems}
+          nodes={agents}
+          onScroll={onMessagesScroll}
+          scrollRef={scrollRef}
+          variant="workspace"
+        />
 
-      <AssistantChatComposer
-        disabled={!input.trim() || sending}
-        input={input}
-        onChange={setInput}
-        onKeyDown={handleKeyDown}
-        onSend={() => void sendMessage()}
-        variant="workspace"
-      />
+        <div
+          ref={composerRef}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(8,8,9,0.18)_24%,rgba(8,8,9,0.76)_68%,rgba(8,8,9,0.95)_100%)] px-3 pb-3 pt-10"
+        >
+          <AssistantChatComposer
+            disabled={!input.trim() || sending}
+            input={input}
+            onChange={setInput}
+            onKeyDown={handleKeyDown}
+            onSend={() => void sendMessage()}
+            overlay
+            variant="workspace"
+          />
+        </div>
+      </div>
     </>
   );
 }

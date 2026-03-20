@@ -1,7 +1,10 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { AssistantChatMessages } from "@/components/AssistantChatContent";
+import { describe, expect, it, vi } from "vitest";
+import {
+  AssistantChatComposer,
+  AssistantChatMessages,
+} from "@/components/AssistantChatContent";
 import type { AssistantChatItem, Node } from "@/types";
 
 describe("AssistantChatMessages", () => {
@@ -119,5 +122,101 @@ describe("AssistantChatMessages", () => {
       screen.getByText("I have inspected the project root."),
     ).toBeInTheDocument();
     expect(screen.getByText("Worker, continue the task.")).toBeInTheDocument();
+  });
+
+  it("applies bottom inset space for an overlay composer", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+
+    render(
+      <AssistantChatMessages
+        bottomInset={120}
+        items={[]}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    expect(scrollRef.current).not.toBeNull();
+    expect(scrollRef.current?.style.paddingBottom).toBe("134px");
+    expect(scrollRef.current?.style.scrollPaddingBottom).toBe("134px");
+  });
+});
+
+describe("AssistantChatComposer", () => {
+  it("keeps the send action inside the composer shell and grows with multiline input", () => {
+    const { rerender } = render(
+      <AssistantChatComposer
+        disabled={false}
+        input=""
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText("Message the Assistant...");
+    const sendButton = screen.getByRole("button", { name: "Send message" });
+    const composerShell = textarea.parentElement;
+
+    expect(composerShell).not.toBeNull();
+    expect(composerShell).toContainElement(sendButton);
+
+    const originalGetComputedStyle = window.getComputedStyle;
+    const getComputedStyleSpy = vi
+      .spyOn(window, "getComputedStyle")
+      .mockImplementation((element) => {
+        if (element === textarea) {
+          return {
+            ...originalGetComputedStyle(element),
+            lineHeight: "20px",
+            paddingTop: "8px",
+            paddingBottom: "8px",
+          } as CSSStyleDeclaration;
+        }
+
+        return originalGetComputedStyle(element);
+      });
+
+    Object.defineProperty(textarea, "scrollHeight", {
+      configurable: true,
+      value: 96,
+    });
+
+    rerender(
+      <AssistantChatComposer
+        disabled={false}
+        input={"line 1\nline 2\nline 3\nline 4"}
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    expect(textarea.style.height).toBe("96px");
+    expect(textarea.style.overflowY).toBe("hidden");
+
+    Object.defineProperty(textarea, "scrollHeight", {
+      configurable: true,
+      value: 240,
+    });
+
+    rerender(
+      <AssistantChatComposer
+        disabled={false}
+        input={"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11"}
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    expect(textarea.style.height).toBe("176px");
+    expect(textarea.style.overflowY).toBe("auto");
+
+    getComputedStyleSpy.mockRestore();
   });
 });

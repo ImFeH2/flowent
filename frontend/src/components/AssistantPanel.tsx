@@ -3,6 +3,7 @@ import {
   AssistantChatMessages,
 } from "@/components/AssistantChatContent";
 import { useAgentNodesRuntime } from "@/context/AgentContext";
+import { useMeasuredHeight } from "@/hooks/useMeasuredHeight";
 import { useAssistantChat } from "@/hooks/useAssistantChat";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +26,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
   } = useAssistantChat();
   const isFloating = variant === "floating";
   const chatVariant = isFloating ? "floating" : "panel";
+  const { height: composerHeight, ref: composerRef } =
+    useMeasuredHeight<HTMLDivElement>();
 
   return (
     <div
@@ -36,21 +39,35 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
       )}
     >
       <PanelHeader connected={connected} floating={isFloating} />
-      <AssistantChatMessages
-        items={timelineItems}
-        nodes={agents}
-        onScroll={onMessagesScroll}
-        scrollRef={scrollRef}
-        variant={chatVariant}
-      />
-      <AssistantChatComposer
-        disabled={!input.trim() || sending}
-        input={input}
-        onChange={setInput}
-        onKeyDown={handleKeyDown}
-        onSend={() => void sendMessage()}
-        variant={chatVariant}
-      />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <AssistantChatMessages
+          bottomInset={composerHeight}
+          items={timelineItems}
+          nodes={agents}
+          onScroll={onMessagesScroll}
+          scrollRef={scrollRef}
+          variant={chatVariant}
+        />
+        <div
+          ref={composerRef}
+          className={cn(
+            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4",
+            isFloating
+              ? "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.12)_24%,rgba(10,10,11,0.72)_68%,rgba(10,10,11,0.92)_100%)] pt-10"
+              : "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.18)_26%,rgba(10,10,11,0.78)_70%,rgba(10,10,11,0.96)_100%)] pt-12",
+          )}
+        >
+          <AssistantChatComposer
+            disabled={!input.trim() || sending}
+            input={input}
+            onChange={setInput}
+            onKeyDown={handleKeyDown}
+            onSend={() => void sendMessage()}
+            overlay
+            variant={chatVariant}
+          />
+        </div>
+      </div>
     </div>
   );
 }

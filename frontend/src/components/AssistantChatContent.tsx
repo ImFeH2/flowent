@@ -1,4 +1,6 @@
 import {
+  useLayoutEffect,
+  useRef,
   useState,
   type KeyboardEventHandler,
   type ReactNode,
@@ -7,6 +9,7 @@ import {
 } from "react";
 import {
   AlertCircle,
+  ArrowUp,
   Brain,
   ChevronRight,
   LoaderCircle,
@@ -24,6 +27,7 @@ import type { AssistantChatItem, HistoryEntry, Node } from "@/types";
 export type AssistantChatVariant = "panel" | "floating" | "workspace";
 
 interface AssistantChatMessagesProps {
+  bottomInset?: number;
   scrollRef: RefObject<HTMLDivElement | null>;
   items: AssistantChatItem[];
   nodes?: Map<string, Node>;
@@ -37,10 +41,12 @@ interface AssistantChatComposerProps {
   onChange: (value: string) => void;
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>;
   onSend: () => void;
+  overlay?: boolean;
   variant: AssistantChatVariant;
 }
 
 export function AssistantChatMessages({
+  bottomInset = 0,
   scrollRef,
   items,
   nodes,
@@ -49,6 +55,7 @@ export function AssistantChatMessages({
 }: AssistantChatMessagesProps) {
   const isWorkspace = variant === "workspace";
   const isFloating = variant === "floating";
+  const baseBottomPadding = isWorkspace ? 14 : 16;
   const visibleItems = items.filter(
     (item) =>
       item.type !== "SystemEntry" &&
@@ -59,9 +66,13 @@ export function AssistantChatMessages({
     <div
       ref={scrollRef}
       onScroll={onScroll}
+      style={{
+        paddingBottom: `${baseBottomPadding + bottomInset}px`,
+        scrollPaddingBottom: `${baseBottomPadding + bottomInset}px`,
+      }}
       className={cn(
         "flex-1 space-y-3 overflow-y-auto",
-        isWorkspace ? "p-3.5" : "px-4 py-4",
+        isWorkspace ? "px-3.5 pt-3.5" : "px-4 pt-4",
       )}
     >
       {visibleItems.length === 0 &&
@@ -89,19 +100,57 @@ export function AssistantChatComposer({
   onChange,
   onKeyDown,
   onSend,
+  overlay = false,
   variant,
 }: AssistantChatComposerProps) {
   const isWorkspace = variant === "workspace";
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    const computedStyle = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(computedStyle.lineHeight) || 20;
+    const paddingTop = Number.parseFloat(computedStyle.paddingTop) || 0;
+    const paddingBottom = Number.parseFloat(computedStyle.paddingBottom) || 0;
+    const minHeight = lineHeight + paddingTop + paddingBottom;
+    const maxHeight =
+      lineHeight * (isWorkspace ? 8 : 7) + paddingTop + paddingBottom;
+
+    textarea.style.height = "0px";
+
+    const nextHeight = Math.min(
+      Math.max(textarea.scrollHeight, minHeight),
+      maxHeight,
+    );
+
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY =
+      textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [input, isWorkspace]);
 
   return (
     <div
       className={cn(
-        "border-t border-white/6",
-        isWorkspace ? "p-3" : "px-4 py-3",
+        overlay
+          ? "w-full pointer-events-auto"
+          : cn("border-t border-white/6", isWorkspace ? "p-3" : "px-4 py-3"),
       )}
     >
-      <div className="flex items-end gap-2">
+      <div
+        className={cn(
+          "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[0.85rem] border px-2 py-1.5 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.78)] transition-[border-color,background-color,box-shadow] duration-200",
+          isWorkspace
+            ? "border-white/8 bg-black/[0.24]"
+            : "border-glass-border bg-surface-2/92 backdrop-blur-xl",
+        )}
+      >
         <textarea
+          ref={textareaRef}
           value={input}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={onKeyDown}
@@ -110,26 +159,25 @@ export function AssistantChatComposer({
               ? "Message the Assistant..."
               : "Message the Assistant... (Enter to send)"
           }
-          rows={isWorkspace ? 1 : 2}
+          rows={1}
           className={cn(
-            "flex-1 resize-none border px-3 py-2 text-sm text-foreground transition-all duration-200 placeholder:text-muted-foreground focus:border-primary/55 focus:outline-none",
-            isWorkspace
-              ? "min-h-[40px] rounded-md border-white/6 bg-transparent"
-              : "rounded-xl border-glass-border bg-surface-2",
+            "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
+            isWorkspace ? "rounded-[0.6rem]" : "rounded-[0.65rem]",
           )}
         />
         <button
           type="button"
           onClick={onSend}
           disabled={disabled}
+          aria-label="Send message"
           className={cn(
-            "flex size-10 items-center justify-center transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+            "flex size-7 shrink-0 items-center justify-center rounded-full transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
             isWorkspace
-              ? "rounded-md bg-primary/[0.9] text-primary-foreground hover:bg-primary/[0.84]"
-              : "rounded-xl bg-primary text-primary-foreground hover:bg-primary/90",
+              ? "bg-primary/[0.92] text-primary-foreground hover:bg-primary/[0.86]"
+              : "bg-primary text-primary-foreground hover:bg-primary/90",
           )}
         >
-          <Send className="size-4" />
+          <ArrowUp className="size-4" strokeWidth={2.5} />
         </button>
       </div>
     </div>

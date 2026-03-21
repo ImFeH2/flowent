@@ -144,10 +144,10 @@ export function AssistantChatComposer({
     >
       <div
         className={cn(
-          "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[0.85rem] border px-2 py-1.5 shadow-[0_10px_24px_-22px_rgba(0,0,0,0.78)] transition-[border-color,background-color,box-shadow] duration-200",
+          "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[0.85rem] border px-2 py-1.5 transition-[border-color,background-color,box-shadow] duration-200",
           isWorkspace
-            ? "border-white/8 bg-black/[0.24]"
-            : "border-glass-border bg-surface-2/92 backdrop-blur-xl",
+            ? "border-white/18 bg-black/[0.24] shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_18px_38px_-24px_rgba(0,0,0,0.88),0_10px_18px_-14px_rgba(255,255,255,0.08)] hover:border-white/26 focus-within:border-white/34 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_22px_46px_-26px_rgba(0,0,0,0.92),0_12px_24px_-16px_rgba(255,255,255,0.12)]"
+            : "border-white/14 bg-surface-2/92 shadow-[0_0_0_1px_rgba(255,255,255,0.025),0_18px_36px_-24px_rgba(0,0,0,0.72),0_8px_16px_-12px_rgba(255,255,255,0.05)] backdrop-blur-xl hover:border-white/22 focus-within:border-white/28 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_22px_42px_-26px_rgba(0,0,0,0.78),0_10px_20px_-14px_rgba(255,255,255,0.08)]",
         )}
       >
         <textarea

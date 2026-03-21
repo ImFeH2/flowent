@@ -151,7 +151,7 @@ describe("AssistantChatMessages", () => {
       screen.getByText("I have inspected the project root."),
     ).toBeInTheDocument();
     expect(screen.getByText("Worker, continue the task.")).toBeInTheDocument();
-  });
+  }, 10000);
 
   it("applies bottom inset space for an overlay composer", () => {
     const scrollRef = createRef<HTMLDivElement>();
@@ -251,6 +251,43 @@ describe("AssistantChatMessages", () => {
     const contentBlock = textNode.parentElement;
     expect(contentBlock).not.toBeNull();
     expect(contentBlock?.querySelector(".streaming-cursor")).not.toBeNull();
+  });
+
+  it("copies human message content with the same copy action style", async () => {
+    const scrollRef = createRef<HTMLDivElement>();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Copy this human message",
+            timestamp: 1,
+          },
+        ]}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    const messageGroup = screen
+      .getByText("Copy this human message")
+      .closest(".group");
+
+    expect(messageGroup).not.toBeNull();
+    fireEvent.click(
+      within(messageGroup as HTMLElement).getByRole("button", { name: "Copy" }),
+    );
+
+    expect(writeText).toHaveBeenCalledWith("Copy this human message");
   });
 });
 

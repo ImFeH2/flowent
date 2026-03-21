@@ -270,7 +270,7 @@ function HumanBubble({
   const isWorkspace = variant === "workspace";
 
   return (
-    <div className="mt-2 flex min-w-0 justify-end">
+    <div className="group mt-2 flex min-w-0 flex-col items-end">
       <div
         className={cn(
           "min-w-0 overflow-hidden px-3 py-2 text-sm [overflow-wrap:anywhere]",
@@ -289,6 +289,9 @@ function HumanBubble({
             </span>
           )}
         </div>
+      </div>
+      <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <CopyButton text={content} />
       </div>
     </div>
   );

@@ -124,6 +124,19 @@ def classify_streaming_content(content: str) -> str:
     return "pending"
 
 
+def build_routed_content(target_refs: list[str], body: str) -> str:
+    targets = ", ".join(target_refs)
+    first_line, separator, rest = body.partition("\n")
+    header = f"@{targets}: {first_line}"
+    if not separator:
+        return header
+    return f"{header}\n{rest}"
+
+
+def build_error_context(content: str) -> str:
+    return f"<system>Previous runtime error:\n{content}</system>"
+
+
 class Agent:
     def __init__(
         self,
@@ -713,14 +726,20 @@ class Agent:
                 self._flush_tool_calls(messages, pending_tool_calls)
                 messages.append({"role": "assistant", "content": entry.content})
 
-            elif isinstance(entry, SentMessage | AssistantThinking):
+            elif isinstance(entry, SentMessage):
+                self._flush_tool_calls(messages, pending_tool_calls)
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": build_routed_content(entry.to_ids, entry.content),
+                    }
+                )
+
+            elif isinstance(entry, AssistantThinking):
                 pass
 
             elif isinstance(entry, ToolCall):
                 if entry.streaming:
-                    continue
-
-                if entry.tool_name == "idle":
                     continue
 
                 pending_tool_calls.append(
@@ -747,7 +766,13 @@ class Agent:
                     )
 
             elif isinstance(entry, ErrorEntry):
-                pass
+                self._flush_tool_calls(messages, pending_tool_calls)
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": build_error_context(entry.content),
+                    }
+                )
 
         self._flush_tool_calls(messages, pending_tool_calls)
         messages.extend(self._build_runtime_tail_messages())

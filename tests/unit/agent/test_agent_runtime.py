@@ -512,7 +512,9 @@ def test_routed_message_emits_streaming_preview_for_sender_and_receiver(monkeypa
     }
 
 
-def test_build_messages_excludes_sent_messages(monkeypatch):
+def test_build_messages_replays_sent_messages_as_routed_assistant_content(
+    monkeypatch,
+):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
@@ -525,7 +527,36 @@ def test_build_messages_excludes_sent_messages(monkeypatch):
     assert messages == [
         {"role": "system", "content": messages[0]["content"]},
         {"role": "user", "content": '<message from="human">begin</message>'},
+        {"role": "assistant", "content": "@peer: to peer"},
         {"role": "assistant", "content": "final answer"},
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+        },
+    ]
+
+
+def test_build_messages_replays_multiline_multi_target_sent_messages(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(
+        SentMessage(
+            content="investigate the error\nwith the latest logs",
+            to_ids=["peer", "helper"],
+        )
+    )
+
+    messages = agent._build_messages()
+
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {
+            "role": "assistant",
+            "content": "@peer, helper: investigate the error\nwith the latest logs",
+        },
         {
             "role": "user",
             "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
@@ -626,6 +657,62 @@ def test_build_messages_keeps_sleep_tool_results_in_context(monkeypatch):
         msg.get("role") == "tool"
         and msg.get("tool_call_id") == "call-sleep"
         and msg.get("content") == "slept 0.50s"
+        for msg in messages
+    )
+
+
+def test_build_messages_keeps_idle_tool_results_in_context(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="resume after wait", from_id="human"))
+    agent._append_history(
+        ToolCall(
+            tool_name="idle",
+            tool_call_id="call-idle",
+            arguments={},
+            result="idle 1.25s",
+        )
+    )
+
+    messages = agent._build_messages()
+
+    assert any(
+        msg.get("role") == "assistant"
+        and msg.get("tool_calls")
+        == [
+            {
+                "id": "call-idle",
+                "type": "function",
+                "function": {
+                    "name": "idle",
+                    "arguments": "{}",
+                },
+            }
+        ]
+        for msg in messages
+    )
+    assert any(
+        msg.get("role") == "tool"
+        and msg.get("tool_call_id") == "call-idle"
+        and msg.get("content") == "idle 1.25s"
+        for msg in messages
+    )
+
+
+def test_build_messages_keeps_error_entries_in_context(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(ErrorEntry(content="RuntimeError: boom\n\ntraceback"))
+
+    messages = agent._build_messages()
+
+    assert any(
+        msg.get("role") == "user"
+        and msg.get("content")
+        == "<system>Previous runtime error:\nRuntimeError: boom\n\ntraceback</system>"
         for msg in messages
     )
 
@@ -738,9 +825,26 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
     assert wait_calls == 1
     assert agent.state == AgentState.TERMINATED
     second_round = llm_messages[1]
-    assert not any(
+    assert any(
+        msg.get("role") == "assistant"
+        and msg.get("tool_calls")
+        == [
+            {
+                "id": "call-idle",
+                "type": "function",
+                "function": {
+                    "name": "idle",
+                    "arguments": "{}",
+                },
+            }
+        ]
+        for msg in second_round
+    )
+    assert any(
         msg.get("role") == "tool"
-        or (msg.get("role") == "assistant" and msg.get("tool_calls"))
+        and msg.get("tool_call_id") == "call-idle"
+        and isinstance(msg.get("content"), str)
+        and msg.get("content", "").startswith("idle ")
         for msg in second_round
     )
     assert any(

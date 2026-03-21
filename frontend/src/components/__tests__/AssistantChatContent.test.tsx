@@ -105,6 +105,18 @@ describe("AssistantChatMessages", () => {
     expect(
       screen.getByRole("button", { name: /Create Root/i }),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Create Root/i }));
+    expect(
+      screen.getByText(
+        (_, element) => element?.textContent === '{\n    "role": "Worker"\n}',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        (_, element) =>
+          element?.textContent === '{\n    "agent_id": "worker-1"\n}',
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /idle/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /idle/i }));
     expect(screen.getByText("idle 1.25s")).toBeInTheDocument();

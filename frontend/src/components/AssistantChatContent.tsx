@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import { formatJsonOutput } from "@/lib/formatJsonOutput";
 import { getNodeLabel } from "@/lib/nodeLabel";
 import { cn } from "@/lib/utils";
 import type { AssistantChatItem, HistoryEntry, Node } from "@/types";
@@ -633,35 +634,6 @@ function StreamingText({
       {streaming ? <span className="streaming-cursor" /> : null}
     </>
   );
-}
-
-function formatJsonOutput(value: unknown): string | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
-      return null;
-    }
-
-    try {
-      return JSON.stringify(JSON.parse(trimmed), null, 2);
-    } catch {
-      return null;
-    }
-  }
-
-  if (typeof value === "object") {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return String(value);
-    }
-  }
-
-  return null;
 }
 
 function formatToolLabel(value: string | null | undefined) {

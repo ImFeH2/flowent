@@ -13,7 +13,9 @@ import {
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, Node } from "@/types";
 import { CopyButton } from "@/components/CopyButton";
+import { MarkdownContent } from "@/components/MarkdownContent";
 import { getNodeLabel } from "@/lib/nodeLabel";
+import { formatJsonOutput } from "@/lib/formatJsonOutput";
 
 interface HistoryViewProps {
   agentLabel?: string;
@@ -40,55 +42,50 @@ export function HistoryView({
   );
 }
 
-function formatJsonOutput(value: unknown): string | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
-      return null;
-    }
-
-    try {
-      return JSON.stringify(JSON.parse(trimmed), null, 2);
-    } catch {
-      return null;
-    }
-  }
-
-  if (typeof value === "object") {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return String(value);
-    }
-  }
-
-  return null;
-}
-
 function MarkdownOrJsonBlock({
   content,
+  markdownClassName,
   preClassName,
   streaming,
 }: {
   content: string | null | undefined;
+  markdownClassName?: string;
   preClassName?: string;
   streaming?: boolean;
 }) {
-  const formatted = formatJsonOutput(content) ?? content ?? "";
+  const formattedJson = formatJsonOutput(content);
+
+  if (formattedJson) {
+    return (
+      <pre
+        className={cn(
+          "text-[11px] whitespace-pre-wrap break-words leading-relaxed",
+          preClassName,
+        )}
+      >
+        <StreamingText text={formattedJson} streaming={streaming} />
+      </pre>
+    );
+  }
+
+  if (streaming) {
+    return (
+      <pre
+        className={cn(
+          "text-[11px] whitespace-pre-wrap break-words leading-relaxed",
+          preClassName,
+        )}
+      >
+        <StreamingText text={content ?? ""} streaming />
+      </pre>
+    );
+  }
 
   return (
-    <pre
-      className={cn(
-        "text-[11px] whitespace-pre-wrap break-words leading-relaxed",
-        preClassName,
-      )}
-    >
-      <StreamingText text={formatted} streaming={streaming} />
-    </pre>
+    <MarkdownContent
+      content={content ?? ""}
+      className={cn("text-[11px] leading-relaxed", markdownClassName)}
+    />
   );
 }
 
@@ -127,6 +124,7 @@ function HistoryItem({
         >
           <MarkdownOrJsonBlock
             content={entry.content}
+            markdownClassName="text-muted-foreground"
             preClassName="text-muted-foreground leading-relaxed"
           />
         </CollapsibleBlock>
@@ -145,6 +143,7 @@ function HistoryItem({
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
             streaming={entry.streaming}
+            markdownClassName="text-foreground/90"
             preClassName="text-foreground/90 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -162,6 +161,7 @@ function HistoryItem({
           <MarkdownOrJsonBlock
             content={entry.content}
             streaming={entry.streaming}
+            markdownClassName="text-amber-200/80"
             preClassName="text-amber-200/80 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -181,6 +181,7 @@ function HistoryItem({
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
             streaming={entry.streaming}
+            markdownClassName="text-sky-100/90"
             preClassName="text-sky-100/90 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -200,6 +201,7 @@ function HistoryItem({
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
             streaming={entry.streaming}
+            markdownClassName="text-emerald-200"
             preClassName="text-emerald-200 leading-relaxed"
           />
         </CollapsibleBlock>
@@ -233,6 +235,7 @@ function HistoryItem({
                 <MarkdownOrJsonBlock
                   content={formattedResult ?? entry.result}
                   streaming={entry.streaming}
+                  markdownClassName="text-muted-foreground"
                   preClassName="text-muted-foreground leading-relaxed"
                 />
               </div>
@@ -254,6 +257,7 @@ function HistoryItem({
         >
           <MarkdownOrJsonBlock
             content={entry.content}
+            markdownClassName="text-red-200"
             preClassName="text-red-200 leading-relaxed"
           />
         </CollapsibleBlock>

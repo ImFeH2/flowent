@@ -1,7 +1,11 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { HistoryView } from "@/components/HistoryView";
 import type { HistoryEntry, Node } from "@/types";
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("HistoryView", () => {
   it("renders message and assistant entries collapsed by default and expands on demand", () => {
@@ -117,5 +121,51 @@ describe("HistoryView", () => {
     );
 
     expect(screen.getByText("Streaming update")).toBeInTheDocument();
+  });
+
+  it("renders markdown for completed history entries", () => {
+    render(
+      <HistoryView
+        history={[
+          {
+            type: "AssistantText",
+            content: "**Summary**\n\n- First item\n- Second item",
+            timestamp: 1,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Agent/i }));
+
+    const summary = screen.getByText("Summary");
+    expect(summary.tagName).toBe("STRONG");
+    expect(screen.getByText("First item")).toBeInTheDocument();
+    expect(screen.getByText("Second item")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("formats json tool output with four-space indentation", () => {
+    render(
+      <HistoryView
+        history={[
+          {
+            type: "ToolCall",
+            tool_name: "inspect_result",
+            arguments: { outer: { value: 1 } },
+            result: '{"outer":{"value":1}}',
+            timestamp: 1,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /inspect_result/i }));
+
+    const expected = '{\n    "outer": {\n        "value": 1\n    }\n}';
+
+    expect(
+      screen.getAllByText((_, element) => element?.textContent === expected),
+    ).toHaveLength(2);
   });
 });

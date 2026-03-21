@@ -1,5 +1,5 @@
 import { createRef } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   AssistantChatComposer,
@@ -8,7 +8,7 @@ import {
 import type { AssistantChatItem, Node } from "@/types";
 
 describe("AssistantChatMessages", () => {
-  it("renders idle tool calls once they have a result and keeps empty idle calls hidden", () => {
+  it("renders idle tool calls before and after the result is available", () => {
     const nodes = new Map<string, Node>([
       [
         "worker-1",
@@ -54,7 +54,7 @@ describe("AssistantChatMessages", () => {
         tool_call_id: "tool-2",
         arguments: {},
         timestamp: 4,
-        streaming: false,
+        streaming: true,
       },
       {
         type: "ToolCall",
@@ -117,8 +117,16 @@ describe("AssistantChatMessages", () => {
           element?.textContent === '{\n    "agent_id": "worker-1"\n}',
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /idle/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /idle/i }));
+    const idleButtons = screen.getAllByRole("button", { name: /idle/i });
+    expect(idleButtons).toHaveLength(2);
+    expect(screen.queryByText("Running...")).not.toBeInTheDocument();
+    fireEvent.click(idleButtons[0]!);
+    expect(
+      within(idleButtons[0]!.parentElement as HTMLElement).queryByText(
+        "Result",
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.click(idleButtons[1]!);
     expect(screen.getByText("idle 1.25s")).toBeInTheDocument();
     expect(
       screen.getByText("Here is a draft plan with priorities and next steps."),

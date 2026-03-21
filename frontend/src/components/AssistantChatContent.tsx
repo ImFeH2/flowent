@@ -57,11 +57,7 @@ export function AssistantChatMessages({
   const isWorkspace = variant === "workspace";
   const isFloating = variant === "floating";
   const baseBottomPadding = isWorkspace ? 14 : 16;
-  const visibleItems = items.filter(
-    (item) =>
-      item.type !== "SystemEntry" &&
-      !(item.type === "ToolCall" && item.tool_name === "idle" && !item.result),
-  );
+  const visibleItems = items.filter((item) => item.type !== "SystemEntry");
 
   return (
     <div
@@ -434,6 +430,8 @@ function ToolCallCard({
   item: HistoryEntry & { type: "ToolCall" };
   variant: AssistantChatVariant;
 }) {
+  const isIdleTool = item.tool_name === "idle";
+  const displayStreaming = Boolean(item.streaming) && !isIdleTool;
   const formattedArguments = formatJsonOutput(item.arguments) ?? "";
   const formattedResult = formatJsonOutput(item.result);
 
@@ -442,9 +440,9 @@ function ToolCallCard({
       label={formatToolLabel(item.tool_name)}
       icon={<Wrench className="size-3.5 text-teal-500" />}
       tone="tool"
-      streaming={item.streaming}
+      streaming={displayStreaming}
       variant={variant}
-      defaultOpen={item.streaming ?? false}
+      defaultOpen={displayStreaming}
     >
       <div className="space-y-3">
         <div className="space-y-1">
@@ -455,23 +453,25 @@ function ToolCallCard({
             {formattedArguments}
           </pre>
         </div>
-        <div className="space-y-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Result
-          </div>
-          {item.result ? (
-            <RichContentBlock
-              content={formattedResult ?? item.result}
-              streaming={item.streaming}
-              markdownClassName="text-[13px] text-foreground/80"
-              preClassName="text-foreground/75"
-            />
-          ) : (
-            <div className="rounded-lg bg-surface-1/80 px-2.5 py-2 text-[12px] text-muted-foreground">
-              {item.streaming ? "Running..." : "No result"}
+        {item.result || !isIdleTool ? (
+          <div className="space-y-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Result
             </div>
-          )}
-        </div>
+            {item.result ? (
+              <RichContentBlock
+                content={formattedResult ?? item.result}
+                streaming={displayStreaming}
+                markdownClassName="text-[13px] text-foreground/80"
+                preClassName="text-foreground/75"
+              />
+            ) : (
+              <div className="rounded-lg bg-surface-1/80 px-2.5 py-2 text-[12px] text-muted-foreground">
+                {displayStreaming ? "Running..." : "No result"}
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </ActivityDisclosure>
   );

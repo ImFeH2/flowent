@@ -19,6 +19,7 @@ const useAgentNodesRuntimeMock = vi.fn();
 const useAgentGraphRuntimeMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
+const reactFlowPropsMock = vi.fn();
 const resizeObservers: ResizeObserverMock[] = [];
 
 class ResizeObserverMock {
@@ -65,6 +66,10 @@ vi.mock("@xyflow/react", async () => {
     onNodeClick,
     onNodeContextMenu,
     onPaneContextMenu,
+    minZoom,
+    maxZoom,
+    zoomOnScroll,
+    zoomOnPinch,
     children,
   }: {
     nodes: Array<{ id: string; type: string; data: Record<string, unknown> }>;
@@ -76,8 +81,19 @@ vi.mock("@xyflow/react", async () => {
       node: { id: string; node_type?: string },
     ) => void;
     onPaneContextMenu?: (event: React.MouseEvent) => void;
+    minZoom?: number;
+    maxZoom?: number;
+    zoomOnScroll?: boolean;
+    zoomOnPinch?: boolean;
     children?: React.ReactNode;
   }) {
+    reactFlowPropsMock({
+      minZoom,
+      maxZoom,
+      zoomOnScroll,
+      zoomOnPinch,
+    });
+
     react.useEffect(() => {
       onInit?.({ fitView: fitViewMock });
     }, [onInit]);
@@ -182,6 +198,7 @@ function renderGraph(nodes: Node[], graphs: Graph[] = []) {
 beforeEach(() => {
   fitViewMock.mockClear();
   terminateNodeMock.mockClear();
+  reactFlowPropsMock.mockClear();
   resizeObservers.splice(0, resizeObservers.length);
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
   vi.useRealTimers();
@@ -329,8 +346,32 @@ describe("AgentGraph", () => {
     await waitFor(() => {
       expect(fitViewMock).toHaveBeenCalledWith({
         padding: 0.3,
-        maxZoom: 0.75,
+        maxZoom: 1,
         duration: 250,
+      });
+    });
+  });
+
+  it("configures the workspace canvas for freeform zooming", async () => {
+    renderGraph([
+      buildNode({
+        id: "assistant",
+        node_type: "assistant",
+        connections: ["worker-1"],
+      }),
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+        connections: ["assistant"],
+      }),
+    ]);
+
+    await waitFor(() => {
+      expect(reactFlowPropsMock).toHaveBeenCalledWith({
+        minZoom: 0.05,
+        maxZoom: 6,
+        zoomOnScroll: true,
+        zoomOnPinch: true,
       });
     });
   });

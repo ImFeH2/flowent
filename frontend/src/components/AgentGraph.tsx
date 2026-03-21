@@ -49,6 +49,10 @@ const GRAPH_SIDE_PADDING = 24;
 const GRAPH_BOTTOM_PADDING = 24;
 const NODE_EXIT_MS = 320;
 const EDGE_EXIT_MS = 220;
+const VIEWPORT_FIT_PADDING = 0.3;
+const VIEWPORT_FIT_MAX_ZOOM = 1;
+const VIEWPORT_MIN_ZOOM = 0.05;
+const VIEWPORT_MAX_ZOOM = 6;
 
 const nodeTypes: NodeTypes = {
   agent: AgentGraphNode,
@@ -1027,7 +1031,11 @@ export function AgentGraph() {
         label: "Fit View",
         disabled: !flowInstance,
         onClick: () => {
-          flowInstance?.fitView({ padding: 0.3, duration: 350 });
+          flowInstance?.fitView({
+            padding: VIEWPORT_FIT_PADDING,
+            maxZoom: VIEWPORT_FIT_MAX_ZOOM,
+            duration: 350,
+          });
         },
       });
       items.push({
@@ -1072,8 +1080,8 @@ export function AgentGraph() {
     const raf = requestAnimationFrame(() => {
       void flowInstance
         .fitView({
-          padding: 0.3,
-          maxZoom: 0.75,
+          padding: VIEWPORT_FIT_PADDING,
+          maxZoom: VIEWPORT_FIT_MAX_ZOOM,
           duration: isInitialViewport ? 0 : 250,
         })
         .catch(() => false);
@@ -1093,8 +1101,8 @@ export function AgentGraph() {
       raf = requestAnimationFrame(() => {
         void flowInstance
           .fitView({
-            padding: 0.3,
-            maxZoom: 0.75,
+            padding: VIEWPORT_FIT_PADDING,
+            maxZoom: VIEWPORT_FIT_MAX_ZOOM,
             duration: 250,
           })
           .catch(() => false);
@@ -1155,8 +1163,9 @@ export function AgentGraph() {
             nodesConnectable={false}
             panOnDrag
             zoomOnScroll
-            minZoom={0.3}
-            maxZoom={1.8}
+            zoomOnPinch
+            minZoom={VIEWPORT_MIN_ZOOM}
+            maxZoom={VIEWPORT_MAX_ZOOM}
             className="bg-graph-bg"
           >
             <Background color="var(--graph-grid)" gap={32} size={0.8} />

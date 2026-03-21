@@ -620,6 +620,118 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
     ]
 
 
+def test_build_messages_warns_about_spawned_agents_waiting_for_first_task(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(
+        ToolCall(
+            tool_name="spawn",
+            tool_call_id="call-spawn",
+            arguments={"role_name": "Worker", "graph_id": "graph-1"},
+            result=json.dumps(
+                {
+                    "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
+                    "name": "Directory Worker",
+                    "graph_id": "graph-1",
+                    "role_name": "Worker",
+                }
+            ),
+        )
+    )
+
+    messages = agent._build_messages()
+
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call-spawn",
+                    "type": "function",
+                    "function": {
+                        "name": "spawn",
+                        "arguments": '{"role_name": "Worker", "graph_id": "graph-1"}',
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-spawn",
+            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "graph_id": "graph-1", "role_name": "Worker"}',
+        },
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Spawned agents still waiting for their first task: Directory Worker (`12345678`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
+        },
+    ]
+
+
+def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(
+        ToolCall(
+            tool_name="spawn",
+            tool_call_id="call-spawn",
+            arguments={"role_name": "Worker", "graph_id": "graph-1"},
+            result=json.dumps(
+                {
+                    "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
+                    "name": "Directory Worker",
+                    "graph_id": "graph-1",
+                    "role_name": "Worker",
+                }
+            ),
+        )
+    )
+    agent._append_history(
+        SentMessage(
+            content="inspect the current directory",
+            to_ids=["12345678-aaaa-bbbb-cccc-ddddeeeeffff"],
+        )
+    )
+
+    messages = agent._build_messages()
+
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call-spawn",
+                    "type": "function",
+                    "function": {
+                        "name": "spawn",
+                        "arguments": '{"role_name": "Worker", "graph_id": "graph-1"}',
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-spawn",
+            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "graph_id": "graph-1", "role_name": "Worker"}',
+        },
+        {
+            "role": "assistant",
+            "content": "@12345678-aaaa-bbbb-cccc-ddddeeeeffff: inspect the current directory",
+        },
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+        },
+    ]
+
+
 def test_build_messages_keeps_sleep_tool_results_in_context(monkeypatch):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
 

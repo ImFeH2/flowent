@@ -400,6 +400,8 @@ class Agent:
     def _build_runtime_tail_messages(self) -> list[dict[str, str]]:
         with self._todos_lock:
             todos = [TodoItem(text=t.text) for t in self.todos]
+        with self._history_lock:
+            history_snapshot = list(self.history)
         custom_post_prompt = get_settings().custom_post_prompt.strip()
         messages: list[dict[str, str]] = []
         todo_message = self._build_runtime_todo_message(todos)
@@ -408,6 +410,9 @@ class Agent:
         messages.append(
             self._build_runtime_post_prompt_message(
                 has_todos=bool(todos),
+                pending_spawn_dispatches=self._get_pending_spawn_dispatches(
+                    history_snapshot
+                ),
             )
         )
         if custom_post_prompt:
@@ -426,10 +431,51 @@ class Agent:
         todo_text = "Current TODO list:\n" + "\n".join(lines)
         return self._build_runtime_system_message(todo_text)
 
+    @staticmethod
+    def _get_spawned_agent_label(payload: dict[str, Any]) -> str | None:
+        agent_id = payload.get("agent_id")
+        if not isinstance(agent_id, str) or not agent_id:
+            return None
+        name = payload.get("name")
+        short_id = agent_id[:8]
+        if isinstance(name, str) and name.strip():
+            return f"{name.strip()} (`{short_id}`)"
+        return f"`{short_id}`"
+
+    def _get_pending_spawn_dispatches(
+        self,
+        history_snapshot: list[HistoryEntry],
+    ) -> list[str]:
+        pending: dict[str, str] = {}
+
+        for entry in history_snapshot:
+            if isinstance(entry, ToolCall):
+                if entry.tool_name != "spawn" or entry.result is None:
+                    continue
+                try:
+                    payload = json.loads(entry.result)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(payload, dict) or payload.get("error") is not None:
+                    continue
+                agent_id = payload.get("agent_id")
+                label = self._get_spawned_agent_label(payload)
+                if not isinstance(agent_id, str) or label is None:
+                    continue
+                pending[agent_id] = label
+                continue
+
+            if isinstance(entry, SentMessage):
+                for target_id in entry.to_ids:
+                    pending.pop(target_id, None)
+
+        return list(pending.values())
+
     def _build_runtime_post_prompt_message(
         self,
         *,
         has_todos: bool,
+        pending_spawn_dispatches: list[str],
     ) -> dict[str, str]:
         lines = [
             "Runtime post prompt:",
@@ -437,7 +483,18 @@ class Agent:
             "- Plain content is not delivered to other agents.",
             "- Do not combine a Human-facing reply and a routed `@target` message in the same content block.",
         ]
-        if has_todos:
+        if pending_spawn_dispatches:
+            targets = ", ".join(pending_spawn_dispatches)
+            lines.append(
+                f"- Spawned agents still waiting for their first task: {targets}."
+            )
+            lines.append(
+                "- `spawn` only creates and connects a new agent. It does not start work by itself."
+            )
+            lines.append(
+                "- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`."
+            )
+        elif has_todos:
             lines.append(
                 "- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items."
             )

@@ -20,7 +20,7 @@ function buildDetail(history: HistoryEntry[] = []): NodeDetail {
   return {
     id: "assistant",
     node_type: "assistant",
-    graph_id: "graph-assistant",
+    formation_id: "formation-assistant",
     state: "idle",
     name: null,
     connections: [],
@@ -29,11 +29,11 @@ function buildDetail(history: HistoryEntry[] = []): NodeDetail {
     tools: [],
     write_dirs: [],
     allow_network: false,
-    graph: {
-      id: "graph-assistant",
+    formation: {
+      id: "formation-assistant",
       owner_agent_id: "assistant",
-      parent_graph_id: null,
-      name: "Assistant Graph",
+      parent_formation_id: null,
+      name: "Assistant Formation",
       goal: "",
     },
     history,
@@ -44,7 +44,7 @@ function buildNode(): Node {
   return {
     id: "assistant",
     node_type: "assistant",
-    graph_id: "graph-assistant",
+    formation_id: "formation-assistant",
     state: "idle",
     connections: [],
     name: null,

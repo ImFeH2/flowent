@@ -9,7 +9,7 @@ import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
 
 const NAV_ITEMS: Array<{ id: PageId; label: string }> = [
-  { id: "graph", label: "Workspace" },
+  { id: "formation", label: "Workspace" },
   { id: "providers", label: "Providers" },
   { id: "roles", label: "Roles" },
   { id: "prompts", label: "Prompts" },
@@ -133,8 +133,8 @@ export function Sidebar({
               <div className="min-w-0 text-left">
                 <span className="block truncate font-medium">{label}</span>
                 <span className="block truncate text-[11px] text-muted-foreground/75">
-                  {id === "graph"
-                    ? "Forest and assistant panels"
+                  {id === "formation"
+                    ? "Formation canvas and assistant panels"
                     : id === "providers"
                       ? "Model backends and catalogs"
                       : id === "roles"

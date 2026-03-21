@@ -28,7 +28,7 @@ describe("HistoryView", () => {
         {
           id: "agent-12345678",
           node_type: "agent",
-          graph_id: "graph-1",
+          formation_id: "formation-1",
           state: "idle",
           connections: [],
           name: "Directory Analyzer",

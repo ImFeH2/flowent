@@ -9,7 +9,7 @@ import {
 } from "react";
 import { sendAssistantMessageRequest } from "@/lib/api";
 import { useAgents } from "@/hooks/useAgents";
-import { useGraphs } from "@/hooks/useGraphs";
+import { useFormations } from "@/hooks/useFormations";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   AgentFeedContext,
@@ -20,7 +20,7 @@ import {
 import type {
   AgentEvent,
   AssistantChatMessage,
-  Graph,
+  Formation,
   HistoryEntry,
   Node,
   PendingAssistantChatMessage,
@@ -35,7 +35,7 @@ export interface ActiveMessage {
 }
 
 export type PageId =
-  | "graph"
+  | "formation"
   | "providers"
   | "roles"
   | "prompts"
@@ -45,7 +45,7 @@ export type PageId =
 
 interface AgentRuntimeContextValue {
   agents: Map<string, Node>;
-  graphs: Map<string, Graph>;
+  formations: Map<string, Formation>;
   connected: boolean;
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
@@ -58,8 +58,8 @@ interface AgentNodesContextValue {
   agents: Map<string, Node>;
 }
 
-interface AgentGraphsContextValue {
-  graphs: Map<string, Graph>;
+interface AgentFormationsContextValue {
+  formations: Map<string, Formation>;
 }
 
 interface AgentConnectionContextValue {
@@ -89,7 +89,8 @@ interface AgentUIContextValue {
 }
 
 const AgentNodesContext = createContext<AgentNodesContextValue | null>(null);
-const AgentGraphsContext = createContext<AgentGraphsContextValue | null>(null);
+const AgentFormationsContext =
+  createContext<AgentFormationsContextValue | null>(null);
 const AgentConnectionContext =
   createContext<AgentConnectionContextValue | null>(null);
 const AgentHistoryContext = createContext<AgentHistoryContextValue | null>(
@@ -117,7 +118,8 @@ function shouldTrackFeedEntry(entry: HistoryEntry): boolean {
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const { agents, handleUpdateEvent } = useAgents();
-  const { graphs, handleUpdateEvent: handleGraphEvent } = useGraphs();
+  const { formations, handleUpdateEvent: handleFormationEvent } =
+    useFormations();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [agentHistories, setAgentHistories] = useState<
@@ -136,7 +138,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [pendingAssistantMessages, setPendingAssistantMessages] = useState<
     PendingAssistantChatMessage[]
   >([]);
-  const [currentPage, setCurrentPage] = useState<PageId>("graph");
+  const [currentPage, setCurrentPage] = useState<PageId>("formation");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -213,7 +215,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const onUpdateEvent = useCallback(
     (event: AgentEvent) => {
       handleUpdateEvent(event);
-      handleGraphEvent(event);
+      handleFormationEvent(event);
 
       if (event.type === "node_message") {
         const fromId = event.agent_id;
@@ -438,7 +440,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [handleGraphEvent, handleUpdateEvent],
+    [handleFormationEvent, handleUpdateEvent],
   );
 
   const { connected } = useWebSocket({ onDisplayEvent, onUpdateEvent });
@@ -454,11 +456,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     [agents],
   );
 
-  const graphsValue = useMemo(
+  const formationsValue = useMemo(
     () => ({
-      graphs,
+      formations,
     }),
-    [graphs],
+    [formations],
   );
 
   const connectionValue = useMemo(
@@ -515,7 +517,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   return (
     <AgentNodesContext.Provider value={nodesValue}>
-      <AgentGraphsContext.Provider value={graphsValue}>
+      <AgentFormationsContext.Provider value={formationsValue}>
         <AgentConnectionContext.Provider value={connectionValue}>
           <AgentHistoryContext.Provider value={historyValue}>
             <AgentActivityContext.Provider value={activityValue}>
@@ -527,7 +529,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             </AgentActivityContext.Provider>
           </AgentHistoryContext.Provider>
         </AgentConnectionContext.Provider>
-      </AgentGraphsContext.Provider>
+      </AgentFormationsContext.Provider>
     </AgentNodesContext.Provider>
   );
 }
@@ -550,10 +552,12 @@ export function useAgentConnectionRuntime() {
   return ctx;
 }
 
-export function useAgentGraphRuntime() {
-  const ctx = useContext(AgentGraphsContext);
+export function useAgentFormationRuntime() {
+  const ctx = useContext(AgentFormationsContext);
   if (!ctx) {
-    throw new Error("useAgentGraphRuntime must be used within AgentProvider");
+    throw new Error(
+      "useAgentFormationRuntime must be used within AgentProvider",
+    );
   }
   return ctx;
 }
@@ -578,7 +582,7 @@ export function useAgentActivityRuntime() {
 
 export function useAgentRuntime(): AgentRuntimeContextValue {
   const { agents } = useAgentNodesRuntime();
-  const { graphs } = useAgentGraphRuntime();
+  const { formations } = useAgentFormationRuntime();
   const { connected } = useAgentConnectionRuntime();
   const { agentHistories, clearAgentHistory, streamingDeltas } =
     useAgentHistoryRuntime();
@@ -587,7 +591,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
   return useMemo(
     () => ({
       agents,
-      graphs,
+      formations,
       connected,
       agentHistories,
       clearAgentHistory,
@@ -597,7 +601,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
     }),
     [
       agents,
-      graphs,
+      formations,
       connected,
       agentHistories,
       clearAgentHistory,

@@ -9,14 +9,14 @@ import {
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentGraph } from "@/components/AgentGraph";
+import { AgentFormation } from "@/components/AgentFormation";
 import { getAgentNodeWidth } from "@/lib/layout";
-import type { Graph, Node } from "@/types";
+import type { Formation, Node } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 const terminateNodeMock = vi.fn().mockResolvedValue(undefined);
 const useAgentNodesRuntimeMock = vi.fn();
-const useAgentGraphRuntimeMock = vi.fn();
+const useAgentFormationRuntimeMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
 const reactFlowPropsMock = vi.fn();
@@ -36,7 +36,7 @@ class ResizeObserverMock {
 
 vi.mock("@/context/AgentContext", () => ({
   useAgentNodesRuntime: () => useAgentNodesRuntimeMock(),
-  useAgentGraphRuntime: () => useAgentGraphRuntimeMock(),
+  useAgentFormationRuntime: () => useAgentFormationRuntimeMock(),
   useAgentActivityRuntime: () => useAgentActivityRuntimeMock(),
   useAgentUI: () => useAgentUIMock(),
 }));
@@ -155,7 +155,7 @@ function buildNode(overrides: Partial<Node>): Node {
   return {
     id: "node",
     node_type: "agent",
-    graph_id: "graph-root",
+    formation_id: "formation-root",
     state: "idle",
     connections: [],
     name: null,
@@ -165,23 +165,25 @@ function buildNode(overrides: Partial<Node>): Node {
   };
 }
 
-function buildGraph(overrides: Partial<Graph>): Graph {
+function buildFormation(overrides: Partial<Formation>): Formation {
   return {
-    id: "graph-root",
+    id: "formation-root",
     owner_agent_id: "worker-1",
-    parent_graph_id: null,
-    name: "Research Graph",
+    parent_formation_id: null,
+    name: "Research Formation",
     goal: "Investigate sources",
     ...overrides,
   };
 }
 
-function renderGraph(nodes: Node[], graphs: Graph[] = []) {
+function renderFormation(nodes: Node[], formations: Formation[] = []) {
   useAgentNodesRuntimeMock.mockReturnValue({
     agents: new Map(nodes.map((node) => [node.id, node])),
   });
-  useAgentGraphRuntimeMock.mockReturnValue({
-    graphs: new Map(graphs.map((graph) => [graph.id, graph])),
+  useAgentFormationRuntimeMock.mockReturnValue({
+    formations: new Map(
+      formations.map((formation) => [formation.id, formation]),
+    ),
   });
   useAgentActivityRuntimeMock.mockReturnValue({
     activeMessages: [],
@@ -192,7 +194,7 @@ function renderGraph(nodes: Node[], graphs: Graph[] = []) {
     selectAgent: vi.fn(),
   });
 
-  return render(<AgentGraph />);
+  return render(<AgentFormation />);
 }
 
 beforeEach(() => {
@@ -208,9 +210,9 @@ afterEach(() => {
   cleanup();
 });
 
-describe("AgentGraph", () => {
+describe("AgentFormation", () => {
   it("renders unnamed agent nodes using role_name and sizes width to fit the label", async () => {
-    renderGraph([
+    renderFormation([
       buildNode({
         id: "assistant",
         node_type: "assistant",
@@ -233,51 +235,51 @@ describe("AgentGraph", () => {
     expect(workerNode).toHaveClass("h-[62px]");
   });
 
-  it("renders nested graph containers alongside agent nodes", async () => {
-    renderGraph(
+  it("renders nested formation containers alongside agent nodes", async () => {
+    renderFormation(
       [
         buildNode({
           id: "assistant",
           node_type: "assistant",
           connections: ["worker-1"],
-          graph_id: null,
+          formation_id: null,
         }),
         buildNode({
           id: "worker-1",
           role_name: "Conductor",
-          graph_id: "graph-root",
+          formation_id: "formation-root",
           connections: ["assistant", "worker-2"],
         }),
         buildNode({
           id: "worker-2",
           role_name: "Worker",
-          graph_id: "graph-child",
+          formation_id: "formation-child",
           connections: ["worker-1"],
         }),
       ],
       [
-        buildGraph({
-          id: "graph-root",
+        buildFormation({
+          id: "formation-root",
           owner_agent_id: "worker-1",
-          name: "Research Graph",
+          name: "Research Formation",
         }),
-        buildGraph({
-          id: "graph-child",
+        buildFormation({
+          id: "formation-child",
           owner_agent_id: "worker-1",
-          parent_graph_id: "graph-root",
+          parent_formation_id: "formation-root",
           name: "Site Sweep",
         }),
       ],
     );
 
-    expect(await screen.findByText("Research Graph")).toBeInTheDocument();
+    expect(await screen.findByText("Research Formation")).toBeInTheDocument();
     expect(screen.getByText("Site Sweep")).toBeInTheDocument();
     expect(screen.getByText("Conductor")).toBeInTheDocument();
     expect(screen.getByText("Worker")).toBeInTheDocument();
   });
 
   it("protects only assistant termination and allows stopping regular agents", async () => {
-    renderGraph([
+    renderFormation([
       buildNode({
         id: "assistant",
         node_type: "assistant",
@@ -316,7 +318,7 @@ describe("AgentGraph", () => {
   });
 
   it("re-fits the forest when the container is resized", async () => {
-    renderGraph([
+    renderFormation([
       buildNode({
         id: "assistant",
         node_type: "assistant",
@@ -353,7 +355,7 @@ describe("AgentGraph", () => {
   });
 
   it("configures the workspace canvas for freeform zooming", async () => {
-    renderGraph([
+    renderFormation([
       buildNode({
         id: "assistant",
         node_type: "assistant",
@@ -379,12 +381,12 @@ describe("AgentGraph", () => {
   it("keeps removed nodes briefly for exit transitions before unmounting them", () => {
     vi.useFakeTimers();
 
-    const view = renderGraph([
+    const view = renderFormation([
       buildNode({
         id: "assistant",
         node_type: "assistant",
         connections: ["worker-1"],
-        graph_id: null,
+        formation_id: null,
       }),
       buildNode({
         id: "worker-1",
@@ -403,13 +405,13 @@ describe("AgentGraph", () => {
             id: "assistant",
             node_type: "assistant",
             connections: [],
-            graph_id: null,
+            formation_id: null,
           }),
         ],
       ]),
     });
 
-    view.rerender(<AgentGraph />);
+    view.rerender(<AgentFormation />);
 
     expect(screen.getByTestId("node-worker-1")).toBeInTheDocument();
 

@@ -3,20 +3,20 @@ import { motion } from "motion/react";
 import { type NodeProps } from "@xyflow/react";
 import { cn } from "@/lib/utils";
 
-interface GraphGroupNodeData {
-  graphId: string;
+interface FormationGroupNodeData {
+  formationId: string;
   label: string;
   goal: string;
   depth: number;
   nodeCount: number;
-  childGraphCount: number;
+  childFormationCount: number;
   [key: string]: unknown;
 }
 
-export function AgentGraphGroupNode({ data }: NodeProps) {
-  const { label, goal, depth, nodeCount, childGraphCount } =
-    data as GraphGroupNodeData;
-  const leaving = Boolean((data as GraphGroupNodeData).leaving);
+export function AgentGroupNode({ data }: NodeProps) {
+  const { label, goal, depth, nodeCount, childFormationCount } =
+    data as FormationGroupNodeData;
+  const leaving = Boolean((data as FormationGroupNodeData).leaving);
 
   return (
     <motion.div
@@ -60,7 +60,7 @@ export function AgentGraphGroupNode({ data }: NodeProps) {
         <div className="pointer-events-none mt-auto flex items-center gap-3 px-4 pb-3 text-[10px] text-muted-foreground/72">
           <span className="inline-flex items-center gap-1">
             <Route className="size-3" />
-            {childGraphCount} graphs
+            {childFormationCount} formations
           </span>
         </div>
       </div>

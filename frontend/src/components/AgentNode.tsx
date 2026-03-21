@@ -26,7 +26,7 @@ interface AgentNodeData {
   [key: string]: unknown;
 }
 
-export function AgentGraphNode({ data }: NodeProps) {
+export function AgentNode({ data }: NodeProps) {
   const { label, width, node_type, state, latestTodo, selected, toolCall } =
     data as unknown as AgentNodeData;
   const leaving = Boolean((data as AgentNodeData).leaving);
@@ -61,12 +61,12 @@ export function AgentGraphNode({ data }: NodeProps) {
   const isRunning = state === "running";
 
   const baseBorder = isToolActive
-    ? "border-graph-attention/70"
+    ? "border-formation-attention/70"
     : stateBorder[state];
 
   const borderClass = selected
-    ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
-    : cn(baseBorder, "hover:border-graph-node-border-hover");
+    ? "ring-1 ring-formation-selection/25 border-formation-selection/80"
+    : cn(baseBorder, "hover:border-formation-node-border-hover");
 
   return (
     <motion.div
@@ -89,7 +89,7 @@ export function AgentGraphNode({ data }: NodeProps) {
       className={cn(
         "relative isolate flex h-[62px] min-w-0 items-center gap-3 overflow-visible rounded-md border px-4 py-3",
         "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
-        "bg-graph-node-bg",
+        "bg-formation-node-bg",
         "transition-[border-color] duration-300",
         leaving && "pointer-events-none",
         borderClass,
@@ -117,7 +117,7 @@ export function AgentGraphNode({ data }: NodeProps) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!z-10 !size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className="!z-10 !size-2.5 !border !border-formation-handle-border !bg-formation-handle-bg"
       />
 
       <div
@@ -146,14 +146,14 @@ export function AgentGraphNode({ data }: NodeProps) {
               <span
                 className={cn(
                   "absolute inline-flex size-full animate-ping rounded-full opacity-40",
-                  isToolActive ? "bg-graph-attention" : stateColor[state],
+                  isToolActive ? "bg-formation-attention" : stateColor[state],
                 )}
               />
             )}
             <span
               className={cn(
                 "relative inline-flex size-3 rounded-full border border-card shadow-sm",
-                isToolActive ? "bg-graph-attention" : stateColor[state],
+                isToolActive ? "bg-formation-attention" : stateColor[state],
               )}
             />
           </span>
@@ -166,7 +166,7 @@ export function AgentGraphNode({ data }: NodeProps) {
           animate={{ opacity: 1, y: 0 }}
           className="absolute -bottom-7 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap"
         >
-          <span className="rounded-sm border border-graph-attention/30 bg-surface-2 px-2 py-1 text-[10px] font-mono text-graph-attention-text shadow-lg backdrop-blur-sm">
+          <span className="rounded-sm border border-formation-attention/30 bg-surface-2 px-2 py-1 text-[10px] font-mono text-formation-attention-text shadow-lg backdrop-blur-sm">
             {toolCall}
           </span>
         </motion.div>
@@ -175,7 +175,7 @@ export function AgentGraphNode({ data }: NodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!z-10 !size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className="!z-10 !size-2.5 !border !border-formation-handle-border !bg-formation-handle-bg"
       />
     </motion.div>
   );

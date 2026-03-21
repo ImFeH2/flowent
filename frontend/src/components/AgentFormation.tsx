@@ -19,10 +19,10 @@ import {
 import "@xyflow/react/dist/style.css";
 import { Network } from "lucide-react";
 import { toast } from "sonner";
-import { AnimatedMessageEdge } from "@/components/AgentGraphEdge";
-import { AgentGraphGroupNode } from "@/components/AgentGraphGroupNode";
-import { AgentGraphNode } from "@/components/AgentGraphNode";
-import { AgentGraphTooltip } from "@/components/AgentGraphTooltip";
+import { AgentEdge } from "@/components/AgentEdge";
+import { AgentGroupNode } from "@/components/AgentGroupNode";
+import { AgentNode } from "@/components/AgentNode";
+import { AgentTooltip } from "@/components/AgentTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import {
   AGENT_NODE_HEIGHT,
@@ -33,7 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   useAgentActivityRuntime,
-  useAgentGraphRuntime,
+  useAgentFormationRuntime,
   useAgentNodesRuntime,
   useAgentUI,
 } from "@/context/AgentContext";
@@ -41,12 +41,12 @@ import { terminateNode } from "@/lib/api";
 import { getNodeLabel } from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
-const GRAPH_NODE_PREFIX = "graph:";
-const GRAPH_MIN_WIDTH = 320;
-const GRAPH_MIN_HEIGHT = 140;
-const GRAPH_HEADER_HEIGHT = 52;
-const GRAPH_SIDE_PADDING = 24;
-const GRAPH_BOTTOM_PADDING = 24;
+const FORMATION_NODE_PREFIX = "formation:";
+const FORMATION_MIN_WIDTH = 320;
+const FORMATION_MIN_HEIGHT = 140;
+const FORMATION_HEADER_HEIGHT = 52;
+const FORMATION_SIDE_PADDING = 24;
+const FORMATION_BOTTOM_PADDING = 24;
 const NODE_EXIT_MS = 320;
 const EDGE_EXIT_MS = 220;
 const VIEWPORT_FIT_PADDING = 0.3;
@@ -55,12 +55,12 @@ const VIEWPORT_MIN_ZOOM = 0.05;
 const VIEWPORT_MAX_ZOOM = 6;
 
 const nodeTypes: NodeTypes = {
-  agent: AgentGraphNode,
-  graphGroup: AgentGraphGroupNode,
+  agent: AgentNode,
+  formationGroup: AgentGroupNode,
 };
 
 const edgeTypes: EdgeTypes = {
-  animated: AnimatedMessageEdge,
+  animated: AgentEdge,
 };
 
 interface TooltipData {
@@ -78,30 +78,30 @@ interface ContextMenuState {
 interface StaticAgentDescriptor {
   id: string;
   nodeType: NodeType;
-  graphId: string | null;
+  formationId: string | null;
   label: string;
   width: number;
   connections: string[];
 }
 
-interface StaticGraphDescriptor {
+interface StaticFormationDescriptor {
   id: string;
-  parentGraphId: string | null;
+  parentFormationId: string | null;
   name: string | null;
   goal: string;
 }
 
-interface StructuralGraph {
+interface StructuralFormation {
   structureKey: string;
   agents: StaticAgentDescriptor[];
-  graphs: StaticGraphDescriptor[];
+  formations: StaticFormationDescriptor[];
 }
 
 interface AgentNodeData extends Record<string, unknown> {
   label: string;
   width: number;
   node_type: NodeType;
-  graph_id: string | null;
+  formation_id: string | null;
   state: AgentState;
   shortId: string;
   name: string | null;
@@ -112,13 +112,13 @@ interface AgentNodeData extends Record<string, unknown> {
   leaving: boolean;
 }
 
-interface GraphGroupData extends Record<string, unknown> {
-  graphId: string;
+interface FormationGroupData extends Record<string, unknown> {
+  formationId: string;
   label: string;
   goal: string;
   depth: number;
   nodeCount: number;
-  childGraphCount: number;
+  childFormationCount: number;
   leaving: boolean;
 }
 
@@ -131,22 +131,22 @@ interface AgentLayoutNode {
   height: number;
 }
 
-interface GraphLayoutNode {
-  kind: "graph";
+interface FormationLayoutNode {
+  kind: "formation";
   id: string;
   parentId?: string;
   position: { x: number; y: number };
   width: number;
   height: number;
-  data: GraphGroupData;
+  data: FormationGroupData;
 }
 
-type WorkspaceLayoutNode = AgentLayoutNode | GraphLayoutNode;
+type WorkspaceLayoutNode = AgentLayoutNode | FormationLayoutNode;
 
-interface GraphSubtreeLayout {
+interface FormationSubtreeLayout {
   width: number;
   height: number;
-  data: GraphGroupData;
+  data: FormationGroupData;
   nodes: WorkspaceLayoutNode[];
 }
 
@@ -161,10 +161,10 @@ interface LayoutCache {
   }>;
 }
 
-const graphLayoutCache = new Map<string, LayoutCache>();
+const formationLayoutCache = new Map<string, LayoutCache>();
 const MAX_LAYOUT_CACHE_SIZE = 20;
 
-function useTransientGraphElements(
+function useTransientFormationElements(
   nodes: FlowNode[],
   edges: FlowEdge[],
 ): { nodes: FlowNode[]; edges: FlowEdge[] } {
@@ -188,7 +188,7 @@ function useTransientGraphElements(
         return {
           ...previous,
           ...node,
-          className: cn(node.className, "agent-graph-node-present"),
+          className: cn(node.className, "agent-formation-node-present"),
           data: {
             ...((previous?.data as Record<string, unknown> | undefined) ?? {}),
             ...((node.data as Record<string, unknown> | undefined) ?? {}),
@@ -213,7 +213,7 @@ function useTransientGraphElements(
 
         nextNodes.push({
           ...node,
-          className: cn(node.className, "agent-graph-node-leaving"),
+          className: cn(node.className, "agent-formation-node-leaving"),
           data: {
             ...((node.data as Record<string, unknown> | undefined) ?? {}),
             leaving: true,
@@ -291,76 +291,83 @@ function useTransientGraphElements(
   return { nodes: renderNodes, edges: renderEdges };
 }
 
-function getGraphNodeId(graphId: string): string {
-  return `${GRAPH_NODE_PREFIX}${graphId}`;
+function getFormationNodeId(formationId: string): string {
+  return `${FORMATION_NODE_PREFIX}${formationId}`;
 }
 
-function getGraphDisplayName(graph: StaticGraphDescriptor): string {
-  const trimmed = graph.name?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : graph.id.slice(0, 8);
+function getFormationDisplayName(formation: StaticFormationDescriptor): string {
+  const trimmed = formation.name?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : formation.id.slice(0, 8);
 }
 
-function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
-  const cached = graphLayoutCache.get(structuralGraph.structureKey);
+function getCachedLayoutFormation(
+  structuralFormation: StructuralFormation,
+): LayoutCache {
+  const cached = formationLayoutCache.get(structuralFormation.structureKey);
   if (cached) {
     return cached;
   }
 
   const agentsById = new Map(
-    structuralGraph.agents.map((agent) => [agent.id, agent] as const),
+    structuralFormation.agents.map((agent) => [agent.id, agent] as const),
   );
-  const graphsById = new Map(
-    structuralGraph.graphs.map((graph) => [graph.id, graph] as const),
+  const formationsById = new Map(
+    structuralFormation.formations.map(
+      (formation) => [formation.id, formation] as const,
+    ),
   );
-  const graphChildren = new Map<string | null, string[]>();
-  const graphNodeIds = new Map<string, string[]>();
-  const graphDepths = new Map<string, number>();
+  const formationChildren = new Map<string | null, string[]>();
+  const formationNodeIds = new Map<string, string[]>();
+  const formationDepths = new Map<string, number>();
 
-  graphChildren.set(null, []);
-  for (const graph of structuralGraph.graphs) {
-    graphChildren.set(graph.id, []);
-    graphNodeIds.set(graph.id, []);
+  formationChildren.set(null, []);
+  for (const formation of structuralFormation.formations) {
+    formationChildren.set(formation.id, []);
+    formationNodeIds.set(formation.id, []);
   }
 
-  for (const graph of structuralGraph.graphs) {
+  for (const formation of structuralFormation.formations) {
     const parentId =
-      graph.parentGraphId && graphsById.has(graph.parentGraphId)
-        ? graph.parentGraphId
+      formation.parentFormationId &&
+      formationsById.has(formation.parentFormationId)
+        ? formation.parentFormationId
         : null;
-    const siblings = graphChildren.get(parentId) ?? [];
-    siblings.push(graph.id);
-    graphChildren.set(parentId, siblings);
+    const siblings = formationChildren.get(parentId) ?? [];
+    siblings.push(formation.id);
+    formationChildren.set(parentId, siblings);
   }
 
-  for (const agent of structuralGraph.agents) {
-    const graphId =
-      agent.graphId && graphsById.has(agent.graphId) ? agent.graphId : null;
-    if (!graphId) {
+  for (const agent of structuralFormation.agents) {
+    const formationId =
+      agent.formationId && formationsById.has(agent.formationId)
+        ? agent.formationId
+        : null;
+    if (!formationId) {
       continue;
     }
-    const nodeIds = graphNodeIds.get(graphId) ?? [];
+    const nodeIds = formationNodeIds.get(formationId) ?? [];
     nodeIds.push(agent.id);
-    graphNodeIds.set(graphId, nodeIds);
+    formationNodeIds.set(formationId, nodeIds);
   }
 
-  const sortGraphIds = (ids: string[]) =>
+  const sortFormationIds = (ids: string[]) =>
     [...ids].sort((leftId, rightId) => {
-      const left = graphsById.get(leftId);
-      const right = graphsById.get(rightId);
-      const leftLabel = left ? getGraphDisplayName(left) : leftId;
-      const rightLabel = right ? getGraphDisplayName(right) : rightId;
+      const left = formationsById.get(leftId);
+      const right = formationsById.get(rightId);
+      const leftLabel = left ? getFormationDisplayName(left) : leftId;
+      const rightLabel = right ? getFormationDisplayName(right) : rightId;
       return (
         leftLabel.localeCompare(rightLabel) || leftId.localeCompare(rightId)
       );
     });
 
-  for (const [parentId, childIds] of graphChildren) {
-    graphChildren.set(parentId, sortGraphIds(childIds));
+  for (const [parentId, childIds] of formationChildren) {
+    formationChildren.set(parentId, sortFormationIds(childIds));
   }
 
-  for (const [graphId, nodeIds] of graphNodeIds) {
-    graphNodeIds.set(
-      graphId,
+  for (const [formationId, nodeIds] of formationNodeIds) {
+    formationNodeIds.set(
+      formationId,
       [...nodeIds].sort((leftId, rightId) => {
         const left = agentsById.get(leftId);
         const right = agentsById.get(rightId);
@@ -373,83 +380,94 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
     );
   }
 
-  const getGraphDepth = (graphId: string): number => {
-    const cachedDepth = graphDepths.get(graphId);
+  const getFormationDepth = (formationId: string): number => {
+    const cachedDepth = formationDepths.get(formationId);
     if (typeof cachedDepth === "number") {
       return cachedDepth;
     }
 
-    const graph = graphsById.get(graphId);
+    const formation = formationsById.get(formationId);
     if (
-      !graph ||
-      !graph.parentGraphId ||
-      !graphsById.has(graph.parentGraphId)
+      !formation ||
+      !formation.parentFormationId ||
+      !formationsById.has(formation.parentFormationId)
     ) {
-      graphDepths.set(graphId, 0);
+      formationDepths.set(formationId, 0);
       return 0;
     }
 
-    const depth = getGraphDepth(graph.parentGraphId) + 1;
-    graphDepths.set(graphId, depth);
+    const depth = getFormationDepth(formation.parentFormationId) + 1;
+    formationDepths.set(formationId, depth);
     return depth;
   };
 
-  const getRootGraphId = (graphId: string): string => {
-    let current = graphId;
+  const getRootFormationId = (formationId: string): string => {
+    let current = formationId;
     while (true) {
-      const graph = graphsById.get(current);
-      if (!graph?.parentGraphId || !graphsById.has(graph.parentGraphId)) {
+      const formation = formationsById.get(current);
+      if (
+        !formation?.parentFormationId ||
+        !formationsById.has(formation.parentFormationId)
+      ) {
         return current;
       }
-      current = graph.parentGraphId;
+      current = formation.parentFormationId;
     }
   };
 
-  const getDirectChildGraphId = (
-    parentGraphId: string,
-    targetGraphId: string,
+  const getDirectChildFormationId = (
+    parentFormationId: string,
+    targetFormationId: string,
   ): string | null => {
-    let current = targetGraphId;
+    let current = targetFormationId;
 
     while (true) {
-      const graph = graphsById.get(current);
-      if (!graph?.parentGraphId || !graphsById.has(graph.parentGraphId)) {
+      const formation = formationsById.get(current);
+      if (
+        !formation?.parentFormationId ||
+        !formationsById.has(formation.parentFormationId)
+      ) {
         return null;
       }
-      if (graph.parentGraphId === parentGraphId) {
+      if (formation.parentFormationId === parentFormationId) {
         return current;
       }
-      current = graph.parentGraphId;
+      current = formation.parentFormationId;
     }
   };
 
   const getContainerItemId = (
-    containerGraphId: string | null,
+    containerFormationId: string | null,
     agent: StaticAgentDescriptor,
   ): string | null => {
-    const graphId =
-      agent.graphId && graphsById.has(agent.graphId) ? agent.graphId : null;
+    const formationId =
+      agent.formationId && formationsById.has(agent.formationId)
+        ? agent.formationId
+        : null;
 
-    if (containerGraphId === null) {
-      if (!graphId) {
+    if (containerFormationId === null) {
+      if (!formationId) {
         return agent.id;
       }
-      return getGraphNodeId(getRootGraphId(graphId));
+      return getFormationNodeId(getRootFormationId(formationId));
     }
 
-    if (graphId === containerGraphId) {
+    if (formationId === containerFormationId) {
       return agent.id;
     }
 
-    if (!graphId) {
+    if (!formationId) {
       return null;
     }
 
-    const childGraphId = getDirectChildGraphId(containerGraphId, graphId);
-    return childGraphId ? getGraphNodeId(childGraphId) : null;
+    const childFormationId = getDirectChildFormationId(
+      containerFormationId,
+      formationId,
+    );
+    return childFormationId ? getFormationNodeId(childFormationId) : null;
   };
 
-  const allAgentEdges = structuralGraph.agents.flatMap((agent) =>
+  const allAgentEdges = structuralFormation.agents.flatMap((agent) =>
     agent.connections
       .filter((targetId) => agentsById.has(targetId))
       .map((targetId) => ({
@@ -459,7 +477,7 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
       })),
   );
 
-  const getContainerEdges = (containerGraphId: string | null) => {
+  const getContainerEdges = (containerFormationId: string | null) => {
     const edgeSet = new Set<string>();
     const edges: Array<{ id: string; source: string; target: string }> = [];
 
@@ -470,8 +488,14 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
         continue;
       }
 
-      const sourceItemId = getContainerItemId(containerGraphId, sourceAgent);
-      const targetItemId = getContainerItemId(containerGraphId, targetAgent);
+      const sourceItemId = getContainerItemId(
+        containerFormationId,
+        sourceAgent,
+      );
+      const targetItemId = getContainerItemId(
+        containerFormationId,
+        targetAgent,
+      );
       if (!sourceItemId || !targetItemId || sourceItemId === targetItemId) {
         continue;
       }
@@ -493,33 +517,35 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
   };
 
   const subtreeNodeCountCache = new Map<string, number>();
-  const countSubtreeNodes = (graphId: string): number => {
-    const cachedCount = subtreeNodeCountCache.get(graphId);
+  const countSubtreeNodes = (formationId: string): number => {
+    const cachedCount = subtreeNodeCountCache.get(formationId);
     if (typeof cachedCount === "number") {
       return cachedCount;
     }
 
-    const directCount = graphNodeIds.get(graphId)?.length ?? 0;
+    const directCount = formationNodeIds.get(formationId)?.length ?? 0;
     const total =
       directCount +
-      (graphChildren.get(graphId) ?? []).reduce(
-        (sum, childGraphId) => sum + countSubtreeNodes(childGraphId),
+      (formationChildren.get(formationId) ?? []).reduce(
+        (sum, childFormationId) => sum + countSubtreeNodes(childFormationId),
         0,
       );
 
-    subtreeNodeCountCache.set(graphId, total);
+    subtreeNodeCountCache.set(formationId, total);
     return total;
   };
 
-  const buildGraphLayout = (graphId: string): GraphSubtreeLayout => {
-    const graph = graphsById.get(graphId);
-    const childGraphIds = graphChildren.get(graphId) ?? [];
-    const directNodeIds = graphNodeIds.get(graphId) ?? [];
+  const buildFormationLayout = (
+    formationId: string,
+  ): FormationSubtreeLayout => {
+    const formation = formationsById.get(formationId);
+    const childFormationIds = formationChildren.get(formationId) ?? [];
+    const directNodeIds = formationNodeIds.get(formationId) ?? [];
 
     const childLayouts = new Map(
-      childGraphIds.map((childGraphId) => [
-        childGraphId,
-        buildGraphLayout(childGraphId),
+      childFormationIds.map((childFormationId) => [
+        childFormationId,
+        buildFormationLayout(childFormationId),
       ]),
     );
 
@@ -534,19 +560,19 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
           data: {},
         } satisfies FlowNode;
       }),
-      ...childGraphIds.map((childGraphId) => {
-        const childLayout = childLayouts.get(childGraphId);
+      ...childFormationIds.map((childFormationId) => {
+        const childLayout = childLayouts.get(childFormationId);
         return {
-          id: getGraphNodeId(childGraphId),
+          id: getFormationNodeId(childFormationId),
           position: { x: 0, y: 0 },
-          width: childLayout?.width ?? GRAPH_MIN_WIDTH,
-          height: childLayout?.height ?? GRAPH_MIN_HEIGHT,
+          width: childLayout?.width ?? FORMATION_MIN_WIDTH,
+          height: childLayout?.height ?? FORMATION_MIN_HEIGHT,
           data: {},
         } satisfies FlowNode;
       }),
     ];
 
-    const rawEdges: FlowEdge[] = getContainerEdges(graphId).map((edge) => ({
+    const rawEdges: FlowEdge[] = getContainerEdges(formationId).map((edge) => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
@@ -562,8 +588,8 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
     );
 
     const nodes: WorkspaceLayoutNode[] = [];
-    let maxRight = GRAPH_SIDE_PADDING;
-    let maxBottom = GRAPH_HEADER_HEIGHT;
+    let maxRight = FORMATION_SIDE_PADDING;
+    let maxBottom = FORMATION_HEADER_HEIGHT;
 
     for (const nodeId of directNodeIds) {
       const agent = agentsById.get(nodeId);
@@ -573,8 +599,8 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
 
       const position = positions.get(nodeId) ?? { x: 0, y: 0 };
       const relativePosition = {
-        x: position.x + GRAPH_SIDE_PADDING,
-        y: position.y + GRAPH_HEADER_HEIGHT,
+        x: position.x + FORMATION_SIDE_PADDING,
+        y: position.y + FORMATION_HEADER_HEIGHT,
       };
 
       maxRight = Math.max(maxRight, relativePosition.x + agent.width);
@@ -583,34 +609,34 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
       nodes.push({
         kind: "agent",
         id: nodeId,
-        parentId: getGraphNodeId(graphId),
+        parentId: getFormationNodeId(formationId),
         position: relativePosition,
         width: agent.width,
         height: AGENT_NODE_HEIGHT,
       });
     }
 
-    for (const childGraphId of childGraphIds) {
-      const childLayout = childLayouts.get(childGraphId);
-      const childGraph = graphsById.get(childGraphId);
-      if (!childLayout || !childGraph) {
+    for (const childFormationId of childFormationIds) {
+      const childLayout = childLayouts.get(childFormationId);
+      const childFormation = formationsById.get(childFormationId);
+      if (!childLayout || !childFormation) {
         continue;
       }
 
-      const childNodeId = getGraphNodeId(childGraphId);
+      const childNodeId = getFormationNodeId(childFormationId);
       const position = positions.get(childNodeId) ?? { x: 0, y: 0 };
       const relativePosition = {
-        x: position.x + GRAPH_SIDE_PADDING,
-        y: position.y + GRAPH_HEADER_HEIGHT,
+        x: position.x + FORMATION_SIDE_PADDING,
+        y: position.y + FORMATION_HEADER_HEIGHT,
       };
 
       maxRight = Math.max(maxRight, relativePosition.x + childLayout.width);
       maxBottom = Math.max(maxBottom, relativePosition.y + childLayout.height);
 
       nodes.push({
-        kind: "graph",
+        kind: "formation",
         id: childNodeId,
-        parentId: getGraphNodeId(graphId),
+        parentId: getFormationNodeId(formationId),
         position: relativePosition,
         width: childLayout.width,
         height: childLayout.height,
@@ -620,28 +646,38 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
     }
 
     return {
-      width: Math.max(GRAPH_MIN_WIDTH, maxRight + GRAPH_SIDE_PADDING),
-      height: Math.max(GRAPH_MIN_HEIGHT, maxBottom + GRAPH_BOTTOM_PADDING),
+      width: Math.max(FORMATION_MIN_WIDTH, maxRight + FORMATION_SIDE_PADDING),
+      height: Math.max(
+        FORMATION_MIN_HEIGHT,
+        maxBottom + FORMATION_BOTTOM_PADDING,
+      ),
       data: {
-        graphId,
-        label: graph ? getGraphDisplayName(graph) : graphId.slice(0, 8),
-        goal: graph?.goal ?? "",
-        depth: getGraphDepth(graphId),
-        nodeCount: countSubtreeNodes(graphId),
-        childGraphCount: childGraphIds.length,
+        formationId,
+        label: formation
+          ? getFormationDisplayName(formation)
+          : formationId.slice(0, 8),
+        goal: formation?.goal ?? "",
+        depth: getFormationDepth(formationId),
+        nodeCount: countSubtreeNodes(formationId),
+        childFormationCount: childFormationIds.length,
         leaving: false,
       },
       nodes,
     };
   };
 
-  const rootGraphIds = graphChildren.get(null) ?? [];
-  const rootGraphLayouts = new Map(
-    rootGraphIds.map((graphId) => [graphId, buildGraphLayout(graphId)]),
+  const rootFormationIds = formationChildren.get(null) ?? [];
+  const rootFormationLayouts = new Map(
+    rootFormationIds.map((formationId) => [
+      formationId,
+      buildFormationLayout(formationId),
+    ]),
   );
 
-  const topLevelAgentIds = structuralGraph.agents
-    .filter((agent) => !agent.graphId || !graphsById.has(agent.graphId))
+  const topLevelAgentIds = structuralFormation.agents
+    .filter(
+      (agent) => !agent.formationId || !formationsById.has(agent.formationId),
+    )
     .map((agent) => agent.id)
     .sort((leftId, rightId) => {
       const left = agentsById.get(leftId);
@@ -664,13 +700,13 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
         data: {},
       } satisfies FlowNode;
     }),
-    ...rootGraphIds.map((graphId) => {
-      const layout = rootGraphLayouts.get(graphId);
+    ...rootFormationIds.map((formationId) => {
+      const layout = rootFormationLayouts.get(formationId);
       return {
-        id: getGraphNodeId(graphId),
+        id: getFormationNodeId(formationId),
         position: { x: 0, y: 0 },
-        width: layout?.width ?? GRAPH_MIN_WIDTH,
-        height: layout?.height ?? GRAPH_MIN_HEIGHT,
+        width: layout?.width ?? FORMATION_MIN_WIDTH,
+        height: layout?.height ?? FORMATION_MIN_HEIGHT,
         data: {},
       } satisfies FlowNode;
     }),
@@ -708,28 +744,28 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
     });
   }
 
-  for (const graphId of rootGraphIds) {
-    const graphLayout = rootGraphLayouts.get(graphId);
-    if (!graphLayout) {
+  for (const formationId of rootFormationIds) {
+    const formationLayout = rootFormationLayouts.get(formationId);
+    if (!formationLayout) {
       continue;
     }
 
     nodes.push({
-      kind: "graph",
-      id: getGraphNodeId(graphId),
-      position: topLevelPositions.get(getGraphNodeId(graphId)) ?? {
+      kind: "formation",
+      id: getFormationNodeId(formationId),
+      position: topLevelPositions.get(getFormationNodeId(formationId)) ?? {
         x: 0,
         y: 0,
       },
-      width: graphLayout.width,
-      height: graphLayout.height,
-      data: graphLayout.data,
+      width: formationLayout.width,
+      height: formationLayout.height,
+      data: formationLayout.data,
     });
-    nodes.push(...graphLayout.nodes);
+    nodes.push(...formationLayout.nodes);
   }
 
   const nextLayout = {
-    structureKey: structuralGraph.structureKey,
+    structureKey: structuralFormation.structureKey,
     nodes,
     edges: allAgentEdges.map((edge) => ({
       id: edge.id,
@@ -739,20 +775,20 @@ function getCachedLayoutGraph(structuralGraph: StructuralGraph): LayoutCache {
     })),
   } satisfies LayoutCache;
 
-  graphLayoutCache.set(structuralGraph.structureKey, nextLayout);
-  if (graphLayoutCache.size > MAX_LAYOUT_CACHE_SIZE) {
-    const oldestKey = graphLayoutCache.keys().next().value;
+  formationLayoutCache.set(structuralFormation.structureKey, nextLayout);
+  if (formationLayoutCache.size > MAX_LAYOUT_CACHE_SIZE) {
+    const oldestKey = formationLayoutCache.keys().next().value;
     if (typeof oldestKey === "string") {
-      graphLayoutCache.delete(oldestKey);
+      formationLayoutCache.delete(oldestKey);
     }
   }
 
   return nextLayout;
 }
 
-export function AgentGraph() {
+export function AgentFormation() {
   const { agents } = useAgentNodesRuntime();
-  const { graphs } = useAgentGraphRuntime();
+  const { formations } = useAgentFormationRuntime();
   const { activeMessages, activeToolCalls } = useAgentActivityRuntime();
   const { selectedAgentId, selectAgent } = useAgentUI();
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
@@ -787,7 +823,7 @@ export function AgentGraph() {
     return map;
   }, [activeMessages]);
 
-  const structuralGraph = useMemo(() => {
+  const structuralFormation = useMemo(() => {
     const structuralAgents = Array.from(agents.values()).map((agent) => {
       const label = getNodeLabel({
         name: agent.name,
@@ -798,46 +834,48 @@ export function AgentGraph() {
       return {
         id: agent.id,
         nodeType: agent.node_type,
-        graphId: agent.graph_id,
+        formationId: agent.formation_id,
         label,
         width: getAgentNodeWidth(label),
         connections: [...agent.connections].sort(),
       } satisfies StaticAgentDescriptor;
     });
 
-    const structuralGraphs = Array.from(graphs.values()).map((graph) => ({
-      id: graph.id,
-      parentGraphId: graph.parent_graph_id,
-      name: graph.name,
-      goal: graph.goal,
-    }));
+    const structuralFormations = Array.from(formations.values()).map(
+      (formation) => ({
+        id: formation.id,
+        parentFormationId: formation.parent_formation_id,
+        name: formation.name,
+        goal: formation.goal,
+      }),
+    );
 
     const agentKey = structuralAgents
       .map(
         (agent) =>
-          `${agent.id}:${agent.nodeType}:${agent.graphId ?? "null"}:${agent.label}:${agent.width}:${agent.connections.join(",")}`,
+          `${agent.id}:${agent.nodeType}:${agent.formationId ?? "null"}:${agent.label}:${agent.width}:${agent.connections.join(",")}`,
       )
       .sort()
       .join("|");
 
-    const graphKey = structuralGraphs
+    const formationKey = structuralFormations
       .map(
-        (graph) =>
-          `${graph.id}:${graph.parentGraphId ?? "null"}:${graph.name ?? ""}:${graph.goal}`,
+        (formation) =>
+          `${formation.id}:${formation.parentFormationId ?? "null"}:${formation.name ?? ""}:${formation.goal}`,
       )
       .sort()
       .join("|");
 
     return {
-      structureKey: `${agentKey}::${graphKey}`,
+      structureKey: `${agentKey}::${formationKey}`,
       agents: structuralAgents,
-      graphs: structuralGraphs,
-    } satisfies StructuralGraph;
-  }, [agents, graphs]);
+      formations: structuralFormations,
+    } satisfies StructuralFormation;
+  }, [agents, formations]);
 
-  const layoutGraph = useMemo(
-    () => getCachedLayoutGraph(structuralGraph),
-    [structuralGraph],
+  const layoutFormation = useMemo(
+    () => getCachedLayoutFormation(structuralFormation),
+    [structuralFormation],
   );
 
   const transientData = useMemo(() => {
@@ -853,7 +891,7 @@ export function AgentGraph() {
         label,
         width: getAgentNodeWidth(label),
         node_type: agent.node_type,
-        graph_id: agent.graph_id,
+        formation_id: agent.formation_id,
         state: agent.state,
         shortId: id.slice(0, 8),
         name: agent.name,
@@ -869,13 +907,13 @@ export function AgentGraph() {
   }, [agents, selectedAgentId, activeToolCalls]);
 
   const { nodes, edges, structureKey } = useMemo(() => {
-    const nodes: FlowNode[] = layoutGraph.nodes.flatMap<FlowNode>(
+    const nodes: FlowNode[] = layoutFormation.nodes.flatMap<FlowNode>(
       (layoutNode) => {
-        if (layoutNode.kind === "graph") {
+        if (layoutNode.kind === "formation") {
           return [
             {
               id: layoutNode.id,
-              type: "graphGroup",
+              type: "formationGroup",
               parentId: layoutNode.parentId,
               position: layoutNode.position,
               width: layoutNode.width,
@@ -885,7 +923,7 @@ export function AgentGraph() {
               selectable: false,
               connectable: false,
               className:
-                "agent-graph-group-shell !border-none !bg-transparent !shadow-none",
+                "agent-formation-group-shell !border-none !bg-transparent !shadow-none",
             } satisfies FlowNode,
           ];
         }
@@ -904,13 +942,13 @@ export function AgentGraph() {
             width: layoutNode.width,
             height: layoutNode.height,
             data,
-            className: "agent-graph-node-shell",
+            className: "agent-formation-node-shell",
           } satisfies FlowNode,
         ];
       },
     );
 
-    const edges = layoutGraph.edges.map((edge) => {
+    const edges = layoutFormation.edges.map((edge) => {
       const activeMessage = activeEdgeMessages.get(edge.id);
       return {
         ...edge,
@@ -926,12 +964,12 @@ export function AgentGraph() {
     return {
       nodes,
       edges,
-      structureKey: layoutGraph.structureKey,
+      structureKey: layoutFormation.structureKey,
     };
-  }, [activeEdgeMessages, layoutGraph, transientData]);
+  }, [activeEdgeMessages, layoutFormation, transientData]);
 
   const { nodes: animatedNodes, edges: animatedEdges } =
-    useTransientGraphElements(nodes, edges);
+    useTransientFormationElements(nodes, edges);
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
@@ -1139,7 +1177,7 @@ export function AgentGraph() {
               <Network className="mx-auto size-8 text-primary/65" />
               <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
               <p className="text-sm text-muted-foreground">
-                Loading agent graph...
+                Loading agent formation...
               </p>
             </div>
           </div>
@@ -1166,13 +1204,13 @@ export function AgentGraph() {
             zoomOnPinch
             minZoom={VIEWPORT_MIN_ZOOM}
             maxZoom={VIEWPORT_MAX_ZOOM}
-            className="bg-graph-bg"
+            className="bg-formation-bg"
           >
-            <Background color="var(--graph-grid)" gap={32} size={0.8} />
+            <Background color="var(--formation-grid)" gap={32} size={0.8} />
             <svg aria-hidden="true" focusable="false">
               <defs>
                 <linearGradient
-                  id="agent-edge-flow"
+                  id="agent-formation-edge-flow"
                   x1="0"
                   y1="0"
                   x2="1"
@@ -1180,44 +1218,45 @@ export function AgentGraph() {
                 >
                   <stop
                     offset="0%"
-                    stopColor="var(--graph-edge)"
+                    stopColor="var(--formation-edge)"
                     stopOpacity="0.2"
                   />
                   <stop
                     offset="50%"
-                    stopColor="var(--graph-edge-active)"
+                    stopColor="var(--formation-edge-active)"
                     stopOpacity="0.94"
                   />
                   <stop
                     offset="100%"
-                    stopColor="var(--graph-edge)"
+                    stopColor="var(--formation-edge)"
                     stopOpacity="0.2"
                   />
                 </linearGradient>
-                <radialGradient id="agent-edge-pulse" cx="50%" cy="50%" r="50%">
+                <radialGradient
+                  id="agent-formation-edge-pulse"
+                  cx="50%"
+                  cy="50%"
+                  r="50%"
+                >
                   <stop
                     offset="0%"
-                    stopColor="var(--graph-edge-active)"
+                    stopColor="var(--formation-edge-active)"
                     stopOpacity="1"
                   />
                   <stop
                     offset="100%"
-                    stopColor="var(--graph-edge-active)"
+                    stopColor="var(--formation-edge-active)"
                     stopOpacity="0.2"
                   />
                 </radialGradient>
                 <filter
-                  id="agent-edge-glow"
+                  id="agent-formation-edge-glow"
                   x="-50%"
                   y="-50%"
                   width="200%"
                   height="200%"
                 >
-                  <feGaussianBlur stdDeviation="2.6" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
+                  <feGaussianBlur stdDeviation="2.6" />
                 </filter>
               </defs>
             </svg>
@@ -1225,7 +1264,7 @@ export function AgentGraph() {
         )}
       </div>
 
-      <AgentGraphTooltip
+      <AgentTooltip
         agent={tooltipAgent ?? null}
         agentId={tooltip?.agentId ?? null}
         activeToolCall={tooltipToolCall}

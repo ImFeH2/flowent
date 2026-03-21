@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
 import type { Node } from "@/types";
 
-interface AgentGraphTooltipProps {
+interface AgentTooltipProps {
   agent: Node | null;
   agentId: string | null;
   activeToolCall: string | null;
@@ -12,13 +12,13 @@ interface AgentGraphTooltipProps {
   tooltipRef: RefObject<HTMLDivElement | null>;
 }
 
-export function AgentGraphTooltip({
+export function AgentTooltip({
   agent,
   agentId,
   activeToolCall,
   style,
   tooltipRef,
-}: AgentGraphTooltipProps) {
+}: AgentTooltipProps) {
   const label = agent
     ? getNodeLabel({
         name: agent.name,
@@ -62,9 +62,9 @@ export function AgentGraphTooltip({
             <span className="text-foreground/80">
               {agent.connections.length}
             </span>
-            <span>Graph</span>
+            <span>Formation</span>
             <span className="font-mono text-foreground/80">
-              {agent.graph_id ? agent.graph_id.slice(0, 8) : "—"}
+              {agent.formation_id ? agent.formation_id.slice(0, 8) : "—"}
             </span>
             {activeToolCall ? (
               <>

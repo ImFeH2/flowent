@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
 
-export function AnimatedMessageEdge(props: EdgeProps) {
+export function AgentEdge(props: EdgeProps) {
   const {
     sourceX,
     sourceY,
@@ -48,7 +48,7 @@ export function AnimatedMessageEdge(props: EdgeProps) {
 
   return (
     <motion.g
-      className="agent-graph-edge-shell"
+      className="agent-formation-edge-shell"
       initial={{ opacity: 0 }}
       animate={{ opacity: leaving ? 0 : 1 }}
       transition={{ duration: leaving ? 0.2 : 0.26, ease: [0.23, 1, 0.32, 1] }}
@@ -58,8 +58,8 @@ export function AnimatedMessageEdge(props: EdgeProps) {
         path={edgePath}
         style={{
           stroke: hasActiveMessage
-            ? "var(--graph-edge-active)"
-            : "var(--graph-edge)",
+            ? "var(--formation-edge-active)"
+            : "var(--formation-edge)",
           strokeWidth: hasActiveMessage ? 2.2 : 1.2,
           transition:
             "stroke 220ms ease, stroke-width 220ms ease, opacity 220ms ease",
@@ -70,7 +70,7 @@ export function AnimatedMessageEdge(props: EdgeProps) {
           <motion.path
             d={edgePath}
             fill="none"
-            stroke="var(--graph-edge-active)"
+            stroke="var(--formation-edge-active)"
             strokeWidth="7"
             strokeLinecap="round"
             opacity="0.18"
@@ -82,7 +82,7 @@ export function AnimatedMessageEdge(props: EdgeProps) {
           <motion.path
             d={edgePath}
             fill="none"
-            stroke="url(#agent-edge-flow)"
+            stroke="url(#agent-formation-edge-flow)"
             strokeWidth="3.4"
             strokeLinecap="round"
             strokeDasharray="10 8"
@@ -103,7 +103,7 @@ export function AnimatedMessageEdge(props: EdgeProps) {
           <motion.path
             d={edgePath}
             fill="none"
-            stroke="var(--graph-edge-active)"
+            stroke="var(--formation-edge-active)"
             strokeWidth="5.8"
             strokeLinecap="round"
             strokeDasharray="22 30"
@@ -125,9 +125,11 @@ export function AnimatedMessageEdge(props: EdgeProps) {
             <circle
               key={`${id}-${particle.radius}-${particle.begin}`}
               r={particle.radius}
-              fill="url(#agent-edge-pulse)"
+              fill="url(#agent-formation-edge-pulse)"
               opacity={particle.opacity}
-              filter={particle.glow ? "url(#agent-edge-glow)" : undefined}
+              filter={
+                particle.glow ? "url(#agent-formation-edge-glow)" : undefined
+              }
             >
               <animateMotion
                 dur="0.72s"

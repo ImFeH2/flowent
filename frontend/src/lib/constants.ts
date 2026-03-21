@@ -19,23 +19,23 @@ export function getNodeLabel({
 }
 
 export const stateColor: Record<AgentState, string> = {
-  running: "bg-graph-status-running",
-  idle: "bg-graph-status-idle",
-  initializing: "bg-graph-status-initializing",
-  error: "bg-graph-status-error",
-  terminated: "bg-graph-status-terminated",
+  running: "bg-formation-status-running",
+  idle: "bg-formation-status-idle",
+  initializing: "bg-formation-status-initializing",
+  error: "bg-formation-status-error",
+  terminated: "bg-formation-status-terminated",
 };
 
 export const stateBadgeColor: Record<AgentState, string> = {
   running:
-    "bg-graph-status-running/12 text-graph-status-running border-graph-status-running/30",
-  idle: "bg-graph-status-idle/10 text-graph-status-idle border-graph-status-idle/20",
+    "bg-formation-status-running/12 text-formation-status-running border-formation-status-running/30",
+  idle: "bg-formation-status-idle/10 text-formation-status-idle border-formation-status-idle/20",
   initializing:
-    "bg-graph-status-initializing/12 text-graph-status-initializing border-graph-status-initializing/30",
+    "bg-formation-status-initializing/12 text-formation-status-initializing border-formation-status-initializing/30",
   error:
-    "bg-graph-status-error/12 text-graph-status-error border-graph-status-error/30",
+    "bg-formation-status-error/12 text-formation-status-error border-formation-status-error/30",
   terminated:
-    "bg-graph-status-terminated/10 text-graph-status-terminated border-graph-status-terminated/20",
+    "bg-formation-status-terminated/10 text-formation-status-terminated border-formation-status-terminated/20",
 };
 
 export const stateRing: Record<AgentState, string> = {
@@ -48,14 +48,15 @@ export const stateRing: Record<AgentState, string> = {
 
 export const nodeTypeIconStyle: Record<NodeType, string> = {
   assistant:
-    "rounded-sm border-graph-assistant/40 bg-graph-assistant/10 text-graph-assistant",
-  agent: "rounded-sm border-graph-node-border bg-surface-3 text-foreground/80",
+    "rounded-sm border-formation-assistant/40 bg-formation-assistant/10 text-formation-assistant",
+  agent:
+    "rounded-sm border-formation-node-border bg-surface-3 text-foreground/80",
 };
 
 export const stateBorder: Record<AgentState, string> = {
-  running: "border-graph-status-running/60",
-  idle: "border-graph-node-border",
-  initializing: "border-graph-status-initializing/60",
-  error: "border-graph-status-error/60",
-  terminated: "border-graph-node-border",
+  running: "border-formation-status-running/60",
+  idle: "border-formation-node-border",
+  initializing: "border-formation-status-initializing/60",
+  error: "border-formation-status-error/60",
+  terminated: "border-formation-node-border",
 };

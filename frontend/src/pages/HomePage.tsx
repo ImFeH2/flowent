@@ -16,7 +16,7 @@ import {
   Shield,
   X,
 } from "lucide-react";
-import { AgentGraph } from "@/components/AgentGraph";
+import { AgentFormation } from "@/components/AgentFormation";
 import { HistoryView } from "@/components/HistoryView";
 import type { Node } from "@/types";
 import {
@@ -44,7 +44,7 @@ import { getAssistantNode } from "@/lib/assistant";
 
 const WORKSPACE_PANEL_ID = "workspace-panel-width";
 const MIN_PANEL_WIDTH = 320;
-const MIN_GRAPH_WIDTH = 320;
+const MIN_FORMATION_WIDTH = 320;
 const MAX_PANEL_WIDTH = 1400;
 const DEFAULT_PANEL_RATIO = 2 / 5;
 const DEFAULT_PANEL_WIDTH = 560;
@@ -68,7 +68,7 @@ export function HomePage() {
         (typeof window === "undefined" ? nextWidth : window.innerWidth);
       const maxWidth = Math.max(
         MIN_PANEL_WIDTH,
-        containerWidth - MIN_GRAPH_WIDTH,
+        containerWidth - MIN_FORMATION_WIDTH,
       );
       setStoredPanelWidth(Math.min(nextWidth, maxWidth));
     },
@@ -148,7 +148,7 @@ export function HomePage() {
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-[linear-gradient(90deg,transparent,rgba(5,7,12,0.24))]" />
 
         <div className="relative flex-1">
-          <AgentGraph />
+          <AgentFormation />
         </div>
 
         <div className="absolute right-5 top-5 z-30 sm:right-6 sm:top-6">
@@ -278,7 +278,7 @@ function AgentDetailPanel({
   const detailTools = detail?.tools ?? [];
   const detailWriteDirs = detail?.write_dirs ?? [];
   const detailAllowNetwork = detail?.allow_network ?? false;
-  const detailGraph = detail?.graph ?? null;
+  const detailFormation = detail?.formation ?? null;
   const label = getNodeLabel({
     name: agent.name,
     roleName: agent.role_name,
@@ -351,23 +351,25 @@ function AgentDetailPanel({
 
             <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Graph
+                Formation
               </p>
               <p className="mt-2 text-sm text-foreground">
-                {detailGraph?.name ?? detailGraph?.id.slice(0, 8) ?? "None"}
+                {detailFormation?.name ??
+                  detailFormation?.id.slice(0, 8) ??
+                  "None"}
               </p>
             </div>
           </div>
 
-          <DetailSection title="Graph">
-            {detailGraph ? (
+          <DetailSection title="Formation">
+            {detailFormation ? (
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     ID
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-foreground">
-                    {detailGraph.id}
+                    {detailFormation.id}
                   </p>
                 </div>
                 <div>
@@ -375,7 +377,7 @@ function AgentDetailPanel({
                     Owner
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-foreground">
-                    {detailGraph.owner_agent_id.slice(0, 8)}
+                    {detailFormation.owner_agent_id.slice(0, 8)}
                   </p>
                 </div>
                 <div>
@@ -383,7 +385,7 @@ function AgentDetailPanel({
                     Parent
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-foreground">
-                    {detailGraph.parent_graph_id?.slice(0, 8) ?? "None"}
+                    {detailFormation.parent_formation_id?.slice(0, 8) ?? "None"}
                   </p>
                 </div>
                 <div>
@@ -394,17 +396,21 @@ function AgentDetailPanel({
                     {detailRoleName ?? "None"}
                   </p>
                 </div>
-                {detailGraph.goal ? (
+                {detailFormation.goal ? (
                   <div className="sm:col-span-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Goal
                     </p>
-                    <p className="mt-1 text-foreground">{detailGraph.goal}</p>
+                    <p className="mt-1 text-foreground">
+                      {detailFormation.goal}
+                    </p>
                   </div>
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No graph metadata</p>
+              <p className="text-sm text-muted-foreground">
+                No formation metadata
+              </p>
             )}
           </DetailSection>
 

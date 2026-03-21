@@ -671,6 +671,81 @@ def test_build_messages_warns_about_spawned_agents_waiting_for_first_task(monkey
     ]
 
 
+def test_build_messages_warns_about_declaratively_created_agents_waiting_for_first_task(
+    monkeypatch,
+):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(
+        ToolCall(
+            tool_name="create_formation",
+            tool_call_id="call-create",
+            arguments={
+                "name": "Delivery Plan",
+                "nodes": [
+                    {"name": "Planner", "role": "Worker"},
+                    {"name": "Reviewer", "role": "Worker"},
+                ],
+            },
+            result=json.dumps(
+                {
+                    "id": "formation-1",
+                    "owner_agent_id": "agent",
+                    "parent_formation_id": None,
+                    "name": "Delivery Plan",
+                    "goal": "",
+                    "nodes": [
+                        {
+                            "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
+                            "name": "Planner",
+                            "formation_id": "formation-1",
+                            "role_name": "Worker",
+                        },
+                        {
+                            "agent_id": "87654321-aaaa-bbbb-cccc-ddddeeeeffff",
+                            "name": "Reviewer",
+                            "formation_id": "formation-1",
+                            "role_name": "Worker",
+                        },
+                    ],
+                    "edges": [],
+                }
+            ),
+        )
+    )
+
+    messages = agent._build_messages()
+
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call-create",
+                    "type": "function",
+                    "function": {
+                        "name": "create_formation",
+                        "arguments": '{"name": "Delivery Plan", "nodes": [{"name": "Planner", "role": "Worker"}, {"name": "Reviewer", "role": "Worker"}]}',
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-create",
+            "content": '{"id": "formation-1", "owner_agent_id": "agent", "parent_formation_id": null, "name": "Delivery Plan", "goal": "", "nodes": [{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Planner", "formation_id": "formation-1", "role_name": "Worker"}, {"agent_id": "87654321-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Reviewer", "formation_id": "formation-1", "role_name": "Worker"}], "edges": []}',
+        },
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Spawned agents still waiting for their first task: Planner (`12345678`), Reviewer (`87654321`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
+        },
+    ]
+
+
 def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatch):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
 

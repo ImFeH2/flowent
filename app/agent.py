@@ -442,6 +442,36 @@ class Agent:
             return f"{name.strip()} (`{short_id}`)"
         return f"`{short_id}`"
 
+    @classmethod
+    def _iter_dispatched_agent_payloads(
+        cls,
+        tool_name: str,
+        payload: dict[str, Any],
+    ) -> list[tuple[str, str]]:
+        if tool_name == "spawn":
+            label = cls._get_spawned_agent_label(payload)
+            agent_id = payload.get("agent_id")
+            if isinstance(agent_id, str) and label is not None:
+                return [(agent_id, label)]
+            return []
+
+        if tool_name != "create_formation":
+            return []
+
+        raw_nodes = payload.get("nodes")
+        if not isinstance(raw_nodes, list):
+            return []
+
+        dispatched: list[tuple[str, str]] = []
+        for raw_node in raw_nodes:
+            if not isinstance(raw_node, dict):
+                continue
+            label = cls._get_spawned_agent_label(raw_node)
+            agent_id = raw_node.get("agent_id")
+            if isinstance(agent_id, str) and label is not None:
+                dispatched.append((agent_id, label))
+        return dispatched
+
     def _get_pending_spawn_dispatches(
         self,
         history_snapshot: list[HistoryEntry],
@@ -450,7 +480,9 @@ class Agent:
 
         for entry in history_snapshot:
             if isinstance(entry, ToolCall):
-                if entry.tool_name != "spawn" or entry.result is None:
+                if entry.tool_name not in {"spawn", "create_formation"}:
+                    continue
+                if entry.result is None:
                     continue
                 try:
                     payload = json.loads(entry.result)
@@ -458,11 +490,11 @@ class Agent:
                     continue
                 if not isinstance(payload, dict) or payload.get("error") is not None:
                     continue
-                agent_id = payload.get("agent_id")
-                label = self._get_spawned_agent_label(payload)
-                if not isinstance(agent_id, str) or label is None:
-                    continue
-                pending[agent_id] = label
+                for agent_id, label in self._iter_dispatched_agent_payloads(
+                    entry.tool_name,
+                    payload,
+                ):
+                    pending[agent_id] = label
                 continue
 
             if isinstance(entry, SentMessage):

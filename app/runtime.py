@@ -57,7 +57,7 @@ def bootstrap_runtime() -> None:
             role_name=settings.assistant.role_name,
             name="Assistant",
             tools=[
-                "create_graph",
+                "create_formation",
                 "spawn",
                 "manage_providers",
                 "manage_roles",

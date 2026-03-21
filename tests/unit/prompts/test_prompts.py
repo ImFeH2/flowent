@@ -136,7 +136,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
         is_assistant=True,
     )
     assert ASSISTANT_ONLY_PROMPT in prompt
-    assert "create_graph" in prompt
+    assert "create_formation" in prompt
     assert "spawn" in prompt
     assert "manage_providers" in prompt
     assert "manage_roles" in prompt

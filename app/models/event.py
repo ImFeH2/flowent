@@ -7,7 +7,7 @@ from typing import Any
 
 
 class EventType(StrEnum):
-    GRAPH_CREATED = "graph_created"
+    FORMATION_CREATED = "formation_created"
     NODE_CREATED = "node_created"
     NODE_STATE_CHANGED = "node_state_changed"
     NODE_TODOS_CHANGED = "node_todos_changed"
@@ -22,7 +22,7 @@ class EventType(StrEnum):
 
 
 DISPLAY_EVENTS: set[EventType] = {
-    EventType.GRAPH_CREATED,
+    EventType.FORMATION_CREATED,
     EventType.NODE_CREATED,
     EventType.NODE_STATE_CHANGED,
     EventType.NODE_TODOS_CHANGED,

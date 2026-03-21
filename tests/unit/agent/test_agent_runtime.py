@@ -10,7 +10,7 @@ from app.models import (
     AssistantText,
     ErrorEntry,
     EventType,
-    Graph,
+    Formation,
     LLMResponse,
     Message,
     NodeConfig,
@@ -123,46 +123,46 @@ def test_finalize_termination_removes_bidirectional_connections():
         registry.reset()
 
 
-def test_finalize_termination_unregisters_empty_graph():
+def test_finalize_termination_unregisters_empty_formation():
     registry.reset()
     try:
-        graph = Graph(
-            id="graph-1",
+        formation = Formation(
+            id="formation-1",
             owner_agent_id="worker",
-            name="Test Graph",
+            name="Test Formation",
         )
         worker = Agent(
-            NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),
+            NodeConfig(node_type=NodeType.AGENT, formation_id=formation.id),
             uuid="worker",
         )
-        registry.register_graph(graph)
+        registry.register_formation(formation)
         registry.register(worker)
 
         worker._finalize_termination("done")
 
         assert registry.get(worker.uuid) is None
-        assert registry.get_graph(graph.id) is None
+        assert registry.get_formation(formation.id) is None
     finally:
         registry.reset()
 
 
-def test_finalize_termination_keeps_graph_when_other_nodes_remain():
+def test_finalize_termination_keeps_formation_when_other_nodes_remain():
     registry.reset()
     try:
-        graph = Graph(
-            id="graph-1",
+        formation = Formation(
+            id="formation-1",
             owner_agent_id="worker-1",
-            name="Shared Graph",
+            name="Shared Formation",
         )
         worker_1 = Agent(
-            NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),
+            NodeConfig(node_type=NodeType.AGENT, formation_id=formation.id),
             uuid="worker-1",
         )
         worker_2 = Agent(
-            NodeConfig(node_type=NodeType.AGENT, graph_id=graph.id),
+            NodeConfig(node_type=NodeType.AGENT, formation_id=formation.id),
             uuid="worker-2",
         )
-        registry.register_graph(graph)
+        registry.register_formation(formation)
         registry.register(worker_1)
         registry.register(worker_2)
 
@@ -170,7 +170,7 @@ def test_finalize_termination_keeps_graph_when_other_nodes_remain():
 
         assert registry.get(worker_1.uuid) is None
         assert registry.get(worker_2.uuid) is worker_2
-        assert registry.get_graph(graph.id) is graph
+        assert registry.get_formation(formation.id) is formation
     finally:
         registry.reset()
 
@@ -629,12 +629,12 @@ def test_build_messages_warns_about_spawned_agents_waiting_for_first_task(monkey
         ToolCall(
             tool_name="spawn",
             tool_call_id="call-spawn",
-            arguments={"role_name": "Worker", "graph_id": "graph-1"},
+            arguments={"role_name": "Worker", "formation_id": "formation-1"},
             result=json.dumps(
                 {
                     "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
                     "name": "Directory Worker",
-                    "graph_id": "graph-1",
+                    "formation_id": "formation-1",
                     "role_name": "Worker",
                 }
             ),
@@ -654,7 +654,7 @@ def test_build_messages_warns_about_spawned_agents_waiting_for_first_task(monkey
                     "type": "function",
                     "function": {
                         "name": "spawn",
-                        "arguments": '{"role_name": "Worker", "graph_id": "graph-1"}',
+                        "arguments": '{"role_name": "Worker", "formation_id": "formation-1"}',
                     },
                 }
             ],
@@ -662,7 +662,7 @@ def test_build_messages_warns_about_spawned_agents_waiting_for_first_task(monkey
         {
             "role": "tool",
             "tool_call_id": "call-spawn",
-            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "graph_id": "graph-1", "role_name": "Worker"}',
+            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "formation_id": "formation-1", "role_name": "Worker"}',
         },
         {
             "role": "user",
@@ -680,12 +680,12 @@ def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatc
         ToolCall(
             tool_name="spawn",
             tool_call_id="call-spawn",
-            arguments={"role_name": "Worker", "graph_id": "graph-1"},
+            arguments={"role_name": "Worker", "formation_id": "formation-1"},
             result=json.dumps(
                 {
                     "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
                     "name": "Directory Worker",
-                    "graph_id": "graph-1",
+                    "formation_id": "formation-1",
                     "role_name": "Worker",
                 }
             ),
@@ -711,7 +711,7 @@ def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatc
                     "type": "function",
                     "function": {
                         "name": "spawn",
-                        "arguments": '{"role_name": "Worker", "graph_id": "graph-1"}',
+                        "arguments": '{"role_name": "Worker", "formation_id": "formation-1"}',
                     },
                 }
             ],
@@ -719,7 +719,7 @@ def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatc
         {
             "role": "tool",
             "tool_call_id": "call-spawn",
-            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "graph_id": "graph-1", "role_name": "Worker"}',
+            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "formation_id": "formation-1", "role_name": "Worker"}',
         },
         {
             "role": "assistant",

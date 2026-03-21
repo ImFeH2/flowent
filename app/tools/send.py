@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from loguru import logger
 
 from app.events import event_bus
-from app.graph_runtime import resolve_node_ref
+from app.formation_runtime import resolve_node_ref
 from app.models import Event, EventType, Message
 from app.tools import Tool
 

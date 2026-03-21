@@ -205,7 +205,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "exec",
             ],
             "optional_tools": [
-                "create_graph",
+                "create_formation",
                 "connect",
                 "edit",
                 "fetch",
@@ -224,7 +224,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "list_connections",
             ],
             "optional_tools": [
-                "create_graph",
+                "create_formation",
                 "connect",
                 "read",
                 "edit",
@@ -258,7 +258,7 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "exec",
         "fetch",
         "spawn",
-        "create_graph",
+        "create_formation",
         "connect",
         "list_roles",
         "list_tools",

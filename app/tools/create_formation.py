@@ -4,27 +4,27 @@ import json
 import uuid
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from app.graph_runtime import emit_graph_created
-from app.models import Graph
+from app.formation_runtime import emit_formation_created
+from app.models import Formation
 from app.tools import Tool
 
 if TYPE_CHECKING:
     from app.agent import Agent
 
 
-class CreateGraphTool(Tool):
-    name = "create_graph"
-    description = "Create a child graph owned by the current agent."
+class CreateFormationTool(Tool):
+    name = "create_formation"
+    description = "Create a child formation owned by the current agent."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "name": {
                 "type": "string",
-                "description": "Human-readable graph name",
+                "description": "Human-readable formation name",
             },
             "goal": {
                 "type": "string",
-                "description": "Goal or purpose of this graph",
+                "description": "Goal or purpose of this formation",
             },
         },
         "required": [],
@@ -40,13 +40,13 @@ class CreateGraphTool(Tool):
         if goal is not None and not isinstance(goal, str):
             return json.dumps({"error": "goal must be a string"})
 
-        graph = Graph(
+        formation = Formation(
             id=str(uuid.uuid4()),
             owner_agent_id=agent.uuid,
-            parent_graph_id=agent.config.graph_id,
+            parent_formation_id=agent.config.formation_id,
             name=name.strip() if isinstance(name, str) and name.strip() else None,
             goal=goal.strip() if isinstance(goal, str) else "",
         )
-        registry.register_graph(graph)
-        emit_graph_created(graph)
-        return json.dumps(graph.serialize())
+        registry.register_formation(formation)
+        emit_formation_created(formation)
+        return json.dumps(formation.serialize())

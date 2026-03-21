@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from app.events import event_bus
-from app.models import Event, EventType, Graph
+from app.models import Event, EventType, Formation
 from app.registry import registry
 
 
-def emit_graph_created(graph: Graph) -> None:
+def emit_formation_created(formation: Formation) -> None:
     event_bus.emit(
         Event(
-            type=EventType.GRAPH_CREATED,
-            agent_id=graph.owner_agent_id,
-            data=graph.serialize(),
+            type=EventType.FORMATION_CREATED,
+            agent_id=formation.owner_agent_id,
+            data=formation.serialize(),
         )
     )
 

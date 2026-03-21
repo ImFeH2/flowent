@@ -9,7 +9,7 @@ from app.models.delta import (
     ToolResultDelta,
 )
 from app.models.event import DISPLAY_EVENTS, Event, EventType
-from app.models.graph import Graph
+from app.models.formation import Formation
 from app.models.history import (
     AssistantText,
     AssistantThinking,
@@ -33,7 +33,7 @@ __all__ = [
     "ErrorEntry",
     "Event",
     "EventType",
-    "Graph",
+    "Formation",
     "HistoryEntry",
     "LLMResponse",
     "Message",

@@ -3,10 +3,10 @@ import json
 import pytest
 
 from app.agent import Agent
-from app.models import Graph, NodeConfig, NodeType
+from app.models import Formation, NodeConfig, NodeType
 from app.registry import registry
 from app.tools.connect import ConnectTool
-from app.tools.create_graph import CreateGraphTool
+from app.tools.create_formation import CreateFormationTool
 
 
 @pytest.fixture(autouse=True)
@@ -16,26 +16,26 @@ def reset_registry():
     registry.reset()
 
 
-def test_create_graph_registers_child_graph_for_owner():
+def test_create_formation_registers_child_formation_for_owner():
     owner = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
-            graph_id="graph-root",
-            tools=["create_graph"],
+            formation_id="formation-root",
+            tools=["create_formation"],
         ),
         uuid="owner",
     )
     registry.register(owner)
-    registry.register_graph(
-        Graph(
-            id="graph-root",
+    registry.register_formation(
+        Formation(
+            id="formation-root",
             owner_agent_id="owner",
-            name="Root Graph",
+            name="Root Formation",
         )
     )
 
     result = json.loads(
-        CreateGraphTool().execute(
+        CreateFormationTool().execute(
             owner,
             {
                 "name": "Research Cluster",
@@ -44,36 +44,36 @@ def test_create_graph_registers_child_graph_for_owner():
         )
     )
 
-    graph = registry.get_graph(result["id"])
-    assert graph is not None
-    assert graph.owner_agent_id == "owner"
-    assert graph.parent_graph_id == "graph-root"
-    assert graph.name == "Research Cluster"
-    assert graph.goal == "Investigate multiple websites"
+    formation = registry.get_formation(result["id"])
+    assert formation is not None
+    assert formation.owner_agent_id == "owner"
+    assert formation.parent_formation_id == "formation-root"
+    assert formation.name == "Research Cluster"
+    assert formation.goal == "Investigate multiple websites"
 
 
 def test_connect_is_directional_by_default():
     owner = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
-            graph_id="graph-root",
+            formation_id="formation-root",
             tools=["connect"],
         ),
         uuid="owner",
     )
     worker = Agent(
-        NodeConfig(node_type=NodeType.AGENT, graph_id="graph-root"),
+        NodeConfig(node_type=NodeType.AGENT, formation_id="formation-root"),
         uuid="worker",
     )
     sink = Agent(
-        NodeConfig(node_type=NodeType.AGENT, graph_id="graph-root"),
+        NodeConfig(node_type=NodeType.AGENT, formation_id="formation-root"),
         uuid="sink",
     )
-    registry.register_graph(
-        Graph(
-            id="graph-root",
+    registry.register_formation(
+        Formation(
+            id="formation-root",
             owner_agent_id="owner",
-            name="Root Graph",
+            name="Root Formation",
         )
     )
     registry.register(owner)
@@ -96,24 +96,24 @@ def test_connect_supports_bidirectional_edges():
     owner = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
-            graph_id="graph-root",
+            formation_id="formation-root",
             tools=["connect"],
         ),
         uuid="owner",
     )
     worker = Agent(
-        NodeConfig(node_type=NodeType.AGENT, graph_id="graph-root"),
+        NodeConfig(node_type=NodeType.AGENT, formation_id="formation-root"),
         uuid="worker",
     )
     sink = Agent(
-        NodeConfig(node_type=NodeType.AGENT, graph_id="graph-root"),
+        NodeConfig(node_type=NodeType.AGENT, formation_id="formation-root"),
         uuid="sink",
     )
-    registry.register_graph(
-        Graph(
-            id="graph-root",
+    registry.register_formation(
+        Formation(
+            id="formation-root",
             owner_agent_id="owner",
-            name="Root Graph",
+            name="Root Formation",
         )
     )
     registry.register(owner)
@@ -136,27 +136,27 @@ def test_connect_rejects_unmanaged_targets():
     owner = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
-            graph_id="graph-root",
+            formation_id="formation-root",
             tools=["connect"],
         ),
         uuid="owner",
     )
     foreign = Agent(
-        NodeConfig(node_type=NodeType.AGENT, graph_id="graph-foreign"),
+        NodeConfig(node_type=NodeType.AGENT, formation_id="formation-foreign"),
         uuid="foreign",
     )
-    registry.register_graph(
-        Graph(
-            id="graph-root",
+    registry.register_formation(
+        Formation(
+            id="formation-root",
             owner_agent_id="owner",
-            name="Root Graph",
+            name="Root Formation",
         )
     )
-    registry.register_graph(
-        Graph(
-            id="graph-foreign",
+    registry.register_formation(
+        Formation(
+            id="formation-foreign",
             owner_agent_id="foreign",
-            name="Foreign Graph",
+            name="Foreign Formation",
         )
     )
     registry.register(owner)

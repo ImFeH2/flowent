@@ -65,7 +65,7 @@ class ToolRegistry:
 
 def build_tool_registry() -> ToolRegistry:
     from app.tools.connect import ConnectTool
-    from app.tools.create_graph import CreateGraphTool
+    from app.tools.create_formation import CreateFormationTool
     from app.tools.edit import EditTool
     from app.tools.exec import ExecTool
     from app.tools.fetch import FetchTool
@@ -90,7 +90,7 @@ def build_tool_registry() -> ToolRegistry:
         SleepTool,
         TodoTool,
         ListConnectionsTool,
-        CreateGraphTool,
+        CreateFormationTool,
         ConnectTool,
         ManageProvidersTool,
         ManageRolesTool,

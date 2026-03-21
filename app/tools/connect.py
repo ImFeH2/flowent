@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from app.graph_runtime import connect_nodes, resolve_node_ref
+from app.formation_runtime import connect_nodes, resolve_node_ref
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class ConnectTool(Tool):
     name = "connect"
     description = (
-        "Create a directed message edge between two nodes in a Graph you own. "
+        "Create a directed message edge between two nodes in a Formation you own. "
         "Use bidirectional=true to create edges in both directions."
     )
     parameters: ClassVar[dict[str, Any]] = {

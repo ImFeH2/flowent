@@ -265,7 +265,7 @@ class Agent:
                     "node_type": self.config.node_type.value,
                     "role_name": self.config.role_name,
                     "name": self.config.name,
-                    "graph_id": self.config.graph_id,
+                    "formation_id": self.config.formation_id,
                 },
             ),
         )
@@ -745,7 +745,7 @@ class Agent:
         *,
         log_failures: bool,
     ) -> list[Agent]:
-        from app.graph_runtime import resolve_node_ref
+        from app.formation_runtime import resolve_node_ref
 
         resolved_targets: list[Agent] = []
         seen_target_ids: set[str] = set()
@@ -1157,6 +1157,6 @@ class Agent:
                 peer.remove_connection(self.uuid)
             self.remove_connection(peer_id)
 
-        graph_id = self.config.graph_id
-        if graph_id and not registry.get_graph_nodes(graph_id):
-            registry.unregister_graph(graph_id)
+        formation_id = self.config.formation_id
+        if formation_id and not registry.get_formation_nodes(formation_id):
+            registry.unregister_formation(formation_id)

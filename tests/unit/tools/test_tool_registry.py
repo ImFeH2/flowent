@@ -40,9 +40,9 @@ def test_tool_registry_registers_connect_and_removes_create_root():
     assert "manage_prompts" in tool_names
 
 
-def test_tool_registry_grants_graph_spawn_tools_when_explicitly_allowed():
+def test_tool_registry_grants_formation_spawn_tools_when_explicitly_allowed():
     agent = Agent(
-        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_graph", "spawn"])
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["create_formation", "spawn"])
     )
 
     tools = build_tool_registry().get_tools_for_agent(agent)
@@ -52,7 +52,7 @@ def test_tool_registry_grants_graph_spawn_tools_when_explicitly_allowed():
         "sleep",
         "todo",
         "list_connections",
-        "create_graph",
+        "create_formation",
         "spawn",
     ]
 

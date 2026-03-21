@@ -35,7 +35,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 system_prompt="Coordinate tasks.",
                 included_tools=[
                     "spawn",
-                    "create_graph",
+                    "create_formation",
                     "connect",
                     "list_roles",
                     "list_tools",
@@ -72,7 +72,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 "model_params": None,
                 "included_tools": [
                     "spawn",
-                    "create_graph",
+                    "create_formation",
                     "connect",
                     "list_roles",
                     "list_tools",

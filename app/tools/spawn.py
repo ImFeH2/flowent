@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
 
-from app.graph_runtime import connect_nodes
+from app.formation_runtime import connect_nodes
 from app.models import NodeConfig, NodeType
 from app.tools import MINIMUM_TOOLS, Tool
 
@@ -22,7 +22,7 @@ class SpawnTool(Tool):
         "This is a low-cost delegation mechanism: you may create specialized agents whenever parallelism or task handoff would help. "
         "If the work is outside your role, expertise, or ownership, spawning a better-suited agent should usually be your first move. "
         "Once you determine that spawning is the better path, do it directly instead of asking the Human for permission, unless the spawn would enable destructive work, material extra cost, or elevated permissions. "
-        "The agent is created and connected to the spawner. graph_id is required, and the caller must own that graph. To assign a task, send a message after spawning."
+        "The agent is created and connected to the spawner. formation_id is required, and the caller must own that formation. To assign a task, send a message after spawning."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -50,12 +50,12 @@ class SpawnTool(Tool):
                 "description": "Whether the agent can access the network",
                 "default": False,
             },
-            "graph_id": {
+            "formation_id": {
                 "type": "string",
-                "description": "ID of the Graph to spawn the node into. The caller must be the owner of this Graph.",
+                "description": "ID of the Formation to spawn the node into. The caller must be the owner of this Formation.",
             },
         },
-        "required": ["role_name", "graph_id"],
+        "required": ["role_name", "formation_id"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -68,7 +68,7 @@ class SpawnTool(Tool):
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
-        graph_id = args.get("graph_id")
+        formation_id = args.get("formation_id")
 
         if not isinstance(tools, list) or not all(
             isinstance(tool_name, str) for tool_name in tools
@@ -85,16 +85,16 @@ class SpawnTool(Tool):
         role_cfg = find_role(settings, role_name)
         if role_cfg is None:
             return json.dumps({"error": f"Role '{role_name}' not found"})
-        if graph_id is None or graph_id == "":
-            return json.dumps({"error": "graph_id is required"})
-        if not isinstance(graph_id, str) or not graph_id:
-            return json.dumps({"error": "graph_id must be a non-empty string"})
-        graph = registry.get_graph(graph_id)
-        if graph is None:
-            return json.dumps({"error": f"Graph '{graph_id}' not found"})
-        if graph.owner_agent_id != agent.uuid:
+        if formation_id is None or formation_id == "":
+            return json.dumps({"error": "formation_id is required"})
+        if not isinstance(formation_id, str) or not formation_id:
+            return json.dumps({"error": "formation_id must be a non-empty string"})
+        formation = registry.get_formation(formation_id)
+        if formation is None:
+            return json.dumps({"error": f"Formation '{formation_id}' not found"})
+        if formation.owner_agent_id != agent.uuid:
             return json.dumps(
-                {"error": f"Graph '{graph_id}' is not managed by this agent"}
+                {"error": f"Formation '{formation_id}' is not managed by this agent"}
             )
 
         final_tools: list[str] = []
@@ -113,7 +113,7 @@ class SpawnTool(Tool):
         config = NodeConfig(
             node_type=NodeType.AGENT,
             role_name=role_name,
-            graph_id=graph_id,
+            formation_id=formation_id,
             name=name,
             tools=final_tools,
             write_dirs=write_dirs,
@@ -121,7 +121,7 @@ class SpawnTool(Tool):
             parent_id=agent.uuid,
         )
 
-        if agent.config.graph_id is not None:
+        if agent.config.formation_id is not None:
             parent_write_dirs = [
                 Path(path).resolve() for path in agent.config.write_dirs
             ]
@@ -192,10 +192,10 @@ class SpawnTool(Tool):
             return json.dumps({"error": f"Failed to spawn agent: {exc}"})
 
         logger.info(
-            "Spawned agent {} (role={}, graph={}) by {}",
+            "Spawned agent {} (role={}, formation={}) by {}",
             agent_uuid[:8],
             role_name,
-            graph_id[:8],
+            formation_id[:8],
             agent.uuid[:8],
         )
 
@@ -203,7 +203,7 @@ class SpawnTool(Tool):
             {
                 "agent_id": agent_uuid,
                 "name": name or role_name,
-                "graph_id": graph_id,
+                "formation_id": formation_id,
                 "role_name": role_name,
             }
         )

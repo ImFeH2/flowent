@@ -18,7 +18,7 @@ from app.settings import (
 )
 
 
-def test_bootstrap_runtime_creates_only_assistant_with_graph_spawn_tools(
+def test_bootstrap_runtime_creates_only_assistant_with_formation_spawn_tools(
     monkeypatch,
     tmp_path,
 ):
@@ -53,7 +53,7 @@ def test_bootstrap_runtime_creates_only_assistant_with_graph_spawn_tools(
         assert assistant.config.name == "Assistant"
         assert assistant.config.role_name == STEWARD_ROLE_NAME
         assert assistant.config.tools == [
-            "create_graph",
+            "create_formation",
             "spawn",
             "manage_providers",
             "manage_roles",

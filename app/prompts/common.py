@@ -108,9 +108,18 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 - To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`). Multiple targets: `@Worker-1, Worker-2: message body`.
 - A single content block is either plain output or a `@target:` routed message, never both. Plain content that does not start with `@target:` will not be seen by any other node.
 - Use `list_connections` to discover connected node names and UUIDs before sending.
+- When you finish your assigned task, you MUST route the result back to the node that sent you the task using `@<name-or-uuid>: result`. Plain content without `@target:` will not reach any other node. If you are unsure who assigned you the task, use `list_connections` to find connected nodes.
+- Do not call `idle` after completing a task without first routing the result back.
 - Do NOT output content just to "think out loud" between tool calls. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
 - System context is injected as: <system>content</system>
+"""
+
+FILE_PATH_GUIDANCE = """\
+## File Path Rules
+
+- Always use relative paths for file operations (read, edit, exec). Do not guess absolute paths like /workspace or /home.
+- If you need the absolute working directory, run `pwd` first.
 """
 
 ASSISTANT_ONLY_PROMPT = """\
@@ -182,7 +191,10 @@ def compose_system_prompt(
     custom_prompt_text = custom_prompt.strip()
     role_specific_prompt = role_prompt.strip()
 
-    parts = [COMMUNICATION_USAGE_GUIDANCE.strip()]
+    parts = [
+        COMMUNICATION_USAGE_GUIDANCE.strip(),
+        FILE_PATH_GUIDANCE.strip(),
+    ]
     if tools is not None:
         parts.extend(_build_conditional_tool_guidance(tools))
     if is_assistant:

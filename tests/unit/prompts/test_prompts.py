@@ -5,6 +5,7 @@ from app.prompts.common import (
     COMMUNICATION_USAGE_GUIDANCE,
     DEFAULT_AGENT_ROLE_PROMPT,
     DELEGATION_GENERAL_GUIDANCE,
+    FILE_PATH_GUIDANCE,
     FORMATION_TOOL_GUIDANCE,
     IDLE_TOOL_GUIDANCE,
     LIST_ROLES_TOOL_GUIDANCE,
@@ -45,6 +46,7 @@ def test_compose_system_prompt_inserts_custom_prompt_between_tool_guidance_and_r
 
     assert result == _join(
         COMMUNICATION_USAGE_GUIDANCE,
+        FILE_PATH_GUIDANCE,
         IDLE_TOOL_GUIDANCE,
         DELEGATION_GENERAL_GUIDANCE,
         SPAWN_TOOL_GUIDANCE,
@@ -63,6 +65,7 @@ def test_compose_system_prompt_inserts_assistant_layer_before_custom_prompt():
 
     assert result == _join(
         COMMUNICATION_USAGE_GUIDANCE,
+        FILE_PATH_GUIDANCE,
         IDLE_TOOL_GUIDANCE,
         ASSISTANT_ONLY_PROMPT,
         "Global custom instructions.",
@@ -79,6 +82,7 @@ def test_compose_system_prompt_ignores_empty_custom_prompt():
 
     assert result == _join(
         COMMUNICATION_USAGE_GUIDANCE,
+        FILE_PATH_GUIDANCE,
         IDLE_TOOL_GUIDANCE,
         "Role-specific instructions.",
     )
@@ -125,7 +129,25 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         "Plain content that does not start with `@target:` will not be seen by any other node."
         in COMMUNICATION_USAGE_GUIDANCE
     )
+    assert "you MUST route the result back" in COMMUNICATION_USAGE_GUIDANCE
+    assert (
+        "Do not call `idle` after completing a task without first routing the result back."
+        in COMMUNICATION_USAGE_GUIDANCE
+    )
     assert "automatically delivered to your parent" not in COMMUNICATION_USAGE_GUIDANCE
+
+
+def test_file_path_guidance_requires_relative_paths():
+    assert "relative paths" in FILE_PATH_GUIDANCE
+    assert "Do not guess absolute paths like /workspace or /home." in FILE_PATH_GUIDANCE
+    assert "run `pwd` first" in FILE_PATH_GUIDANCE
+
+
+def test_compose_system_prompt_always_includes_file_path_guidance():
+    result = compose_system_prompt("Role-specific instructions.", tools=["read"])
+
+    assert FILE_PATH_GUIDANCE in result
+    assert result.index(COMMUNICATION_USAGE_GUIDANCE) < result.index(FILE_PATH_GUIDANCE)
 
 
 def test_assistant_only_prompt_keeps_frontend_semantics_without_repeating_block_rule():
@@ -225,6 +247,14 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert (
+        "When a task contains two or more independent subtasks that can run in parallel"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "When in doubt between a single Worker and multiple agents, prefer multiple agents."
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
+    assert (
         "Use `spawn` only when you need to add nodes to an existing formation dynamically, not as the primary creation method"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
@@ -263,6 +293,10 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     assert SPAWN_TOOL_GUIDANCE in prompt
     assert FORMATION_TOOL_GUIDANCE in prompt
     assert "## Tools Available" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    assert (
+        "Prefer multi-agent parallelism over serial single-agent execution."
+        in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    )
     assert (
         "prefer one declarative `create_formation(name=..., goal=..., nodes=[...], edges=[...])` call"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT

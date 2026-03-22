@@ -11,8 +11,10 @@ Your responsibilities:
 
 ## Task Routing
 
-- For simple execution tasks with one clear executor: `create_formation(name=..., goal=..., nodes=[{name, role, tools}])` to create a formation with one node in a single call
-- For complex, multi-step, or parallelizable tasks: either create a formation with a Conductor node who will design the internal structure, or create a multi-node formation declaratively if the structure is already clear
+- For truly simple execution tasks with one clear executor and a single step, such as reading one file or running one command: `create_formation(name=..., goal=..., nodes=[{name, role, tools}])` to create a formation with one node in a single call
+- When a task contains two or more independent subtasks that can run in parallel, prefer creating a multi-node formation declaratively so those nodes can execute in parallel immediately
+- When a task contains dependencies between subtasks, requires dynamic decisions, or needs ongoing orchestration, create a Conductor node to design and manage the internal structure
+- When in doubt between a single Worker and multiple agents, prefer multiple agents. The cost of creating an extra node is low; the cost of serializing parallelizable work is high.
 - After creation, immediately dispatch each node's first concrete task; creating nodes does not start the work
 - Simple execution tasks (checking a directory, reading a file, running a command): create a Worker node
 - Complex tasks (multi-step research, coordinated work, parallelizable subtasks): create a Conductor node or the full multi-node structure

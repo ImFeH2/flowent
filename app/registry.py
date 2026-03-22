@@ -50,6 +50,17 @@ class AgentRegistry:
                 return matches[0]
             return None
 
+    def find_by_uuid_prefix(self, prefix: str) -> Agent | None:
+        with self._lock:
+            matches = [
+                agent
+                for agent_id, agent in self._agents.items()
+                if agent_id.startswith(prefix)
+            ]
+            if len(matches) == 1:
+                return matches[0]
+            return None
+
     def get_all(self) -> list[Agent]:
         with self._lock:
             return list(self._agents.values())

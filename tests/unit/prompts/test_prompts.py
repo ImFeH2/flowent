@@ -94,6 +94,7 @@ def test_compose_system_prompt_injects_spawn_guidance_when_tool_present():
     assert DELEGATION_GENERAL_GUIDANCE in result
     assert SPAWN_TOOL_GUIDANCE in result
     assert FORMATION_TOOL_GUIDANCE not in result
+    assert "dispatch tasks to ALL of them before calling" in SPAWN_TOOL_GUIDANCE
 
 
 def test_compose_system_prompt_omits_spawn_guidance_when_tool_absent():
@@ -101,6 +102,16 @@ def test_compose_system_prompt_omits_spawn_guidance_when_tool_absent():
 
     assert DELEGATION_GENERAL_GUIDANCE not in result
     assert SPAWN_TOOL_GUIDANCE not in result
+
+
+def test_compose_system_prompt_injects_formation_parallel_dispatch_guidance():
+    result = compose_system_prompt(
+        "Role-specific instructions.",
+        tools=["create_formation"],
+    )
+
+    assert FORMATION_TOOL_GUIDANCE in result
+    assert "dispatch tasks to all nodes" in FORMATION_TOOL_GUIDANCE
 
 
 def test_compose_system_prompt_injects_management_guidance_when_manage_tool_present():
@@ -121,6 +132,7 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         "must start with `@<name-or-uuid>: message body`"
         in COMMUNICATION_USAGE_GUIDANCE
     )
+    assert "Prefer using node names" in COMMUNICATION_USAGE_GUIDANCE
     assert (
         "A single content block is either plain output or a `@target:` routed message"
         in COMMUNICATION_USAGE_GUIDANCE

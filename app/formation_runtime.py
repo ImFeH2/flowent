@@ -48,4 +48,6 @@ def resolve_node_ref(node_ref: str):
     target = registry.get(node_ref)
     if target is None:
         target = registry.find_by_name(node_ref)
+    if target is None and 4 <= len(node_ref) < 36:
+        target = registry.find_by_uuid_prefix(node_ref)
     return target

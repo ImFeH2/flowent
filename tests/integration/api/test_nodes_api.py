@@ -1,8 +1,11 @@
+import os
 from uuid import UUID
 
 from fastapi.testclient import TestClient
 
 from app.routes.nodes import router as nodes_router
+from app.settings import STEWARD_ROLE_INCLUDED_TOOLS
+from app.tools import MINIMUM_TOOLS
 
 
 def _get_assistant_id(client: TestClient) -> str:
@@ -79,19 +82,8 @@ def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient)
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == assistant_id
-    assert set(data["tools"]) == {
-        "idle",
-        "sleep",
-        "todo",
-        "list_connections",
-        "create_formation",
-        "spawn",
-        "manage_providers",
-        "manage_roles",
-        "manage_settings",
-        "manage_prompts",
-    }
-    assert data["write_dirs"] == []
+    assert set(data["tools"]) == set(MINIMUM_TOOLS) | set(STEWARD_ROLE_INCLUDED_TOOLS)
+    assert data["write_dirs"] == [os.getcwd()]
     assert data["allow_network"] is True
 
 

@@ -1,4 +1,5 @@
 import json
+import os
 from uuid import UUID
 
 import app.settings as settings_module
@@ -9,6 +10,7 @@ from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
     STEWARD_ROLE_SYSTEM_PROMPT,
     WORKER_ROLE_INCLUDED_TOOLS,
@@ -52,15 +54,8 @@ def test_bootstrap_runtime_creates_only_assistant_with_formation_spawn_tools(
         assert assistant.config.node_type.value == "assistant"
         assert assistant.config.name == "Assistant"
         assert assistant.config.role_name == STEWARD_ROLE_NAME
-        assert assistant.config.tools == [
-            "create_formation",
-            "spawn",
-            "manage_providers",
-            "manage_roles",
-            "manage_settings",
-            "manage_prompts",
-        ]
-        assert assistant.config.write_dirs == []
+        assert assistant.config.tools == list(STEWARD_ROLE_INCLUDED_TOOLS)
+        assert assistant.config.write_dirs == [os.getcwd()]
         assert assistant.config.allow_network is True
         assert assistant.config.parent_id == "human"
     finally:
@@ -98,7 +93,7 @@ def test_bootstrap_runtime_creates_builtin_worker_and_conductor_roles(
             RoleConfig(
                 name=STEWARD_ROLE_NAME,
                 system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
-                included_tools=[],
+                included_tools=STEWARD_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=WORKER_ROLE_NAME,
@@ -150,7 +145,7 @@ def test_bootstrap_runtime_reconciles_existing_builtin_roles(monkeypatch, tmp_pa
             RoleConfig(
                 name=STEWARD_ROLE_NAME,
                 system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
-                included_tools=[],
+                included_tools=STEWARD_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=WORKER_ROLE_NAME,

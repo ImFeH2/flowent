@@ -105,34 +105,26 @@ def prepare_spawn(
         parent_id=agent.uuid,
     )
 
-    if agent.config.formation_id is not None:
-        parent_write_dirs = [Path(path).resolve() for path in agent.config.write_dirs]
-        invalid_write_dirs = sorted(
-            path
-            for path in config.write_dirs
-            if not any(
-                Path(path).resolve().is_relative_to(parent_path)
-                for parent_path in parent_write_dirs
-            )
+    parent_write_dirs = [Path(path).resolve() for path in agent.config.write_dirs]
+    invalid_write_dirs = sorted(
+        path
+        for path in config.write_dirs
+        if not any(
+            Path(path).resolve().is_relative_to(parent_path)
+            for parent_path in parent_write_dirs
         )
-        if invalid_write_dirs:
-            return (
-                None,
-                "write_dirs boundary exceeded: " + ", ".join(invalid_write_dirs),
-            )
-
-        if config.allow_network and not agent.config.allow_network:
-            return (
-                None,
-                "allow_network boundary exceeded: parent disallows network access",
-            )
-
-        allowed_tools = set(agent.config.tools) | set(MINIMUM_TOOLS)
-        invalid_tools = sorted(
-            tool_name for tool_name in final_tools if tool_name not in allowed_tools
+    )
+    if invalid_write_dirs:
+        return (
+            None,
+            "write_dirs boundary exceeded: " + ", ".join(invalid_write_dirs),
         )
-        if invalid_tools:
-            return None, "tool boundary exceeded: " + ", ".join(invalid_tools)
+
+    if config.allow_network and not agent.config.allow_network:
+        return (
+            None,
+            "allow_network boundary exceeded: parent disallows network access",
+        )
 
     return PreparedSpawn(agent_uuid=str(uuid.uuid4()), config=config), None
 

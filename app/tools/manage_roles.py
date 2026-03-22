@@ -115,7 +115,6 @@ def _enforce_builtin_role_guards(
 
 class ManageRolesTool(Tool):
     name = "manage_roles"
-    agent_visible = False
     description = (
         "Manage Role configuration. Supports listing, creating, updating, "
         "and deleting roles. Built-in roles cannot be deleted, renamed, "

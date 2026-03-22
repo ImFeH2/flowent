@@ -70,13 +70,13 @@ def test_tool_registry_hides_send_from_llm_even_if_explicitly_allowed():
     ]
 
 
-def test_tool_registry_hides_assistant_only_management_tools_from_agent_visible_list():
+def test_tool_registry_shows_management_tools_in_agent_visible_list():
     visible_tool_names = {
         tool.name for tool in build_tool_registry().list_tools(agent_visible_only=True)
     }
 
     assert "send" not in visible_tool_names
-    assert "manage_providers" not in visible_tool_names
-    assert "manage_roles" not in visible_tool_names
-    assert "manage_settings" not in visible_tool_names
-    assert "manage_prompts" not in visible_tool_names
+    assert "manage_providers" in visible_tool_names
+    assert "manage_roles" in visible_tool_names
+    assert "manage_settings" in visible_tool_names
+    assert "manage_prompts" in visible_tool_names

@@ -25,7 +25,6 @@ def _serialize_provider(provider: ProviderConfig) -> dict[str, str]:
 
 class ManageProvidersTool(Tool):
     name = "manage_providers"
-    agent_visible = False
     description = (
         "Manage LLM provider configuration. Supports listing, creating, "
         "updating, deleting providers, and listing models for a provider."

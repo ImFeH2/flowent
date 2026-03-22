@@ -5,6 +5,7 @@ from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
     STEWARD_ROLE_SYSTEM_PROMPT,
     WORKER_ROLE_INCLUDED_TOOLS,
@@ -333,7 +334,7 @@ def test_ensure_builtin_roles_repairs_and_creates_builtin_roles():
         RoleConfig(
             name=STEWARD_ROLE_NAME,
             system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
-            included_tools=[],
+            included_tools=STEWARD_ROLE_INCLUDED_TOOLS,
             excluded_tools=[],
         ),
         RoleConfig(

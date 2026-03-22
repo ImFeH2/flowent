@@ -17,6 +17,14 @@ _SETTINGS_FILE = WORKING_DIR / "settings.json"
 STEWARD_ROLE_NAME = "Steward"
 WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
+STEWARD_ROLE_INCLUDED_TOOLS = [
+    "create_formation",
+    "spawn",
+    "manage_providers",
+    "manage_roles",
+    "manage_settings",
+    "manage_prompts",
+]
 WORKER_ROLE_SYSTEM_PROMPT = (
     "You are a general-purpose worker. Follow the assigned task, use the "
     "tools you were given to complete the task, and report back clearly. You do "
@@ -1000,7 +1008,7 @@ def build_steward_role() -> RoleConfig:
     return RoleConfig(
         name=STEWARD_ROLE_NAME,
         system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
-        included_tools=[],
+        included_tools=list(STEWARD_ROLE_INCLUDED_TOOLS),
         excluded_tools=[],
     )
 

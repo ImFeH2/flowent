@@ -53,7 +53,7 @@ def test_roles_bootstrap_includes_tools_and_providers(client: TestClient, monkey
     assert {role["name"] for role in payload["roles"]} == {"Steward", "Reviewer"}
     tool_names = {tool["name"] for tool in payload["tools"]}
     assert "spawn" in tool_names
-    assert "manage_roles" not in tool_names
+    assert "manage_roles" in tool_names
 
 
 def test_create_role_rejects_duplicate_name(client: TestClient, monkeypatch):

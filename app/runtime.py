@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 from typing import TYPE_CHECKING
 
@@ -45,26 +46,32 @@ def restart_telegram_channel() -> None:
 def bootstrap_runtime() -> None:
     from app.agent import Agent
     from app.models import NodeConfig, NodeType
-    from app.settings import ensure_builtin_roles, get_settings, save_settings
+    from app.settings import (
+        STEWARD_ROLE_INCLUDED_TOOLS,
+        ensure_builtin_roles,
+        find_role,
+        get_settings,
+        save_settings,
+    )
 
+    working_dir = os.getcwd()
     settings = get_settings()
     if ensure_builtin_roles(settings):
         save_settings(settings)
+    assistant_role = find_role(settings, settings.assistant.role_name)
+    assistant_tools = (
+        list(assistant_role.included_tools)
+        if assistant_role is not None
+        else list(STEWARD_ROLE_INCLUDED_TOOLS)
+    )
 
     assistant = Agent(
         NodeConfig(
             node_type=NodeType.ASSISTANT,
             role_name=settings.assistant.role_name,
             name="Assistant",
-            tools=[
-                "create_formation",
-                "spawn",
-                "manage_providers",
-                "manage_roles",
-                "manage_settings",
-                "manage_prompts",
-            ],
-            write_dirs=[],
+            tools=assistant_tools,
+            write_dirs=[working_dir],
             allow_network=True,
             parent_id="human",
         ),

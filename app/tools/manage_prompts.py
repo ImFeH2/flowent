@@ -11,7 +11,6 @@ from app.tools import Tool
 
 class ManagePromptsTool(Tool):
     name = "manage_prompts"
-    agent_visible = False
     description = (
         "Read and update the global custom prompt and custom post prompt. The "
         "custom prompt is appended to every node's system prompt, and the "

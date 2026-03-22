@@ -340,52 +340,6 @@ def test_spawn_rejects_network_escalation(monkeypatch):
     assert len(registry.get_all()) == 1
 
 
-def test_spawn_rejects_tool_escalation(monkeypatch):
-    parent = Agent(
-        NodeConfig(
-            node_type=NodeType.AGENT,
-            formation_id="formation-parent",
-            role_name="Conductor",
-            tools=["spawn", "send"],
-        ),
-        uuid="parent",
-    )
-    registry.register_formation(
-        Formation(
-            id="formation-parent",
-            owner_agent_id="parent",
-            name="Parent Formation",
-        )
-    )
-    registry.register(parent)
-
-    monkeypatch.setattr(
-        "app.settings.get_settings",
-        lambda: Settings(
-            roles=[
-                RoleConfig(
-                    name="Worker",
-                    system_prompt="...",
-                    included_tools=["read"],
-                )
-            ]
-        ),
-    )
-
-    result = json.loads(
-        SpawnTool().execute(
-            parent,
-            {
-                "role_name": "Worker",
-                "formation_id": "formation-parent",
-            },
-        )
-    )
-
-    assert result == {"error": "tool boundary exceeded: read"}
-    assert len(registry.get_all()) == 1
-
-
 def test_spawn_requires_formation_id(monkeypatch):
     parent = Agent(
         NodeConfig(
@@ -416,14 +370,19 @@ def test_spawn_requires_formation_id(monkeypatch):
     assert len(registry.get_all()) == 1
 
 
-def test_spawn_assistant_bypasses_inherited_boundaries(monkeypatch, tmp_path):
-    writable_dir = tmp_path / "worker"
+def test_spawn_assistant_respects_inherited_boundaries(monkeypatch, tmp_path):
+    writable_dir = tmp_path / "workspace"
+    allowed_subdir = writable_dir / "child"
+    blocked_dir = tmp_path / "blocked"
     writable_dir.mkdir()
+    allowed_subdir.mkdir()
+    blocked_dir.mkdir()
     assistant = Agent(
         NodeConfig(
             node_type=NodeType.ASSISTANT,
             role_name="Steward",
             tools=["create_formation", "spawn"],
+            write_dirs=[str(writable_dir)],
             allow_network=False,
         ),
         uuid="assistant",
@@ -457,9 +416,8 @@ def test_spawn_assistant_bypasses_inherited_boundaries(monkeypatch, tmp_path):
             {
                 "role_name": "Worker",
                 "formation_id": "formation-owned",
-                "tools": ["fetch"],
-                "write_dirs": [str(writable_dir)],
-                "allow_network": True,
+                "write_dirs": [str(allowed_subdir)],
+                "allow_network": False,
             },
         )
     )
@@ -468,6 +426,33 @@ def test_spawn_assistant_bypasses_inherited_boundaries(monkeypatch, tmp_path):
 
     assert result["formation_id"] == "formation-owned"
     assert child is not None
-    assert child.config.tools == [*MINIMUM_TOOLS, "read", "exec", "fetch"]
-    assert child.config.write_dirs == [str(writable_dir)]
-    assert child.config.allow_network is True
+    assert child.config.tools == [*MINIMUM_TOOLS, "read", "exec"]
+    assert child.config.write_dirs == [str(allowed_subdir)]
+    assert child.config.allow_network is False
+
+    blocked_result = json.loads(
+        SpawnTool().execute(
+            assistant,
+            {
+                "role_name": "Worker",
+                "formation_id": "formation-owned",
+                "write_dirs": [str(blocked_dir)],
+                "allow_network": False,
+            },
+        )
+    )
+    assert blocked_result == {"error": f"write_dirs boundary exceeded: {blocked_dir}"}
+
+    network_result = json.loads(
+        SpawnTool().execute(
+            assistant,
+            {
+                "role_name": "Worker",
+                "formation_id": "formation-owned",
+                "allow_network": True,
+            },
+        )
+    )
+    assert network_result == {
+        "error": "allow_network boundary exceeded: parent disallows network access"
+    }

@@ -34,7 +34,6 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
 
 class ManageSettingsTool(Tool):
     name = "manage_settings"
-    agent_visible = False
     description = (
         "Read and update system settings, including the Assistant role, active "
         "provider and model, default model params, event log timestamp format, "

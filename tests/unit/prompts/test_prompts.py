@@ -10,6 +10,7 @@ from app.prompts.common import (
     LIST_ROLES_TOOL_GUIDANCE,
     LIST_TOOLS_TOOL_GUIDANCE,
     MANAGE_TOOLS_GUIDANCE,
+    SLEEP_TOOL_GUIDANCE,
     SPAWN_TOOL_GUIDANCE,
     compose_system_prompt,
 )
@@ -24,10 +25,15 @@ from app.settings import (
     Settings,
     build_conductor_role,
 )
+from app.tools import MINIMUM_TOOLS
 
 
 def _join(*parts: str) -> str:
     return "\n\n".join(part.strip() for part in parts if part.strip())
+
+
+def _with_minimum_tools(*tools: str) -> list[str]:
+    return list(dict.fromkeys([*tools, *MINIMUM_TOOLS]))
 
 
 def test_compose_system_prompt_inserts_custom_prompt_between_tool_guidance_and_role():
@@ -153,9 +159,30 @@ def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
     assert prompt == compose_system_prompt(
         "Review code carefully.",
         custom_prompt="Global custom instructions.",
-        tools=["read"],
+        tools=_with_minimum_tools("read"),
     )
     assert "Runtime-only reminder." not in prompt
+
+
+def test_get_system_prompt_merges_minimum_tools_for_guidance(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Reviewer",
+                    system_prompt="Review code carefully.",
+                )
+            ],
+        ),
+    )
+
+    prompt = get_system_prompt(
+        NodeConfig(node_type=NodeType.AGENT, role_name="Reviewer", tools=["read"])
+    )
+
+    assert IDLE_TOOL_GUIDANCE in prompt
+    assert SLEEP_TOOL_GUIDANCE in prompt
 
 
 def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_empty(
@@ -186,7 +213,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
         STEWARD_ROLE_SYSTEM_PROMPT,
         custom_prompt="",
         is_assistant=True,
-        tools=list(STEWARD_ROLE_INCLUDED_TOOLS),
+        tools=_with_minimum_tools(*STEWARD_ROLE_INCLUDED_TOOLS),
     )
     assert ASSISTANT_ONLY_PROMPT in prompt
     assert LIST_ROLES_TOOL_GUIDANCE in prompt
@@ -224,7 +251,7 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     assert prompt == compose_system_prompt(
         CONDUCTOR_ROLE_SYSTEM_PROMPT,
         custom_prompt="",
-        tools=list(CONDUCTOR_ROLE_INCLUDED_TOOLS),
+        tools=_with_minimum_tools(*CONDUCTOR_ROLE_INCLUDED_TOOLS),
     )
     assert ASSISTANT_ONLY_PROMPT not in prompt
     assert LIST_ROLES_TOOL_GUIDANCE in prompt
@@ -282,7 +309,7 @@ def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
     assert prompt == compose_system_prompt(
         DEFAULT_AGENT_ROLE_PROMPT,
         custom_prompt="",
-        tools=["read"],
+        tools=_with_minimum_tools("read"),
     )
     assert ASSISTANT_ONLY_PROMPT not in prompt
     assert "@target:" not in WORKER_ROLE_SYSTEM_PROMPT
@@ -307,7 +334,7 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
         STEWARD_ROLE_SYSTEM_PROMPT,
         custom_prompt="",
         is_assistant=True,
-        tools=list(STEWARD_ROLE_INCLUDED_TOOLS),
+        tools=_with_minimum_tools(*STEWARD_ROLE_INCLUDED_TOOLS),
     )
     assert ASSISTANT_ONLY_PROMPT in prompt
 

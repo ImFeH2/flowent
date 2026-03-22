@@ -3,12 +3,14 @@ from __future__ import annotations
 from app.models import NodeConfig, NodeType
 from app.prompts.common import DEFAULT_AGENT_ROLE_PROMPT, compose_system_prompt
 from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
+from app.tools import MINIMUM_TOOLS
 
 
 def get_system_prompt(config: NodeConfig) -> str:
     from app.settings import STEWARD_ROLE_NAME, find_role, get_settings
 
     settings = get_settings()
+    tools = list(dict.fromkeys([*config.tools, *MINIMUM_TOOLS]))
 
     if config.node_type == NodeType.ASSISTANT:
         role_name = (
@@ -27,5 +29,5 @@ def get_system_prompt(config: NodeConfig) -> str:
         prompt,
         custom_prompt=settings.custom_prompt,
         is_assistant=config.node_type == NodeType.ASSISTANT,
-        tools=config.tools,
+        tools=tools,
     )

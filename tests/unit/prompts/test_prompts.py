@@ -221,7 +221,11 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert MANAGE_TOOLS_GUIDANCE in prompt
     assert "## Tools Available" not in prompt
     assert (
-        "Use `list_roles` when you need to inspect built-in or custom role details before choosing what to spawn"
+        "create_formation(name=..., goal=..., nodes=[{name, role, tools}])"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "Use `spawn` only when you need to add nodes to an existing formation dynamically, not as the primary creation method"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert (

@@ -142,6 +142,18 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert "manage_roles" in prompt
     assert "manage_settings" in prompt
     assert "manage_prompts" in prompt
+    assert (
+        "For simple execution tasks with one clear executor"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "then `spawn` a Conductor into that formation and let the Conductor decide how to build the right internal structure"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "supports optional `nodes` and `edges` for declarative structure creation"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
     assert "Conductor at startup" not in prompt
     assert "send(to=conductor_id" not in prompt
     assert "Immediately send that new node its first task" in prompt
@@ -171,7 +183,19 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     assert "plain text output" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert "plain content" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert "your parent" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
-    assert "**Dispatch immediately** after each `spawn`" in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    assert (
+        "prefer one declarative `create_formation(name=..., goal=..., nodes=[...], edges=[...])` call"
+        in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "**Create the formation structure** declaratively when possible"
+        in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    )
+    assert "**Dispatch immediately** after creation" in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    assert (
+        "Use `spawn` and `connect` as follow-up tools when the topology needs to be discovered, revised, or extended during execution"
+        in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    )
 
 
 def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):

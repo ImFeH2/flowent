@@ -108,8 +108,8 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 - To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`). Multiple targets: `@Worker-1, Worker-2: message body`.
 - A single content block is either plain output or a `@target:` routed message, never both. Plain content that does not start with `@target:` will not be seen by any other node.
 - Use `list_connections` to discover connected node names and UUIDs before sending.
-- When you finish your assigned task, you MUST route the result back to the node that sent you the task using `@<name-or-uuid>: result`. Plain content without `@target:` will not reach any other node. If you are unsure who assigned you the task, use `list_connections` to find connected nodes.
-- Do not call `idle` after completing a task without first routing the result back.
+- When you finish your assigned task, route the result to the appropriate destination using `@<name-or-uuid>: result`. The destination is the node specified in your task instructions; if no specific destination was given, route back to the node that assigned you the task. Plain content without `@target:` will not reach any other node. If you are unsure where to send results, use `list_connections` to find connected nodes.
+- Do not call `idle` after completing a task without first routing the result to its destination.
 - Do NOT output content just to "think out loud" between tool calls. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
 - System context is injected as: <system>content</system>

@@ -129,9 +129,12 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         "Plain content that does not start with `@target:` will not be seen by any other node."
         in COMMUNICATION_USAGE_GUIDANCE
     )
-    assert "you MUST route the result back" in COMMUNICATION_USAGE_GUIDANCE
     assert (
-        "Do not call `idle` after completing a task without first routing the result back."
+        "route the result to the appropriate destination"
+        in COMMUNICATION_USAGE_GUIDANCE
+    )
+    assert (
+        "Do not call `idle` after completing a task without first routing the result"
         in COMMUNICATION_USAGE_GUIDANCE
     )
     assert "automatically delivered to your parent" not in COMMUNICATION_USAGE_GUIDANCE
@@ -254,6 +257,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
         "When in doubt between a single Worker and multiple agents, prefer multiple agents."
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
+    assert "instruct each node where to send its result" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
         "Use `spawn` only when you need to add nodes to an existing formation dynamically, not as the primary creation method"
         in STEWARD_ROLE_SYSTEM_PROMPT
@@ -296,6 +300,9 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     assert (
         "Prefer multi-agent parallelism over serial single-agent execution."
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "specify where each node should send its result" in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
         "prefer one declarative `create_formation(name=..., goal=..., nodes=[...], edges=[...])` call"

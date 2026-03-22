@@ -57,25 +57,11 @@ def test_tool_registry_grants_formation_spawn_tools_when_explicitly_allowed():
     ]
 
 
-def test_tool_registry_hides_send_from_llm_even_if_explicitly_allowed():
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["send"]))
-
-    tools = build_tool_registry().get_tools_for_agent(agent)
-
-    assert [tool.name for tool in tools] == [
-        "idle",
-        "sleep",
-        "todo",
-        "list_connections",
-    ]
-
-
 def test_tool_registry_shows_management_tools_in_agent_visible_list():
     visible_tool_names = {
         tool.name for tool in build_tool_registry().list_tools(agent_visible_only=True)
     }
 
-    assert "send" not in visible_tool_names
     assert "manage_providers" in visible_tool_names
     assert "manage_roles" in visible_tool_names
     assert "manage_settings" in visible_tool_names

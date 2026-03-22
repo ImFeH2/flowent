@@ -11,7 +11,6 @@ def test_tools_api_shows_agent_visible_management_tools(client: TestClient):
     assert "manage_roles" in tool_names
     assert "manage_settings" in tool_names
     assert "manage_prompts" in tool_names
-    assert "send" not in tool_names
     assert "sleep" in tool_names
     assert "spawn" in tool_names
     assert "connect" in tool_names

@@ -78,14 +78,12 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.manage_roles import ManageRolesTool
     from app.tools.manage_settings import ManageSettingsTool
     from app.tools.read import ReadTool
-    from app.tools.send import SendTool
     from app.tools.sleep import SleepTool
     from app.tools.spawn import SpawnTool
     from app.tools.todo import TodoTool
 
     reg = ToolRegistry()
     for tool_cls in [
-        SendTool,
         IdleTool,
         SleepTool,
         TodoTool,

@@ -23,7 +23,7 @@ def test_spawn_creates_connected_child_without_task_delivery(monkeypatch):
             node_type=NodeType.AGENT,
             formation_id="formation-parent",
             role_name="Conductor",
-            tools=["spawn", "send", "read", "edit"],
+            tools=["spawn", "read", "edit"],
         ),
         uuid="parent",
     )
@@ -90,7 +90,7 @@ def test_spawn_uses_default_termination_timeout_when_setup_fails(monkeypatch):
             node_type=NodeType.AGENT,
             formation_id="formation-parent",
             role_name="Conductor",
-            tools=["spawn", "send", "read"],
+            tools=["spawn", "read"],
         ),
         uuid="parent",
     )
@@ -150,7 +150,7 @@ def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
             node_type=NodeType.AGENT,
             formation_id="formation-parent",
             role_name="Conductor",
-            tools=["spawn", "send", "exec"],
+            tools=["spawn", "exec"],
         ),
         uuid="parent",
     )
@@ -171,7 +171,7 @@ def test_spawn_uses_base_tools_when_requested_tools_missing(monkeypatch):
                     name="Worker",
                     system_prompt="...",
                     included_tools=["exec"],
-                    excluded_tools=["send"],
+                    excluded_tools=[],
                 )
             ]
         ),
@@ -204,7 +204,7 @@ def test_spawn_allows_child_security_boundary_within_parent(monkeypatch, tmp_pat
             node_type=NodeType.AGENT,
             formation_id="formation-parent",
             role_name="Conductor",
-            tools=["spawn", "send", "read"],
+            tools=["spawn", "read"],
             write_dirs=[str(parent_dir)],
             allow_network=True,
         ),
@@ -264,7 +264,7 @@ def test_spawn_rejects_write_dir_escalation(monkeypatch, tmp_path):
             node_type=NodeType.AGENT,
             formation_id="formation-parent",
             role_name="Conductor",
-            tools=["spawn", "send"],
+            tools=["spawn"],
             write_dirs=[str(allowed_dir)],
         ),
         uuid="parent",
@@ -304,7 +304,7 @@ def test_spawn_rejects_network_escalation(monkeypatch):
             node_type=NodeType.AGENT,
             formation_id="formation-parent",
             role_name="Conductor",
-            tools=["spawn", "send"],
+            tools=["spawn"],
             allow_network=False,
         ),
         uuid="parent",

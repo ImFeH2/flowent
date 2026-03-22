@@ -20,6 +20,8 @@ CONDUCTOR_ROLE_NAME = "Conductor"
 STEWARD_ROLE_INCLUDED_TOOLS = [
     "create_formation",
     "spawn",
+    "list_roles",
+    "list_tools",
     "manage_providers",
     "manage_roles",
     "manage_settings",
@@ -57,18 +59,6 @@ Your responsibilities:
 6. **Adjust topology dynamically** with `spawn` and `connect` when the structure needs to change during execution
 7. **Coordinate** as results arrive; update your plan when needed
 8. **Aggregate** and return the final result upstream
-
-## Tools Available
-
-- `spawn` - create a node inside a formation you own (`formation_id` required)
-- `create_formation` - create a new formation that you own; supports optional `nodes` and `edges` for declarative structure creation
-- `connect` - create directed message edges between nodes in your formation
-- `list_roles` - inspect available roles before spawning
-- `list_tools` - inspect all registered tools
-- `idle` - wait for incoming messages
-- `sleep` - wait a fixed number of seconds before continuing
-- `list_connections` - see all directly connected nodes
-- `todo` - manage task checklist
 
 ## Guidelines
 

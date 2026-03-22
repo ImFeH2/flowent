@@ -95,6 +95,7 @@ def test_compose_system_prompt_injects_spawn_guidance_when_tool_present():
     assert SPAWN_TOOL_GUIDANCE in result
     assert FORMATION_TOOL_GUIDANCE not in result
     assert "dispatch tasks to ALL of them before calling" in SPAWN_TOOL_GUIDANCE
+    assert "Do not insert tool calls between task dispatches" in SPAWN_TOOL_GUIDANCE
 
 
 def test_compose_system_prompt_omits_spawn_guidance_when_tool_absent():
@@ -112,6 +113,7 @@ def test_compose_system_prompt_injects_formation_parallel_dispatch_guidance():
 
     assert FORMATION_TOOL_GUIDANCE in result
     assert "dispatch tasks to all nodes" in FORMATION_TOOL_GUIDANCE
+    assert "aggregator or synthesizer" in FORMATION_TOOL_GUIDANCE
 
 
 def test_compose_system_prompt_injects_management_guidance_when_manage_tool_present():
@@ -132,6 +134,7 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         "must start with `@<name-or-uuid>: message body`"
         in COMMUNICATION_USAGE_GUIDANCE
     )
+    assert "identical content" in COMMUNICATION_USAGE_GUIDANCE
     assert "Prefer using node names" in COMMUNICATION_USAGE_GUIDANCE
     assert (
         "A single content block is either plain output or a `@target:` routed message"
@@ -399,3 +402,12 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
 def test_steward_included_tools_contains_list_roles_and_list_tools():
     assert "list_roles" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tools" in STEWARD_ROLE_INCLUDED_TOOLS
+
+
+def test_steward_prompt_requires_same_response_dispatch_and_no_rebroadcast():
+    assert "In the same response after creation" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "Do not re-send a task to a node" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert (
+        "Do not insert tool calls such as `list_connections`"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )

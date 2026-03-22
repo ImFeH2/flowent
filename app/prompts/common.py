@@ -58,6 +58,7 @@ SPAWN_TOOL_GUIDANCE = """\
 - `spawn` only creates and connects a new agent. It does not assign work by itself.
 - After `spawn`, if you want the new agent to start working now, send it a concrete first task with a content block whose first line starts with `@target: ...` before you `idle` or move on.
 - After creating multiple nodes, dispatch tasks to ALL of them before calling `idle`. Each `@target:` message is one content block; output multiple content blocks in sequence to dispatch to different nodes, then `idle` once all tasks are dispatched.
+- Do not insert tool calls between task dispatches. Output all `@target:` blocks consecutively in one response, then `idle`.
 - When naming an agent via the `name` parameter of `spawn`, use title case with spaces (e.g. "Web Researcher", "Code Reviewer", "Data Analyst"). Avoid snake_case, camelCase, or all-lowercase names.
 """
 
@@ -69,6 +70,7 @@ FORMATION_TOOL_GUIDANCE = """\
 - Use `create_formation(name=..., goal=..., nodes=[...], edges=[...])` when the formation structure is already clear and you want to create the full topology declaratively in one step.
 - Declarative creation with `nodes` and `edges` does not assign work by itself. After creation, explicitly send each node its first concrete task.
 - After declarative creation, dispatch tasks to all nodes that should begin working before calling `idle`. Do not wait for one node's result before dispatching to the next.
+- When creating aggregator or synthesizer nodes, instruct them in the task message how many inputs to expect and to produce output immediately once all inputs arrive.
 """
 
 CONNECT_TOOL_GUIDANCE = """\
@@ -108,6 +110,7 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
 - To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`). Multiple targets: `@Worker-1, Worker-2: message body`.
+- The multi-target syntax `@A, B: message` sends identical content to every listed target. When different targets need different tasks, use separate content blocks with individual `@target:` prefixes.
 - Prefer using node names rather than UUIDs for `@target:` routing. Names are more readable and less error-prone. Short UUID prefixes are also supported when unambiguous.
 - A single content block is either plain output or a `@target:` routed message, never both. Plain content that does not start with `@target:` will not be seen by any other node.
 - Use `list_connections` to discover connected node names and UUIDs before sending.

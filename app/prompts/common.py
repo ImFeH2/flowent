@@ -57,7 +57,7 @@ SPAWN_TOOL_GUIDANCE = """\
 - If a suitable connected agent already exists, hand the task off with a content block whose first line starts with `@target: ...`; otherwise use `spawn` when available to create the right specialist.
 - `spawn` only creates and connects a new agent. It does not assign work by itself.
 - After `spawn`, if you want the new agent to start working now, send it a concrete first task with a content block whose first line starts with `@target: ...` before you `idle` or move on.
-- After creating multiple nodes, dispatch tasks to ALL of them before calling `idle`. Each `@target:` message is one content block; output multiple content blocks in sequence to dispatch to different nodes, then `idle` once all tasks are dispatched.
+- After creating multiple nodes, dispatch tasks to ALL of them before calling `idle`. Each content block may contain only one routed `@target:` header; emit separate content blocks in sequence to dispatch to different nodes, then `idle` once all tasks are dispatched.
 - Do not insert tool calls between task dispatches. Output all `@target:` blocks consecutively in one response, then `idle`.
 - When naming an agent via the `name` parameter of `spawn`, use title case with spaces (e.g. "Web Researcher", "Code Reviewer", "Data Analyst"). Avoid snake_case, camelCase, or all-lowercase names.
 """
@@ -109,10 +109,11 @@ MANAGE_TOOLS_GUIDANCE = """\
 COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
-- To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`). Multiple targets: `@Worker-1, Worker-2: message body`.
-- The multi-target syntax `@A, B: message` sends identical content to every listed target. When different targets need different tasks, use separate content blocks with individual `@target:` prefixes.
+- To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`).
+- Only one target ref is supported in each routed header. Do not use commas in the target field.
+- If you need to message multiple nodes, emit separate content blocks with one `@target:` header per block.
 - Prefer using node names rather than UUIDs for `@target:` routing. Names are more readable and less error-prone. Short UUID prefixes are also supported when unambiguous.
-- A single content block is either plain output or a `@target:` routed message, never both. Plain content that does not start with `@target:` will not be seen by any other node.
+- A single content block is either plain output or a `@target:` routed message, never both. A content block supports only one routed header; later `@...:` lines are treated as body text for the first target. Plain content that does not start with `@target:` will not be seen by any other node.
 - Use `list_connections` to discover connected node names and UUIDs before sending.
 - When you finish your assigned task, route the result to the appropriate destination using `@<name-or-uuid>: result`. The destination is the node specified in your task instructions; if no specific destination was given, route back to the node that assigned you the task. Plain content without `@target:` will not reach any other node. If you are unsure where to send results, use `list_connections` to find connected nodes.
 - Do not call `idle` after completing a task without first routing the result to its destination.
@@ -134,7 +135,7 @@ ASSISTANT_ONLY_PROMPT = """\
 - Your content is pushed directly to the frontend chat panel as your reply to the Human.
 - You do not need `@target:` when replying to the Human.
 - Plain content that does not start with `@target:` is a reply to the Human.
-- If you need to send a message to a connected node instead of the Human, start the content with `@<name-or-uuid>: message body` (e.g. `@Worker-1: please start the task`). Multiple targets: `@Worker-1, Worker-2: message body`.
+- If you need to send a message to a connected node instead of the Human, start the content with a single routed header `@<name-or-uuid>: message body` (e.g. `@Worker-1: please start the task`). If you need to message multiple nodes, use separate content blocks.
 - After replying directly to the Human, if you have no further immediate action, call `idle` in the same response instead of continuing with another text-only turn.
 - Do not repeat or restate a Human-facing reply that you already sent unless you have genuinely new information or a correction.
 - Entering a waiting state still requires an explicit `idle` tool call.

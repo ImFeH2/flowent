@@ -65,7 +65,16 @@ class StreamingContentState:
     streamed_message_body: str = ""
 
 
+@dataclass
+class RoutedContentResult:
+    sent_messages: list[SentMessage] = field(default_factory=list)
+    had_routed_header: bool = False
+    route_errors: list[str] = field(default_factory=list)
+    had_additional_routed_headers: bool = False
+
+
 _HEADER_RE = re.compile(r"^@([^:\n]+):[ \t]*(.*)$", re.DOTALL)
+_LINE_HEADER_RE = re.compile(r"^@[^:\n]+:[ \t]*", re.MULTILINE)
 
 
 def extract_routed_content(content: str) -> tuple[str, list[tuple[list[str], str]]]:
@@ -77,14 +86,14 @@ def extract_routed_content(content: str) -> tuple[str, list[tuple[list[str], str
     if not match:
         return content, []
 
-    targets = [target.strip() for target in match.group(1).split(",") if target.strip()]
+    target_ref = match.group(1).strip()
     body_first_line = match.group(2).strip()
     body = (body_first_line + ("\n" + rest if rest else "")).strip()
 
-    if not targets or not body:
+    if not target_ref or not body:
         return content, []
 
-    return "", [(targets, body)]
+    return "", [([target_ref], body)]
 
 
 def extract_routed_header(content: str) -> tuple[list[str], str] | None:
@@ -96,13 +105,24 @@ def extract_routed_header(content: str) -> tuple[list[str], str] | None:
     if not match:
         return None
 
-    targets = [target.strip() for target in match.group(1).split(",") if target.strip()]
-    if not targets:
+    target_ref = match.group(1).strip()
+    if not target_ref:
         return None
 
     body_first_line = match.group(2)
     body = body_first_line + ("\n" + rest if rest else "")
-    return targets, body
+    return [target_ref], body
+
+
+def has_additional_routed_headers(content: str) -> bool:
+    first_line_end = content.find("\n")
+    first_line = content[:first_line_end] if first_line_end != -1 else content
+    if not _HEADER_RE.match(first_line):
+        return False
+    if first_line_end == -1:
+        return False
+    rest = content[first_line_end + 1 :]
+    return bool(_LINE_HEADER_RE.search(rest))
 
 
 def classify_streaming_content(content: str) -> str:
@@ -161,6 +181,8 @@ class Agent:
         self._connections_lock = threading.Lock()
         self._history_lock = threading.Lock()
         self._todos_lock = threading.Lock()
+        self._runtime_notice_lock = threading.Lock()
+        self._pending_runtime_notices: list[str] = []
         self._log = logger.bind(
             agent_id=self.uuid[:8], node_type=self.config.node_type.value
         )
@@ -402,6 +424,7 @@ class Agent:
             todos = [TodoItem(text=t.text) for t in self.todos]
         with self._history_lock:
             history_snapshot = list(self.history)
+        runtime_notices = self._consume_runtime_notices()
         custom_post_prompt = get_settings().custom_post_prompt.strip()
         messages: list[dict[str, str]] = []
         todo_message = self._build_runtime_todo_message(todos)
@@ -415,6 +438,8 @@ class Agent:
                 ),
             )
         )
+        for notice in runtime_notices:
+            messages.append(self._build_runtime_system_message(notice))
         if custom_post_prompt:
             messages.append(self._build_runtime_system_message(custom_post_prompt))
         return messages
@@ -514,6 +539,7 @@ class Agent:
             "- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.",
             "- Plain content is not delivered to other agents.",
             "- Do not combine a Human-facing reply and a routed `@target` message in the same content block.",
+            "- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.",
         ]
         if pending_spawn_dispatches:
             targets = ", ".join(pending_spawn_dispatches)
@@ -536,6 +562,27 @@ class Agent:
             )
         return self._build_runtime_system_message("\n".join(lines))
 
+    @staticmethod
+    def _build_multi_routed_header_notice() -> str:
+        return (
+            "Routing reminder: only the first `@target:` header in this content "
+            "block was routed. Any later `@...:` lines were delivered as plain "
+            "body text to the first target. If that was not intentional, send "
+            "a correction to the first recipient and then send separate content "
+            "blocks to the other targets."
+        )
+
+    def _queue_runtime_notice(self, content: str) -> None:
+        with self._runtime_notice_lock:
+            if content not in self._pending_runtime_notices:
+                self._pending_runtime_notices.append(content)
+
+    def _consume_runtime_notices(self) -> list[str]:
+        with self._runtime_notice_lock:
+            notices = list(self._pending_runtime_notices)
+            self._pending_runtime_notices.clear()
+        return notices
+
     def _emit_routed_message_preview(
         self,
         state: StreamingContentState,
@@ -546,7 +593,7 @@ class Agent:
             return
 
         target_refs, raw_body = routed_header
-        targets = self._resolve_routed_targets(
+        targets, _ = self._resolve_routed_targets(
             target_refs,
             log_failures=False,
         )
@@ -723,10 +770,20 @@ class Agent:
         emitted_human_content: bool,
         message_id: str | None = None,
     ) -> None:
-        routed_entries = self._route_content_output(content, message_id=message_id)
-        if routed_entries:
-            for entry in routed_entries:
+        routed_result = self._route_content_output(content, message_id=message_id)
+        if routed_result.had_additional_routed_headers and routed_result.sent_messages:
+            self._queue_runtime_notice(self._build_multi_routed_header_notice())
+
+        if routed_result.route_errors:
+            for error in routed_result.route_errors:
+                self._append_history(ErrorEntry(content=error))
+
+        if routed_result.sent_messages:
+            for entry in routed_result.sent_messages:
                 self._append_history(entry)
+            return
+
+        if routed_result.had_routed_header:
             return
 
         if self.node_type == NodeType.ASSISTANT and not emitted_human_content:
@@ -745,15 +802,22 @@ class Agent:
         content: str,
         *,
         message_id: str | None = None,
-    ) -> list[SentMessage]:
+    ) -> RoutedContentResult:
         _, routed_messages = extract_routed_content(content)
-        sent_messages: list[SentMessage] = []
+        if not routed_messages:
+            return RoutedContentResult()
+
+        result = RoutedContentResult(
+            had_routed_header=True,
+            had_additional_routed_headers=has_additional_routed_headers(content),
+        )
 
         for target_refs, body in routed_messages:
-            resolved_targets = self._resolve_routed_targets(
+            resolved_targets, route_errors = self._resolve_routed_targets(
                 target_refs,
                 log_failures=True,
             )
+            result.route_errors.extend(route_errors)
             delivered_to: list[str] = []
             current_message_id = message_id or str(_uuid.uuid4())
             for target in resolved_targets:
@@ -761,7 +825,7 @@ class Agent:
                 delivered_to.append(target.uuid)
 
             if delivered_to:
-                sent_messages.append(
+                result.sent_messages.append(
                     SentMessage(
                         content=body,
                         to_ids=delivered_to,
@@ -769,29 +833,40 @@ class Agent:
                     ),
                 )
 
-        return sent_messages
+        return result
 
     def _resolve_routed_targets(
         self,
         target_refs: list[str],
         *,
         log_failures: bool,
-    ) -> list[Agent]:
+    ) -> tuple[list[Agent], list[str]]:
         from app.formation_runtime import resolve_node_ref
 
         resolved_targets: list[Agent] = []
         seen_target_ids: set[str] = set()
+        route_errors: list[str] = []
         for target_ref in target_refs:
             target = resolve_node_ref(target_ref)
-            if target is None or not self.is_connected_to(target.uuid):
+            if target is None:
                 if log_failures:
                     self._log.warning("@target routing failed: {}", target_ref)
+                route_errors.append(
+                    f"Routing failed: target `{target_ref}` was not found."
+                )
+                continue
+            if not self.is_connected_to(target.uuid):
+                if log_failures:
+                    self._log.warning("@target routing failed: {}", target_ref)
+                route_errors.append(
+                    f"Routing failed: target `{target_ref}` is not directly connected."
+                )
                 continue
             if target.uuid in seen_target_ids:
                 continue
             resolved_targets.append(target)
             seen_target_ids.add(target.uuid)
-        return resolved_targets
+        return resolved_targets, route_errors
 
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = [
@@ -817,12 +892,13 @@ class Agent:
 
             elif isinstance(entry, SentMessage):
                 self._flush_tool_calls(messages, pending_tool_calls)
-                messages.append(
-                    {
-                        "role": "assistant",
-                        "content": build_routed_content(entry.to_ids, entry.content),
-                    }
-                )
+                for target_id in entry.to_ids:
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": build_routed_content([target_id], entry.content),
+                        }
+                    )
 
             elif isinstance(entry, AssistantThinking):
                 pass

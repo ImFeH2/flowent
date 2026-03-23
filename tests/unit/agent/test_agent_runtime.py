@@ -261,13 +261,13 @@ def test_extract_routed_content_parses_single_target_block():
     assert routed == [(["worker"], "review the diff")]
 
 
-def test_extract_routed_content_parses_multiple_targets_without_parent_content():
+def test_extract_routed_content_treats_comma_target_as_single_literal_target():
     parent_content, routed = extract_routed_content(
         "@alice, bob: check the latest output\nand confirm",
     )
 
     assert parent_content == ""
-    assert routed == [(["alice", "bob"], "check the latest output\nand confirm")]
+    assert routed == [(["alice, bob"], "check the latest output\nand confirm")]
 
 
 def test_extract_routed_content_returns_plain_content_without_target_header():
@@ -288,7 +288,9 @@ def test_extract_routed_content_treats_non_header_target_as_plain_content():
     assert routed == []
 
 
-def test_route_content_output_delivers_to_targets_when_header_present(monkeypatch):
+def test_route_content_output_delivers_to_single_target_when_header_present(
+    monkeypatch,
+):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
     child = Agent(
@@ -296,30 +298,23 @@ def test_route_content_output_delivers_to_targets_when_header_present(monkeypatc
         uuid="child",
     )
     peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
-    helper = Agent(
-        NodeConfig(node_type=NodeType.AGENT, name="Helper"),
-        uuid="helper",
-    )
     registry.register(parent)
     registry.register(child)
     registry.register(peer)
-    registry.register(helper)
     child.add_connection(peer.uuid)
-    child.add_connection(helper.uuid)
     events = []
 
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
-        sent_messages = child._route_content_output(
-            "@peer, Helper: investigate the error\nwith the latest logs",
+        routed_result = child._route_content_output(
+            "@peer: investigate the error\nwith the latest logs",
         )
     finally:
         registry.reset()
 
     peer_signal = peer._wake_queue.get_nowait()
-    helper_signal = helper._wake_queue.get_nowait()
-    message_id = sent_messages[0].message_id
+    message_id = routed_result.sent_messages[0].message_id
 
     assert peer_signal.payload == {
         "message": {
@@ -328,25 +323,18 @@ def test_route_content_output_delivers_to_targets_when_header_present(monkeypatc
             "message_id": message_id,
         }
     }
-    assert helper_signal.payload == {
-        "message": {
-            "from": "child",
-            "content": "investigate the error\nwith the latest logs",
-            "message_id": message_id,
-        }
-    }
-    assert len(sent_messages) == 1
-    assert sent_messages[0].content == "investigate the error\nwith the latest logs"
-    assert sent_messages[0].to_ids == ["peer", "helper"]
+    assert len(routed_result.sent_messages) == 1
+    assert (
+        routed_result.sent_messages[0].content
+        == "investigate the error\nwith the latest logs"
+    )
+    assert routed_result.sent_messages[0].to_ids == ["peer"]
+    assert routed_result.route_errors == []
+    assert routed_result.had_additional_routed_headers is False
     assert message_id is not None
     assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
         {
             "to_id": "peer",
-            "content": "investigate the error\nwith the latest logs",
-            "message_id": message_id,
-        },
-        {
-            "to_id": "helper",
             "content": "investigate the error\nwith the latest logs",
             "message_id": message_id,
         },
@@ -366,11 +354,12 @@ def test_route_content_output_does_not_deliver_plain_content(monkeypatch):
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
-        sent_messages = agent._route_content_output("Status update.")
+        routed_result = agent._route_content_output("Status update.")
     finally:
         registry.reset()
 
-    assert sent_messages == []
+    assert routed_result.sent_messages == []
+    assert routed_result.had_routed_header is False
     assert parent._wake_queue.empty()
     assert not any(event.type == EventType.NODE_MESSAGE for event in events)
 
@@ -390,15 +379,79 @@ def test_route_content_output_treats_non_header_target_text_as_plain_content(
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
-        sent_messages = agent._route_content_output(
+        routed_result = agent._route_content_output(
             "Status update.\n@peer: investigate the error"
         )
     finally:
         registry.reset()
 
-    assert sent_messages == []
+    assert routed_result.sent_messages == []
+    assert routed_result.had_routed_header is False
     assert parent._wake_queue.empty()
     assert not any(event.type == EventType.NODE_MESSAGE for event in events)
+
+
+def test_record_content_output_appends_error_entry_for_unmatched_target(monkeypatch):
+    registry.reset()
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    registry.register(agent)
+    events = []
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        agent._record_content_output(
+            "@alice, bob: review the diff",
+            emitted_human_content=False,
+        )
+    finally:
+        registry.reset()
+
+    history = agent.get_history_snapshot()
+
+    assert any(
+        isinstance(entry, ErrorEntry)
+        and entry.content == "Routing failed: target `alice, bob` was not found."
+        for entry in history
+    )
+    assert not any(isinstance(entry, AssistantText) for entry in history)
+    assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
+
+
+def test_build_messages_adds_one_shot_notice_for_multiple_routed_headers(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+    registry.reset()
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    worker = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="worker")
+    registry.register(assistant)
+    registry.register(worker)
+    assistant.add_connection(worker.uuid)
+
+    try:
+        assistant._record_content_output(
+            "@worker: first task\n@other: second task",
+            emitted_human_content=False,
+        )
+
+        first_messages = assistant._build_messages()
+        second_messages = assistant._build_messages()
+    finally:
+        registry.reset()
+
+    reminder = (
+        "<system>Routing reminder: only the first `@target:` header in this content "
+        "block was routed. Any later `@...:` lines were delivered as plain body "
+        "text to the first target. If that was not intentional, send a correction "
+        "to the first recipient and then send separate content blocks to the other "
+        "targets.</system>"
+    )
+
+    assert any(msg.get("content") == reminder for msg in first_messages)
+    assert not any(msg.get("content") == reminder for msg in second_messages)
+    worker_signal = worker._wake_queue.get_nowait()
+    assert (
+        worker_signal.payload["message"]["content"] == "first task\n@other: second task"
+    )
 
 
 def test_record_content_output_records_sent_message_in_history(monkeypatch):
@@ -531,12 +584,14 @@ def test_build_messages_replays_sent_messages_as_routed_assistant_content(
         {"role": "assistant", "content": "final answer"},
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 
 
-def test_build_messages_replays_multiline_multi_target_sent_messages(monkeypatch):
+def test_build_messages_replays_each_sent_target_as_separate_routed_content(
+    monkeypatch,
+):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
@@ -555,11 +610,15 @@ def test_build_messages_replays_multiline_multi_target_sent_messages(monkeypatch
         {"role": "user", "content": '<message from="human">begin</message>'},
         {
             "role": "assistant",
-            "content": "@peer, helper: investigate the error\nwith the latest logs",
+            "content": "@peer: investigate the error\nwith the latest logs",
+        },
+        {
+            "role": "assistant",
+            "content": "@helper: investigate the error\nwith the latest logs",
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 
@@ -585,7 +644,7 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry(monke
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
         },
     ]
 
@@ -611,7 +670,7 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
         {"role": "user", "content": '<message from="human">begin</message>'},
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
         {
             "role": "user",
@@ -666,7 +725,7 @@ def test_build_messages_warns_about_spawned_agents_waiting_for_first_task(monkey
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Spawned agents still waiting for their first task: Directory Worker (`12345678`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- Spawned agents still waiting for their first task: Directory Worker (`12345678`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
         },
     ]
 
@@ -741,7 +800,7 @@ def test_build_messages_warns_about_declaratively_created_agents_waiting_for_fir
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Spawned agents still waiting for their first task: Planner (`12345678`), Reviewer (`87654321`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- Spawned agents still waiting for their first task: Planner (`12345678`), Reviewer (`87654321`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
         },
     ]
 
@@ -802,7 +861,7 @@ def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatc
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 

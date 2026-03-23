@@ -134,10 +134,19 @@ def test_common_communication_guidance_requires_explicit_target_routing():
         "must start with `@<name-or-uuid>: message body`"
         in COMMUNICATION_USAGE_GUIDANCE
     )
-    assert "identical content" in COMMUNICATION_USAGE_GUIDANCE
+    assert "Only one target ref is supported" in COMMUNICATION_USAGE_GUIDANCE
+    assert "Do not use commas in the target field." in COMMUNICATION_USAGE_GUIDANCE
+    assert (
+        "emit separate content blocks with one `@target:` header per block"
+        in COMMUNICATION_USAGE_GUIDANCE
+    )
     assert "Prefer using node names" in COMMUNICATION_USAGE_GUIDANCE
     assert (
         "A single content block is either plain output or a `@target:` routed message"
+        in COMMUNICATION_USAGE_GUIDANCE
+    )
+    assert (
+        "later `@...:` lines are treated as body text for the first target"
         in COMMUNICATION_USAGE_GUIDANCE
     )
     assert (
@@ -405,7 +414,11 @@ def test_steward_included_tools_contains_list_roles_and_list_tools():
 
 
 def test_steward_prompt_requires_same_response_dispatch_and_no_rebroadcast():
-    assert "In the same response after creation" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "In the same assistant turn after creation" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert (
+        "Each block must contain exactly one routed header"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
     assert "Do not re-send a task to a node" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
         "Do not insert tool calls such as `list_connections`"

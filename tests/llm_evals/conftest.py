@@ -36,12 +36,7 @@ def llm_eval_save_mode(request: pytest.FixtureRequest) -> str:
 def llm_eval_workspace(monkeypatch):
     import app.settings as settings_module
 
-    project_root = Path.cwd().resolve()
-    workspace_root = project_root / ".pytest-llm-eval-workspaces"
-    workspace_root.mkdir(exist_ok=True)
-    workspace = Path(
-        tempfile.mkdtemp(prefix="workspace-", dir=str(workspace_root))
-    ).resolve()
+    workspace = Path(tempfile.mkdtemp(prefix="autopoe-llm-eval-")).resolve()
 
     current_settings = settings_module.get_settings()
     settings_payload = settings_module.serialize_settings(

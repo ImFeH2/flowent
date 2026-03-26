@@ -13,7 +13,9 @@ def build_bwrap_cmd(
     command: str,
     *,
     allow_network: bool = False,
+    cwd: str | Path | None = None,
 ) -> list[str]:
+    resolved_cwd = Path(cwd).resolve() if cwd is not None else None
     cmd = [
         "bwrap",
         "--ro-bind",
@@ -26,9 +28,13 @@ def build_bwrap_cmd(
         "--tmpfs",
         "/tmp",
     ]
+    if resolved_cwd is not None:
+        cmd.extend(["--ro-bind", str(resolved_cwd), str(resolved_cwd)])
     for d in write_dirs:
         cmd.extend(["--bind", d, d])
     if not allow_network:
         cmd.append("--unshare-net")
+    if resolved_cwd is not None:
+        cmd.extend(["--chdir", str(resolved_cwd)])
     cmd.extend(["--die-with-parent", "--new-session", "--", "bash", "-c", command])
     return cmd

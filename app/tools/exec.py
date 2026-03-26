@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from loguru import logger
@@ -39,14 +41,21 @@ class ExecTool(Tool):
         command = args["command"]
         timeout = int(args.get("timeout", 30))
         write_dirs = agent.config.write_dirs
+        cwd = Path(os.getcwd()).resolve()
 
         bwrap_cmd = build_bwrap_cmd(
             write_dirs,
             command,
             allow_network=agent.config.allow_network,
+            cwd=cwd,
         )
 
-        logger.debug("Executing command: {} (timeout={}s)", command, timeout)
+        logger.debug(
+            "Executing command: {} (timeout={}s, cwd={})",
+            command,
+            timeout,
+            cwd,
+        )
 
         try:
             proc = subprocess.Popen(
@@ -54,6 +63,7 @@ class ExecTool(Tool):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                cwd=str(cwd),
             )
 
             stdout_lines: list[str] = []

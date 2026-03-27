@@ -187,6 +187,25 @@ class Agent:
             agent_id=self.uuid[:8], node_type=self.config.node_type.value
         )
 
+    def _persist_workspace_node(self) -> None:
+        if not self.config.tab_id:
+            return
+        from app.models import GraphNodeRecord
+        from app.workspace_store import workspace_store
+
+        existing = workspace_store.get_node_record(self.uuid)
+        record = GraphNodeRecord(
+            id=self.uuid,
+            config=self.config,
+            state=self.state,
+            todos=self.get_todos_snapshot(),
+            history=self.get_history_snapshot(),
+            position=existing.position if existing is not None else None,
+            created_at=existing.created_at if existing is not None else _time.time(),
+            updated_at=_time.time(),
+        )
+        workspace_store.upsert_node_record(record)
+
     def add_connection(self, other_uuid: str) -> None:
         with self._connections_lock:
             if other_uuid not in self.connections:
@@ -216,8 +235,12 @@ class Agent:
     def set_todos(self, todos: list[TodoItem]) -> None:
         with self._todos_lock:
             self.todos = [TodoItem(text=t.text) for t in todos]
+        self._persist_workspace_node()
 
     def request_idle(self, *, tool_call_id: str | None = None) -> str:
+        if self._has_pending_runtime_notices():
+            self._log.debug("Skipping idle because runtime notice is pending")
+            return ""
         self._idle_started_by_tool_call_id = tool_call_id
         self.set_state(AgentState.IDLE)
         signal = self._wait_for_wakeup()
@@ -248,8 +271,13 @@ class Agent:
         from app.registry import registry
 
         result: list[dict[str, Any]] = []
-        with self._connections_lock:
-            connection_ids = list(self.connections)
+        if self.node_type == NodeType.ASSISTANT:
+            connection_ids = [
+                node.uuid for node in registry.get_all() if node.uuid != self.uuid
+            ]
+        else:
+            with self._connections_lock:
+                connection_ids = list(self.connections)
 
         for cid in connection_ids:
             node = registry.get(cid)
@@ -262,6 +290,18 @@ class Agent:
                     "role_name": node.config.role_name,
                     "name": node.config.name,
                     "state": node.state.value,
+                }
+            )
+
+        assistant = registry.get_assistant()
+        if assistant is not None and assistant.uuid != self.uuid:
+            result.append(
+                {
+                    "uuid": assistant.uuid,
+                    "node_type": assistant.config.node_type.value,
+                    "role_name": assistant.config.role_name,
+                    "name": assistant.config.name,
+                    "state": assistant.state.value,
                 }
             )
 
@@ -287,10 +327,11 @@ class Agent:
                     "node_type": self.config.node_type.value,
                     "role_name": self.config.role_name,
                     "name": self.config.name,
-                    "formation_id": self.config.formation_id,
+                    "tab_id": self.config.tab_id,
                 },
             ),
         )
+        self._persist_workspace_node()
 
     def _append_history(self, entry: HistoryEntry) -> None:
         with self._history_lock:
@@ -310,13 +351,23 @@ class Agent:
                 data=data,
             ),
         )
+        self._persist_workspace_node()
 
     def _run(self) -> None:
         with logger.contextualize(
             agent_id=self.uuid[:8],
             node_type=self.config.node_type.value,
         ):
-            self._append_history(SystemEntry(content=get_system_prompt(self.config)))
+            with self._history_lock:
+                has_system_entry = any(
+                    isinstance(entry, SystemEntry) for entry in self.history
+                )
+            if has_system_entry:
+                self._sync_system_prompt_entry()
+            else:
+                self._append_history(
+                    SystemEntry(content=get_system_prompt(self.config))
+                )
 
             self.set_state(AgentState.IDLE, "initialized, awaiting first message")
             self._log.info("Agent started, waiting for first message")
@@ -433,7 +484,7 @@ class Agent:
         messages.append(
             self._build_runtime_post_prompt_message(
                 has_todos=bool(todos),
-                pending_spawn_dispatches=self._get_pending_spawn_dispatches(
+                pending_agent_dispatches=self._get_pending_agent_dispatches(
                     history_snapshot
                 ),
             )
@@ -457,11 +508,23 @@ class Agent:
         return self._build_runtime_system_message(todo_text)
 
     @staticmethod
-    def _get_spawned_agent_label(payload: dict[str, Any]) -> str | None:
+    def _get_created_agent_label(payload: dict[str, Any]) -> str | None:
         agent_id = payload.get("agent_id")
+        if not isinstance(agent_id, str) or not agent_id:
+            agent_id = payload.get("id")
         if not isinstance(agent_id, str) or not agent_id:
             return None
         name = payload.get("name")
+        if (not isinstance(name, str) or not name.strip()) and isinstance(
+            payload.get("config"), dict
+        ):
+            config = payload["config"]
+            config_name = config.get("name")
+            config_role_name = config.get("role_name")
+            if isinstance(config_name, str) and config_name.strip():
+                name = config_name
+            elif isinstance(config_role_name, str) and config_role_name.strip():
+                name = config_role_name
         short_id = agent_id[:8]
         if isinstance(name, str) and name.strip():
             return f"{name.strip()} (`{short_id}`)"
@@ -473,31 +536,15 @@ class Agent:
         tool_name: str,
         payload: dict[str, Any],
     ) -> list[tuple[str, str]]:
-        if tool_name == "spawn":
-            label = cls._get_spawned_agent_label(payload)
-            agent_id = payload.get("agent_id")
+        if tool_name == "create_agent":
+            label = cls._get_created_agent_label(payload)
+            agent_id = payload.get("id")
             if isinstance(agent_id, str) and label is not None:
                 return [(agent_id, label)]
             return []
+        return []
 
-        if tool_name != "create_formation":
-            return []
-
-        raw_nodes = payload.get("nodes")
-        if not isinstance(raw_nodes, list):
-            return []
-
-        dispatched: list[tuple[str, str]] = []
-        for raw_node in raw_nodes:
-            if not isinstance(raw_node, dict):
-                continue
-            label = cls._get_spawned_agent_label(raw_node)
-            agent_id = raw_node.get("agent_id")
-            if isinstance(agent_id, str) and label is not None:
-                dispatched.append((agent_id, label))
-        return dispatched
-
-    def _get_pending_spawn_dispatches(
+    def _get_pending_agent_dispatches(
         self,
         history_snapshot: list[HistoryEntry],
     ) -> list[str]:
@@ -505,7 +552,7 @@ class Agent:
 
         for entry in history_snapshot:
             if isinstance(entry, ToolCall):
-                if entry.tool_name not in {"spawn", "create_formation"}:
+                if entry.tool_name != "create_agent":
                     continue
                 if entry.result is None:
                     continue
@@ -532,25 +579,25 @@ class Agent:
         self,
         *,
         has_todos: bool,
-        pending_spawn_dispatches: list[str],
+        pending_agent_dispatches: list[str],
     ) -> dict[str, str]:
         lines = [
             "Runtime post prompt:",
             "- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.",
             "- Plain content is not delivered to other agents.",
             "- Do not combine a Human-facing reply and a routed `@target` message in the same content block.",
-            "- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.",
+            "- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.",
         ]
-        if pending_spawn_dispatches:
-            targets = ", ".join(pending_spawn_dispatches)
+        if pending_agent_dispatches:
+            targets = ", ".join(pending_agent_dispatches)
             lines.append(
-                f"- Spawned agents still waiting for their first task: {targets}."
+                f"- Newly created agents still waiting for their first task: {targets}."
             )
             lines.append(
-                "- `spawn` only creates and connects a new agent. It does not start work by itself."
+                "- `create_agent` only creates a new graph node. It does not start work by itself."
             )
             lines.append(
-                "- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`."
+                "- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`. If several agents are waiting, route to one agent per response until all of them have been dispatched."
             )
         elif has_todos:
             lines.append(
@@ -565,17 +612,22 @@ class Agent:
     @staticmethod
     def _build_multi_routed_header_notice() -> str:
         return (
-            "Routing reminder: only the first `@target:` header in this content "
-            "block was routed. Any later `@...:` lines were delivered as plain "
-            "body text to the first target. If that was not intentional, send "
-            "a correction to the first recipient and then send separate content "
-            "blocks to the other targets."
+            "Routing reminder: each response can route to only one node. Only "
+            "the first `@target:` header in this content block was routed. Any "
+            "later `@...:` lines were delivered as plain body text to the first "
+            "target. If that was not intentional, send a correction to the "
+            "first recipient and then send the remaining node messages in later "
+            "responses, one target at a time."
         )
 
     def _queue_runtime_notice(self, content: str) -> None:
         with self._runtime_notice_lock:
             if content not in self._pending_runtime_notices:
                 self._pending_runtime_notices.append(content)
+
+    def _has_pending_runtime_notices(self) -> bool:
+        with self._runtime_notice_lock:
+            return bool(self._pending_runtime_notices)
 
     def _consume_runtime_notices(self) -> list[str]:
         with self._runtime_notice_lock:
@@ -841,7 +893,7 @@ class Agent:
         *,
         log_failures: bool,
     ) -> tuple[list[Agent], list[str]]:
-        from app.formation_runtime import resolve_node_ref
+        from app.graph_runtime import resolve_node_ref
 
         resolved_targets: list[Agent] = []
         seen_target_ids: set[str] = set()
@@ -855,7 +907,11 @@ class Agent:
                     f"Routing failed: target `{target_ref}` was not found."
                 )
                 continue
-            if not self.is_connected_to(target.uuid):
+            if (
+                self.node_type != NodeType.ASSISTANT
+                and target.node_type != NodeType.ASSISTANT
+                and not self.is_connected_to(target.uuid)
+            ):
                 if log_failures:
                     self._log.warning("@target routing failed: {}", target_ref)
                 route_errors.append(
@@ -1227,6 +1283,7 @@ class Agent:
                     },
                 ),
             )
+        self._persist_workspace_node()
 
     def request_termination(self, reason: str = "") -> None:
         self._termination_reason = reason
@@ -1265,6 +1322,4 @@ class Agent:
                 peer.remove_connection(self.uuid)
             self.remove_connection(peer_id)
 
-        formation_id = self.config.formation_id
-        if formation_id and not registry.get_formation_nodes(formation_id):
-            registry.unregister_formation(formation_id)
+        self._persist_workspace_node()

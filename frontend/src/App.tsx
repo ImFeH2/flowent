@@ -63,7 +63,7 @@ function PageLoadingFallback() {
 
 function AppContent() {
   const { currentPage } = useAgentUI();
-  const isWorkspace = currentPage === "formation";
+  const isWorkspace = currentPage === "workspace";
   const [sidebarWidth, setSidebarWidth] = usePanelWidth(
     "sidebar-width",
     256,

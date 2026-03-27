@@ -1,5 +1,17 @@
-export { fetchNodes, fetchNodeDetail, terminateNode } from "./nodes";
-export { fetchFormations } from "./formations";
+export {
+  fetchNodes,
+  fetchNodeDetail,
+  terminateNode,
+  dispatchNodeMessageRequest,
+  updateNodePositionRequest,
+} from "./nodes";
+export {
+  fetchTabs,
+  createTabRequest,
+  fetchTabDetail,
+  createTabNodeRequest,
+  createTabEdgeRequest,
+} from "./tabs";
 export {
   fetchRoles,
   fetchRolesBootstrap,

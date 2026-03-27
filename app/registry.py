@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from app.models import Formation, NodeType
+from app.models import NodeType
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 class AgentRegistry:
     def __init__(self) -> None:
         self._agents: dict[str, Agent] = {}
-        self._formations: dict[str, Formation] = {}
         self._lock = threading.Lock()
 
     def register(self, agent: Agent) -> None:
@@ -65,58 +64,9 @@ class AgentRegistry:
         with self._lock:
             return list(self._agents.values())
 
-    def register_formation(self, formation: Formation) -> None:
-        with self._lock:
-            self._formations[formation.id] = formation
-            logger.info(
-                "Formation registered: {} (owner={})",
-                formation.id[:8],
-                formation.owner_agent_id[:8],
-            )
-
-    def unregister_formation(self, formation_id: str) -> None:
-        with self._lock:
-            removed = self._formations.pop(formation_id, None)
-            if removed:
-                logger.info("Formation unregistered: {}", formation_id[:8])
-
-    def get_formation(self, formation_id: str) -> Formation | None:
-        with self._lock:
-            return self._formations.get(formation_id)
-
-    def get_all_formations(self) -> list[Formation]:
-        with self._lock:
-            return list(self._formations.values())
-
-    def get_formation_nodes(self, formation_id: str) -> list[Agent]:
-        with self._lock:
-            return [
-                agent
-                for agent in self._agents.values()
-                if agent.config.formation_id == formation_id
-            ]
-
-    def is_formation_owner(self, agent_id: str, formation_id: str | None) -> bool:
-        if formation_id is None:
-            return False
-        with self._lock:
-            formation = self._formations.get(formation_id)
-            return formation is not None and formation.owner_agent_id == agent_id
-
-    def can_manage_node(self, agent_id: str, node_id: str) -> bool:
-        with self._lock:
-            if agent_id == node_id:
-                return True
-            node = self._agents.get(node_id)
-            if node is None or node.config.formation_id is None:
-                return False
-            formation = self._formations.get(node.config.formation_id)
-            return formation is not None and formation.owner_agent_id == agent_id
-
     def reset(self) -> None:
         with self._lock:
             self._agents.clear()
-            self._formations.clear()
             logger.debug("Registry reset")
 
 

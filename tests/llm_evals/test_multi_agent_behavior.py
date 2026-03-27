@@ -59,9 +59,9 @@ SCENARIOS = [
         name="parallel_two_workers",
         input_message="同时帮我做两件事: 1. 查看当前目录有哪些文件 2. 查看当前 Python 版本",
         expected_behavior=(
-            "Assistant should use declarative creation for a Formation with two "
-            "Workers, dispatch two different concrete tasks in the same turn, avoid "
-            "inserting tool calls between those dispatches, and finally return a "
+            "Assistant should create one task tab with two worker nodes, dispatch "
+            "two different concrete tasks in the same turn, avoid inserting tool "
+            "calls between those dispatches, and finally return a "
             "combined Human-facing reply that includes both the workspace file list "
             "and a Python version string."
         ),
@@ -89,8 +89,8 @@ SCENARIOS = [
         name="single_node_simple_file_count",
         input_message="帮我看一下 app/settings.py 这个文件有多少行",
         expected_behavior=(
-            "Assistant should treat this as a real execution task, create a simple "
-            "single-node Formation, delegate the work, and return a final "
+            "Assistant should treat this as a real execution task, create a task "
+            "tab with one worker node, delegate the work, and return a final "
             "Human-facing reply that includes app/settings.py and the correct line "
             "count of 5."
         ),

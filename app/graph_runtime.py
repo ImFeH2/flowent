@@ -1,18 +1,8 @@
 from __future__ import annotations
 
 from app.events import event_bus
-from app.models import Event, EventType, Formation
+from app.models import Event, EventType
 from app.registry import registry
-
-
-def emit_formation_created(formation: Formation) -> None:
-    event_bus.emit(
-        Event(
-            type=EventType.FORMATION_CREATED,
-            agent_id=formation.owner_agent_id,
-            data=formation.serialize(),
-        )
-    )
 
 
 def connect_nodes(from_id: str, to_id: str) -> None:

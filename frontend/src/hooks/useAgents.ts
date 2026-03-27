@@ -21,7 +21,7 @@ export function useAgents() {
     if (event.type === "node_created") {
       const data = event.data as unknown as {
         node_type: Node["node_type"];
-        formation_id?: string | null;
+        tab_id?: string | null;
         role_name?: string | null;
         name?: string | null;
       };
@@ -30,7 +30,7 @@ export function useAgents() {
         next.set(event.agent_id, {
           id: event.agent_id,
           node_type: data.node_type,
-          formation_id: data.formation_id ?? null,
+          tab_id: data.tab_id ?? null,
           role_name: data.role_name ?? null,
           state: "initializing",
           connections: [],
@@ -49,9 +49,7 @@ export function useAgents() {
         const next = new Map(prev);
         const todos = event.data.todos as Node["todos"] | undefined;
         const roleName = event.data.role_name as Node["role_name"] | undefined;
-        const formationId = event.data.formation_id as
-          | Node["formation_id"]
-          | undefined;
+        const tabId = event.data.tab_id as Node["tab_id"] | undefined;
         const name = event.data.name as Node["name"] | undefined;
         next.set(event.agent_id, {
           ...node,
@@ -59,7 +57,7 @@ export function useAgents() {
             event.type === "node_state_changed"
               ? (event.data.new_state as Node["state"])
               : node.state,
-          formation_id: formationId ?? node.formation_id,
+          tab_id: tabId ?? node.tab_id,
           role_name: roleName ?? node.role_name,
           name: name ?? node.name,
           todos: todos ?? node.todos,

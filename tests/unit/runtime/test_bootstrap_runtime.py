@@ -57,7 +57,6 @@ def test_bootstrap_runtime_creates_only_assistant_with_formation_spawn_tools(
         assert assistant.config.tools == list(STEWARD_ROLE_INCLUDED_TOOLS)
         assert assistant.config.write_dirs == [os.getcwd()]
         assert assistant.config.allow_network is True
-        assert assistant.config.parent_id == "human"
     finally:
         registry.reset()
 

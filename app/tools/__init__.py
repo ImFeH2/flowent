@@ -65,13 +65,15 @@ class ToolRegistry:
 
 def build_tool_registry() -> ToolRegistry:
     from app.tools.connect import ConnectTool
-    from app.tools.create_formation import CreateFormationTool
+    from app.tools.create_agent import CreateAgentTool
+    from app.tools.create_tab import CreateTabTool
     from app.tools.edit import EditTool
     from app.tools.exec import ExecTool
     from app.tools.fetch import FetchTool
     from app.tools.idle import IdleTool
     from app.tools.list_connections import ListConnectionsTool
     from app.tools.list_roles import ListRolesTool
+    from app.tools.list_tabs import ListTabsTool
     from app.tools.list_tools import ListToolsTool
     from app.tools.manage_prompts import ManagePromptsTool
     from app.tools.manage_providers import ManageProvidersTool
@@ -79,7 +81,6 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.manage_settings import ManageSettingsTool
     from app.tools.read import ReadTool
     from app.tools.sleep import SleepTool
-    from app.tools.spawn import SpawnTool
     from app.tools.todo import TodoTool
 
     reg = ToolRegistry()
@@ -88,7 +89,8 @@ def build_tool_registry() -> ToolRegistry:
         SleepTool,
         TodoTool,
         ListConnectionsTool,
-        CreateFormationTool,
+        CreateTabTool,
+        CreateAgentTool,
         ConnectTool,
         ManageProvidersTool,
         ManageRolesTool,
@@ -98,8 +100,8 @@ def build_tool_registry() -> ToolRegistry:
         EditTool,
         ExecTool,
         FetchTool,
-        SpawnTool,
         ListRolesTool,
+        ListTabsTool,
         ListToolsTool,
     ]:
         reg.register(tool_cls())  # type: ignore[abstract]

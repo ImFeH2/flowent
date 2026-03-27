@@ -45,7 +45,8 @@ def restart_telegram_channel() -> None:
 
 def bootstrap_runtime() -> None:
     from app.agent import Agent
-    from app.models import NodeConfig, NodeType
+    from app.graph_runtime import connect_nodes
+    from app.models import AgentState, NodeConfig, NodeType
     from app.settings import (
         STEWARD_ROLE_INCLUDED_TOOLS,
         ensure_builtin_roles,
@@ -53,8 +54,10 @@ def bootstrap_runtime() -> None:
         get_settings,
         save_settings,
     )
+    from app.workspace_store import workspace_store
 
     working_dir = os.getcwd()
+    workspace_store.reset_cache()
     settings = get_settings()
     if ensure_builtin_roles(settings):
         save_settings(settings)
@@ -73,12 +76,47 @@ def bootstrap_runtime() -> None:
             tools=assistant_tools,
             write_dirs=[working_dir],
             allow_network=True,
-            parent_id="human",
         ),
     )
     registry.register(assistant)
     assistant.start()
     logger.info("Assistant started with role {}", settings.assistant.role_name)
+
+    restored_node_ids: set[str] = set()
+    for record in workspace_store.list_node_records():
+        if record.state == AgentState.TERMINATED:
+            continue
+        node = Agent(
+            NodeConfig(
+                node_type=record.config.node_type,
+                role_name=record.config.role_name,
+                tab_id=record.config.tab_id,
+                name=record.config.name,
+                tools=list(record.config.tools),
+                write_dirs=list(record.config.write_dirs),
+                allow_network=record.config.allow_network,
+            ),
+            uuid=record.id,
+        )
+        node.history = list(record.history)
+        node.todos = list(record.todos)
+        registry.register(node)
+        node.start()
+        restored_node_ids.add(node.uuid)
+
+    for edge in workspace_store.list_edges():
+        if edge.from_node_id not in restored_node_ids:
+            continue
+        if edge.to_node_id not in restored_node_ids:
+            continue
+        try:
+            connect_nodes(edge.from_node_id, edge.to_node_id)
+        except ValueError:
+            logger.warning(
+                "Skipping invalid restored edge {} -> {}",
+                edge.from_node_id[:8],
+                edge.to_node_id[:8],
+            )
 
     if settings.telegram.bot_token.strip():
         restart_telegram_channel()

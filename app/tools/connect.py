@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import uuid
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from app.formation_runtime import connect_nodes, resolve_node_ref
+from app.graph_runtime import connect_nodes, resolve_node_ref
+from app.models import GraphEdge, NodeType
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -13,7 +15,7 @@ if TYPE_CHECKING:
 class ConnectTool(Tool):
     name = "connect"
     description = (
-        "Create a directed message edge between two nodes in a Formation you own. "
+        "Create a directed message edge between two nodes in the same task tab. "
         "Use bidirectional=true to create edges in both directions."
     )
     parameters: ClassVar[dict[str, Any]] = {
@@ -37,8 +39,6 @@ class ConnectTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app.registry import registry
-
         from_ref = args.get("from")
         to_ref = args.get("to")
         bidirectional = args.get("bidirectional", False)
@@ -56,15 +56,42 @@ class ConnectTool(Tool):
             return json.dumps({"error": f"Node '{from_ref}' not found"})
         if target is None:
             return json.dumps({"error": f"Node '{to_ref}' not found"})
-        if not registry.can_manage_node(agent.uuid, source.uuid):
-            return json.dumps({"error": f"Cannot manage source node '{from_ref}'"})
-        if not registry.can_manage_node(agent.uuid, target.uuid):
-            return json.dumps({"error": f"Cannot manage target node '{to_ref}'"})
+
+        if not source.config.tab_id or source.config.tab_id != target.config.tab_id:
+            return json.dumps({"error": "Both nodes must belong to the same tab"})
+        if agent.node_type != NodeType.ASSISTANT and (
+            not agent.config.tab_id or agent.config.tab_id != source.config.tab_id
+        ):
+            return json.dumps(
+                {"error": "A graph node may only connect peers inside its own tab"}
+            )
 
         connected = [[source.uuid, target.uuid]]
         connect_nodes(source.uuid, target.uuid)
+        if source.config.tab_id:
+            from app.workspace_store import workspace_store
+
+            workspace_store.upsert_edge(
+                GraphEdge(
+                    id=str(uuid.uuid4()),
+                    tab_id=source.config.tab_id,
+                    from_node_id=source.uuid,
+                    to_node_id=target.uuid,
+                )
+            )
         if bidirectional:
             connect_nodes(target.uuid, source.uuid)
             connected.append([target.uuid, source.uuid])
+            if source.config.tab_id:
+                from app.workspace_store import workspace_store
+
+                workspace_store.upsert_edge(
+                    GraphEdge(
+                        id=str(uuid.uuid4()),
+                        tab_id=source.config.tab_id,
+                        from_node_id=target.uuid,
+                        to_node_id=source.uuid,
+                    )
+                )
 
         return json.dumps({"connected": connected})

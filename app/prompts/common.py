@@ -29,6 +29,26 @@ TODO_TOOL_GUIDANCE = """\
 - Use `todo` to manage your task checklist and track the current plan or remaining work.
 """
 
+CREATE_TAB_TOOL_GUIDANCE = """\
+## Create Tab Tool Rules
+
+- Use `create_tab` to open a persistent task workspace before building an Agent Graph for that task.
+- A tab is the user-visible home for one task. Keep the title concrete and easy to recognize later.
+"""
+
+CREATE_AGENT_TOOL_GUIDANCE = """\
+## Create Agent Tool Rules
+
+- Use `create_agent` to add a new node to a tab's Agent Graph.
+- Prefer creating the right set of peer agents up front, then wire them with `connect` as needed.
+- If you are already working inside a tab, you may omit `tab_id` and create the new peer in your current tab.
+- Creating an agent does not start work by itself; explicitly send it its first task.
+- After creating multiple agents, dispatch tasks to all of them before calling `idle`.
+- Each response can route to only one node. When multiple agents need first-task dispatches, send one node-specific `@target:` task, continue to the next response, and keep going until every planned node has been dispatched.
+- Do not insert unrelated tool calls or Human-facing text while some planned nodes are still waiting for their first task.
+- When naming an agent via `create_agent`, use title case with spaces (e.g. "Web Researcher", "Code Reviewer", "Data Analyst"). Avoid snake_case, camelCase, or all-lowercase names.
+"""
+
 DELEGATION_GENERAL_GUIDANCE = """\
 ## Delegation Rules
 
@@ -45,38 +65,13 @@ DELEGATION_GENERAL_GUIDANCE = """\
 - Do not start with repeated local retries when the better move is obvious delegation.
 - Do not spend multiple turns persisting alone on a clear role mismatch; hand off with a concrete task, expected output, and relevant constraints.
 - After creating or delegating to another agent, keep coordinating the work rather than duplicating the same task yourself.
-- Before calling `idle`, check whether delegation, handoff, or spawning another agent is the real next action.
-"""
-
-SPAWN_TOOL_GUIDANCE = """\
-## Spawn Tool Rules
-
-- If you have access to `spawn`, treat creating another agent as low-cost and available at any time.
-- Prefer creating specialized agents for parallel work, blocked work, unclear work, or work outside your current strengths.
-- If you are unsure whether to delegate and `spawn` is available, bias toward delegation.
-- If a suitable connected agent already exists, hand the task off with a content block whose first line starts with `@target: ...`; otherwise use `spawn` when available to create the right specialist.
-- `spawn` only creates and connects a new agent. It does not assign work by itself.
-- After `spawn`, if you want the new agent to start working now, send it a concrete first task with a content block whose first line starts with `@target: ...` before you `idle` or move on.
-- After creating multiple nodes, dispatch tasks to ALL of them before calling `idle`. Each content block may contain only one routed `@target:` header; emit separate content blocks in sequence to dispatch to different nodes, then `idle` once all tasks are dispatched.
-- Do not insert tool calls between task dispatches. Output all `@target:` blocks consecutively in one response, then `idle`.
-- When naming an agent via the `name` parameter of `spawn`, use title case with spaces (e.g. "Web Researcher", "Code Reviewer", "Data Analyst"). Avoid snake_case, camelCase, or all-lowercase names.
-"""
-
-FORMATION_TOOL_GUIDANCE = """\
-## Formation Tool Rules
-
-- If you have access to `create_formation`, treat evolving task structure as a normal coordination action when it improves throughput or clarity.
-- Use `create_formation(name=..., goal=...)` to create an empty formation when you want to build the structure incrementally.
-- Use `create_formation(name=..., goal=..., nodes=[...], edges=[...])` when the formation structure is already clear and you want to create the full topology declaratively in one step.
-- Declarative creation with `nodes` and `edges` does not assign work by itself. After creation, explicitly send each node its first concrete task.
-- After declarative creation, dispatch tasks to all nodes that should begin working before calling `idle`. Do not wait for one node's result before dispatching to the next.
-- When creating aggregator or synthesizer nodes, instruct them in the task message how many inputs to expect and to produce output immediately once all inputs arrive.
+- Before calling `idle`, check whether delegation, handoff, or creating another agent is the real next action.
 """
 
 CONNECT_TOOL_GUIDANCE = """\
 ## Connect Tool Rules
 
-- Use `connect` to establish additional directed message edges inside a formation when the default spawn edges are not enough.
+- Use `connect` to establish additional directed message edges inside a task tab when the current graph topology needs them.
 """
 
 LIST_CONNECTIONS_TOOL_GUIDANCE = """\
@@ -88,7 +83,14 @@ LIST_CONNECTIONS_TOOL_GUIDANCE = """\
 LIST_ROLES_TOOL_GUIDANCE = """\
 ## List Roles Tool Rules
 
-- Use `list_roles` to inspect all registered roles and their included or optional tool configuration before choosing what to spawn.
+- Use `list_roles` to inspect all registered roles and their included or optional tool configuration before choosing what nodes to create.
+"""
+
+LIST_TABS_TOOL_GUIDANCE = """\
+## List Tabs Tool Rules
+
+- Use `list_tabs` to inspect the current persistent task tabs.
+- Pass `tab_id` when you need the detailed node and edge structure for one tab before changing or continuing its work.
 """
 
 LIST_TOOLS_TOOL_GUIDANCE = """\
@@ -111,7 +113,7 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 
 - To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`).
 - Only one target ref is supported in each routed header. Do not use commas in the target field.
-- If you need to message multiple nodes, emit separate content blocks with one `@target:` header per block.
+- Each response can produce only one content block. If you need to message multiple nodes, do it across multiple consecutive responses with one `@target:` header each time.
 - Prefer using node names rather than UUIDs for `@target:` routing. Names are more readable and less error-prone. Short UUID prefixes are also supported when unambiguous.
 - A single content block is either plain output or a `@target:` routed message, never both. A content block supports only one routed header; later `@...:` lines are treated as body text for the first target. Plain content that does not start with `@target:` will not be seen by any other node.
 - Use `list_connections` to discover connected node names and UUIDs before sending.
@@ -135,7 +137,7 @@ ASSISTANT_ONLY_PROMPT = """\
 - Your content is pushed directly to the frontend chat panel as your reply to the Human.
 - You do not need `@target:` when replying to the Human.
 - Plain content that does not start with `@target:` is a reply to the Human.
-- If you need to send a message to a connected node instead of the Human, start the content with a single routed header `@<name-or-uuid>: message body` (e.g. `@Worker-1: please start the task`). If you need to message multiple nodes, use separate content blocks.
+- If you need to send a message to a connected node instead of the Human, start the content with a single routed header `@<name-or-uuid>: message body` (e.g. `@Worker-1: please start the task`). If you need to message multiple nodes, do it across multiple consecutive responses, one node per response.
 - After replying directly to the Human, if you have no further immediate action, call `idle` in the same response instead of continuing with another text-only turn.
 - Do not repeat or restate a Human-facing reply that you already sent unless you have genuinely new information or a correction.
 - Entering a waiting state still requires an explicit `idle` tool call.
@@ -170,18 +172,20 @@ def _build_conditional_tool_guidance(tools: list[str]) -> list[str]:
         parts.append(SLEEP_TOOL_GUIDANCE.strip())
     if "todo" in tool_names:
         parts.append(TODO_TOOL_GUIDANCE.strip())
-    if {"spawn", "create_formation"} & tool_names:
+    if "create_tab" in tool_names:
+        parts.append(CREATE_TAB_TOOL_GUIDANCE.strip())
+    if "create_agent" in tool_names:
+        parts.append(CREATE_AGENT_TOOL_GUIDANCE.strip())
+    if "create_agent" in tool_names:
         parts.append(DELEGATION_GENERAL_GUIDANCE.strip())
-    if "spawn" in tool_names:
-        parts.append(SPAWN_TOOL_GUIDANCE.strip())
-    if "create_formation" in tool_names:
-        parts.append(FORMATION_TOOL_GUIDANCE.strip())
     if "connect" in tool_names:
         parts.append(CONNECT_TOOL_GUIDANCE.strip())
     if "list_connections" in tool_names:
         parts.append(LIST_CONNECTIONS_TOOL_GUIDANCE.strip())
     if "list_roles" in tool_names:
         parts.append(LIST_ROLES_TOOL_GUIDANCE.strip())
+    if "list_tabs" in tool_names:
+        parts.append(LIST_TABS_TOOL_GUIDANCE.strip())
     if "list_tools" in tool_names:
         parts.append(LIST_TOOLS_TOOL_GUIDANCE.strip())
     if _MANAGEMENT_TOOL_NAMES & tool_names:

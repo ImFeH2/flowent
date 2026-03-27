@@ -48,7 +48,7 @@ export function AgentEdge(props: EdgeProps) {
 
   return (
     <motion.g
-      className="agent-formation-edge-shell"
+      className="agent-graph-edge-shell"
       initial={{ opacity: 0 }}
       animate={{ opacity: leaving ? 0 : 1 }}
       transition={{ duration: leaving ? 0.2 : 0.26, ease: [0.23, 1, 0.32, 1] }}
@@ -58,8 +58,8 @@ export function AgentEdge(props: EdgeProps) {
         path={edgePath}
         style={{
           stroke: hasActiveMessage
-            ? "var(--formation-edge-active)"
-            : "var(--formation-edge)",
+            ? "var(--graph-edge-active)"
+            : "var(--graph-edge)",
           strokeWidth: hasActiveMessage ? 2.2 : 1.2,
           transition:
             "stroke 220ms ease, stroke-width 220ms ease, opacity 220ms ease",
@@ -70,7 +70,7 @@ export function AgentEdge(props: EdgeProps) {
           <motion.path
             d={edgePath}
             fill="none"
-            stroke="var(--formation-edge-active)"
+            stroke="var(--graph-edge-active)"
             strokeWidth="7"
             strokeLinecap="round"
             opacity="0.18"
@@ -82,7 +82,7 @@ export function AgentEdge(props: EdgeProps) {
           <motion.path
             d={edgePath}
             fill="none"
-            stroke="url(#agent-formation-edge-flow)"
+            stroke="url(#agent-graph-edge-flow)"
             strokeWidth="3.4"
             strokeLinecap="round"
             strokeDasharray="10 8"
@@ -103,7 +103,7 @@ export function AgentEdge(props: EdgeProps) {
           <motion.path
             d={edgePath}
             fill="none"
-            stroke="var(--formation-edge-active)"
+            stroke="var(--graph-edge-active)"
             strokeWidth="5.8"
             strokeLinecap="round"
             strokeDasharray="22 30"
@@ -125,11 +125,9 @@ export function AgentEdge(props: EdgeProps) {
             <circle
               key={`${id}-${particle.radius}-${particle.begin}`}
               r={particle.radius}
-              fill="url(#agent-formation-edge-pulse)"
+              fill="url(#agent-graph-edge-pulse)"
               opacity={particle.opacity}
-              filter={
-                particle.glow ? "url(#agent-formation-edge-glow)" : undefined
-              }
+              filter={particle.glow ? "url(#agent-graph-edge-glow)" : undefined}
             >
               <animateMotion
                 dur="0.72s"

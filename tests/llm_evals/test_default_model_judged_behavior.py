@@ -24,7 +24,7 @@ SCENARIOS = [
         input_message="你好, 回复一个OK",
         expected_behavior=(
             "Assistant should reply directly to the Human without creating any "
-            "Formation or extra nodes. The final reply should be a minimal direct "
+            "task tab or extra nodes. The final reply should be a minimal direct "
             "confirmation equivalent to 'OK'."
         ),
         timeout_seconds=30.0,
@@ -34,8 +34,8 @@ SCENARIOS = [
         input_message="帮我看一下 settings.json 这个文件有多少行",
         expected_behavior=(
             "Assistant should treat this as a real execution task rather than "
-            "answering from memory. It should create a Formation, delegate the "
-            "work to an execution node, and return a final Human-facing reply that "
+            "answering from memory. It should create a task tab, create a worker "
+            "node, delegate the work, and return a final Human-facing reply that "
             "includes settings.json and the correct line count of 5."
         ),
         timeout_seconds=90.0,

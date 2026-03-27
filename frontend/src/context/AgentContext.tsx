@@ -9,7 +9,7 @@ import {
 } from "react";
 import { sendAssistantMessageRequest } from "@/lib/api";
 import { useAgents } from "@/hooks/useAgents";
-import { useFormations } from "@/hooks/useFormations";
+import { useTabs } from "@/hooks/useTabs";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   AgentFeedContext,
@@ -20,11 +20,11 @@ import {
 import type {
   AgentEvent,
   AssistantChatMessage,
-  Formation,
   HistoryEntry,
   Node,
   PendingAssistantChatMessage,
   StreamingDelta,
+  TaskTab,
 } from "@/types";
 
 export interface ActiveMessage {
@@ -35,7 +35,7 @@ export interface ActiveMessage {
 }
 
 export type PageId =
-  | "formation"
+  | "workspace"
   | "providers"
   | "roles"
   | "prompts"
@@ -45,7 +45,7 @@ export type PageId =
 
 interface AgentRuntimeContextValue {
   agents: Map<string, Node>;
-  formations: Map<string, Formation>;
+  tabs: Map<string, TaskTab>;
   connected: boolean;
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
@@ -58,8 +58,8 @@ interface AgentNodesContextValue {
   agents: Map<string, Node>;
 }
 
-interface AgentFormationsContextValue {
-  formations: Map<string, Formation>;
+interface AgentTabsContextValue {
+  tabs: Map<string, TaskTab>;
 }
 
 interface AgentConnectionContextValue {
@@ -84,13 +84,14 @@ interface AgentUIContextValue {
   setHoveredAgentId: (id: string | null) => void;
   pendingAssistantMessages: PendingAssistantChatMessage[];
   sendAssistantMessage: (content: string) => Promise<void>;
+  activeTabId: string | null;
+  setActiveTabId: (id: string | null) => void;
   currentPage: PageId;
   setCurrentPage: (page: PageId) => void;
 }
 
 const AgentNodesContext = createContext<AgentNodesContextValue | null>(null);
-const AgentFormationsContext =
-  createContext<AgentFormationsContextValue | null>(null);
+const AgentTabsContext = createContext<AgentTabsContextValue | null>(null);
 const AgentConnectionContext =
   createContext<AgentConnectionContextValue | null>(null);
 const AgentHistoryContext = createContext<AgentHistoryContextValue | null>(
@@ -118,10 +119,10 @@ function shouldTrackFeedEntry(entry: HistoryEntry): boolean {
 
 export function AgentProvider({ children }: { children: ReactNode }) {
   const { agents, handleUpdateEvent } = useAgents();
-  const { formations, handleUpdateEvent: handleFormationEvent } =
-    useFormations();
+  const { tabs, handleUpdateEvent: handleTabEvent } = useTabs();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
+  const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [agentHistories, setAgentHistories] = useState<
     Map<string, HistoryEntry[]>
   >(() => new Map());
@@ -138,7 +139,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [pendingAssistantMessages, setPendingAssistantMessages] = useState<
     PendingAssistantChatMessage[]
   >([]);
-  const [currentPage, setCurrentPage] = useState<PageId>("formation");
+  const [currentPage, setCurrentPage] = useState<PageId>("workspace");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
@@ -148,6 +149,13 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const assistantMessageCounterRef = useRef(0);
   const activityEntryCounterRef = useRef(0);
   const seenToolCallIdsRef = useRef<Set<string>>(new Set());
+  const activeTabId = useMemo(() => {
+    if (selectedTabId && tabs.has(selectedTabId)) {
+      return selectedTabId;
+    }
+    const firstTabId = tabs.keys().next().value;
+    return typeof firstTabId === "string" ? firstTabId : null;
+  }, [selectedTabId, tabs]);
 
   const nextAssistantMessageId = useCallback(
     (from: AssistantChatMessage["from"], timestamp: number) =>
@@ -215,7 +223,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const onUpdateEvent = useCallback(
     (event: AgentEvent) => {
       handleUpdateEvent(event);
-      handleFormationEvent(event);
+      handleTabEvent(event);
 
       if (event.type === "node_message") {
         const fromId = event.agent_id;
@@ -440,14 +448,23 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [handleFormationEvent, handleUpdateEvent],
+    [handleTabEvent, handleUpdateEvent],
   );
 
   const { connected } = useWebSocket({ onDisplayEvent, onUpdateEvent });
 
-  const selectAgent = useCallback((id: string | null) => {
-    setSelectedAgentId(id);
-  }, []);
+  const selectAgent = useCallback(
+    (id: string | null) => {
+      if (id) {
+        const agent = agents.get(id);
+        if (agent?.tab_id) {
+          setSelectedTabId(agent.tab_id);
+        }
+      }
+      setSelectedAgentId(id);
+    },
+    [agents],
+  );
 
   const nodesValue = useMemo(
     () => ({
@@ -456,11 +473,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     [agents],
   );
 
-  const formationsValue = useMemo(
+  const tabsValue = useMemo(
     () => ({
-      formations,
+      tabs,
     }),
-    [formations],
+    [tabs],
   );
 
   const connectionValue = useMemo(
@@ -502,6 +519,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       setHoveredAgentId,
       pendingAssistantMessages,
       sendAssistantMessage,
+      activeTabId,
+      setActiveTabId: setSelectedTabId,
       currentPage,
       setCurrentPage,
     }),
@@ -511,13 +530,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       hoveredAgentId,
       pendingAssistantMessages,
       sendAssistantMessage,
+      activeTabId,
       currentPage,
     ],
   );
 
   return (
     <AgentNodesContext.Provider value={nodesValue}>
-      <AgentFormationsContext.Provider value={formationsValue}>
+      <AgentTabsContext.Provider value={tabsValue}>
         <AgentConnectionContext.Provider value={connectionValue}>
           <AgentHistoryContext.Provider value={historyValue}>
             <AgentActivityContext.Provider value={activityValue}>
@@ -529,7 +549,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
             </AgentActivityContext.Provider>
           </AgentHistoryContext.Provider>
         </AgentConnectionContext.Provider>
-      </AgentFormationsContext.Provider>
+      </AgentTabsContext.Provider>
     </AgentNodesContext.Provider>
   );
 }
@@ -552,12 +572,10 @@ export function useAgentConnectionRuntime() {
   return ctx;
 }
 
-export function useAgentFormationRuntime() {
-  const ctx = useContext(AgentFormationsContext);
+export function useAgentTabsRuntime() {
+  const ctx = useContext(AgentTabsContext);
   if (!ctx) {
-    throw new Error(
-      "useAgentFormationRuntime must be used within AgentProvider",
-    );
+    throw new Error("useAgentTabsRuntime must be used within AgentProvider");
   }
   return ctx;
 }
@@ -582,7 +600,7 @@ export function useAgentActivityRuntime() {
 
 export function useAgentRuntime(): AgentRuntimeContextValue {
   const { agents } = useAgentNodesRuntime();
-  const { formations } = useAgentFormationRuntime();
+  const { tabs } = useAgentTabsRuntime();
   const { connected } = useAgentConnectionRuntime();
   const { agentHistories, clearAgentHistory, streamingDeltas } =
     useAgentHistoryRuntime();
@@ -591,7 +609,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
   return useMemo(
     () => ({
       agents,
-      formations,
+      tabs,
       connected,
       agentHistories,
       clearAgentHistory,
@@ -601,7 +619,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
     }),
     [
       agents,
-      formations,
+      tabs,
       connected,
       agentHistories,
       clearAgentHistory,

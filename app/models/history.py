@@ -66,3 +66,73 @@ HistoryEntry = (
     | ToolCall
     | ErrorEntry
 )
+
+
+def deserialize_history_entry(data: dict[str, Any]) -> HistoryEntry:
+    entry_type = data.get("type")
+    timestamp = data.get("timestamp")
+    timestamp_value = timestamp if isinstance(timestamp, (int, float)) else time.time()
+
+    if entry_type == "SystemEntry":
+        return SystemEntry(
+            content=str(data.get("content", "")),
+            timestamp=timestamp_value,
+        )
+    if entry_type == "ReceivedMessage":
+        return ReceivedMessage(
+            content=str(data.get("content", "")),
+            from_id=str(data.get("from_id", "")),
+            message_id=(
+                str(data["message_id"])
+                if isinstance(data.get("message_id"), str)
+                else None
+            ),
+            timestamp=timestamp_value,
+        )
+    if entry_type == "AssistantText":
+        return AssistantText(
+            content=str(data.get("content", "")),
+            timestamp=timestamp_value,
+        )
+    if entry_type == "SentMessage":
+        raw_to_ids = data.get("to_ids")
+        to_ids = (
+            [str(item) for item in raw_to_ids if isinstance(item, str)]
+            if isinstance(raw_to_ids, list)
+            else []
+        )
+        return SentMessage(
+            content=str(data.get("content", "")),
+            to_ids=to_ids,
+            message_id=(
+                str(data["message_id"])
+                if isinstance(data.get("message_id"), str)
+                else None
+            ),
+            timestamp=timestamp_value,
+        )
+    if entry_type == "AssistantThinking":
+        return AssistantThinking(
+            content=str(data.get("content", "")),
+            timestamp=timestamp_value,
+        )
+    if entry_type == "ToolCall":
+        arguments = data.get("arguments")
+        return ToolCall(
+            tool_name=str(data.get("tool_name", "")),
+            tool_call_id=str(data.get("tool_call_id", "")),
+            arguments=arguments if isinstance(arguments, dict) else {},
+            result=str(data["result"]) if isinstance(data.get("result"), str) else None,
+            streaming=bool(data.get("streaming", False)),
+            timestamp=timestamp_value,
+        )
+    if entry_type == "ErrorEntry":
+        return ErrorEntry(
+            content=str(data.get("content", "")),
+            timestamp=timestamp_value,
+        )
+    raise ValueError(f"Unknown history entry type: {entry_type}")
+
+
+def deserialize_history_entries(items: list[dict[str, Any]]) -> list[HistoryEntry]:
+    return [deserialize_history_entry(item) for item in items]

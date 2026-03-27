@@ -56,8 +56,8 @@ class EvalArtifacts:
     timed_out: bool
     nodes: list[dict[str, Any]]
     node_details: list[dict[str, Any]]
-    formations: list[dict[str, Any]]
-    formation_details: list[dict[str, Any]]
+    tabs: list[dict[str, Any]]
+    tab_details: list[dict[str, Any]]
 
     def to_judge_payload(self) -> dict[str, Any]:
         return {
@@ -67,8 +67,8 @@ class EvalArtifacts:
             "timed_out": self.timed_out,
             "nodes": self.nodes,
             "node_details": self.node_details,
-            "formations": self.formations,
-            "formation_details": self.formation_details,
+            "tabs": self.tabs,
+            "tab_details": self.tab_details,
         }
 
 
@@ -294,12 +294,9 @@ def _collect_artifacts(
 ) -> EvalArtifacts:
     assistant_detail = client.get(f"/api/nodes/{assistant_id}").json()
     nodes = client.get("/api/nodes").json()["nodes"]
-    formations = client.get("/api/formations").json()["formations"]
+    tabs = client.get("/api/tabs").json()["tabs"]
     node_details = [client.get(f"/api/nodes/{node['id']}").json() for node in nodes]
-    formation_details = [
-        client.get(f"/api/formations/{formation['id']}").json()
-        for formation in formations
-    ]
+    tab_details = [client.get(f"/api/tabs/{tab['id']}").json() for tab in tabs]
     return EvalArtifacts(
         assistant_id=assistant_id,
         assistant_state=assistant_detail["state"],
@@ -307,8 +304,8 @@ def _collect_artifacts(
         timed_out=timed_out,
         nodes=nodes,
         node_details=node_details,
-        formations=formations,
-        formation_details=formation_details,
+        tabs=tabs,
+        tab_details=tab_details,
     )
 
 
@@ -356,7 +353,7 @@ def _build_result_summary(result: EvalRunResult | None) -> dict[str, Any] | None
         "timed_out": result.artifacts.timed_out,
         "final_reply": result.artifacts.final_reply,
         "node_count": len(result.artifacts.nodes),
-        "formation_count": len(result.artifacts.formations),
+        "tab_count": len(result.artifacts.tabs),
         "judge": judge_summary,
     }
 

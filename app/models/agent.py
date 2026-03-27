@@ -21,9 +21,8 @@ class AgentState(StrEnum):
 class NodeConfig:
     node_type: NodeType
     role_name: str | None = None
-    formation_id: str | None = None
+    tab_id: str | None = None
     name: str | None = None
     tools: list[str] = field(default_factory=list)
     write_dirs: list[str] = field(default_factory=list)
     allow_network: bool = False
-    parent_id: str | None = None

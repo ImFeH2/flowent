@@ -1,5 +1,5 @@
 from app.agent import Agent
-from app.formation_runtime import resolve_node_ref
+from app.graph_runtime import resolve_node_ref
 from app.models import NodeConfig, NodeType
 from app.registry import registry
 

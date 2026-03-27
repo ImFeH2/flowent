@@ -10,18 +10,22 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bot,
+  Link2,
+  Plus,
   PanelRightClose,
   PanelRightOpen,
   Radio,
+  SendHorizontal,
   Shield,
   X,
 } from "lucide-react";
-import { AgentFormation } from "@/components/AgentFormation";
+import { AgentGraph } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
 import type { Node } from "@/types";
 import {
   useAgentConnectionRuntime,
   useAgentNodesRuntime,
+  useAgentTabsRuntime,
   useAgentUI,
 } from "@/context/AgentContext";
 import { cn } from "@/lib/utils";
@@ -41,6 +45,13 @@ import {
 } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 import { getAssistantNode } from "@/lib/assistant";
+import {
+  createTabEdgeRequest,
+  createTabNodeRequest,
+  createTabRequest,
+  dispatchNodeMessageRequest,
+} from "@/lib/api";
+import { toast } from "sonner";
 
 const WORKSPACE_PANEL_ID = "workspace-panel-width";
 const MIN_PANEL_WIDTH = 320;
@@ -51,8 +62,10 @@ const DEFAULT_PANEL_WIDTH = 560;
 
 export function HomePage() {
   const { agents } = useAgentNodesRuntime();
+  const { tabs } = useAgentTabsRuntime();
   const { connected } = useAgentConnectionRuntime();
-  const { selectedAgentId, selectAgent } = useAgentUI();
+  const { activeTabId, selectedAgentId, selectAgent, setActiveTabId } =
+    useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setStoredPanelWidth] = usePanelWidth(
@@ -123,6 +136,14 @@ export function HomePage() {
   }, [agents]);
 
   const selectedAgent = selectedAgentId ? agents.get(selectedAgentId) : null;
+  const tabAgents = useMemo(
+    () =>
+      Array.from(agents.values()).filter(
+        (agent) =>
+          agent.node_type !== "assistant" && agent.tab_id === activeTabId,
+      ),
+    [activeTabId, agents],
+  );
   const panelVisible = panelOpen || !!selectedAgent;
 
   const togglePanel = () => {
@@ -134,6 +155,100 @@ export function HomePage() {
       return;
     }
     setPanelOpen(true);
+  };
+
+  const handleCreateTab = async () => {
+    const title = window.prompt("New tab title");
+    if (!title || !title.trim()) {
+      return;
+    }
+    try {
+      const tab = await createTabRequest(title.trim());
+      setActiveTabId(tab.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create tab",
+      );
+    }
+  };
+
+  const handleCreateAgent = async () => {
+    if (!activeTabId) {
+      toast.error("Create or select a tab first");
+      return;
+    }
+    const roleName = window.prompt("Role name", "Worker");
+    if (!roleName || !roleName.trim()) {
+      return;
+    }
+    const name = window.prompt("Agent name", "");
+    try {
+      await createTabNodeRequest(activeTabId, {
+        role_name: roleName.trim(),
+        name: name?.trim() || undefined,
+      });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create agent",
+      );
+    }
+  };
+
+  const handleConnectAgents = async () => {
+    if (!activeTabId) {
+      toast.error("Create or select a tab first");
+      return;
+    }
+    const sourceName = window.prompt(
+      `Source agent name\n${tabAgents.map((agent) => `- ${agent.name ?? agent.id.slice(0, 8)}`).join("\n")}`,
+      selectedAgent?.name ?? "",
+    );
+    if (!sourceName || !sourceName.trim()) {
+      return;
+    }
+    const targetName = window.prompt("Target agent name", "");
+    if (!targetName || !targetName.trim()) {
+      return;
+    }
+    const source = tabAgents.find(
+      (agent) => (agent.name ?? agent.id.slice(0, 8)) === sourceName.trim(),
+    );
+    const target = tabAgents.find(
+      (agent) => (agent.name ?? agent.id.slice(0, 8)) === targetName.trim(),
+    );
+    if (!source || !target) {
+      toast.error("Source or target agent not found in the current tab");
+      return;
+    }
+    try {
+      await createTabEdgeRequest(activeTabId, source.id, target.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to connect agents",
+      );
+    }
+  };
+
+  const handleDispatchTask = async () => {
+    if (!selectedAgentId) {
+      toast.error("Select an agent first");
+      return;
+    }
+    const content = window.prompt("Task message");
+    if (!content || !content.trim()) {
+      return;
+    }
+    try {
+      await dispatchNodeMessageRequest(
+        selectedAgentId,
+        content.trim(),
+        "human",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send task",
+      );
+    }
   };
 
   return (
@@ -148,7 +263,7 @@ export function HomePage() {
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-[linear-gradient(90deg,transparent,rgba(5,7,12,0.24))]" />
 
         <div className="relative flex-1">
-          <AgentFormation />
+          <AgentGraph />
         </div>
 
         <div className="absolute right-5 top-5 z-30 sm:right-6 sm:top-6">
@@ -172,6 +287,57 @@ export function HomePage() {
             <span className="text-muted-foreground/50">/</span>
             {metrics.idle} idle
           </BadgeChip>
+        </div>
+
+        <div className="absolute left-5 right-20 top-20 z-30 sm:left-6 sm:right-24 sm:top-[5.25rem]">
+          <div className="pointer-events-auto flex flex-col gap-2 rounded-[0.9rem] border border-white/8 bg-black/[0.26] px-2 py-2 backdrop-blur-xl shadow-[0_18px_42px_-30px_rgba(0,0,0,0.82)]">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {Array.from(tabs.values()).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTabId(tab.id)}
+                  className={cn(
+                    "shrink-0 rounded-[0.75rem] border px-3 py-1.5 text-left transition-colors",
+                    activeTabId === tab.id
+                      ? "border-white/16 bg-white/[0.1] text-foreground"
+                      : "border-transparent bg-transparent text-muted-foreground hover:border-white/10 hover:bg-white/[0.04] hover:text-foreground",
+                  )}
+                >
+                  <div className="text-xs font-medium">{tab.title}</div>
+                  {tab.goal ? (
+                    <div className="mt-0.5 max-w-48 truncate text-[10px] text-muted-foreground">
+                      {tab.goal}
+                    </div>
+                  ) : null}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  void handleCreateTab();
+                }}
+                className="flex shrink-0 items-center gap-1 rounded-[0.75rem] border border-dashed border-white/14 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-white/22 hover:text-foreground"
+              >
+                <Plus className="size-3.5" />
+                New Tab
+              </button>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <ToolbarButton onClick={() => void handleCreateAgent()}>
+                <Plus className="size-3.5" />
+                Add Agent
+              </ToolbarButton>
+              <ToolbarButton onClick={() => void handleConnectAgents()}>
+                <Link2 className="size-3.5" />
+                Connect
+              </ToolbarButton>
+              <ToolbarButton onClick={() => void handleDispatchTask()}>
+                <SendHorizontal className="size-3.5" />
+                Send Task
+              </ToolbarButton>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -237,6 +403,24 @@ export function HomePage() {
   );
 }
 
+function ToolbarButton({
+  children,
+  onClick,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex shrink-0 items-center gap-1 rounded-[0.75rem] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-white/18 hover:bg-white/[0.07] hover:text-foreground"
+    >
+      {children}
+    </button>
+  );
+}
+
 function BadgeChip({
   children,
   tone = "default",
@@ -266,6 +450,7 @@ function AgentDetailPanel({
   onClose: () => void;
 }) {
   const { agents } = useAgentNodesRuntime();
+  const { tabs } = useAgentTabsRuntime();
   const { detail, error, loading } = useAgentDetail(
     agent.id,
     agent.node_type === "assistant",
@@ -278,7 +463,8 @@ function AgentDetailPanel({
   const detailTools = detail?.tools ?? [];
   const detailWriteDirs = detail?.write_dirs ?? [];
   const detailAllowNetwork = detail?.allow_network ?? false;
-  const detailFormation = detail?.formation ?? null;
+  const detailTabId = detail?.tab_id ?? agent.tab_id ?? null;
+  const detailTab = detailTabId ? (tabs.get(detailTabId) ?? null) : null;
   const label = getNodeLabel({
     name: agent.name,
     roleName: agent.role_name,
@@ -351,41 +537,31 @@ function AgentDetailPanel({
 
             <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Formation
+                Task Tab
               </p>
               <p className="mt-2 text-sm text-foreground">
-                {detailFormation?.name ??
-                  detailFormation?.id.slice(0, 8) ??
-                  "None"}
+                {detailTab?.title ?? detailTabId?.slice(0, 8) ?? "None"}
               </p>
             </div>
           </div>
 
-          <DetailSection title="Formation">
-            {detailFormation ? (
+          <DetailSection title="Task Context">
+            {detailTabId ? (
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     ID
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-foreground">
-                    {detailFormation.id}
+                    {detailTabId ?? "None"}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Owner
+                    Title
                   </p>
-                  <p className="mt-1 font-mono text-[11px] text-foreground">
-                    {detailFormation.owner_agent_id.slice(0, 8)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Parent
-                  </p>
-                  <p className="mt-1 font-mono text-[11px] text-foreground">
-                    {detailFormation.parent_formation_id?.slice(0, 8) ?? "None"}
+                  <p className="mt-1 text-foreground">
+                    {detailTab?.title ?? "Unknown"}
                   </p>
                 </div>
                 <div>
@@ -396,21 +572,17 @@ function AgentDetailPanel({
                     {detailRoleName ?? "None"}
                   </p>
                 </div>
-                {detailFormation.goal ? (
+                {detailTab?.goal ? (
                   <div className="sm:col-span-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Goal
                     </p>
-                    <p className="mt-1 text-foreground">
-                      {detailFormation.goal}
-                    </p>
+                    <p className="mt-1 text-foreground">{detailTab.goal}</p>
                   </div>
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                No formation metadata
-              </p>
+              <p className="text-sm text-muted-foreground">No task metadata</p>
             )}
           </DetailSection>
 

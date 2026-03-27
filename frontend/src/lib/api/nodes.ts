@@ -33,3 +33,30 @@ export async function terminateNode(nodeId: string): Promise<void> {
     errorMessage: "Failed to terminate node",
   });
 }
+
+export async function dispatchNodeMessageRequest(
+  nodeId: string,
+  content: string,
+  fromId = "human",
+): Promise<void> {
+  await requestVoid(`/api/nodes/${nodeId}/messages`, {
+    method: "POST",
+    body: {
+      content,
+      from_id: fromId,
+    },
+    errorMessage: "Failed to send node message",
+  });
+}
+
+export async function updateNodePositionRequest(
+  nodeId: string,
+  x: number,
+  y: number,
+): Promise<void> {
+  await requestVoid(`/api/nodes/${nodeId}/position`, {
+    method: "PATCH",
+    body: { x, y },
+    errorMessage: "Failed to save node position",
+  });
+}

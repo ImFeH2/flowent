@@ -9,14 +9,14 @@ import {
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentFormation } from "@/components/AgentFormation";
+import { AgentGraph } from "@/components/AgentGraph";
 import { getAgentNodeWidth } from "@/lib/layout";
-import type { Formation, Node } from "@/types";
+import type { Node, TaskTab } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 const terminateNodeMock = vi.fn().mockResolvedValue(undefined);
 const useAgentNodesRuntimeMock = vi.fn();
-const useAgentFormationRuntimeMock = vi.fn();
+const useAgentTabsRuntimeMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
 const reactFlowPropsMock = vi.fn();
@@ -36,7 +36,7 @@ class ResizeObserverMock {
 
 vi.mock("@/context/AgentContext", () => ({
   useAgentNodesRuntime: () => useAgentNodesRuntimeMock(),
-  useAgentFormationRuntime: () => useAgentFormationRuntimeMock(),
+  useAgentTabsRuntime: () => useAgentTabsRuntimeMock(),
   useAgentActivityRuntime: () => useAgentActivityRuntimeMock(),
   useAgentUI: () => useAgentUIMock(),
 }));
@@ -76,10 +76,7 @@ vi.mock("@xyflow/react", async () => {
     nodeTypes: Record<string, React.ComponentType<MockNodeComponentProps>>;
     onInit?: (instance: { fitView: typeof fitViewMock }) => void;
     onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
-    onNodeContextMenu?: (
-      event: React.MouseEvent,
-      node: { id: string; node_type?: string },
-    ) => void;
+    onNodeContextMenu?: (event: React.MouseEvent, node: { id: string }) => void;
     onPaneContextMenu?: (event: React.MouseEvent) => void;
     minZoom?: number;
     maxZoom?: number;
@@ -155,7 +152,7 @@ function buildNode(overrides: Partial<Node>): Node {
   return {
     id: "node",
     node_type: "agent",
-    formation_id: "formation-root",
+    tab_id: "tab-1",
     state: "idle",
     connections: [],
     name: null,
@@ -165,24 +162,30 @@ function buildNode(overrides: Partial<Node>): Node {
   };
 }
 
-function buildFormation(overrides: Partial<Formation>): Formation {
+function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
   return {
-    id: "formation-root",
-    owner_agent_id: "worker-1",
-    parent_formation_id: null,
-    name: "Research Formation",
-    goal: "Investigate sources",
+    id: "tab-1",
+    title: "Research Task",
+    goal: "Inspect the repository",
+    created_at: 1,
+    updated_at: 1,
     ...overrides,
   };
 }
 
-function renderFormation(nodes: Node[], formations: Formation[] = []) {
+function renderGraph(
+  nodes: Node[],
+  options?: {
+    activeTabId?: string | null;
+    tabs?: TaskTab[];
+  },
+) {
   useAgentNodesRuntimeMock.mockReturnValue({
     agents: new Map(nodes.map((node) => [node.id, node])),
   });
-  useAgentFormationRuntimeMock.mockReturnValue({
-    formations: new Map(
-      formations.map((formation) => [formation.id, formation]),
+  useAgentTabsRuntimeMock.mockReturnValue({
+    tabs: new Map(
+      (options?.tabs ?? [buildTab()]).map((tab) => [tab.id, tab] as const),
     ),
   });
   useAgentActivityRuntimeMock.mockReturnValue({
@@ -190,11 +193,12 @@ function renderFormation(nodes: Node[], formations: Formation[] = []) {
     activeToolCalls: new Map(),
   });
   useAgentUIMock.mockReturnValue({
+    activeTabId: options?.activeTabId ?? "tab-1",
     selectedAgentId: null,
     selectAgent: vi.fn(),
   });
 
-  return render(<AgentFormation />);
+  return render(<AgentGraph />);
 }
 
 beforeEach(() => {
@@ -210,23 +214,24 @@ afterEach(() => {
   cleanup();
 });
 
-describe("AgentFormation", () => {
-  it("renders unnamed agent nodes using role_name and sizes width to fit the label", async () => {
-    renderFormation([
+describe("AgentGraph", () => {
+  it("renders active tab agent nodes using role_name and sizes width to fit the label", async () => {
+    renderGraph([
       buildNode({
         id: "assistant",
         node_type: "assistant",
+        tab_id: null,
         connections: ["worker-1"],
       }),
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: ["assistant"],
+        connections: [],
       }),
     ]);
 
-    expect(await screen.findByText("Assistant")).toBeInTheDocument();
-    expect(screen.getByText("Worker")).toBeInTheDocument();
+    expect(await screen.findByText("Worker")).toBeInTheDocument();
+    expect(screen.queryByText("Assistant")).not.toBeInTheDocument();
 
     const workerNode = screen.getByTestId("node-worker-1").firstElementChild;
     expect(workerNode).toHaveStyle({
@@ -235,75 +240,31 @@ describe("AgentFormation", () => {
     expect(workerNode).toHaveClass("h-[62px]");
   });
 
-  it("renders nested formation containers alongside agent nodes", async () => {
-    renderFormation(
-      [
-        buildNode({
-          id: "assistant",
-          node_type: "assistant",
-          connections: ["worker-1"],
-          formation_id: null,
-        }),
-        buildNode({
-          id: "worker-1",
-          role_name: "Conductor",
-          formation_id: "formation-root",
-          connections: ["assistant", "worker-2"],
-        }),
-        buildNode({
-          id: "worker-2",
-          role_name: "Worker",
-          formation_id: "formation-child",
-          connections: ["worker-1"],
-        }),
-      ],
-      [
-        buildFormation({
-          id: "formation-root",
-          owner_agent_id: "worker-1",
-          name: "Research Formation",
-        }),
-        buildFormation({
-          id: "formation-child",
-          owner_agent_id: "worker-1",
-          parent_formation_id: "formation-root",
-          name: "Site Sweep",
-        }),
-      ],
-    );
-
-    expect(await screen.findByText("Research Formation")).toBeInTheDocument();
-    expect(screen.getByText("Site Sweep")).toBeInTheDocument();
-    expect(screen.getByText("Conductor")).toBeInTheDocument();
-    expect(screen.getByText("Worker")).toBeInTheDocument();
-  });
-
-  it("protects only assistant termination and allows stopping regular agents", async () => {
-    renderFormation([
-      buildNode({
-        id: "assistant",
-        node_type: "assistant",
-        connections: ["worker-1"],
-      }),
+  it("renders only nodes from the active task tab", async () => {
+    renderGraph([
       buildNode({
         id: "worker-1",
-        role_name: "Worker",
-        connections: ["assistant"],
+        role_name: "Planner",
+        tab_id: "tab-1",
+      }),
+      buildNode({
+        id: "worker-2",
+        role_name: "Reviewer",
+        tab_id: "tab-2",
       }),
     ]);
 
-    fireEvent.contextMenu(screen.getByTestId("node-assistant"));
-    const stopAssistant = await screen.findByRole("button", {
-      name: "Stop Agent",
-    });
-    expect(stopAssistant).toBeDisabled();
+    expect(await screen.findByText("Planner")).toBeInTheDocument();
+    expect(screen.queryByText("Reviewer")).not.toBeInTheDocument();
+  });
 
-    fireEvent.mouseDown(document.body);
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("button", { name: "Stop Agent" }),
-      ).not.toBeInTheDocument();
-    });
+  it("allows stopping regular agents from the graph context menu", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+      }),
+    ]);
 
     fireEvent.contextMenu(screen.getByTestId("node-worker-1"));
     const stopWorker = await screen.findByRole("button", {
@@ -317,17 +278,11 @@ describe("AgentFormation", () => {
     });
   });
 
-  it("re-fits the forest when the container is resized", async () => {
-    renderFormation([
-      buildNode({
-        id: "assistant",
-        node_type: "assistant",
-        connections: ["worker-1"],
-      }),
+  it("re-fits the graph when the container is resized", async () => {
+    renderGraph([
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: ["assistant"],
       }),
     ]);
 
@@ -355,16 +310,10 @@ describe("AgentFormation", () => {
   });
 
   it("configures the workspace canvas for freeform zooming", async () => {
-    renderFormation([
-      buildNode({
-        id: "assistant",
-        node_type: "assistant",
-        connections: ["worker-1"],
-      }),
+    renderGraph([
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: ["assistant"],
       }),
     ]);
 
@@ -381,37 +330,20 @@ describe("AgentFormation", () => {
   it("keeps removed nodes briefly for exit transitions before unmounting them", () => {
     vi.useFakeTimers();
 
-    const view = renderFormation([
-      buildNode({
-        id: "assistant",
-        node_type: "assistant",
-        connections: ["worker-1"],
-        formation_id: null,
-      }),
+    const view = renderGraph([
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: ["assistant"],
       }),
     ]);
 
     expect(screen.getByTestId("node-worker-1")).toBeInTheDocument();
 
     useAgentNodesRuntimeMock.mockReturnValue({
-      agents: new Map([
-        [
-          "assistant",
-          buildNode({
-            id: "assistant",
-            node_type: "assistant",
-            connections: [],
-            formation_id: null,
-          }),
-        ],
-      ]),
+      agents: new Map(),
     });
 
-    view.rerender(<AgentFormation />);
+    view.rerender(<AgentGraph />);
 
     expect(screen.getByTestId("node-worker-1")).toBeInTheDocument();
 

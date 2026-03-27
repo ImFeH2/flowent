@@ -10,7 +10,6 @@ from app.models import (
     AssistantText,
     ErrorEntry,
     EventType,
-    Formation,
     LLMResponse,
     Message,
     NodeConfig,
@@ -119,58 +118,6 @@ def test_finalize_termination_removes_bidirectional_connections():
         assert registry.get(worker.uuid) is None
         assert assistant.get_connections_snapshot() == []
         assert worker.get_connections_snapshot() == []
-    finally:
-        registry.reset()
-
-
-def test_finalize_termination_unregisters_empty_formation():
-    registry.reset()
-    try:
-        formation = Formation(
-            id="formation-1",
-            owner_agent_id="worker",
-            name="Test Formation",
-        )
-        worker = Agent(
-            NodeConfig(node_type=NodeType.AGENT, formation_id=formation.id),
-            uuid="worker",
-        )
-        registry.register_formation(formation)
-        registry.register(worker)
-
-        worker._finalize_termination("done")
-
-        assert registry.get(worker.uuid) is None
-        assert registry.get_formation(formation.id) is None
-    finally:
-        registry.reset()
-
-
-def test_finalize_termination_keeps_formation_when_other_nodes_remain():
-    registry.reset()
-    try:
-        formation = Formation(
-            id="formation-1",
-            owner_agent_id="worker-1",
-            name="Shared Formation",
-        )
-        worker_1 = Agent(
-            NodeConfig(node_type=NodeType.AGENT, formation_id=formation.id),
-            uuid="worker-1",
-        )
-        worker_2 = Agent(
-            NodeConfig(node_type=NodeType.AGENT, formation_id=formation.id),
-            uuid="worker-2",
-        )
-        registry.register_formation(formation)
-        registry.register(worker_1)
-        registry.register(worker_2)
-
-        worker_1._finalize_termination("done")
-
-        assert registry.get(worker_1.uuid) is None
-        assert registry.get(worker_2.uuid) is worker_2
-        assert registry.get_formation(formation.id) is formation
     finally:
         registry.reset()
 
@@ -293,10 +240,7 @@ def test_route_content_output_delivers_to_single_target_when_header_present(
 ):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
-    child = Agent(
-        NodeConfig(node_type=NodeType.AGENT, parent_id="parent"),
-        uuid="child",
-    )
+    child = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
     peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
     registry.register(parent)
     registry.register(child)
@@ -344,9 +288,7 @@ def test_route_content_output_delivers_to_single_target_when_header_present(
 def test_route_content_output_does_not_deliver_plain_content(monkeypatch):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
-    agent = Agent(
-        NodeConfig(node_type=NodeType.AGENT, parent_id="parent"), uuid="child"
-    )
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
     events = []
     registry.register(parent)
     registry.register(agent)
@@ -369,9 +311,7 @@ def test_route_content_output_treats_non_header_target_text_as_plain_content(
 ):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
-    agent = Agent(
-        NodeConfig(node_type=NodeType.AGENT, parent_id="parent"), uuid="child"
-    )
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
     events = []
     registry.register(parent)
     registry.register(agent)
@@ -439,11 +379,12 @@ def test_build_messages_adds_one_shot_notice_for_multiple_routed_headers(monkeyp
         registry.reset()
 
     reminder = (
-        "<system>Routing reminder: only the first `@target:` header in this content "
-        "block was routed. Any later `@...:` lines were delivered as plain body "
-        "text to the first target. If that was not intentional, send a correction "
-        "to the first recipient and then send separate content blocks to the other "
-        "targets.</system>"
+        "<system>Routing reminder: each response can route to only one node. Only "
+        "the first `@target:` header in this content block was routed. Any later "
+        "`@...:` lines were delivered as plain body text to the first target. If "
+        "that was not intentional, send a correction to the first recipient and "
+        "then send the remaining node messages in later responses, one target at "
+        "a time.</system>"
     )
 
     assert any(msg.get("content") == reminder for msg in first_messages)
@@ -452,6 +393,40 @@ def test_build_messages_adds_one_shot_notice_for_multiple_routed_headers(monkeyp
     assert (
         worker_signal.payload["message"]["content"] == "first task\n@other: second task"
     )
+
+
+def test_multiple_routed_headers_prevent_idle_until_notice_is_seen(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+    registry.reset()
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    worker = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="worker")
+    registry.register(assistant)
+    registry.register(worker)
+    assistant.add_connection(worker.uuid)
+    assistant.set_state(AgentState.RUNNING, "processing")
+
+    try:
+        assistant._record_content_output(
+            "@worker: first task\n@other: second task",
+            emitted_human_content=False,
+        )
+        idle_result = assistant.request_idle()
+        first_messages = assistant._build_messages()
+    finally:
+        registry.reset()
+
+    reminder = (
+        "<system>Routing reminder: each response can route to only one node. Only "
+        "the first `@target:` header in this content block was routed. Any later "
+        "`@...:` lines were delivered as plain body text to the first target. If "
+        "that was not intentional, send a correction to the first recipient and "
+        "then send the remaining node messages in later responses, one target at "
+        "a time.</system>"
+    )
+
+    assert idle_result == ""
+    assert assistant.state == AgentState.RUNNING
+    assert any(msg.get("content") == reminder for msg in first_messages)
 
 
 def test_record_content_output_records_sent_message_in_history(monkeypatch):
@@ -584,7 +559,7 @@ def test_build_messages_replays_sent_messages_as_routed_assistant_content(
         {"role": "assistant", "content": "final answer"},
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 
@@ -618,7 +593,7 @@ def test_build_messages_replays_each_sent_target_as_separate_routed_content(
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 
@@ -644,7 +619,7 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry(monke
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
         },
     ]
 
@@ -670,7 +645,7 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
         {"role": "user", "content": '<message from="human">begin</message>'},
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
         {
             "role": "user",
@@ -679,58 +654,7 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
     ]
 
 
-def test_build_messages_warns_about_spawned_agents_waiting_for_first_task(monkeypatch):
-    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
-
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
-    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
-    agent._append_history(
-        ToolCall(
-            tool_name="spawn",
-            tool_call_id="call-spawn",
-            arguments={"role_name": "Worker", "formation_id": "formation-1"},
-            result=json.dumps(
-                {
-                    "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
-                    "name": "Directory Worker",
-                    "formation_id": "formation-1",
-                    "role_name": "Worker",
-                }
-            ),
-        )
-    )
-
-    messages = agent._build_messages()
-
-    assert messages == [
-        {"role": "system", "content": messages[0]["content"]},
-        {"role": "user", "content": '<message from="human">begin</message>'},
-        {
-            "role": "assistant",
-            "tool_calls": [
-                {
-                    "id": "call-spawn",
-                    "type": "function",
-                    "function": {
-                        "name": "spawn",
-                        "arguments": '{"role_name": "Worker", "formation_id": "formation-1"}',
-                    },
-                }
-            ],
-        },
-        {
-            "role": "tool",
-            "tool_call_id": "call-spawn",
-            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "formation_id": "formation-1", "role_name": "Worker"}',
-        },
-        {
-            "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- Spawned agents still waiting for their first task: Directory Worker (`12345678`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
-        },
-    ]
-
-
-def test_build_messages_warns_about_declaratively_created_agents_waiting_for_first_task(
+def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
     monkeypatch,
 ):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
@@ -739,37 +663,31 @@ def test_build_messages_warns_about_declaratively_created_agents_waiting_for_fir
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
     agent._append_history(
         ToolCall(
-            tool_name="create_formation",
-            tool_call_id="call-create",
+            tool_name="create_agent",
+            tool_call_id="call-create-agent",
             arguments={
-                "name": "Delivery Plan",
-                "nodes": [
-                    {"name": "Planner", "role": "Worker"},
-                    {"name": "Reviewer", "role": "Worker"},
-                ],
+                "tab_id": "tab-1",
+                "role_name": "Worker",
+                "name": "Directory Worker",
             },
             result=json.dumps(
                 {
-                    "id": "formation-1",
-                    "owner_agent_id": "agent",
-                    "parent_formation_id": None,
-                    "name": "Delivery Plan",
-                    "goal": "",
-                    "nodes": [
-                        {
-                            "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
-                            "name": "Planner",
-                            "formation_id": "formation-1",
-                            "role_name": "Worker",
-                        },
-                        {
-                            "agent_id": "87654321-aaaa-bbbb-cccc-ddddeeeeffff",
-                            "name": "Reviewer",
-                            "formation_id": "formation-1",
-                            "role_name": "Worker",
-                        },
-                    ],
-                    "edges": [],
+                    "id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
+                    "config": {
+                        "node_type": "agent",
+                        "role_name": "Worker",
+                        "tab_id": "tab-1",
+                        "name": "Directory Worker",
+                        "tools": ["idle", "sleep", "todo", "list_connections", "read"],
+                        "write_dirs": [],
+                        "allow_network": False,
+                    },
+                    "state": "initializing",
+                    "todos": [],
+                    "history": [],
+                    "position": None,
+                    "created_at": 1.0,
+                    "updated_at": 1.0,
                 }
             ),
         )
@@ -784,43 +702,124 @@ def test_build_messages_warns_about_declaratively_created_agents_waiting_for_fir
             "role": "assistant",
             "tool_calls": [
                 {
-                    "id": "call-create",
+                    "id": "call-create-agent",
                     "type": "function",
                     "function": {
-                        "name": "create_formation",
-                        "arguments": '{"name": "Delivery Plan", "nodes": [{"name": "Planner", "role": "Worker"}, {"name": "Reviewer", "role": "Worker"}]}',
+                        "name": "create_agent",
+                        "arguments": '{"tab_id": "tab-1", "role_name": "Worker", "name": "Directory Worker"}',
                     },
                 }
             ],
         },
         {
             "role": "tool",
-            "tool_call_id": "call-create",
-            "content": '{"id": "formation-1", "owner_agent_id": "agent", "parent_formation_id": null, "name": "Delivery Plan", "goal": "", "nodes": [{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Planner", "formation_id": "formation-1", "role_name": "Worker"}, {"agent_id": "87654321-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Reviewer", "formation_id": "formation-1", "role_name": "Worker"}], "edges": []}',
+            "tool_call_id": "call-create-agent",
+            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": "Directory Worker", "tools": ["idle", "sleep", "todo", "list_connections", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- Spawned agents still waiting for their first task: Planner (`12345678`), Reviewer (`87654321`).\n- `spawn` only creates and connects a new agent. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- Newly created agents still waiting for their first task: Directory Worker (`12345678`).\n- `create_agent` only creates a new graph node. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`. If several agents are waiting, route to one agent per response until all of them have been dispatched.</system>",
         },
     ]
 
 
-def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatch):
+def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
+    monkeypatch,
+):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
     agent._append_history(
         ToolCall(
-            tool_name="spawn",
-            tool_call_id="call-spawn",
-            arguments={"role_name": "Worker", "formation_id": "formation-1"},
+            tool_name="create_agent",
+            tool_call_id="call-create-agent",
+            arguments={"tab_id": "tab-1", "role_name": "Worker"},
             result=json.dumps(
                 {
-                    "agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
-                    "name": "Directory Worker",
-                    "formation_id": "formation-1",
-                    "role_name": "Worker",
+                    "id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
+                    "config": {
+                        "node_type": "agent",
+                        "role_name": "Worker",
+                        "tab_id": "tab-1",
+                        "name": None,
+                        "tools": ["idle", "sleep", "todo", "list_connections", "read"],
+                        "write_dirs": [],
+                        "allow_network": False,
+                    },
+                    "state": "initializing",
+                    "todos": [],
+                    "history": [],
+                    "position": None,
+                    "created_at": 1.0,
+                    "updated_at": 1.0,
+                }
+            ),
+        )
+    )
+
+    messages = agent._build_messages()
+
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": "call-create-agent",
+                    "type": "function",
+                    "function": {
+                        "name": "create_agent",
+                        "arguments": '{"tab_id": "tab-1", "role_name": "Worker"}',
+                    },
+                }
+            ],
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call-create-agent",
+            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": null, "tools": ["idle", "sleep", "todo", "list_connections", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
+        },
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- Newly created agents still waiting for their first task: Worker (`12345678`).\n- `create_agent` only creates a new graph node. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`. If several agents are waiting, route to one agent per response until all of them have been dispatched.</system>",
+        },
+    ]
+
+
+def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(
+        ToolCall(
+            tool_name="create_agent",
+            tool_call_id="call-create-agent",
+            arguments={
+                "tab_id": "tab-1",
+                "role_name": "Worker",
+                "name": "Directory Worker",
+            },
+            result=json.dumps(
+                {
+                    "id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
+                    "config": {
+                        "node_type": "agent",
+                        "role_name": "Worker",
+                        "tab_id": "tab-1",
+                        "name": "Directory Worker",
+                        "tools": ["idle", "sleep", "todo", "list_connections", "read"],
+                        "write_dirs": [],
+                        "allow_network": False,
+                    },
+                    "state": "initializing",
+                    "todos": [],
+                    "history": [],
+                    "position": None,
+                    "created_at": 1.0,
+                    "updated_at": 1.0,
                 }
             ),
         )
@@ -841,19 +840,19 @@ def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatc
             "role": "assistant",
             "tool_calls": [
                 {
-                    "id": "call-spawn",
+                    "id": "call-create-agent",
                     "type": "function",
                     "function": {
-                        "name": "spawn",
-                        "arguments": '{"role_name": "Worker", "formation_id": "formation-1"}',
+                        "name": "create_agent",
+                        "arguments": '{"tab_id": "tab-1", "role_name": "Worker", "name": "Directory Worker"}',
                     },
                 }
             ],
         },
         {
             "role": "tool",
-            "tool_call_id": "call-spawn",
-            "content": '{"agent_id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "name": "Directory Worker", "formation_id": "formation-1", "role_name": "Worker"}',
+            "tool_call_id": "call-create-agent",
+            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": "Directory Worker", "tools": ["idle", "sleep", "todo", "list_connections", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
         },
         {
             "role": "assistant",
@@ -861,7 +860,7 @@ def test_build_messages_clears_spawn_warning_after_first_sent_message(monkeypatc
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- A content block supports only one routed `@target:` header. If you need to message multiple nodes, use separate content blocks.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 

@@ -95,8 +95,8 @@ def test_persist_eval_result_saves_failed_run_with_masked_workspace(tmp_path):
         timed_out=True,
         nodes=[],
         node_details=[],
-        formations=[],
-        formation_details=[],
+        tabs=[],
+        tab_details=[],
     )
     result = EvalRunResult(
         scenario=scenario,
@@ -153,8 +153,8 @@ def test_persist_eval_result_skips_passing_run_in_failed_mode(tmp_path):
         timed_out=False,
         nodes=[],
         node_details=[],
-        formations=[],
-        formation_details=[],
+        tabs=[],
+        tab_details=[],
     )
     judge = EvalJudgeResult(
         passed=True,

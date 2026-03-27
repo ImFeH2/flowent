@@ -8,7 +8,9 @@ export type AgentState =
   | "terminated";
 
 export type DisplayEventType =
-  | "formation_created"
+  | "tab_created"
+  | "tab_updated"
+  | "tab_deleted"
   | "node_created"
   | "node_state_changed"
   | "node_todos_changed"
@@ -34,12 +36,16 @@ export interface TodoItem {
 export interface Node {
   id: string;
   node_type: NodeType;
-  formation_id: string | null;
+  tab_id?: string | null;
   state: AgentState;
   connections: string[];
   name: string | null;
   todos: TodoItem[];
   role_name: string | null;
+  position?: {
+    x: number;
+    y: number;
+  } | null;
 }
 
 export interface AgentEvent {
@@ -88,7 +94,7 @@ export type AssistantChatItem = HistoryEntry | PendingAssistantChatMessage;
 export interface NodeDetail {
   id: string;
   node_type: NodeType;
-  formation_id: string | null;
+  tab_id?: string | null;
   state: AgentState;
   name: string | null;
   connections: string[];
@@ -97,16 +103,29 @@ export interface NodeDetail {
   tools: string[];
   write_dirs: string[];
   allow_network: boolean;
-  formation: Formation | null;
+  position?: {
+    x: number;
+    y: number;
+  } | null;
   history: HistoryEntry[];
 }
 
-export interface Formation {
+export interface TaskTab {
   id: string;
-  owner_agent_id: string;
-  parent_formation_id: string | null;
-  name: string | null;
+  title: string;
   goal: string;
+  created_at: number;
+  updated_at: number;
+  node_count?: number;
+  edge_count?: number;
+}
+
+export interface TabEdge {
+  id: string;
+  tab_id: string;
+  from_node_id: string;
+  to_node_id: string;
+  created_at?: number;
 }
 
 export interface RoleModelConfig {

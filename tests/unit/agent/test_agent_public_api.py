@@ -2,12 +2,20 @@ import json
 import threading
 
 from app.agent import Agent
-from app.models import Message, NodeConfig, NodeType, ReceivedMessage, TodoItem
+from app.models import (
+    AgentState,
+    Message,
+    NodeConfig,
+    NodeType,
+    ReceivedMessage,
+    TodoItem,
+)
 from app.registry import registry
 from app.settings import RoleConfig, Settings
 from app.tools.idle import IdleTool
 from app.tools.list_connections import ListConnectionsTool
 from app.tools.list_roles import ListRolesTool
+from app.tools.list_tabs import ListTabsTool
 from app.tools.list_tools import ListToolsTool
 from app.tools.sleep import SleepTool
 from app.tools.todo import TodoTool
@@ -51,6 +59,21 @@ def test_idle_tool_blocks_until_message_and_returns_idle_duration():
     assert isinstance(agent.history[-1], ReceivedMessage)
     assert agent.history[-1].from_id == "tester"
     assert agent.history[-1].content == "hello from queue"
+
+
+def test_idle_tool_returns_immediately_when_runtime_notice_is_pending():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, tools=["idle"]), uuid="agent-a")
+    agent.set_state(AgentState.RUNNING, "processing")
+    agent._queue_runtime_notice("fix the previous routing mistake")
+
+    result = IdleTool().execute(agent, {})
+
+    assert result == ""
+    assert agent.state == AgentState.RUNNING
+    assert agent._build_messages()[-1] == {
+        "role": "user",
+        "content": "<system>fix the previous routing mistake</system>",
+    }
 
 
 def test_sleep_tool_uses_request_sleep(monkeypatch):
@@ -205,7 +228,8 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "exec",
             ],
             "optional_tools": [
-                "create_formation",
+                "create_tab",
+                "create_agent",
                 "connect",
                 "manage_providers",
                 "manage_roles",
@@ -213,8 +237,8 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "manage_prompts",
                 "edit",
                 "fetch",
-                "spawn",
                 "list_roles",
+                "list_tabs",
                 "list_tools",
             ],
         },
@@ -228,7 +252,8 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "list_connections",
             ],
             "optional_tools": [
-                "create_formation",
+                "create_tab",
+                "create_agent",
                 "connect",
                 "manage_providers",
                 "manage_roles",
@@ -237,8 +262,8 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "read",
                 "edit",
                 "exec",
-                "spawn",
                 "list_roles",
+                "list_tabs",
                 "list_tools",
             ],
         },
@@ -265,20 +290,92 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "edit",
         "exec",
         "fetch",
-        "spawn",
-        "create_formation",
+        "create_tab",
+        "create_agent",
         "connect",
         "manage_providers",
         "manage_roles",
         "manage_settings",
         "manage_prompts",
         "list_roles",
+        "list_tabs",
         "list_tools",
     }
     assert all(set(item) == {"name", "description"} for item in result)
     assert all(
         isinstance(item["description"], str) and item["description"] for item in result
     )
+
+
+def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
+    import app.settings as settings_module
+    from app.graph_service import create_agent_node, create_edge, create_tab
+    from app.workspace_store import workspace_store
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "custom_prompt": "",
+                "custom_post_prompt": "",
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="Do work.",
+                    included_tools=["read"],
+                )
+            ]
+        ),
+    )
+    workspace_store.reset_cache()
+    registry.reset()
+
+    try:
+        tab = create_tab(title="Review", goal="Inspect code")
+        left, error = create_agent_node(role_name="Worker", tab_id=tab.id, name="Left")
+        assert error is None and left is not None
+        right, error = create_agent_node(
+            role_name="Worker", tab_id=tab.id, name="Right"
+        )
+        assert error is None and right is not None
+        edge, error = create_edge(from_node_id=left.id, to_node_id=right.id)
+        assert error is None and edge is not None
+
+        agent = Agent(
+            NodeConfig(node_type=NodeType.ASSISTANT, tools=["list_tabs"]),
+            uuid="assistant",
+        )
+
+        summaries = json.loads(ListTabsTool().execute(agent, {}))
+        assert summaries == [
+            {
+                **tab.serialize(),
+                "node_count": 2,
+                "edge_count": 1,
+            }
+        ]
+
+        detail = json.loads(ListTabsTool().execute(agent, {"tab_id": tab.id}))
+        assert detail["tab"]["id"] == tab.id
+        assert {node["name"] for node in detail["nodes"]} == {"Left", "Right"}
+        assert detail["edges"] == [edge.serialize()]
+    finally:
+        registry.reset()
+        workspace_store.reset_cache()
+        monkeypatch.setattr(settings_module, "_cached_settings", None)
 
 
 def test_todo_tool_writes_via_set_todos(monkeypatch):

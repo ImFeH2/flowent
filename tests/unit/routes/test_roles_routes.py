@@ -34,8 +34,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 name=CONDUCTOR_ROLE_NAME,
                 system_prompt="Coordinate tasks.",
                 included_tools=[
-                    "spawn",
-                    "create_formation",
+                    "create_agent",
                     "connect",
                     "list_roles",
                     "list_tools",
@@ -71,8 +70,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                 "model": None,
                 "model_params": None,
                 "included_tools": [
-                    "spawn",
-                    "create_formation",
+                    "create_agent",
                     "connect",
                     "list_roles",
                     "list_tools",

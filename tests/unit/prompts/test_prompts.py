@@ -3,16 +3,18 @@ from app.prompts import get_system_prompt
 from app.prompts.common import (
     ASSISTANT_ONLY_PROMPT,
     COMMUNICATION_USAGE_GUIDANCE,
+    CONNECT_TOOL_GUIDANCE,
+    CREATE_AGENT_TOOL_GUIDANCE,
+    CREATE_TAB_TOOL_GUIDANCE,
     DEFAULT_AGENT_ROLE_PROMPT,
     DELEGATION_GENERAL_GUIDANCE,
     FILE_PATH_GUIDANCE,
-    FORMATION_TOOL_GUIDANCE,
     IDLE_TOOL_GUIDANCE,
     LIST_ROLES_TOOL_GUIDANCE,
+    LIST_TABS_TOOL_GUIDANCE,
     LIST_TOOLS_TOOL_GUIDANCE,
     MANAGE_TOOLS_GUIDANCE,
     SLEEP_TOOL_GUIDANCE,
-    SPAWN_TOOL_GUIDANCE,
     compose_system_prompt,
 )
 from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
@@ -41,15 +43,15 @@ def test_compose_system_prompt_inserts_custom_prompt_between_tool_guidance_and_r
     result = compose_system_prompt(
         "Role-specific instructions.",
         custom_prompt="Global custom instructions.",
-        tools=["idle", "spawn"],
+        tools=["idle", "create_agent"],
     )
 
     assert result == _join(
         COMMUNICATION_USAGE_GUIDANCE,
         FILE_PATH_GUIDANCE,
         IDLE_TOOL_GUIDANCE,
+        CREATE_AGENT_TOOL_GUIDANCE,
         DELEGATION_GENERAL_GUIDANCE,
-        SPAWN_TOOL_GUIDANCE,
         "Global custom instructions.",
         "Role-specific instructions.",
     )
@@ -88,32 +90,35 @@ def test_compose_system_prompt_ignores_empty_custom_prompt():
     )
 
 
-def test_compose_system_prompt_injects_spawn_guidance_when_tool_present():
-    result = compose_system_prompt("Role-specific instructions.", tools=["spawn"])
+def test_compose_system_prompt_injects_create_agent_guidance_when_tool_present():
+    result = compose_system_prompt(
+        "Role-specific instructions.",
+        tools=["create_agent"],
+    )
 
     assert DELEGATION_GENERAL_GUIDANCE in result
-    assert SPAWN_TOOL_GUIDANCE in result
-    assert FORMATION_TOOL_GUIDANCE not in result
-    assert "dispatch tasks to ALL of them before calling" in SPAWN_TOOL_GUIDANCE
-    assert "Do not insert tool calls between task dispatches" in SPAWN_TOOL_GUIDANCE
+    assert CREATE_AGENT_TOOL_GUIDANCE in result
+    assert "dispatch tasks to all of them before calling `idle`" in result
+    assert "Each response can route to only one node." in result
+    assert "Do not insert unrelated tool calls or Human-facing text" in result
+    assert "title case with spaces" in CREATE_AGENT_TOOL_GUIDANCE
 
 
-def test_compose_system_prompt_omits_spawn_guidance_when_tool_absent():
+def test_compose_system_prompt_omits_delegation_guidance_when_create_agent_is_absent():
     result = compose_system_prompt("Role-specific instructions.", tools=["read"])
 
     assert DELEGATION_GENERAL_GUIDANCE not in result
-    assert SPAWN_TOOL_GUIDANCE not in result
+    assert CREATE_AGENT_TOOL_GUIDANCE not in result
 
 
-def test_compose_system_prompt_injects_formation_parallel_dispatch_guidance():
+def test_compose_system_prompt_injects_connect_guidance_when_tool_present():
     result = compose_system_prompt(
         "Role-specific instructions.",
-        tools=["create_formation"],
+        tools=["connect"],
     )
 
-    assert FORMATION_TOOL_GUIDANCE in result
-    assert "dispatch tasks to all nodes" in FORMATION_TOOL_GUIDANCE
-    assert "aggregator or synthesizer" in FORMATION_TOOL_GUIDANCE
+    assert CONNECT_TOOL_GUIDANCE in result
+    assert "task tab" in CONNECT_TOOL_GUIDANCE
 
 
 def test_compose_system_prompt_injects_management_guidance_when_manage_tool_present():
@@ -129,6 +134,19 @@ def test_compose_system_prompt_injects_management_guidance_when_manage_tool_pres
     assert "`manage_prompts`" in result
 
 
+def test_compose_system_prompt_injects_tab_graph_guidance_when_tools_present():
+    result = compose_system_prompt(
+        "Role-specific instructions.",
+        tools=["create_tab", "create_agent", "list_tabs"],
+    )
+
+    assert CREATE_TAB_TOOL_GUIDANCE in result
+    assert CREATE_AGENT_TOOL_GUIDANCE in result
+    assert LIST_TABS_TOOL_GUIDANCE in result
+    assert "create_tab" in CREATE_TAB_TOOL_GUIDANCE
+    assert "current tab" in CREATE_AGENT_TOOL_GUIDANCE
+
+
 def test_common_communication_guidance_requires_explicit_target_routing():
     assert (
         "must start with `@<name-or-uuid>: message body`"
@@ -137,7 +155,7 @@ def test_common_communication_guidance_requires_explicit_target_routing():
     assert "Only one target ref is supported" in COMMUNICATION_USAGE_GUIDANCE
     assert "Do not use commas in the target field." in COMMUNICATION_USAGE_GUIDANCE
     assert (
-        "emit separate content blocks with one `@target:` header per block"
+        "Each response can produce only one content block"
         in COMMUNICATION_USAGE_GUIDANCE
     )
     assert "Prefer using node names" in COMMUNICATION_USAGE_GUIDANCE
@@ -183,6 +201,7 @@ def test_assistant_only_prompt_keeps_frontend_semantics_without_repeating_block_
         "Plain content that does not start with `@target:` is a reply to the Human."
         in ASSISTANT_ONLY_PROMPT
     )
+    assert "one node per response" in ASSISTANT_ONLY_PROMPT
     assert "A single content block is either" not in ASSISTANT_ONLY_PROMPT
 
 
@@ -266,13 +285,12 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     )
     assert ASSISTANT_ONLY_PROMPT in prompt
     assert LIST_ROLES_TOOL_GUIDANCE in prompt
+    assert LIST_TABS_TOOL_GUIDANCE in prompt
     assert LIST_TOOLS_TOOL_GUIDANCE in prompt
     assert MANAGE_TOOLS_GUIDANCE in prompt
     assert "## Tools Available" not in prompt
-    assert (
-        "create_formation(name=..., goal=..., nodes=[{name, role, tools}])"
-        in STEWARD_ROLE_SYSTEM_PROMPT
-    )
+    assert "create_tab" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "create_agent" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
         "When a task contains two or more independent subtasks that can run in parallel"
         in STEWARD_ROLE_SYSTEM_PROMPT
@@ -283,11 +301,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     )
     assert "instruct each node where to send its result" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "Use `spawn` only when you need to add nodes to an existing formation dynamically, not as the primary creation method"
-        in STEWARD_ROLE_SYSTEM_PROMPT
-    )
-    assert (
-        "If role or tool availability is uncertain, use `list_roles` and `list_tools` to inspect the current options before acting"
+        "use `list_roles`, `list_tabs`, and `list_tools` to inspect the current options before acting"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert "call `idle` in the same response" in prompt
@@ -316,10 +330,10 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
         tools=_with_minimum_tools(*CONDUCTOR_ROLE_INCLUDED_TOOLS),
     )
     assert ASSISTANT_ONLY_PROMPT not in prompt
+    assert CREATE_AGENT_TOOL_GUIDANCE in prompt
+    assert LIST_TABS_TOOL_GUIDANCE in prompt
     assert LIST_ROLES_TOOL_GUIDANCE in prompt
     assert LIST_TOOLS_TOOL_GUIDANCE in prompt
-    assert SPAWN_TOOL_GUIDANCE in prompt
-    assert FORMATION_TOOL_GUIDANCE in prompt
     assert "## Tools Available" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert (
         "Prefer multi-agent parallelism over serial single-agent execution."
@@ -329,17 +343,17 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
         "specify where each node should send its result" in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
-        "prefer one declarative `create_formation(name=..., goal=..., nodes=[...], edges=[...])` call"
+        "Prefer adding peer nodes to the current tab with `create_agent`"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
-        "**Create the formation structure** declaratively when possible"
+        "**Create the graph structure** with `create_agent` and `connect`"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert "**Dispatch immediately** after creation" in CONDUCTOR_ROLE_SYSTEM_PROMPT
 
 
-def test_get_system_prompt_for_worker_omits_spawn_and_formation_guidance(monkeypatch):
+def test_get_system_prompt_for_worker_omits_graph_creation_guidance(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
@@ -360,8 +374,8 @@ def test_get_system_prompt_for_worker_omits_spawn_and_formation_guidance(monkeyp
         )
     )
 
-    assert SPAWN_TOOL_GUIDANCE not in prompt
-    assert FORMATION_TOOL_GUIDANCE not in prompt
+    assert CREATE_AGENT_TOOL_GUIDANCE not in prompt
+    assert CONNECT_TOOL_GUIDANCE not in prompt
     assert DELEGATION_GENERAL_GUIDANCE not in prompt
 
 
@@ -410,17 +424,18 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
 
 def test_steward_included_tools_contains_list_roles_and_list_tools():
     assert "list_roles" in STEWARD_ROLE_INCLUDED_TOOLS
+    assert "list_tabs" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tools" in STEWARD_ROLE_INCLUDED_TOOLS
 
 
 def test_steward_prompt_requires_same_response_dispatch_and_no_rebroadcast():
-    assert "In the same assistant turn after creation" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "Each response can route to only one node." in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "Each block must contain exactly one routed header"
+        "keep sending one node-specific `@target:` task per response"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert "Do not re-send a task to a node" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "Do not insert tool calls such as `list_connections`"
+        "Do not insert tool calls such as `list_connections` between dispatch responses"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )

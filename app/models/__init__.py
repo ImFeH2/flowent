@@ -9,7 +9,7 @@ from app.models.delta import (
     ToolResultDelta,
 )
 from app.models.event import DISPLAY_EVENTS, Event, EventType
-from app.models.formation import Formation
+from app.models.graph import GraphEdge, GraphNodeRecord, NodePosition
 from app.models.history import (
     AssistantText,
     AssistantThinking,
@@ -22,6 +22,7 @@ from app.models.history import (
 )
 from app.models.llm import LLMResponse, ModelInfo, ToolCallResult
 from app.models.message import Message
+from app.models.tab import Tab
 from app.models.todo import TodoItem
 
 __all__ = [
@@ -33,12 +34,14 @@ __all__ = [
     "ErrorEntry",
     "Event",
     "EventType",
-    "Formation",
+    "GraphEdge",
+    "GraphNodeRecord",
     "HistoryEntry",
     "LLMResponse",
     "Message",
     "ModelInfo",
     "NodeConfig",
+    "NodePosition",
     "NodeType",
     "ReceivedMessage",
     "ReceivedMessageDelta",
@@ -47,6 +50,7 @@ __all__ = [
     "Serializable",
     "StreamingDelta",
     "SystemEntry",
+    "Tab",
     "ThinkingDelta",
     "TodoItem",
     "ToolCall",

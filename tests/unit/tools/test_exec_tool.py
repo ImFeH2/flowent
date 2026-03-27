@@ -1,14 +1,55 @@
 import json
+import shutil
+import subprocess
+
+import pytest
 
 from app.agent import Agent
 from app.models import NodeConfig, NodeType
 from app.tools.exec import ExecTool
 
 
+def _sandbox_exec_supported(tmp_path) -> bool:
+    if shutil.which("bwrap") is None:
+        return False
+
+    probe = subprocess.run(
+        [
+            "bwrap",
+            "--ro-bind",
+            "/",
+            "/",
+            "--dev",
+            "/dev",
+            "--proc",
+            "/proc",
+            "--tmpfs",
+            "/tmp",
+            "--ro-bind",
+            str(tmp_path),
+            str(tmp_path),
+            "--chdir",
+            str(tmp_path),
+            "--die-with-parent",
+            "--new-session",
+            "--",
+            "bash",
+            "-c",
+            "pwd >/dev/null",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return probe.returncode == 0
+
+
 def test_exec_tool_runs_in_current_workspace_when_tmp_is_sandboxed(
     monkeypatch,
     tmp_path,
 ):
+    if not _sandbox_exec_supported(tmp_path):
+        pytest.skip("bwrap sandbox is unavailable in this environment")
+
     target = tmp_path / "settings.json"
     target.write_text('{"name": "demo"}\n', encoding="utf-8")
     monkeypatch.chdir(tmp_path)

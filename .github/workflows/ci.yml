@@ -49,6 +49,9 @@ jobs:
 
       - run: uv sync
 
+      - name: Install bubblewrap
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
       - name: Pytest
         run: uv run pytest
 

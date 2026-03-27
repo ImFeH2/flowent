@@ -125,6 +125,23 @@ def has_additional_routed_headers(content: str) -> bool:
     return bool(_LINE_HEADER_RE.search(rest))
 
 
+def split_plain_content_before_later_routed_header(
+    content: str,
+) -> tuple[str, str | None]:
+    first_line_end = content.find("\n")
+    if first_line_end == -1:
+        return content, None
+    first_line = content[:first_line_end]
+    if _HEADER_RE.match(first_line):
+        return content, None
+    rest = content[first_line_end + 1 :]
+    match = _LINE_HEADER_RE.search(rest)
+    if match is None:
+        return content, None
+    header_start = first_line_end + 1 + match.start()
+    return content[:header_start].rstrip(), content[header_start:].strip()
+
+
 def classify_streaming_content(content: str) -> str:
     if not content:
         return "pending"
@@ -183,6 +200,9 @@ class Agent:
         self._todos_lock = threading.Lock()
         self._runtime_notice_lock = threading.Lock()
         self._pending_runtime_notices: list[str] = []
+        self._pending_input_turn = False
+        self._turn_started_with_pending_input = False
+        self._turn_made_progress = False
         self._log = logger.bind(
             agent_id=self.uuid[:8], node_type=self.config.node_type.value
         )
@@ -240,6 +260,21 @@ class Agent:
     def request_idle(self, *, tool_call_id: str | None = None) -> str:
         if self._has_pending_runtime_notices():
             self._log.debug("Skipping idle because runtime notice is pending")
+            return ""
+        if (
+            self.node_type == NodeType.ASSISTANT
+            and self._turn_started_with_pending_input
+            and not self._turn_made_progress
+        ):
+            self._queue_runtime_notice(self._build_idle_without_progress_notice())
+            self._log.debug("Skipping idle because fresh input is still unhandled")
+            return ""
+        actionable_todo = self._get_first_actionable_todo()
+        if actionable_todo is not None:
+            self._queue_runtime_notice(
+                self._build_actionable_todo_notice(actionable_todo)
+            )
+            self._log.debug("Skipping idle because TODO is still actionable")
             return ""
         self._idle_started_by_tool_call_id = tool_call_id
         self.set_state(AgentState.IDLE)
@@ -336,6 +371,8 @@ class Agent:
     def _append_history(self, entry: HistoryEntry) -> None:
         with self._history_lock:
             self.history.append(entry)
+            if isinstance(entry, ReceivedMessage):
+                self._pending_input_turn = True
         data = entry.serialize()
         self._log.debug(
             "History append: type={}, content_len={}",
@@ -381,6 +418,8 @@ class Agent:
                 try:
                     self._sync_system_prompt_entry()
                     self._drain_messages()
+                    self._turn_started_with_pending_input = self._pending_input_turn
+                    self._turn_made_progress = False
 
                     tools_schema = _get_tool_registry().get_tools_schema(self)
                     messages = self._build_messages()
@@ -620,6 +659,34 @@ class Agent:
             "responses, one target at a time."
         )
 
+    @staticmethod
+    def _build_plain_then_routed_notice() -> str:
+        return (
+            "Routing reminder: this response mixed plain text with a later "
+            "`@target:` line. Only the leading plain text was kept as plain "
+            "output. The later routed-looking lines were not delivered. If you "
+            "intended to message a node, send that `@target:` message in a "
+            "later response."
+        )
+
+    @staticmethod
+    def _build_idle_without_progress_notice() -> str:
+        return (
+            "Idle reminder: you received a new message this turn, but this "
+            "response did not send a reply, route a message, or use any "
+            "non-idle tool. Do not call `idle` yet. First reply to the Human, "
+            "dispatch/delegate work, or take another concrete step."
+        )
+
+    @staticmethod
+    def _build_actionable_todo_notice(todo_text: str) -> str:
+        return (
+            "Idle reminder: your first remaining TODO still looks actionable "
+            f"(`{todo_text}`). Do that next, or update the TODO list so the "
+            "first remaining item is the actual waiting step, before calling "
+            "`idle`."
+        )
+
     def _queue_runtime_notice(self, content: str) -> None:
         with self._runtime_notice_lock:
             if content not in self._pending_runtime_notices:
@@ -822,6 +889,12 @@ class Agent:
         emitted_human_content: bool,
         message_id: str | None = None,
     ) -> None:
+        plain_content, mixed_routed_suffix = (
+            split_plain_content_before_later_routed_header(content)
+        )
+        if mixed_routed_suffix is not None:
+            self._queue_runtime_notice(self._build_plain_then_routed_notice())
+
         routed_result = self._route_content_output(content, message_id=message_id)
         if routed_result.had_additional_routed_headers and routed_result.sent_messages:
             self._queue_runtime_notice(self._build_multi_routed_header_notice())
@@ -831,6 +904,7 @@ class Agent:
                 self._append_history(ErrorEntry(content=error))
 
         if routed_result.sent_messages:
+            self._mark_turn_progress()
             for entry in routed_result.sent_messages:
                 self._append_history(entry)
             return
@@ -838,16 +912,21 @@ class Agent:
         if routed_result.had_routed_header:
             return
 
+        if not plain_content.strip():
+            return
+
+        self._mark_turn_progress()
+
         if self.node_type == NodeType.ASSISTANT and not emitted_human_content:
             event_bus.emit(
                 Event(
                     type=EventType.ASSISTANT_CONTENT,
                     agent_id=self.uuid,
-                    data={"content": content},
+                    data={"content": plain_content},
                 ),
             )
 
-        self._append_history(AssistantText(content=content))
+        self._append_history(AssistantText(content=plain_content))
 
     def _route_content_output(
         self,
@@ -923,6 +1002,34 @@ class Agent:
             resolved_targets.append(target)
             seen_target_ids.add(target.uuid)
         return resolved_targets, route_errors
+
+    def _mark_turn_progress(self) -> None:
+        self._turn_made_progress = True
+        self._pending_input_turn = False
+
+    def _get_first_actionable_todo(self) -> str | None:
+        with self._todos_lock:
+            if not self.todos:
+                return None
+            first_todo = self.todos[0].text.strip()
+        if not first_todo:
+            return None
+        normalized = first_todo.lower()
+        waiting_prefixes = (
+            "wait",
+            "await",
+            "waiting",
+            "awaiting",
+            "monitor",
+            "listen",
+            "idle",
+            "sleep",
+        )
+        if normalized.startswith(waiting_prefixes) or first_todo.startswith(
+            ("等待", "等候", "监听", "休眠", "空闲")
+        ):
+            return None
+        return first_todo
 
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = [

@@ -358,6 +358,43 @@ def test_record_content_output_appends_error_entry_for_unmatched_target(monkeypa
     assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
 
 
+def test_record_content_output_keeps_plain_prefix_and_drops_later_routed_text(
+    monkeypatch,
+):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+    registry.reset()
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    registry.register(assistant)
+    events = []
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        assistant._record_content_output(
+            "OK\n\n@worker: do the follow-up task",
+            emitted_human_content=False,
+        )
+        messages = assistant._build_messages()
+    finally:
+        registry.reset()
+
+    reminder = (
+        "<system>Routing reminder: this response mixed plain text with a later "
+        "`@target:` line. Only the leading plain text was kept as plain output. "
+        "The later routed-looking lines were not delivered. If you intended to "
+        "message a node, send that `@target:` message in a later response.</system>"
+    )
+
+    history = assistant.get_history_snapshot()
+    assert isinstance(history[-1], AssistantText)
+    assert history[-1].content == "OK"
+    assert any(
+        event.type == EventType.ASSISTANT_CONTENT and event.data == {"content": "OK"}
+        for event in events
+    )
+    assert any(msg.get("content") == reminder for msg in messages)
+
+
 def test_build_messages_adds_one_shot_notice_for_multiple_routed_headers(monkeypatch):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
     registry.reset()
@@ -427,6 +464,54 @@ def test_multiple_routed_headers_prevent_idle_until_notice_is_seen(monkeypatch):
     assert idle_result == ""
     assert assistant.state == AgentState.RUNNING
     assert any(msg.get("content") == reminder for msg in first_messages)
+
+
+def test_idle_is_blocked_when_fresh_input_has_no_progress(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    agent.set_state(AgentState.RUNNING, "processing")
+    agent._turn_started_with_pending_input = True
+    agent._turn_made_progress = False
+
+    idle_result = agent.request_idle()
+    messages = agent._build_messages()
+
+    reminder = (
+        "<system>Idle reminder: you received a new message this turn, but this "
+        "response did not send a reply, route a message, or use any non-idle "
+        "tool. Do not call `idle` yet. First reply to the Human, dispatch/"
+        "delegate work, or take another concrete step.</system>"
+    )
+
+    assert idle_result == ""
+    assert agent.state == AgentState.RUNNING
+    assert any(msg.get("content") == reminder for msg in messages)
+
+
+def test_idle_is_blocked_when_first_todo_is_actionable(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    agent.set_state(AgentState.RUNNING, "processing")
+    agent.set_todos(
+        [
+            TodoItem(text="Forward pyproject summary to Project Synthesizer"),
+            TodoItem(text="Wait for final synthesis"),
+        ]
+    )
+
+    idle_result = agent.request_idle()
+    messages = agent._build_messages()
+
+    reminder = (
+        "<system>Idle reminder: your first remaining TODO still looks actionable "
+        "(`Forward pyproject summary to Project Synthesizer`). Do that next, or "
+        "update the TODO list so the first remaining item is the actual waiting "
+        "step, before calling `idle`.</system>"
+    )
+
+    assert idle_result == ""
+    assert agent.state == AgentState.RUNNING
+    assert any(msg.get("content") == reminder for msg in messages)
 
 
 def test_record_content_output_records_sent_message_in_history(monkeypatch):

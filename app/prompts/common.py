@@ -36,6 +36,13 @@ CREATE_TAB_TOOL_GUIDANCE = """\
 - A tab is the user-visible home for one task. Keep the title concrete and easy to recognize later.
 """
 
+DELETE_TAB_TOOL_GUIDANCE = """\
+## Delete Tab Tool Rules
+
+- Use `delete_tab` only when the Human explicitly asks to remove a tab or when you are intentionally cleaning up a task workspace that should no longer exist.
+- Deleting a tab permanently removes the tab and its persisted Agent Graph after active nodes are terminated.
+"""
+
 CREATE_AGENT_TOOL_GUIDANCE = """\
 ## Create Agent Tool Rules
 
@@ -174,6 +181,8 @@ def _build_conditional_tool_guidance(tools: list[str]) -> list[str]:
         parts.append(TODO_TOOL_GUIDANCE.strip())
     if "create_tab" in tool_names:
         parts.append(CREATE_TAB_TOOL_GUIDANCE.strip())
+    if "delete_tab" in tool_names:
+        parts.append(DELETE_TAB_TOOL_GUIDANCE.strip())
     if "create_agent" in tool_names:
         parts.append(CREATE_AGENT_TOOL_GUIDANCE.strip())
     if "create_agent" in tool_names:

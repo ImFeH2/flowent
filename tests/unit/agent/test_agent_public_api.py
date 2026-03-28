@@ -229,6 +229,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             ],
             "optional_tools": [
                 "create_tab",
+                "delete_tab",
                 "create_agent",
                 "connect",
                 "manage_providers",
@@ -253,6 +254,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             ],
             "optional_tools": [
                 "create_tab",
+                "delete_tab",
                 "create_agent",
                 "connect",
                 "manage_providers",
@@ -291,6 +293,7 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "exec",
         "fetch",
         "create_tab",
+        "delete_tab",
         "create_agent",
         "connect",
         "manage_providers",
@@ -360,13 +363,14 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
         )
 
         summaries = json.loads(ListTabsTool().execute(agent, {}))
-        assert summaries == [
-            {
-                **tab.serialize(),
-                "node_count": 2,
-                "edge_count": 1,
-            }
-        ]
+        assert len(summaries) == 1
+        assert summaries[0]["id"] == tab.id
+        assert summaries[0]["title"] == tab.title
+        assert summaries[0]["goal"] == tab.goal
+        assert summaries[0]["created_at"] == tab.created_at
+        assert isinstance(summaries[0]["updated_at"], float)
+        assert summaries[0]["node_count"] == 2
+        assert summaries[0]["edge_count"] == 1
 
         detail = json.loads(ListTabsTool().execute(agent, {"tab_id": tab.id}))
         assert detail["tab"]["id"] == tab.id

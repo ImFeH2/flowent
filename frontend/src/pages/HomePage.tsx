@@ -49,6 +49,7 @@ import {
   createTabEdgeRequest,
   createTabNodeRequest,
   createTabRequest,
+  deleteTabRequest,
   dispatchNodeMessageRequest,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -194,6 +195,19 @@ export function HomePage() {
     }
   };
 
+  const handleDeleteTab = async (tabId: string, title: string) => {
+    if (!window.confirm(`Delete tab "${title}" and its agent graph?`)) {
+      return;
+    }
+    try {
+      await deleteTabRequest(tabId);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete tab",
+      );
+    }
+  };
+
   const handleConnectAgents = async () => {
     if (!activeTabId) {
       toast.error("Create or select a tab first");
@@ -262,21 +276,42 @@ export function HomePage() {
         <div className="relative z-30 flex flex-col border-b border-white/10 bg-black/40 backdrop-blur-md">
           <div className="pointer-events-auto flex items-end overflow-x-auto px-2 pt-1 scrollbar-none">
             {Array.from(tabs.values()).map((tab) => (
-              <button
+              <div
                 key={tab.id}
-                type="button"
-                onClick={() => setActiveTabId(tab.id)}
-                className={cn(
-                  "group relative flex min-w-[120px] max-w-[200px] shrink-0 flex-col justify-center border-r border-white/5 px-4 py-3 text-left transition-colors",
-                  activeTabId === tab.id
-                    ? "z-10 bg-white/[0.08] text-foreground shadow-[inset_0_2px_0_0_rgba(96,165,250,1)]"
-                    : "bg-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
-                )}
+                className="group relative min-w-[120px] max-w-[200px] shrink-0 border-r border-white/5"
               >
-                <div className="truncate text-[13px] font-medium leading-tight">
-                  {tab.title}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTabId(tab.id)}
+                  className={cn(
+                    "relative z-10 flex w-full flex-col justify-center px-4 py-3 pr-10 text-left transition-colors",
+                    activeTabId === tab.id
+                      ? "bg-white/[0.08] text-foreground shadow-[inset_0_2px_0_0_rgba(96,165,250,1)]"
+                      : "bg-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                  )}
+                >
+                  <div className="truncate text-[13px] font-medium leading-tight">
+                    {tab.title}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  title="Delete tab"
+                  aria-label={`Delete ${tab.title}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleDeleteTab(tab.id, tab.title);
+                  }}
+                  className={cn(
+                    "absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 text-white/45 transition-[opacity,color,background-color] hover:bg-white/10 hover:text-white",
+                    activeTabId === tab.id
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100",
+                  )}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
             ))}
             <button
               type="button"

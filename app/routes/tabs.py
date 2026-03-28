@@ -7,6 +7,7 @@ from app.graph_service import (
     create_agent_node,
     create_edge,
     create_tab,
+    delete_tab,
     list_tab_edges,
     list_tab_nodes,
 )
@@ -88,6 +89,17 @@ async def get_tab(tab_id: str) -> dict[str, object]:
         ],
         "edges": [edge.serialize() for edge in edges],
     }
+
+
+@router.delete("/api/tabs/{tab_id}")
+async def delete_tab_route(tab_id: str) -> dict[str, object]:
+    deleted, error = delete_tab(tab_id=tab_id)
+    if error is not None or deleted is None:
+        status_code = 404 if error and error.endswith("not found") else 400
+        raise HTTPException(
+            status_code=status_code, detail=error or "Failed to delete tab"
+        )
+    return deleted
 
 
 @router.post("/api/tabs/{tab_id}/nodes")

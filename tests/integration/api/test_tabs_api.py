@@ -65,3 +65,49 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     assert reader_node["tab_id"] == tab_id
     assert writer_node["tab_id"] == tab_id
     assert reader_node["connections"] == [writer["id"]]
+
+
+def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
+    create_tab_response = client.post(
+        "/api/tabs",
+        json={"title": "Disposable", "goal": "Delete me"},
+    )
+
+    assert create_tab_response.status_code == 200
+    tab_id = create_tab_response.json()["id"]
+
+    left_response = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Left"},
+    )
+    right_response = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Right"},
+    )
+    assert left_response.status_code == 200
+    assert right_response.status_code == 200
+    left_id = left_response.json()["id"]
+    right_id = right_response.json()["id"]
+
+    edge_response = client.post(
+        f"/api/tabs/{tab_id}/edges",
+        json={"from_node_id": left_id, "to_node_id": right_id},
+    )
+    assert edge_response.status_code == 200
+    edge_id = edge_response.json()["id"]
+
+    delete_response = client.delete(f"/api/tabs/{tab_id}")
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["id"] == tab_id
+    assert set(delete_response.json()["removed_node_ids"]) == {left_id, right_id}
+    assert delete_response.json()["removed_edge_ids"] == [edge_id]
+
+    tab_detail_response = client.get(f"/api/tabs/{tab_id}")
+    assert tab_detail_response.status_code == 404
+
+    nodes_response = client.get("/api/nodes")
+    assert nodes_response.status_code == 200
+    node_ids = {node["id"] for node in nodes_response.json()["nodes"]}
+    assert left_id not in node_ids
+    assert right_id not in node_ids

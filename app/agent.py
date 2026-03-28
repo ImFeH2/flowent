@@ -1405,8 +1405,12 @@ class Agent:
 
     def terminate_and_wait(self, timeout: float = 10.0) -> None:
         self.request_termination("shutdown")
+        self.wait_for_termination(timeout=timeout)
+
+    def wait_for_termination(self, timeout: float = 10.0) -> bool:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
+        return not (self._thread and self._thread.is_alive())
 
     def _finalize_termination(self, reason: str) -> None:
         from app.registry import registry

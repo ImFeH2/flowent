@@ -225,6 +225,66 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       handleUpdateEvent(event);
       handleTabEvent(event);
 
+      if (event.type === "tab_deleted") {
+        const removedNodeIds = Array.isArray(event.data.removed_node_ids)
+          ? event.data.removed_node_ids.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : [];
+        const removedNodeIdSet = new Set(removedNodeIds);
+        const deletedTabId =
+          typeof event.data.id === "string" ? event.data.id : null;
+
+        if (deletedTabId) {
+          setSelectedTabId((current) =>
+            current === deletedTabId ? null : current,
+          );
+        }
+
+        if (removedNodeIdSet.size > 0) {
+          setSelectedAgentId((current) =>
+            current && removedNodeIdSet.has(current) ? null : current,
+          );
+          setHoveredAgentId((current) =>
+            current && removedNodeIdSet.has(current) ? null : current,
+          );
+        }
+
+        if (removedNodeIdSet.size > 0) {
+          setAgentHistories((prev) => {
+            const next = new Map(prev);
+            for (const nodeId of removedNodeIdSet) {
+              next.delete(nodeId);
+            }
+            return next;
+          });
+          setStreamingDeltas((prev) => {
+            const next = new Map(prev);
+            for (const nodeId of removedNodeIdSet) {
+              next.delete(nodeId);
+            }
+            return next;
+          });
+          setActiveMessages((prev) =>
+            prev.filter(
+              (message) =>
+                !removedNodeIdSet.has(message.fromId) &&
+                !removedNodeIdSet.has(message.toId),
+            ),
+          );
+          setActiveToolCalls((prev) => {
+            const next = new Map(prev);
+            for (const nodeId of removedNodeIdSet) {
+              next.delete(nodeId);
+            }
+            return next;
+          });
+          setRecentActivities((prev) =>
+            prev.filter((activity) => !removedNodeIdSet.has(activity.agentId)),
+          );
+        }
+      }
+
       if (event.type === "node_message") {
         const fromId = event.agent_id;
         const toId = event.data.to_id as string | undefined;

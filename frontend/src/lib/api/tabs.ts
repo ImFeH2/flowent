@@ -32,6 +32,13 @@ export async function createTabRequest(
   });
 }
 
+export async function deleteTabRequest(tabId: string): Promise<void> {
+  await requestVoid(`/api/tabs/${tabId}`, {
+    method: "DELETE",
+    errorMessage: "Failed to delete tab",
+  });
+}
+
 export async function fetchTabDetail(
   tabId: string,
   signal?: AbortSignal,

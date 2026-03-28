@@ -19,6 +19,7 @@ WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
 STEWARD_ROLE_INCLUDED_TOOLS = [
     "create_tab",
+    "delete_tab",
     "create_agent",
     "connect",
     "list_tabs",

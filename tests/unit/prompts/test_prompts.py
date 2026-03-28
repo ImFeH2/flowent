@@ -8,6 +8,7 @@ from app.prompts.common import (
     CREATE_TAB_TOOL_GUIDANCE,
     DEFAULT_AGENT_ROLE_PROMPT,
     DELEGATION_GENERAL_GUIDANCE,
+    DELETE_TAB_TOOL_GUIDANCE,
     FILE_PATH_GUIDANCE,
     IDLE_TOOL_GUIDANCE,
     LIST_ROLES_TOOL_GUIDANCE,
@@ -137,10 +138,11 @@ def test_compose_system_prompt_injects_management_guidance_when_manage_tool_pres
 def test_compose_system_prompt_injects_tab_graph_guidance_when_tools_present():
     result = compose_system_prompt(
         "Role-specific instructions.",
-        tools=["create_tab", "create_agent", "list_tabs"],
+        tools=["create_tab", "delete_tab", "create_agent", "list_tabs"],
     )
 
     assert CREATE_TAB_TOOL_GUIDANCE in result
+    assert DELETE_TAB_TOOL_GUIDANCE in result
     assert CREATE_AGENT_TOOL_GUIDANCE in result
     assert LIST_TABS_TOOL_GUIDANCE in result
     assert "create_tab" in CREATE_TAB_TOOL_GUIDANCE
@@ -290,6 +292,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert MANAGE_TOOLS_GUIDANCE in prompt
     assert "## Tools Available" not in prompt
     assert "create_tab" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "delete_tab" in STEWARD_ROLE_SYSTEM_PROMPT
     assert "create_agent" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
         "When a task contains two or more independent subtasks that can run in parallel"
@@ -423,6 +426,7 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
 
 
 def test_steward_included_tools_contains_list_roles_and_list_tools():
+    assert "delete_tab" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_roles" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tabs" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tools" in STEWARD_ROLE_INCLUDED_TOOLS

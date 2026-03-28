@@ -17,6 +17,7 @@ from app.models import (
     Tab,
 )
 from app.registry import registry
+from app.runtime import SYSTEM_NODE_TIMEOUT
 from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
@@ -36,6 +37,57 @@ def create_tab(*, title: str, goal: str = "") -> Tab:
         )
     )
     return tab
+
+
+def delete_tab(
+    *,
+    tab_id: str,
+    timeout: float = SYSTEM_NODE_TIMEOUT,
+) -> tuple[dict[str, object] | None, str | None]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None, f"Tab '{tab_id}' not found"
+
+    stored_nodes = list_tab_nodes(tab_id)
+    stored_edges = list_tab_edges(tab_id)
+    live_nodes = [node for node in registry.get_all() if node.config.tab_id == tab_id]
+
+    removed_node_ids = list(
+        dict.fromkeys(
+            [*(node.id for node in stored_nodes), *(node.uuid for node in live_nodes)]
+        )
+    )
+    removed_edge_ids = [edge.id for edge in stored_edges]
+
+    for node in live_nodes:
+        node.request_termination("tab_deleted")
+
+    lingering_node_ids: list[str] = []
+    for node in live_nodes:
+        if not node.wait_for_termination(timeout=timeout):
+            lingering_node_ids.append(node.uuid)
+
+    if lingering_node_ids:
+        return (
+            None,
+            "Failed to delete tab because some nodes did not terminate: "
+            + ", ".join(node_id[:8] for node_id in lingering_node_ids),
+        )
+
+    workspace_store.delete_tab(tab_id)
+    payload = {
+        **tab.serialize(),
+        "removed_node_ids": removed_node_ids,
+        "removed_edge_ids": removed_edge_ids,
+    }
+    event_bus.emit(
+        Event(
+            type=EventType.TAB_DELETED,
+            agent_id="assistant",
+            data=payload,
+        )
+    )
+    return payload, None
 
 
 def build_node_config(

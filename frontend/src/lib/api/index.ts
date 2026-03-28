@@ -8,6 +8,7 @@ export {
 export {
   fetchTabs,
   createTabRequest,
+  deleteTabRequest,
   fetchTabDetail,
   createTabNodeRequest,
   createTabEdgeRequest,

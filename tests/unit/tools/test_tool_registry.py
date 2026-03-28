@@ -33,6 +33,7 @@ def test_tool_registry_registers_connect_and_removes_create_root():
     tool_names = [tool.name for tool in build_tool_registry().list_tools()]
 
     assert "create_tab" in tool_names
+    assert "delete_tab" in tool_names
     assert "create_agent" in tool_names
     assert "connect" in tool_names
     assert "list_tabs" in tool_names
@@ -49,6 +50,7 @@ def test_tool_registry_grants_tab_graph_tools_when_explicitly_allowed():
             node_type=NodeType.ASSISTANT,
             tools=[
                 "create_tab",
+                "delete_tab",
                 "create_agent",
                 "connect",
                 "list_tabs",
@@ -64,6 +66,7 @@ def test_tool_registry_grants_tab_graph_tools_when_explicitly_allowed():
         "todo",
         "list_connections",
         "create_tab",
+        "delete_tab",
         "create_agent",
         "connect",
         "list_tabs",

@@ -72,6 +72,40 @@ export function useAgents() {
         next.set(event.agent_id, { ...node, state: "terminated" });
         return next;
       });
+    } else if (event.type === "tab_deleted") {
+      const removedNodeIds = Array.isArray(event.data.removed_node_ids)
+        ? event.data.removed_node_ids.filter(
+            (value): value is string => typeof value === "string",
+          )
+        : [];
+      const deletedTabId =
+        typeof event.data.id === "string" ? event.data.id : null;
+      setAgents((prev) => {
+        const next = new Map(prev);
+        const removedNodeIdSet = new Set(removedNodeIds);
+        if (removedNodeIdSet.size === 0 && deletedTabId) {
+          for (const [nodeId, node] of next.entries()) {
+            if (node.tab_id === deletedTabId) {
+              removedNodeIdSet.add(nodeId);
+            }
+          }
+        }
+        if (removedNodeIdSet.size === 0) {
+          return prev;
+        }
+        for (const nodeId of removedNodeIdSet) {
+          next.delete(nodeId);
+        }
+        for (const [nodeId, node] of next.entries()) {
+          const connections = node.connections.filter(
+            (connection) => !removedNodeIdSet.has(connection),
+          );
+          if (connections.length !== node.connections.length) {
+            next.set(nodeId, { ...node, connections });
+          }
+        }
+        return next;
+      });
     } else if (event.type === "node_connected") {
       const { from_id, to_id } = event.data as {
         from_id: string;

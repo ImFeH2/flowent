@@ -10,6 +10,8 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bot,
+  CircuitBoard,
+  FilePlus2,
   Link2,
   Plus,
   PanelRightClose,
@@ -17,6 +19,8 @@ import {
   Radio,
   SendHorizontal,
   Shield,
+  Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
@@ -53,6 +57,31 @@ import {
   dispatchNodeMessageRequest,
 } from "@/lib/api";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  WorkspaceCommandDialog,
+  WorkspaceDialogField,
+  WorkspaceDialogMeta,
+} from "@/components/WorkspaceCommandDialog";
 
 const WORKSPACE_PANEL_ID = "workspace-panel-width";
 const MIN_PANEL_WIDTH = 320;
@@ -61,6 +90,14 @@ const MAX_PANEL_WIDTH = 1400;
 const DEFAULT_PANEL_RATIO = 2 / 5;
 const DEFAULT_PANEL_WIDTH = 560;
 
+type WorkspaceDialogKind =
+  | "create-tab"
+  | "create-agent"
+  | "connect-agents"
+  | "send-task"
+  | "delete-tab"
+  | null;
+
 export function HomePage() {
   const { agents } = useAgentNodesRuntime();
   const { tabs } = useAgentTabsRuntime();
@@ -68,6 +105,20 @@ export function HomePage() {
   const { activeTabId, selectedAgentId, selectAgent, setActiveTabId } =
     useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
+  const [activeDialog, setActiveDialog] = useState<WorkspaceDialogKind>(null);
+  const [pendingAction, setPendingAction] = useState<WorkspaceDialogKind>(null);
+  const [createTabTitle, setCreateTabTitle] = useState("");
+  const [createTabGoal, setCreateTabGoal] = useState("");
+  const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
+  const [createAgentName, setCreateAgentName] = useState("");
+  const [connectSourceId, setConnectSourceId] = useState("");
+  const [connectTargetId, setConnectTargetId] = useState("");
+  const [taskMessageDraft, setTaskMessageDraft] = useState("");
+  const [deleteTabTarget, setDeleteTabTarget] = useState<{
+    id: string;
+    title: string;
+    nodeCount?: number;
+  } | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [panelWidth, setStoredPanelWidth] = usePanelWidth(
     WORKSPACE_PANEL_ID,
@@ -137,6 +188,7 @@ export function HomePage() {
   }, [agents]);
 
   const selectedAgent = selectedAgentId ? agents.get(selectedAgentId) : null;
+  const activeTab = activeTabId ? (tabs.get(activeTabId) ?? null) : null;
   const tabAgents = useMemo(
     () =>
       Array.from(agents.values()).filter(
@@ -145,6 +197,25 @@ export function HomePage() {
       ),
     [activeTabId, agents],
   );
+  const tabAgentOptions = useMemo(
+    () =>
+      tabAgents.map((agent) => ({
+        id: agent.id,
+        label: getNodeLabel({
+          name: agent.name,
+          roleName: agent.role_name,
+          nodeType: agent.node_type,
+        }),
+      })),
+    [tabAgents],
+  );
+  const selectedAgentLabel = selectedAgent
+    ? getNodeLabel({
+        name: selectedAgent.name,
+        roleName: selectedAgent.role_name,
+        nodeType: selectedAgent.node_type,
+      })
+    : null;
   const panelVisible = panelOpen || !!selectedAgent;
 
   const togglePanel = () => {
@@ -158,110 +229,164 @@ export function HomePage() {
     setPanelOpen(true);
   };
 
+  const openCreateTabDialog = () => {
+    setCreateTabTitle("");
+    setCreateTabGoal("");
+    setActiveDialog("create-tab");
+  };
+
   const handleCreateTab = async () => {
-    const title = window.prompt("New tab title");
-    if (!title || !title.trim()) {
+    const title = createTabTitle.trim();
+    if (!title) {
       return;
     }
+    setPendingAction("create-tab");
     try {
-      const tab = await createTabRequest(title.trim());
+      const tab = await createTabRequest(title, createTabGoal.trim());
       setActiveTabId(tab.id);
+      setActiveDialog(null);
+      setCreateTabTitle("");
+      setCreateTabGoal("");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create tab",
       );
+    } finally {
+      setPendingAction(null);
     }
   };
 
-  const handleCreateAgent = async () => {
+  const openCreateAgentDialog = () => {
     if (!activeTabId) {
       toast.error("Create or select a tab first");
       return;
     }
-    const roleName = window.prompt("Role name", "Worker");
-    if (!roleName || !roleName.trim()) {
+    setCreateAgentRoleName("Worker");
+    setCreateAgentName("");
+    setActiveDialog("create-agent");
+  };
+
+  const handleCreateAgent = async () => {
+    const roleName = createAgentRoleName.trim();
+    if (!activeTabId || !roleName) {
       return;
     }
-    const name = window.prompt("Agent name", "");
+    setPendingAction("create-agent");
     try {
       await createTabNodeRequest(activeTabId, {
-        role_name: roleName.trim(),
-        name: name?.trim() || undefined,
+        role_name: roleName,
+        name: createAgentName.trim() || undefined,
       });
+      setActiveDialog(null);
+      setCreateAgentRoleName("Worker");
+      setCreateAgentName("");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create agent",
       );
+    } finally {
+      setPendingAction(null);
     }
   };
 
-  const handleDeleteTab = async (tabId: string, title: string) => {
-    if (!window.confirm(`Delete tab "${title}" and its agent graph?`)) {
+  const requestDeleteTab = (
+    tabId: string,
+    title: string,
+    nodeCount?: number,
+  ) => {
+    setDeleteTabTarget({ id: tabId, title, nodeCount });
+  };
+
+  const handleDeleteTab = async () => {
+    if (!deleteTabTarget) {
       return;
     }
+    setPendingAction("delete-tab");
     try {
-      await deleteTabRequest(tabId);
+      await deleteTabRequest(deleteTabTarget.id);
+      setDeleteTabTarget(null);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete tab",
       );
+    } finally {
+      setPendingAction(null);
     }
   };
 
-  const handleConnectAgents = async () => {
+  const openConnectDialog = () => {
     if (!activeTabId) {
       toast.error("Create or select a tab first");
       return;
     }
-    const sourceName = window.prompt(
-      `Source agent name\n${tabAgents.map((agent) => `- ${agent.name ?? agent.id.slice(0, 8)}`).join("\n")}`,
-      selectedAgent?.name ?? "",
-    );
-    if (!sourceName || !sourceName.trim()) {
+    if (tabAgentOptions.length < 2) {
+      toast.error("Add at least two agents before creating a connection");
       return;
     }
-    const targetName = window.prompt("Target agent name", "");
-    if (!targetName || !targetName.trim()) {
+    const selectedSourceId =
+      selectedAgent && selectedAgent.tab_id === activeTabId
+        ? selectedAgent.id
+        : tabAgentOptions[0]?.id;
+    const initialTargetId =
+      tabAgentOptions.find((agent) => agent.id !== selectedSourceId)?.id ?? "";
+    if (!selectedSourceId || !initialTargetId) {
       return;
     }
-    const source = tabAgents.find(
-      (agent) => (agent.name ?? agent.id.slice(0, 8)) === sourceName.trim(),
-    );
-    const target = tabAgents.find(
-      (agent) => (agent.name ?? agent.id.slice(0, 8)) === targetName.trim(),
-    );
-    if (!source || !target) {
-      toast.error("Source or target agent not found in the current tab");
+    setConnectSourceId(selectedSourceId);
+    setConnectTargetId(initialTargetId);
+    setActiveDialog("connect-agents");
+  };
+
+  const handleConnectAgents = async () => {
+    if (!activeTabId || !connectSourceId || !connectTargetId) {
       return;
     }
+    if (connectSourceId === connectTargetId) {
+      toast.error("Choose two different agents");
+      return;
+    }
+    setPendingAction("connect-agents");
     try {
-      await createTabEdgeRequest(activeTabId, source.id, target.id);
+      await createTabEdgeRequest(activeTabId, connectSourceId, connectTargetId);
+      setActiveDialog(null);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to connect agents",
       );
+    } finally {
+      setPendingAction(null);
     }
   };
 
-  const handleDispatchTask = async () => {
-    if (!selectedAgentId) {
+  const openTaskDialog = () => {
+    if (
+      !selectedAgentId ||
+      !selectedAgent ||
+      selectedAgent.node_type === "assistant"
+    ) {
       toast.error("Select an agent first");
       return;
     }
-    const content = window.prompt("Task message");
-    if (!content || !content.trim()) {
+    setTaskMessageDraft("");
+    setActiveDialog("send-task");
+  };
+
+  const handleDispatchTask = async () => {
+    const content = taskMessageDraft.trim();
+    if (!selectedAgentId || !content) {
       return;
     }
+    setPendingAction("send-task");
     try {
-      await dispatchNodeMessageRequest(
-        selectedAgentId,
-        content.trim(),
-        "human",
-      );
+      await dispatchNodeMessageRequest(selectedAgentId, content, "human");
+      setTaskMessageDraft("");
+      setActiveDialog(null);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to send task",
       );
+    } finally {
+      setPendingAction(null);
     }
   };
 
@@ -300,7 +425,7 @@ export function HomePage() {
                   aria-label={`Delete ${tab.title}`}
                   onClick={(event) => {
                     event.stopPropagation();
-                    void handleDeleteTab(tab.id, tab.title);
+                    requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
                     "absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 text-white/45 transition-[opacity,color,background-color] hover:bg-white/10 hover:text-white",
@@ -315,8 +440,9 @@ export function HomePage() {
             ))}
             <button
               type="button"
+              aria-label="Create tab"
               onClick={() => {
-                void handleCreateTab();
+                openCreateTabDialog();
               }}
               className="ml-2 flex shrink-0 items-center justify-center rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
             >
@@ -368,15 +494,24 @@ export function HomePage() {
         </div>
 
         <div className="absolute bottom-8 left-1/2 z-40 -translate-x-1/2 pointer-events-auto flex items-center gap-1 rounded-[26px] border border-white/5 bg-[#0A0A0A]/95 p-1.5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-2xl">
-          <ToolbarButton onClick={() => void handleCreateAgent()}>
+          <ToolbarButton
+            disabled={!activeTabId}
+            onClick={openCreateAgentDialog}
+          >
             <Plus className="size-4 opacity-70" />
             Add Agent
           </ToolbarButton>
-          <ToolbarButton onClick={() => void handleConnectAgents()}>
+          <ToolbarButton
+            disabled={!activeTabId || tabAgentOptions.length < 2}
+            onClick={openConnectDialog}
+          >
             <Link2 className="size-4 opacity-70" />
             Connect
           </ToolbarButton>
-          <ToolbarButton onClick={() => void handleDispatchTask()}>
+          <ToolbarButton
+            disabled={!selectedAgent || selectedAgent.node_type === "assistant"}
+            onClick={openTaskDialog}
+          >
             <SendHorizontal className="size-4 opacity-70" />
             Send Task
           </ToolbarButton>
@@ -445,22 +580,346 @@ export function HomePage() {
           </motion.aside>
         )}
       </AnimatePresence>
+
+      <WorkspaceCommandDialog
+        open={activeDialog === "create-tab"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveDialog(null);
+          }
+        }}
+        icon={FilePlus2}
+        eyebrow="Workspace"
+        title="Create Task Tab"
+        description="Open a persistent task workspace with a clear title and an optional goal so both you and the Assistant can revisit it later."
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setActiveDialog(null)}
+              disabled={pendingAction === "create-tab"}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleCreateTab()}
+              disabled={
+                !createTabTitle.trim() || pendingAction === "create-tab"
+              }
+            >
+              {pendingAction === "create-tab" ? "Creating..." : "Create Tab"}
+            </Button>
+          </>
+        }
+      >
+        <WorkspaceDialogField label="Title" hint="Shown in the tab strip">
+          <Input
+            autoFocus
+            aria-label="Tab title"
+            value={createTabTitle}
+            onChange={(event) => setCreateTabTitle(event.target.value)}
+            placeholder="Release checklist"
+            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+        <WorkspaceDialogField label="Goal" hint="Optional">
+          <Textarea
+            value={createTabGoal}
+            aria-label="Tab goal"
+            onChange={(event) => setCreateTabGoal(event.target.value)}
+            placeholder="Summarize the task or outcome this workspace should drive."
+            className="min-h-[116px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+      </WorkspaceCommandDialog>
+
+      <WorkspaceCommandDialog
+        open={activeDialog === "create-agent"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveDialog(null);
+          }
+        }}
+        icon={Bot}
+        eyebrow="Agent Graph"
+        title="Add Agent"
+        description="Add a peer node to the current tab. Start with the role and optional display name, then wire it into the graph."
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setActiveDialog(null)}
+              disabled={pendingAction === "create-agent"}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleCreateAgent()}
+              disabled={
+                !activeTabId ||
+                !createAgentRoleName.trim() ||
+                pendingAction === "create-agent"
+              }
+            >
+              {pendingAction === "create-agent" ? "Adding..." : "Add Agent"}
+            </Button>
+          </>
+        }
+      >
+        <WorkspaceDialogMeta>
+          Adding to{" "}
+          <span className="font-semibold text-white">
+            {activeTab?.title ?? "No active tab"}
+          </span>
+        </WorkspaceDialogMeta>
+        <WorkspaceDialogField label="Role" hint="Required">
+          <Input
+            autoFocus
+            aria-label="Agent role"
+            value={createAgentRoleName}
+            onChange={(event) => setCreateAgentRoleName(event.target.value)}
+            placeholder="Worker"
+            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+        <WorkspaceDialogField label="Display Name" hint="Optional">
+          <Input
+            value={createAgentName}
+            aria-label="Agent display name"
+            onChange={(event) => setCreateAgentName(event.target.value)}
+            placeholder="Docs Worker"
+            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+      </WorkspaceCommandDialog>
+
+      <WorkspaceCommandDialog
+        open={activeDialog === "connect-agents"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveDialog(null);
+          }
+        }}
+        icon={CircuitBoard}
+        eyebrow="Topology"
+        title="Connect Agents"
+        description="Create a directed edge between two peers in the current tab so they can message each other directly."
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setActiveDialog(null)}
+              disabled={pendingAction === "connect-agents"}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleConnectAgents()}
+              disabled={
+                !connectSourceId ||
+                !connectTargetId ||
+                connectSourceId === connectTargetId ||
+                pendingAction === "connect-agents"
+              }
+            >
+              {pendingAction === "connect-agents"
+                ? "Connecting..."
+                : "Create Edge"}
+            </Button>
+          </>
+        }
+      >
+        <WorkspaceDialogMeta>
+          {activeTab ? (
+            <>
+              Tab{" "}
+              <span className="font-semibold text-white">
+                {activeTab.title}
+              </span>{" "}
+              · {tabAgentOptions.length} agents available
+            </>
+          ) : (
+            "No active tab"
+          )}
+        </WorkspaceDialogMeta>
+        <WorkspaceDialogField label="Source" hint="Sends messages out">
+          <Select
+            value={connectSourceId}
+            onValueChange={(value) => {
+              setConnectSourceId(value);
+              if (value === connectTargetId) {
+                const nextTarget =
+                  tabAgentOptions.find((agent) => agent.id !== value)?.id ?? "";
+                setConnectTargetId(nextTarget);
+              }
+            }}
+          >
+            <SelectTrigger
+              aria-label="Source agent"
+              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
+            >
+              <SelectValue placeholder="Choose source agent" />
+            </SelectTrigger>
+            <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(17,21,31,0.98),rgba(11,15,23,0.96))] text-white backdrop-blur-2xl">
+              {tabAgentOptions.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id}>
+                  {agent.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </WorkspaceDialogField>
+        <WorkspaceDialogField label="Target" hint="Receives messages">
+          <Select value={connectTargetId} onValueChange={setConnectTargetId}>
+            <SelectTrigger
+              aria-label="Target agent"
+              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
+            >
+              <SelectValue placeholder="Choose target agent" />
+            </SelectTrigger>
+            <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(17,21,31,0.98),rgba(11,15,23,0.96))] text-white backdrop-blur-2xl">
+              {tabAgentOptions
+                .filter((agent) => agent.id !== connectSourceId)
+                .map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.label}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </WorkspaceDialogField>
+      </WorkspaceCommandDialog>
+
+      <WorkspaceCommandDialog
+        open={activeDialog === "send-task"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveDialog(null);
+          }
+        }}
+        icon={Sparkles}
+        eyebrow="Dispatch"
+        title="Send Task"
+        description="Write the first concrete instruction for the selected agent. This goes straight into that node's queue."
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setActiveDialog(null)}
+              disabled={pendingAction === "send-task"}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleDispatchTask()}
+              disabled={
+                !taskMessageDraft.trim() || pendingAction === "send-task"
+              }
+            >
+              {pendingAction === "send-task" ? "Sending..." : "Send Message"}
+            </Button>
+          </>
+        }
+      >
+        <WorkspaceDialogMeta>
+          {selectedAgentLabel ? (
+            <>
+              Delivering to{" "}
+              <span className="font-semibold text-white">
+                {selectedAgentLabel}
+              </span>
+            </>
+          ) : (
+            "No selected agent"
+          )}
+        </WorkspaceDialogMeta>
+        <WorkspaceDialogField label="Message" hint="Plain task content">
+          <Textarea
+            autoFocus
+            aria-label="Task message"
+            value={taskMessageDraft}
+            onChange={(event) => setTaskMessageDraft(event.target.value)}
+            placeholder="Inspect the current directory and report back the file list."
+            className="min-h-[140px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+      </WorkspaceCommandDialog>
+
+      <AlertDialog
+        open={Boolean(deleteTabTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTabTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-[30rem] rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(22,18,22,0.98),rgba(15,11,15,0.96))] shadow-[0_30px_90px_-42px_rgba(0,0,0,0.95),0_16px_38px_-28px_rgba(244,63,94,0.18)] backdrop-blur-2xl">
+          <AlertDialogHeader className="gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-11 items-center justify-center rounded-2xl border border-rose-400/18 bg-rose-400/10 text-rose-200 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05),0_16px_30px_-22px_rgba(244,63,94,0.45)]">
+                <Trash2 className="size-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-rose-100/45">
+                  Destructive Action
+                </p>
+                <AlertDialogTitle className="mt-1 text-white">
+                  Delete tab?
+                </AlertDialogTitle>
+              </div>
+            </div>
+            <AlertDialogDescription className="text-white/62">
+              {deleteTabTarget ? (
+                <>
+                  Remove{" "}
+                  <span className="font-semibold text-white">
+                    {deleteTabTarget.title}
+                  </span>{" "}
+                  and clean up its persisted graph.
+                  {typeof deleteTabTarget.nodeCount === "number"
+                    ? ` ${deleteTabTarget.nodeCount} node${deleteTabTarget.nodeCount === 1 ? "" : "s"} will be removed with it.`
+                    : ""}
+                </>
+              ) : (
+                "This action cannot be undone."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel asChild>
+              <Button variant="outline">Cancel</Button>
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={() => void handleDeleteTab()}
+                disabled={pendingAction === "delete-tab"}
+              >
+                {pendingAction === "delete-tab" ? "Deleting..." : "Delete Tab"}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
 function ToolbarButton({
   children,
+  disabled = false,
   onClick,
 }: {
   children: ReactNode;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex shrink-0 items-center gap-2 rounded-[20px] bg-transparent px-4 py-3 text-[14px] font-medium text-white/90 transition-colors hover:bg-white/10"
+      disabled={disabled}
+      className="flex shrink-0 items-center gap-2 rounded-[20px] bg-transparent px-4 py-3 text-[14px] font-medium text-white/90 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/28 disabled:hover:bg-transparent"
     >
       {children}
     </button>

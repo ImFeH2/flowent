@@ -259,6 +259,37 @@ export function HomePage() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_16%,transparent_82%,rgba(255,255,255,0.015))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="relative flex min-w-0 flex-1 flex-col">
+        <div className="relative z-30 flex flex-col border-b border-white/10 bg-black/40 backdrop-blur-md">
+          <div className="pointer-events-auto flex items-end overflow-x-auto px-2 pt-1 scrollbar-none">
+            {Array.from(tabs.values()).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTabId(tab.id)}
+                className={cn(
+                  "group relative flex min-w-[120px] max-w-[200px] shrink-0 flex-col justify-center border-r border-white/5 px-4 py-3 text-left transition-colors",
+                  activeTabId === tab.id
+                    ? "z-10 bg-white/[0.08] text-foreground shadow-[inset_0_2px_0_0_rgba(96,165,250,1)]"
+                    : "bg-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                )}
+              >
+                <div className="truncate text-[13px] font-medium leading-tight">
+                  {tab.title}
+                </div>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                void handleCreateTab();
+              }}
+              className="ml-2 flex shrink-0 items-center justify-center rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+            >
+              <Plus className="size-4" />
+            </button>
+          </div>
+        </div>
+
         <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_18%_14%,rgba(92,162,255,0.09),transparent_0,transparent_28%),radial-gradient(circle_at_70%_86%,rgba(255,255,255,0.028),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.016),transparent_30%)]" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-[linear-gradient(90deg,transparent,rgba(5,7,12,0.24))]" />
 
@@ -266,78 +297,58 @@ export function HomePage() {
           <AgentGraph />
         </div>
 
-        <div className="absolute right-5 top-5 z-30 sm:right-6 sm:top-6">
-          <PanelToggleButton expanded={panelVisible} onClick={togglePanel} />
-        </div>
-
-        <div className="absolute left-5 top-5 z-30 flex max-w-[75%] flex-wrap items-center gap-2 sm:left-6 sm:top-6">
+        <div className="absolute left-6 top-[5.5rem] z-40 flex items-center gap-2">
           <BadgeChip tone="primary">
             <Radio
               className={cn(
-                "size-3",
+                "size-4 shrink-0",
                 connected ? "text-emerald-400" : "text-amber-400",
               )}
             />
-            {connected ? "Live" : "Reconnecting"}
+            <span className="whitespace-nowrap">
+              {connected ? "Live" : "Reconnecting"}
+            </span>
           </BadgeChip>
           <BadgeChip>
-            {metrics.total} nodes
-            <span className="text-muted-foreground/50">/</span>
-            {metrics.running} running
-            <span className="text-muted-foreground/50">/</span>
-            {metrics.idle} idle
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center">
+                <span className="text-[13px] leading-tight text-white">
+                  {metrics.total}
+                </span>
+                <span className="text-[10px] leading-tight text-white/50">
+                  nodes
+                </span>
+              </div>
+              <div className="h-6 w-px bg-white/10 shrink-0" />
+              <div className="flex flex-col items-center">
+                <span className="text-[13px] leading-tight text-white">
+                  {metrics.running}
+                </span>
+                <span className="text-[10px] leading-tight text-white/50">
+                  running
+                </span>
+              </div>
+            </div>
           </BadgeChip>
         </div>
 
-        <div className="absolute left-5 right-20 top-20 z-30 sm:left-6 sm:right-24 sm:top-[5.25rem]">
-          <div className="pointer-events-auto flex flex-col gap-2 rounded-[0.9rem] border border-white/8 bg-black/[0.26] px-2 py-2 backdrop-blur-xl shadow-[0_18px_42px_-30px_rgba(0,0,0,0.82)]">
-            <div className="flex items-center gap-2 overflow-x-auto">
-              {Array.from(tabs.values()).map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTabId(tab.id)}
-                  className={cn(
-                    "shrink-0 rounded-[0.75rem] border px-3 py-1.5 text-left transition-colors",
-                    activeTabId === tab.id
-                      ? "border-white/16 bg-white/[0.1] text-foreground"
-                      : "border-transparent bg-transparent text-muted-foreground hover:border-white/10 hover:bg-white/[0.04] hover:text-foreground",
-                  )}
-                >
-                  <div className="text-xs font-medium">{tab.title}</div>
-                  {tab.goal ? (
-                    <div className="mt-0.5 max-w-48 truncate text-[10px] text-muted-foreground">
-                      {tab.goal}
-                    </div>
-                  ) : null}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  void handleCreateTab();
-                }}
-                className="flex shrink-0 items-center gap-1 rounded-[0.75rem] border border-dashed border-white/14 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-white/22 hover:text-foreground"
-              >
-                <Plus className="size-3.5" />
-                New Tab
-              </button>
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto">
-              <ToolbarButton onClick={() => void handleCreateAgent()}>
-                <Plus className="size-3.5" />
-                Add Agent
-              </ToolbarButton>
-              <ToolbarButton onClick={() => void handleConnectAgents()}>
-                <Link2 className="size-3.5" />
-                Connect
-              </ToolbarButton>
-              <ToolbarButton onClick={() => void handleDispatchTask()}>
-                <SendHorizontal className="size-3.5" />
-                Send Task
-              </ToolbarButton>
-            </div>
-          </div>
+        <div className="absolute bottom-8 left-1/2 z-40 -translate-x-1/2 pointer-events-auto flex items-center gap-1 rounded-[26px] border border-white/5 bg-[#0A0A0A]/95 p-1.5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-2xl">
+          <ToolbarButton onClick={() => void handleCreateAgent()}>
+            <Plus className="size-4 opacity-70" />
+            Add Agent
+          </ToolbarButton>
+          <ToolbarButton onClick={() => void handleConnectAgents()}>
+            <Link2 className="size-4 opacity-70" />
+            Connect
+          </ToolbarButton>
+          <ToolbarButton onClick={() => void handleDispatchTask()}>
+            <SendHorizontal className="size-4 opacity-70" />
+            Send Task
+          </ToolbarButton>
+        </div>
+
+        <div className="absolute right-5 top-5 z-30 sm:right-6 sm:top-6">
+          <PanelToggleButton expanded={panelVisible} onClick={togglePanel} />
         </div>
       </div>
 
@@ -414,7 +425,7 @@ function ToolbarButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex shrink-0 items-center gap-1 rounded-[0.75rem] border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-white/18 hover:bg-white/[0.07] hover:text-foreground"
+      className="flex shrink-0 items-center gap-2 rounded-[20px] bg-transparent px-4 py-3 text-[14px] font-medium text-white/90 transition-colors hover:bg-white/10"
     >
       {children}
     </button>
@@ -431,10 +442,8 @@ function BadgeChip({
   return (
     <div
       className={cn(
-        "pointer-events-auto relative isolate flex items-center gap-1.5 rounded-[0.85rem] border px-3 py-1.5 text-[11px] font-medium shadow-[0_10px_24px_-20px_rgba(0,0,0,0.76)] [contain:paint]",
-        tone === "primary"
-          ? "border-primary/12 bg-white/[0.045] text-foreground"
-          : "border-white/6 bg-black/[0.2] text-foreground",
+        "pointer-events-auto relative isolate flex items-center gap-2 rounded-[16px] border border-white/5 bg-[#121212] px-4 py-2.5 text-[14px] font-medium text-white transition-colors",
+        tone === "primary" ? "bg-[#1A1A1A]" : "",
       )}
     >
       {children}

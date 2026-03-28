@@ -20,7 +20,7 @@ from app.settings import (
 )
 
 
-def test_bootstrap_runtime_creates_only_assistant_with_formation_spawn_tools(
+def test_bootstrap_runtime_creates_only_assistant(
     monkeypatch,
     tmp_path,
 ):

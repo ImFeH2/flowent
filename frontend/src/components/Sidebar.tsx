@@ -105,7 +105,7 @@ export function Sidebar({
           </div>
         </div>
 
-        <div className="mb-2 mt-5 shrink-0 border-t border-white/[0.05] px-4 pt-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/60">
+        <div className="shrink-0 px-4 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/60">
           Navigation
         </div>
 

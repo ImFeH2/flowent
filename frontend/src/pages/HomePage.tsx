@@ -398,26 +398,42 @@ export function HomePage() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_16%,transparent_82%,rgba(255,255,255,0.015))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="relative z-30 flex flex-col border-b border-white/10 bg-black/40 backdrop-blur-md">
-          <div className="pointer-events-auto flex items-end overflow-x-auto px-2 pt-1 scrollbar-none">
+        <div className="relative z-30 border-b border-white/8 bg-[linear-gradient(180deg,rgba(12,15,24,0.92),rgba(9,12,18,0.72))] backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/10" />
+          <div className="pointer-events-auto relative z-10 flex items-end gap-1.5 overflow-x-auto px-3 pt-2 scrollbar-none">
             {Array.from(tabs.values()).map((tab) => (
               <div
                 key={tab.id}
-                className="group relative min-w-[120px] max-w-[200px] shrink-0 border-r border-white/5"
+                className="group relative min-w-[132px] max-w-[220px] shrink-0"
               >
                 <button
                   type="button"
                   onClick={() => setActiveTabId(tab.id)}
                   className={cn(
-                    "relative z-10 flex w-full flex-col justify-center px-4 py-3 pr-10 text-left transition-colors",
+                    "relative -mb-px flex w-full flex-col justify-center rounded-t-[12px] border px-4 pb-3.5 pt-3 pr-11 text-left transition-[background-color,border-color,box-shadow,color,transform] duration-200",
                     activeTabId === tab.id
-                      ? "bg-white/[0.08] text-foreground shadow-[inset_0_2px_0_0_rgba(96,165,250,1)]"
-                      : "bg-transparent text-muted-foreground hover:bg-white/5 hover:text-foreground",
+                      ? "border-white/10 bg-[linear-gradient(180deg,rgba(27,33,47,0.98),rgba(18,22,32,0.94))] text-white shadow-[0_-4px_16px_-8px_rgba(96,165,250,0.3),inset_0_1px_0_0_rgba(255,255,255,0.08)]"
+                      : "border-transparent bg-transparent text-white/54 hover:-translate-y-px hover:border-white/8 hover:bg-white/[0.06] hover:text-white/88",
                   )}
                 >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute inset-x-4 top-0 h-px rounded-full transition-opacity duration-200",
+                      activeTabId === tab.id
+                        ? "bg-sky-400/80 opacity-100"
+                        : "bg-white/18 opacity-0 group-hover:opacity-100",
+                    )}
+                  />
                   <div className="truncate text-[13px] font-medium leading-tight">
                     {tab.title}
                   </div>
+                  {activeTabId === tab.id ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-x-3 -bottom-px h-px rounded-full bg-[rgba(9,12,18,0.9)]"
+                    />
+                  ) : null}
                 </button>
                 <button
                   type="button"
@@ -428,7 +444,7 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 text-white/45 transition-[opacity,color,background-color] hover:bg-white/10 hover:text-white",
+                    "absolute right-3 top-1/2 z-20 -translate-y-1/2 rounded-full border border-transparent p-1 text-white/45 transition-[opacity,color,background-color,border-color] hover:border-white/10 hover:bg-white/10 hover:text-white",
                     activeTabId === tab.id
                       ? "opacity-100"
                       : "opacity-0 group-hover:opacity-100",
@@ -444,7 +460,7 @@ export function HomePage() {
               onClick={() => {
                 openCreateTabDialog();
               }}
-              className="ml-2 flex shrink-0 items-center justify-center rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+              className="mb-1.5 ml-1 flex h-10 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/[0.03] px-3 text-white/62 transition-[background-color,border-color,color,transform] duration-200 hover:-translate-y-px hover:border-white/14 hover:bg-white/[0.07] hover:text-white"
             >
               <Plus className="size-4" />
             </button>
@@ -456,65 +472,68 @@ export function HomePage() {
 
         <div className="relative flex-1">
           <AgentGraph />
-        </div>
-
-        <div className="absolute left-6 top-[5.5rem] z-40 flex items-center gap-2">
-          <BadgeChip tone="primary">
-            <Radio
-              className={cn(
-                "size-4 shrink-0",
-                connected ? "text-emerald-400" : "text-amber-400",
-              )}
-            />
-            <span className="whitespace-nowrap">
-              {connected ? "Live" : "Reconnecting"}
-            </span>
-          </BadgeChip>
-          <BadgeChip>
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col items-center">
-                <span className="text-[13px] leading-tight text-white">
-                  {metrics.total}
-                </span>
-                <span className="text-[10px] leading-tight text-white/50">
-                  nodes
-                </span>
+          <div className="absolute left-6 top-6 z-40 flex max-w-[calc(100%-3rem)] flex-wrap items-center gap-2">
+            <BadgeChip tone="primary">
+              <Radio
+                className={cn(
+                  "size-4 shrink-0",
+                  connected ? "text-emerald-400" : "text-amber-400",
+                )}
+              />
+              <span className="whitespace-nowrap">
+                {connected ? "Live" : "Reconnecting"}
+              </span>
+            </BadgeChip>
+            <BadgeChip>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center">
+                  <span className="text-[13px] leading-tight text-white">
+                    {metrics.total}
+                  </span>
+                  <span className="text-[10px] leading-tight text-white/50">
+                    nodes
+                  </span>
+                </div>
+                <div className="h-6 w-px shrink-0 bg-white/10" />
+                <div className="flex flex-col items-center">
+                  <span className="text-[13px] leading-tight text-white">
+                    {metrics.running}
+                  </span>
+                  <span className="text-[10px] leading-tight text-white/50">
+                    running
+                  </span>
+                </div>
               </div>
-              <div className="h-6 w-px bg-white/10 shrink-0" />
-              <div className="flex flex-col items-center">
-                <span className="text-[13px] leading-tight text-white">
-                  {metrics.running}
-                </span>
-                <span className="text-[10px] leading-tight text-white/50">
-                  running
-                </span>
-              </div>
-            </div>
-          </BadgeChip>
-        </div>
+            </BadgeChip>
+          </div>
 
-        <div className="absolute bottom-8 left-1/2 z-40 -translate-x-1/2 pointer-events-auto flex items-center gap-1 rounded-[26px] border border-white/5 bg-[#0A0A0A]/95 p-1.5 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8),inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-2xl">
-          <ToolbarButton
-            disabled={!activeTabId}
-            onClick={openCreateAgentDialog}
-          >
-            <Plus className="size-4 opacity-70" />
-            Add Agent
-          </ToolbarButton>
-          <ToolbarButton
-            disabled={!activeTabId || tabAgentOptions.length < 2}
-            onClick={openConnectDialog}
-          >
-            <Link2 className="size-4 opacity-70" />
-            Connect
-          </ToolbarButton>
-          <ToolbarButton
-            disabled={!selectedAgent || selectedAgent.node_type === "assistant"}
-            onClick={openTaskDialog}
-          >
-            <SendHorizontal className="size-4 opacity-70" />
-            Send Task
-          </ToolbarButton>
+          <div className="pointer-events-auto absolute bottom-7 left-1/2 z-40 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center rounded-[30px] border border-white/10 bg-[rgba(10,14,22,0.84)] p-1.5 shadow-[0_24px_54px_-24px_rgba(0,0,0,0.82),inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+            <ToolbarButton
+              disabled={!activeTabId}
+              onClick={openCreateAgentDialog}
+            >
+              <Plus className="size-4 opacity-70" />
+              Add Agent
+            </ToolbarButton>
+            <ToolbarDivider />
+            <ToolbarButton
+              disabled={!activeTabId || tabAgentOptions.length < 2}
+              onClick={openConnectDialog}
+            >
+              <Link2 className="size-4 opacity-70" />
+              Connect
+            </ToolbarButton>
+            <ToolbarDivider />
+            <ToolbarButton
+              disabled={
+                !selectedAgent || selectedAgent.node_type === "assistant"
+              }
+              onClick={openTaskDialog}
+            >
+              <SendHorizontal className="size-4 opacity-70" />
+              Send Task
+            </ToolbarButton>
+          </div>
         </div>
 
         <div className="absolute right-5 top-5 z-30 sm:right-6 sm:top-6">
@@ -919,11 +938,15 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex shrink-0 items-center gap-2 rounded-[20px] bg-transparent px-4 py-3 text-[14px] font-medium text-white/90 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/28 disabled:hover:bg-transparent"
+      className="flex shrink-0 items-center gap-2 rounded-[18px] border border-transparent bg-transparent px-4 py-2.5 text-[13px] font-medium text-white/78 transition-[background-color,border-color,color,transform,box-shadow] duration-200 hover:-translate-y-px hover:border-white/10 hover:bg-white/[0.06] hover:text-white active:translate-y-0 active:scale-[0.98] active:bg-white/[0.1] disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:translate-y-0 disabled:hover:bg-transparent"
     >
       {children}
     </button>
   );
+}
+
+function ToolbarDivider() {
+  return <div aria-hidden="true" className="h-7 w-px shrink-0 bg-white/10" />;
 }
 
 function BadgeChip({
@@ -936,8 +959,10 @@ function BadgeChip({
   return (
     <div
       className={cn(
-        "pointer-events-auto relative isolate flex items-center gap-2 rounded-[16px] border border-white/5 bg-[#121212] px-4 py-2.5 text-[14px] font-medium text-white transition-colors",
-        tone === "primary" ? "bg-[#1A1A1A]" : "",
+        "pointer-events-auto relative isolate flex items-center gap-2 rounded-full border border-white/10 bg-[linear-gradient(180deg,rgba(18,22,30,0.82),rgba(11,14,20,0.88))] px-4 py-2.5 text-[13px] font-medium text-white shadow-[0_18px_40px_-28px_rgba(0,0,0,0.82),inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl",
+        tone === "primary"
+          ? "border-sky-400/20 bg-[linear-gradient(180deg,rgba(16,25,42,0.92),rgba(10,18,30,0.86))]"
+          : "",
       )}
     >
       {children}

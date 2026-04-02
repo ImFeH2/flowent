@@ -670,20 +670,26 @@ export function AgentGraph() {
   const emptyState = useMemo(() => {
     if (tabs.size === 0) {
       return {
+        eyebrow: "Workspace",
         title: "No task tabs yet",
         description: "Create a task tab to start building an agent graph.",
+        hint: "Use the + button in the tab bar to open your first workspace.",
       };
     }
     if (!activeTabId) {
       return {
+        eyebrow: "Workspace",
         title: "Select a task tab",
         description: "Choose a tab to inspect and edit its agent graph.",
+        hint: "Each tab keeps its own goal, nodes, and connections.",
       };
     }
     return {
-      title: "This task tab is empty",
+      eyebrow: "Empty canvas",
+      title: "This task tab is ready for its first agent",
       description:
-        "Add agents or ask Assistant to build a graph for this task.",
+        "Add agents, connect them, or ask Assistant to scaffold the graph for you.",
+      hint: "Start with a worker, a reviewer, or a conductor for orchestration.",
     };
   }, [activeTabId, tabs.size]);
 
@@ -691,15 +697,26 @@ export function AgentGraph() {
     <div ref={containerRef} className="relative flex h-full flex-col">
       <div className="relative flex-1 overflow-hidden">
         {animatedNodes.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="space-y-3 text-center">
-              <Network className="mx-auto size-8 text-primary/65" />
-              <p className="text-sm font-medium text-foreground/88">
-                {emptyState.title}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {emptyState.description}
-              </p>
+          <div className="flex h-full items-center justify-center px-6 py-10">
+            <div className="relative isolate w-full max-w-[32rem] overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,20,28,0.86),rgba(10,13,18,0.78))] px-8 py-7 text-center shadow-[0_30px_80px_-48px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.14),transparent_52%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_22%)]" />
+              <div className="relative">
+                <div className="mx-auto flex size-14 items-center justify-center rounded-[18px] border border-sky-400/18 bg-sky-400/10 text-sky-100 shadow-[0_18px_40px_-26px_rgba(96,165,250,0.7)]">
+                  <Network className="size-6" />
+                </div>
+                <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.34em] text-white/42">
+                  {emptyState.eyebrow}
+                </p>
+                <p className="mt-3 text-[18px] font-semibold leading-tight text-white">
+                  {emptyState.title}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-white/60">
+                  {emptyState.description}
+                </p>
+                <p className="mt-4 text-xs leading-5 text-white/38">
+                  {emptyState.hint}
+                </p>
+              </div>
             </div>
           </div>
         ) : (

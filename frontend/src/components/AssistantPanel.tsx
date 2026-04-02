@@ -14,6 +14,7 @@ interface AssistantPanelProps {
 export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
   const { agents } = useAgentNodesRuntime();
   const {
+    assistantActivity = { running: false },
     connected,
     handleKeyDown,
     input,
@@ -32,12 +33,21 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
   return (
     <div
       className={cn(
-        "flex h-full flex-col",
+        "relative flex h-full flex-col",
         isFloating
           ? "overflow-hidden rounded-[1.5rem] border border-glass-border bg-glass-bg text-foreground shadow-2xl backdrop-blur-2xl"
           : "overflow-hidden rounded-3xl border border-glass-border bg-surface-raised shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur-xl",
       )}
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-0 rounded-[inherit] border transition-[opacity,border-color,box-shadow] duration-300",
+          assistantActivity.running
+            ? "animate-pulse border-sky-400/28 opacity-100 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_0_30px_-10px_rgba(56,189,248,0.32)]"
+            : "border-transparent opacity-0",
+        )}
+      />
       <PanelHeader connected={connected} floating={isFloating} />
       <div className="relative flex min-h-0 flex-1 flex-col">
         <AssistantChatMessages

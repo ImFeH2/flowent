@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 import { fetchNodeDetail } from "@/lib/api";
 import {
+  useAgentActivityRuntime,
   useAgentConnectionRuntime,
   useAgentHistoryRuntime,
   useAgentNodesRuntime,
@@ -23,6 +24,7 @@ export function useAssistantChat() {
   const { connected } = useAgentConnectionRuntime();
   const { agentHistories, clearAgentHistory, streamingDeltas } =
     useAgentHistoryRuntime();
+  const { activeToolCalls } = useAgentActivityRuntime();
   const { pendingAssistantMessages, sendAssistantMessage } = useAgentUI();
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
@@ -31,6 +33,10 @@ export function useAssistantChat() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const assistantId = useMemo(() => getAssistantNodeId(agents), [agents]);
+  const assistantNode = useMemo(
+    () => (assistantId ? (agents.get(assistantId) ?? null) : null),
+    [agents, assistantId],
+  );
 
   useEffect(() => {
     if (!connected || !assistantId) {
@@ -88,6 +94,26 @@ export function useAssistantChat() {
     assistantId,
   ]);
 
+  const assistantActivity = useMemo(() => {
+    const pendingCount = pendingAssistantMessages.length;
+    const deltas = assistantId ? (streamingDeltas.get(assistantId) ?? []) : [];
+    return {
+      running:
+        connected &&
+        (pendingCount > 0 ||
+          assistantNode?.state === "running" ||
+          activeToolCalls.has(assistantId ?? "") ||
+          deltas.length > 0),
+    };
+  }, [
+    activeToolCalls,
+    assistantId,
+    assistantNode?.state,
+    connected,
+    pendingAssistantMessages.length,
+    streamingDeltas,
+  ]);
+
   useEffect(() => {
     const element = scrollRef.current;
     if (!element || !autoScrollRef.current) {
@@ -136,5 +162,6 @@ export function useAssistantChat() {
     sendMessage,
     setInput,
     timelineItems,
+    assistantActivity,
   };
 }

@@ -1202,6 +1202,7 @@ function AgentDetailPanel({
 function AssistantChatPanel() {
   const { agents } = useAgentNodesRuntime();
   const {
+    assistantActivity = { running: false },
     connected,
     handleKeyDown,
     input,
@@ -1217,13 +1218,24 @@ function AssistantChatPanel() {
     useMeasuredHeight<HTMLDivElement>();
 
   return (
-    <>
+    <div className="relative flex h-full flex-col">
+      <div
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-2 rounded-[0.95rem] border transition-[opacity,border-color,box-shadow] duration-300",
+          assistantActivity.running
+            ? "animate-pulse border-sky-400/24 opacity-100 shadow-[0_0_0_1px_rgba(56,189,248,0.14),0_0_26px_-12px_rgba(56,189,248,0.28)]"
+            : "border-transparent opacity-0",
+        )}
+      />
       <div className="flex items-center gap-3 border-b border-white/6 px-4 py-3">
         <div className="flex-1">
           <p className="font-semibold">Assistant</p>
           <p className="text-[11px] text-muted-foreground">
             {assistantRoleName
-              ? `Role: ${assistantRoleName} · ${connected ? "Online" : "Connecting..."}`
+              ? `Role: ${assistantRoleName} · ${
+                  connected ? "Online" : "Connecting..."
+                }`
               : connected
                 ? "Online"
                 : "Connecting..."}
@@ -1256,7 +1268,7 @@ function AssistantChatPanel() {
           />
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

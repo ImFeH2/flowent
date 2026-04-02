@@ -698,25 +698,22 @@ export function AgentGraph() {
       <div className="relative flex-1 overflow-hidden">
         {animatedNodes.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 py-10">
-            <div className="relative isolate w-full max-w-[32rem] overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,20,28,0.86),rgba(10,13,18,0.78))] px-8 py-7 text-center shadow-[0_30px_80px_-48px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.14),transparent_52%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_22%)]" />
-              <div className="relative">
-                <div className="mx-auto flex size-14 items-center justify-center rounded-[18px] border border-sky-400/18 bg-sky-400/10 text-sky-100 shadow-[0_18px_40px_-26px_rgba(96,165,250,0.7)]">
-                  <Network className="size-6" />
-                </div>
-                <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.34em] text-white/42">
-                  {emptyState.eyebrow}
-                </p>
-                <p className="mt-3 text-[18px] font-semibold leading-tight text-white">
-                  {emptyState.title}
-                </p>
-                <p className="mt-2 text-sm leading-6 text-white/60">
-                  {emptyState.description}
-                </p>
-                <p className="mt-4 text-xs leading-5 text-white/38">
-                  {emptyState.hint}
-                </p>
+            <div className="w-full max-w-[27rem] rounded-[22px] border border-white/8 bg-[rgba(12,15,20,0.62)] px-7 py-6 text-center shadow-[0_16px_36px_-28px_rgba(0,0,0,0.72)] backdrop-blur-sm">
+              <div className="mx-auto flex size-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/72">
+                <Network className="size-5" />
               </div>
+              <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/36">
+                {emptyState.eyebrow}
+              </p>
+              <p className="mt-3 text-[20px] font-semibold leading-tight text-white/92">
+                {emptyState.title}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-white/58">
+                {emptyState.description}
+              </p>
+              <p className="mt-4 text-[12px] leading-5 text-white/36">
+                {emptyState.hint}
+              </p>
             </div>
           </div>
         ) : (

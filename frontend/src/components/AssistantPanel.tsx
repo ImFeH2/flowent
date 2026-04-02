@@ -42,7 +42,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
       <div
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-0 rounded-[inherit] border transition-[opacity,border-color,box-shadow] duration-300",
+          "pointer-events-none absolute inset-0 border transition-[opacity,border-color,box-shadow] duration-300",
           assistantActivity.running
             ? "animate-pulse border-sky-400/28 opacity-100 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_0_30px_-10px_rgba(56,189,248,0.32)]"
             : "border-transparent opacity-0",

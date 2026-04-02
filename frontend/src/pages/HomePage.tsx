@@ -1222,7 +1222,7 @@ function AssistantChatPanel() {
       <div
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-2 rounded-[0.95rem] border transition-[opacity,border-color,box-shadow] duration-300",
+          "pointer-events-none absolute inset-2 border transition-[opacity,border-color,box-shadow] duration-300",
           assistantActivity.running
             ? "animate-pulse border-sky-400/24 opacity-100 shadow-[0_0_0_1px_rgba(56,189,248,0.14),0_0_26px_-12px_rgba(56,189,248,0.28)]"
             : "border-transparent opacity-0",

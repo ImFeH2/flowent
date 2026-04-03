@@ -27,7 +27,9 @@ import { AgentGraph } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
 import type { Node } from "@/types";
 import {
+  useAgentActivityRuntime,
   useAgentConnectionRuntime,
+  useAgentHistoryRuntime,
   useAgentNodesRuntime,
   useAgentTabsRuntime,
   useAgentUI,
@@ -102,8 +104,15 @@ export function HomePage() {
   const { agents } = useAgentNodesRuntime();
   const { tabs } = useAgentTabsRuntime();
   const { connected } = useAgentConnectionRuntime();
-  const { activeTabId, selectedAgentId, selectAgent, setActiveTabId } =
-    useAgentUI();
+  const { activeToolCalls } = useAgentActivityRuntime();
+  const { streamingDeltas } = useAgentHistoryRuntime();
+  const {
+    activeTabId,
+    pendingAssistantMessages,
+    selectedAgentId,
+    selectAgent,
+    setActiveTabId,
+  } = useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
   const [activeDialog, setActiveDialog] = useState<WorkspaceDialogKind>(null);
   const [pendingAction, setPendingAction] = useState<WorkspaceDialogKind>(null);
@@ -202,6 +211,27 @@ export function HomePage() {
       })
     : null;
   const panelVisible = panelOpen || !!selectedAgent;
+  const assistantNode = getAssistantNode(agents);
+  const assistantPanelRunning = useMemo(() => {
+    const assistantId = assistantNode?.id ?? null;
+    const assistantDeltas = assistantId
+      ? (streamingDeltas.get(assistantId) ?? [])
+      : [];
+
+    return (
+      connected &&
+      (pendingAssistantMessages.length > 0 ||
+        assistantNode?.state === "running" ||
+        (assistantId ? activeToolCalls.has(assistantId) : false) ||
+        assistantDeltas.length > 0)
+    );
+  }, [
+    activeToolCalls,
+    assistantNode,
+    connected,
+    pendingAssistantMessages.length,
+    streamingDeltas,
+  ]);
 
   const togglePanel = () => {
     if (panelVisible) {
@@ -506,6 +536,15 @@ export function HomePage() {
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="relative z-20 shrink-0 border-l border-white/6 bg-[linear-gradient(180deg,rgba(14,14,15,0.92),rgba(11,11,12,0.88))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
           >
+            <div
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute inset-0 z-20 border transition-[opacity,border-color,box-shadow] duration-300",
+                !selectedAgent && assistantPanelRunning
+                  ? "animate-pulse border-sky-400/24 opacity-100 shadow-[0_0_0_1px_rgba(56,189,248,0.14),0_0_28px_-12px_rgba(56,189,248,0.28)]"
+                  : "border-transparent opacity-0",
+              )}
+            />
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),transparent_14%,transparent_82%,rgba(255,255,255,0.012))]" />
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
             <PanelResizer
@@ -1202,7 +1241,6 @@ function AgentDetailPanel({
 function AssistantChatPanel() {
   const { agents } = useAgentNodesRuntime();
   const {
-    assistantActivity = { running: false },
     connected,
     handleKeyDown,
     input,
@@ -1219,15 +1257,6 @@ function AssistantChatPanel() {
 
   return (
     <div className="relative flex h-full flex-col">
-      <div
-        aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute inset-2 border transition-[opacity,border-color,box-shadow] duration-300",
-          assistantActivity.running
-            ? "animate-pulse border-sky-400/24 opacity-100 shadow-[0_0_0_1px_rgba(56,189,248,0.14),0_0_26px_-12px_rgba(56,189,248,0.28)]"
-            : "border-transparent opacity-0",
-        )}
-      />
       <div className="flex items-center gap-3 border-b border-white/6 px-4 py-3">
         <div className="flex-1">
           <p className="font-semibold">Assistant</p>

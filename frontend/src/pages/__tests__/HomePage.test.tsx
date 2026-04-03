@@ -30,11 +30,15 @@ const {
   useAgentNodesRuntimeMock,
   useAgentTabsRuntimeMock,
   useAgentConnectionRuntimeMock,
+  useAgentActivityRuntimeMock,
+  useAgentHistoryRuntimeMock,
   useAgentUIMock,
 } = vi.hoisted(() => ({
   useAgentNodesRuntimeMock: vi.fn(),
   useAgentTabsRuntimeMock: vi.fn(),
   useAgentConnectionRuntimeMock: vi.fn(),
+  useAgentActivityRuntimeMock: vi.fn(),
+  useAgentHistoryRuntimeMock: vi.fn(),
   useAgentUIMock: vi.fn(),
 }));
 
@@ -50,9 +54,11 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/context/AgentContext", () => ({
+  useAgentActivityRuntime: () => useAgentActivityRuntimeMock(),
   useAgentNodesRuntime: () => useAgentNodesRuntimeMock(),
   useAgentTabsRuntime: () => useAgentTabsRuntimeMock(),
   useAgentConnectionRuntime: () => useAgentConnectionRuntimeMock(),
+  useAgentHistoryRuntime: () => useAgentHistoryRuntimeMock(),
   useAgentUI: () => useAgentUIMock(),
 }));
 
@@ -179,8 +185,18 @@ describe("HomePage", () => {
     useAgentConnectionRuntimeMock.mockReturnValue({
       connected: true,
     });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
+      agentHistories: new Map(),
+      clearAgentHistory: vi.fn(),
+      streamingDeltas: new Map(),
+    });
     useAgentUIMock.mockReturnValue({
       activeTabId: "tab-1",
+      pendingAssistantMessages: [],
       selectedAgentId: worker.id,
       selectAgent: vi.fn(),
       setActiveTabId: vi.fn(),
@@ -197,6 +213,7 @@ describe("HomePage", () => {
     const setActiveTabId = vi.fn();
     useAgentUIMock.mockReturnValue({
       activeTabId: "tab-1",
+      pendingAssistantMessages: [],
       selectedAgentId: null,
       selectAgent: vi.fn(),
       setActiveTabId,

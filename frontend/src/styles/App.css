@@ -54,10 +54,10 @@
 @keyframes tool-call-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.12);
   }
   50% {
-    box-shadow: 0 0 8px 2px rgba(251, 191, 36, 0.3);
+    box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.18);
   }
 }
 .tool-call-pulse {
@@ -128,12 +128,12 @@
     from var(--border-angle) at 50% 50%,
     transparent 0%,
     transparent 36%,
-    color-mix(in srgb, var(--graph-status-running) 6%, transparent) 45%,
-    color-mix(in srgb, var(--graph-status-running) 22%, transparent) 54%,
-    color-mix(in srgb, var(--graph-status-running) 46%, transparent) 63%,
-    color-mix(in srgb, var(--graph-status-running) 72%, transparent) 72%,
+    color-mix(in srgb, var(--graph-status-running) 8%, transparent) 45%,
+    color-mix(in srgb, var(--graph-status-running) 20%, transparent) 54%,
+    color-mix(in srgb, var(--graph-status-running) 38%, transparent) 63%,
+    color-mix(in srgb, var(--graph-status-running) 62%, transparent) 72%,
     var(--graph-status-running) 82%,
-    color-mix(in srgb, var(--graph-status-running) 60%, white) 89%,
+    color-mix(in srgb, var(--graph-status-running) 72%, white) 89%,
     color-mix(in srgb, var(--graph-status-running) 20%, transparent) 95%,
     transparent 100%
   );
@@ -188,22 +188,22 @@
 
 .agent-state-ring-running {
   --status-color: var(--graph-status-running);
-  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 54%, transparent);
+  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 26%, transparent);
   --agent-ring-shadow-soft: color-mix(
     in srgb,
-    var(--status-color) 18%,
+    var(--status-color) 10%,
     transparent
   );
-  --base-ring-opacity: 0.6;
-  --hover-ring-opacity: 0.4;
+  --base-ring-opacity: 0.52;
+  --hover-ring-opacity: 0.34;
 }
 
 .agent-state-ring-idle {
   --status-color: var(--graph-status-idle);
-  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 34%, transparent);
+  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 20%, transparent);
   --agent-ring-shadow-soft: color-mix(
     in srgb,
-    var(--status-color) 14%,
+    var(--status-color) 8%,
     transparent
   );
   --base-ring-opacity: 0.3;
@@ -212,38 +212,38 @@
 
 .agent-state-ring-initializing {
   --status-color: var(--graph-status-initializing);
-  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 42%, transparent);
+  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 24%, transparent);
   --agent-ring-shadow-soft: color-mix(
     in srgb,
-    var(--status-color) 16%,
+    var(--status-color) 9%,
     transparent
   );
-  --base-ring-opacity: 0.4;
+  --base-ring-opacity: 0.36;
   --hover-ring-opacity: 0.6;
 }
 
 .agent-state-ring-error {
   --status-color: var(--graph-status-error);
-  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 52%, transparent);
-  --agent-ring-shadow-soft: color-mix(
-    in srgb,
-    var(--status-color) 20%,
-    transparent
-  );
-  --base-ring-opacity: 0.5;
-  --hover-ring-opacity: 0.5;
-}
-
-.agent-state-ring-terminated {
-  --status-color: var(--graph-status-terminated);
-  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 22%, transparent);
+  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 28%, transparent);
   --agent-ring-shadow-soft: color-mix(
     in srgb,
     var(--status-color) 10%,
     transparent
   );
-  --base-ring-opacity: 0.2;
+  --base-ring-opacity: 0.42;
   --hover-ring-opacity: 0.5;
+}
+
+.agent-state-ring-terminated {
+  --status-color: var(--graph-status-terminated);
+  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 12%, transparent);
+  --agent-ring-shadow-soft: color-mix(
+    in srgb,
+    var(--status-color) 4%,
+    transparent
+  );
+  --base-ring-opacity: 0.16;
+  --hover-ring-opacity: 0.36;
 }
 
 .react-flow__node.agent-graph-node-shell {

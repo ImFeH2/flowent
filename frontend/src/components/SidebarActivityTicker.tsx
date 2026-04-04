@@ -189,7 +189,7 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
           className={cn(
             "size-1.5 rounded-full transition-all duration-300",
             recentBurstCount > 0
-              ? "bg-emerald-400 shadow-[0_0_10px_rgba(74,222,128,0.55)]"
+              ? "bg-white shadow-[0_0_10px_rgba(255,255,255,0.32)]"
               : "bg-white/20",
           )}
         />
@@ -234,9 +234,9 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
                   className={cn(
                     "shrink-0 rounded-full",
                     currentItem.tone === "alert"
-                      ? "bg-red-300/90"
+                      ? "bg-white/94"
                       : currentItem.tone === "thinking"
-                        ? "bg-amber-300/90"
+                        ? "bg-white/62"
                         : currentItem.tone === "active"
                           ? "bg-white/80"
                           : "bg-white/28",

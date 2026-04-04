@@ -151,7 +151,7 @@ export function ChannelsPage() {
                 variant="outline"
                 className={
                   configured
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                    ? "border-white/14 bg-white/[0.07] text-white/88"
                     : "border-white/10 bg-white/[0.03] text-muted-foreground"
                 }
               >
@@ -244,7 +244,7 @@ export function ChannelsPage() {
                             variant="ghost"
                             size="icon-sm"
                             onClick={() => void handleReject(chat.chat_id)}
-                            className="text-muted-foreground hover:bg-white/[0.05] hover:text-red-300"
+                            className="text-muted-foreground hover:bg-white/[0.05] hover:text-white"
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -297,7 +297,7 @@ export function ChannelsPage() {
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => void handleRevoke(chat.chat_id)}
-                          className="shrink-0 text-muted-foreground hover:bg-white/[0.05] hover:text-red-300"
+                          className="shrink-0 text-muted-foreground hover:bg-white/[0.05] hover:text-white"
                         >
                           <Trash2 className="size-4" />
                         </Button>

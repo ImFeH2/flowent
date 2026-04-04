@@ -135,7 +135,7 @@ function HistoryItem({
         <CollapsibleBlock
           label={`From ${getNodeLabel(entry.from_id ?? "", nodes)}`}
           icon={<MessageSquare className="size-3 text-foreground/70" />}
-          className="border-muted-foreground/25 bg-muted-foreground/10"
+          className="border-white/10 bg-white/[0.03]"
           labelClassName="text-foreground/70"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={entry.streaming ?? false}
@@ -153,16 +153,16 @@ function HistoryItem({
       return (
         <CollapsibleBlock
           label="Thinking"
-          icon={<Brain className="size-3 text-amber-400" />}
-          className="border-amber-500/20 bg-amber-500/5"
-          labelClassName="text-amber-300/90"
+          icon={<Brain className="size-3 text-foreground/72" />}
+          className="border-white/10 bg-white/[0.034]"
+          labelClassName="text-foreground/72"
           defaultOpen={false}
         >
           <MarkdownOrJsonBlock
             content={entry.content}
             streaming={entry.streaming}
-            markdownClassName="text-amber-200/80"
-            preClassName="text-amber-200/80 leading-relaxed"
+            markdownClassName="text-foreground/82"
+            preClassName="text-foreground/82 leading-relaxed"
           />
         </CollapsibleBlock>
       );
@@ -172,17 +172,17 @@ function HistoryItem({
       return (
         <CollapsibleBlock
           label={`To ${targets.join(", ") || "Unknown"}`}
-          icon={<Send className="size-3 text-sky-400" />}
-          className="border-sky-500/20 bg-sky-500/5"
-          labelClassName="text-sky-300/90"
+          icon={<Send className="size-3 text-foreground/58" />}
+          className="border-white/8 bg-white/[0.02]"
+          labelClassName="text-foreground/72"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={entry.streaming ?? false}
         >
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
             streaming={entry.streaming}
-            markdownClassName="text-sky-100/90"
-            preClassName="text-sky-100/90 leading-relaxed"
+            markdownClassName="text-foreground/86"
+            preClassName="text-foreground/86 leading-relaxed"
           />
         </CollapsibleBlock>
       );
@@ -192,17 +192,17 @@ function HistoryItem({
       return (
         <CollapsibleBlock
           label={agentLabel}
-          icon={<Bot className="size-3 text-emerald-400" />}
-          className="border-emerald-500/20 bg-emerald-500/5"
-          labelClassName="text-emerald-400"
+          icon={<Bot className="size-3 text-foreground/84" />}
+          className="border-white/12 bg-surface-2/72"
+          labelClassName="text-foreground/84"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
         >
           <MarkdownOrJsonBlock
             content={entry.content ?? ""}
             streaming={entry.streaming}
-            markdownClassName="text-emerald-200"
-            preClassName="text-emerald-200 leading-relaxed"
+            markdownClassName="text-foreground/88"
+            preClassName="text-foreground/88 leading-relaxed"
           />
         </CollapsibleBlock>
       );
@@ -213,9 +213,9 @@ function HistoryItem({
       return (
         <CollapsibleBlock
           label={entry.tool_name ?? "tool"}
-          icon={<Wrench className="size-3 text-teal-400" />}
-          className="border-teal-500/20 bg-teal-500/5"
-          labelClassName="text-teal-300/90"
+          icon={<Wrench className="size-3 text-foreground/66" />}
+          className="border-white/8 bg-surface-1/62"
+          labelClassName="text-foreground/72"
           defaultOpen={false}
         >
           <div className="space-y-2">
@@ -223,7 +223,7 @@ function HistoryItem({
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
                 Arguments
               </div>
-              <pre className="text-[11px] whitespace-pre-wrap break-words leading-relaxed text-teal-200/80">
+              <pre className="text-[11px] whitespace-pre-wrap break-words leading-relaxed text-foreground/78">
                 {formattedArguments}
               </pre>
             </div>
@@ -249,16 +249,16 @@ function HistoryItem({
       return (
         <CollapsibleBlock
           label="Error"
-          icon={<AlertCircle className="size-3 text-red-400" />}
-          className="border-red-500/30 bg-red-500/5"
-          labelClassName="text-red-400"
+          icon={<AlertCircle className="size-3 text-white/84" />}
+          className="border-white/16 bg-white/[0.045]"
+          labelClassName="text-white/78"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
         >
           <MarkdownOrJsonBlock
             content={entry.content}
-            markdownClassName="text-red-200"
-            preClassName="text-red-200 leading-relaxed"
+            markdownClassName="text-white/84"
+            preClassName="text-white/84 leading-relaxed"
           />
         </CollapsibleBlock>
       );

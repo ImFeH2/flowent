@@ -205,7 +205,7 @@ function TimelineItem({
       return (
         <MessageActivityCard
           content={item.content}
-          icon={<MessageSquare className="size-3.5 text-sky-400" />}
+          icon={<MessageSquare className="size-3.5 text-foreground/68" />}
           label={`From ${getNodeLabel(item.from_id ?? "", nodes)}`}
           tone="received"
           streaming={item.streaming}
@@ -226,7 +226,7 @@ function TimelineItem({
       return (
         <MessageActivityCard
           content={item.content}
-          icon={<Send className="size-3.5 text-sky-300" />}
+          icon={<Send className="size-3.5 text-foreground/58" />}
           label={`To ${
             (item.to_ids ?? [])
               .map((id) => getNodeLabel(id, nodes))
@@ -343,9 +343,9 @@ function MessageActivityCard({
         "min-w-0 w-full px-2.5 py-1.5",
         isWorkspace ? "border-l border-white/8 pl-3.5" : "rounded-xl",
         tone === "received" &&
-          "border-sky-500/20 bg-[linear-gradient(180deg,rgba(56,189,248,0.03),rgba(56,189,248,0.01))]",
+          "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.012))]",
         tone === "sent" &&
-          "border-cyan-500/20 bg-[linear-gradient(180deg,rgba(34,211,238,0.03),rgba(34,211,238,0.01))]",
+          "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.016),rgba(255,255,255,0.006))]",
       )}
     >
       <div
@@ -373,8 +373,8 @@ function MessageActivityCard({
         {streaming ? (
           <span className="inline-flex size-5 items-center justify-center">
             <span className="relative flex size-2.5 items-center justify-center">
-              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-emerald-400/45" />
-              <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-white/28" />
+              <span className="relative inline-flex size-2 rounded-full bg-white/78" />
             </span>
             <span className="sr-only">Live</span>
           </span>
@@ -410,7 +410,7 @@ function ThinkingCard({
   return (
     <ActivityDisclosure
       label="Thinking"
-      icon={<Brain className="size-3.5 text-amber-500" />}
+      icon={<Brain className="size-3.5 text-foreground/72" />}
       tone="thinking"
       streaming={item.streaming}
       variant={variant}
@@ -441,7 +441,7 @@ function ToolCallCard({
   return (
     <ActivityDisclosure
       label={formatToolLabel(item.tool_name)}
-      icon={<Wrench className="size-3.5 text-teal-500" />}
+      icon={<Wrench className="size-3.5 text-foreground/66" />}
       tone="tool"
       streaming={displayStreaming}
       variant={variant}
@@ -492,20 +492,20 @@ function ErrorCard({
   return (
     <div
       className={cn(
-        "min-w-0 w-full space-y-2 border-l-2 border-red-500/30 bg-red-500/[0.045] px-2.5 py-1.5",
+        "min-w-0 w-full space-y-2 border-l-2 border-white/18 bg-white/[0.045] px-2.5 py-1.5",
         !isWorkspace && "rounded-xl",
       )}
     >
       <div className="flex items-center gap-2">
-        <AlertCircle className="size-3.5 text-red-500" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-red-500">
+        <AlertCircle className="size-3.5 text-white/82" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/72">
           Error
         </span>
         <span className="ml-auto">
           <CopyButton text={content} />
         </span>
       </div>
-      <p className="whitespace-pre-wrap break-words text-[13px] text-red-950/80 dark:text-red-200">
+      <p className="whitespace-pre-wrap break-words text-[13px] text-white/82">
         {content}
       </p>
     </div>
@@ -538,9 +538,9 @@ function ActivityDisclosure({
         "min-w-0 w-full px-2.5 py-1.5",
         isWorkspace ? "border-l border-white/8 pl-3.5" : "rounded-xl",
         tone === "thinking" &&
-          "border-amber-500/20 bg-[linear-gradient(180deg,rgba(245,158,11,0.03),rgba(245,158,11,0.01))]",
+          "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),rgba(255,255,255,0.01))]",
         tone === "tool" &&
-          "border-teal-500/20 bg-[linear-gradient(180deg,rgba(20,184,166,0.03),rgba(20,184,166,0.01))]",
+          "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.016),rgba(255,255,255,0.006))]",
       )}
     >
       <button
@@ -559,8 +559,8 @@ function ActivityDisclosure({
         {streaming ? (
           <span className="ml-auto inline-flex size-5 items-center justify-center">
             <span className="relative flex size-2.5 items-center justify-center">
-              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-emerald-400/45" />
-              <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-white/28" />
+              <span className="relative inline-flex size-2 rounded-full bg-white/78" />
             </span>
             <span className="sr-only">Live</span>
           </span>
@@ -688,7 +688,7 @@ function PanelEmptyState({ floating }: { floating: boolean }) {
         <Sparkles
           className={cn(
             "mx-auto size-5",
-            floating ? "text-amber-300" : "text-muted-foreground",
+            floating ? "text-white/72" : "text-muted-foreground",
           )}
         />
         <p className="text-sm text-muted-foreground">

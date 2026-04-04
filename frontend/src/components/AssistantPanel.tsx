@@ -36,7 +36,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
         "relative flex h-full flex-col",
         isFloating
           ? "overflow-hidden rounded-[1.5rem] border border-glass-border bg-glass-bg text-foreground shadow-2xl backdrop-blur-2xl"
-          : "overflow-hidden rounded-3xl border border-glass-border bg-surface-raised shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur-xl",
+          : "overflow-hidden rounded-3xl border border-glass-border bg-surface-raised shadow-[0_24px_70px_-45px_rgba(0,0,0,0.45)] backdrop-blur-xl",
       )}
     >
       <div
@@ -44,7 +44,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
         className={cn(
           "pointer-events-none absolute inset-0 border transition-[opacity,border-color,box-shadow] duration-300",
           assistantActivity.running
-            ? "animate-pulse border-sky-400/28 opacity-100 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_0_30px_-10px_rgba(56,189,248,0.32)]"
+            ? "animate-pulse border-white/14 opacity-100 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_0_30px_-12px_rgba(255,255,255,0.12)]"
             : "border-transparent opacity-0",
         )}
       />
@@ -110,8 +110,8 @@ function StatusBadge({ connected }: { connected: boolean }) {
       className={cn(
         "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
         connected
-          ? "bg-emerald-400/20 text-emerald-300"
-          : "bg-amber-400/20 text-amber-300",
+          ? "border border-white/12 bg-white/[0.08] text-white/88"
+          : "border border-white/10 bg-white/[0.03] text-white/58",
       )}
     >
       {connected ? "Online" : "Offline"}

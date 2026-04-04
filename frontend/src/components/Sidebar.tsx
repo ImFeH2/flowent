@@ -94,8 +94,8 @@ export function Sidebar({
                 className={cn(
                   "size-2 rounded-full shadow-[0_0_10px_currentColor]",
                   connected
-                    ? "bg-emerald-400 text-emerald-400"
-                    : "bg-amber-400 text-amber-400",
+                    ? "bg-white text-white"
+                    : "bg-white/24 text-white/24",
                 )}
               />
               <span className="font-medium text-foreground">
@@ -126,7 +126,7 @@ export function Sidebar({
                 className={cn(
                   "h-7 w-px shrink-0 rounded-full transition-[opacity,background-color] duration-150",
                   currentPage === id
-                    ? "bg-primary/70 opacity-100"
+                    ? "bg-white/72 opacity-100"
                     : "bg-white/0 opacity-0 group-hover:bg-white/8 group-hover:opacity-100",
                 )}
               />

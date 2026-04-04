@@ -771,9 +771,9 @@ export function RolesPage() {
                         className={cn(
                           "shrink-0 rounded-full transition-colors",
                           state === "included" &&
-                            "border-emerald-500/30 bg-emerald-500/8 text-emerald-300",
+                            "border-white/14 bg-white/[0.07] text-white/88",
                           state === "excluded" &&
-                            "border-red-500/30 bg-red-500/8 text-red-300",
+                            "border-white/10 bg-white/[0.03] text-white/52 line-through",
                           state === "allowed" &&
                             "border-white/8 bg-black/[0.24] text-muted-foreground",
                           (isReadOnly || lockBuiltinFields) &&
@@ -917,7 +917,7 @@ export function RolesPage() {
                           title={`Delete ${role.name}`}
                           variant="ghost"
                           size="icon-sm"
-                          className="text-muted-foreground hover:bg-white/[0.06] hover:text-red-400"
+                          className="text-muted-foreground hover:bg-white/[0.06] hover:text-white"
                         >
                           <Trash2 className="size-3.5" />
                         </Button>

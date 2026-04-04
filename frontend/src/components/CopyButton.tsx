@@ -23,7 +23,7 @@ export function CopyButton({ text }: CopyButtonProps) {
       title="Copy"
     >
       {copied ? (
-        <Check className="size-3 text-emerald-400" />
+        <Check className="size-3 text-white/88" />
       ) : (
         <Copy className="size-3" />
       )}

@@ -80,7 +80,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             }}
             className={`w-full px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               item.danger
-                ? "text-red-400 hover:bg-red-900/30"
+                ? "text-white hover:bg-white/[0.08]"
                 : "text-foreground hover:bg-surface-3"
             }`}
           >

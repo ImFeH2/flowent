@@ -28,14 +28,12 @@ export const stateColor: Record<AgentState, string> = {
 
 export const stateBadgeColor: Record<AgentState, string> = {
   running:
-    "bg-graph-status-running/12 text-graph-status-running border-graph-status-running/30",
-  idle: "bg-graph-status-idle/10 text-graph-status-idle border-graph-status-idle/20",
-  initializing:
-    "bg-graph-status-initializing/12 text-graph-status-initializing border-graph-status-initializing/30",
+    "border-white/18 bg-white/[0.12] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
+  idle: "border-white/10 bg-white/[0.04] text-white/72",
+  initializing: "border-white/14 bg-white/[0.07] text-white/84",
   error:
-    "bg-graph-status-error/12 text-graph-status-error border-graph-status-error/30",
-  terminated:
-    "bg-graph-status-terminated/10 text-graph-status-terminated border-graph-status-terminated/20",
+    "border-white/20 bg-white/[0.09] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]",
+  terminated: "border-white/8 bg-white/[0.03] text-white/56",
 };
 
 export const stateRing: Record<AgentState, string> = {
@@ -47,15 +45,14 @@ export const stateRing: Record<AgentState, string> = {
 };
 
 export const nodeTypeIconStyle: Record<NodeType, string> = {
-  assistant:
-    "rounded-sm border-graph-assistant/40 bg-graph-assistant/10 text-graph-assistant",
+  assistant: "rounded-sm border-white/18 bg-white/[0.08] text-white",
   agent: "rounded-sm border-graph-node-border bg-surface-3 text-foreground/80",
 };
 
 export const stateBorder: Record<AgentState, string> = {
-  running: "border-graph-status-running/60",
+  running: "border-white/18",
   idle: "border-graph-node-border",
-  initializing: "border-graph-status-initializing/60",
-  error: "border-graph-status-error/60",
-  terminated: "border-graph-node-border",
+  initializing: "border-white/14 border-dashed",
+  error: "border-white/24 border-double",
+  terminated: "border-white/8",
 };

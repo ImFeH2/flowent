@@ -39,7 +39,7 @@ export function WorkspaceCommandDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={cn("p-0", className)}>
         <div className="relative overflow-hidden px-6 pb-6 pt-5">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top_left,rgba(96,165,250,0.16),transparent_58%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_48%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.12),transparent_58%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.08),transparent_48%)]" />
           <DialogClose asChild>
             <button
               type="button"
@@ -52,7 +52,7 @@ export function WorkspaceCommandDialog({
 
           <DialogHeader className="relative z-10 gap-4 pr-10">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.055] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_14px_28px_-22px_rgba(96,165,250,0.55)]">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.055] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_14px_28px_-22px_rgba(255,255,255,0.16)]">
                 <Icon className="size-5" />
               </div>
               <div className="min-w-0">

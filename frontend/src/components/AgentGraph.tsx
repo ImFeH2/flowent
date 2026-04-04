@@ -698,7 +698,7 @@ export function AgentGraph() {
       <div className="relative flex-1 overflow-hidden">
         {animatedNodes.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 py-10">
-            <div className="w-full max-w-[27rem] rounded-[22px] border border-white/8 bg-[rgba(12,15,20,0.62)] px-7 py-6 text-center shadow-[0_16px_36px_-28px_rgba(0,0,0,0.72)] backdrop-blur-sm">
+            <div className="w-full max-w-[27rem] rounded-[22px] border border-white/8 bg-[rgba(12,12,13,0.62)] px-7 py-6 text-center shadow-[0_16px_36px_-28px_rgba(0,0,0,0.72)] backdrop-blur-sm">
               <div className="mx-auto flex size-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/72">
                 <Network className="size-5" />
               </div>

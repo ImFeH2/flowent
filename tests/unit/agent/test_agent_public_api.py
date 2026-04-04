@@ -186,6 +186,49 @@ def test_agent_get_connections_info_returns_connected_node_metadata():
         registry.reset()
 
 
+def test_agent_get_connections_info_excludes_assistant_without_direct_edge():
+    registry.reset()
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
+        uuid="assistant-a",
+    )
+    registry.register(agent)
+    registry.register(assistant)
+
+    try:
+        assert agent.get_connections_info() == []
+    finally:
+        registry.reset()
+
+
+def test_assistant_get_connections_info_lists_registered_nodes():
+    registry.reset()
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
+        uuid="assistant-a",
+    )
+    worker = Agent(
+        NodeConfig(node_type=NodeType.AGENT, role_name="Worker", name="Worker"),
+        uuid="agent-b",
+    )
+    registry.register(assistant)
+    registry.register(worker)
+
+    try:
+        assert assistant.get_connections_info() == [
+            {
+                "uuid": "agent-b",
+                "node_type": "agent",
+                "role_name": "Worker",
+                "name": "Worker",
+                "state": "initializing",
+            }
+        ]
+    finally:
+        registry.reset()
+
+
 def test_list_roles_tool_returns_registered_roles(monkeypatch):
     agent = Agent(
         NodeConfig(

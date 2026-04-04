@@ -328,18 +328,6 @@ class Agent:
                 }
             )
 
-        assistant = registry.get_assistant()
-        if assistant is not None and assistant.uuid != self.uuid:
-            result.append(
-                {
-                    "uuid": assistant.uuid,
-                    "node_type": assistant.config.node_type.value,
-                    "role_name": assistant.config.role_name,
-                    "name": assistant.config.name,
-                    "state": assistant.state.value,
-                }
-            )
-
         return result
 
     def wait_until_idle(self, timeout: float | None = None) -> bool:

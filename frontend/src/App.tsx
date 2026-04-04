@@ -1,6 +1,7 @@
 import "@/styles/App.css";
 import { AnimatePresence, motion } from "motion/react";
-import { Suspense, lazy, type ComponentType } from "react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Suspense, lazy, useState, type ComponentType } from "react";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
@@ -8,6 +9,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
 import { HomePage } from "@/pages/HomePage";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { usePanelWidth } from "@/hooks/usePanelDrag";
 
 function lazyPage<TModule, TKey extends keyof TModule & string>(
@@ -64,14 +66,17 @@ function PageLoadingFallback() {
 function AppContent() {
   const { currentPage } = useAgentUI();
   const isWorkspace = currentPage === "workspace";
+  const isCompactLayout = useMediaQuery("(max-width: 980px)");
   const [sidebarWidth, setSidebarWidth] = usePanelWidth(
     "sidebar-width",
     256,
     180,
     400,
   );
+  const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
 
   const LazyPage = lazyPageMap[currentPage];
+  const sidebarOpen = isCompactLayout && sidebarDrawerOpen;
 
   const renderPage = () => {
     if (!LazyPage) {
@@ -90,14 +95,51 @@ function AppContent() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_18%,transparent_82%,rgba(255,255,255,0.015))]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:24px_24px]" />
 
-      <Sidebar width={sidebarWidth} onWidthChange={setSidebarWidth} />
+      {isCompactLayout ? (
+        <AnimatePresence>
+          {sidebarOpen ? (
+            <>
+              <motion.button
+                type="button"
+                aria-label="Close navigation"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+                className="absolute inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+                onClick={() => setSidebarDrawerOpen(false)}
+              />
+              <motion.div
+                initial={{ x: -24, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -24, opacity: 0 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-y-0 left-0 z-50"
+              >
+                <Sidebar
+                  autoHide
+                  width={Math.min(sidebarWidth, 320)}
+                  onWidthChange={setSidebarWidth}
+                  onNavigate={() => setSidebarDrawerOpen(false)}
+                />
+              </motion.div>
+            </>
+          ) : null}
+        </AnimatePresence>
+      ) : (
+        <Sidebar width={sidebarWidth} onWidthChange={setSidebarWidth} />
+      )}
 
       <main
         className="relative z-10 h-full isolate"
-        style={{
-          marginLeft: `${sidebarWidth}px`,
-          width: `calc(100% - ${sidebarWidth}px)`,
-        }}
+        style={
+          isCompactLayout
+            ? undefined
+            : {
+                marginLeft: `${sidebarWidth}px`,
+                width: `calc(100% - ${sidebarWidth}px)`,
+              }
+        }
       >
         <div
           className={cn(
@@ -107,6 +149,20 @@ function AppContent() {
               : "bg-[linear-gradient(180deg,rgba(15,15,16,0.92),rgba(10,10,11,0.88))]",
           )}
         >
+          {isCompactLayout ? (
+            <button
+              type="button"
+              aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
+              onClick={() => setSidebarDrawerOpen((current) => !current)}
+              className="absolute left-4 top-4 z-30 flex size-10 items-center justify-center rounded-lg border border-white/10 bg-black/24 text-white/72 backdrop-blur-xl transition-colors hover:bg-white/[0.06] hover:text-white"
+            >
+              {sidebarOpen ? (
+                <PanelLeftClose className="size-4" />
+              ) : (
+                <PanelLeftOpen className="size-4" />
+              )}
+            </button>
+          ) : null}
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.024),transparent_18%,transparent_80%,rgba(255,255,255,0.014))]" />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
           <Toaster

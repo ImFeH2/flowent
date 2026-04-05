@@ -2,6 +2,7 @@ export {
   fetchNodes,
   fetchNodeDetail,
   terminateNode,
+  interruptNode,
   dispatchNodeMessageRequest,
   updateNodePositionRequest,
 } from "./nodes";

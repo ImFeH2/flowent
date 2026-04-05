@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from loguru import logger
 
 from app.sandbox import build_bwrap_cmd
-from app.tools import Tool
+from app.tools import Tool, re_raise_interrupt
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -57,6 +57,7 @@ class ExecTool(Tool):
             cwd,
         )
 
+        proc: subprocess.Popen[str] | None = None
         try:
             proc = subprocess.Popen(
                 bwrap_cmd,
@@ -104,4 +105,8 @@ class ExecTool(Tool):
                 }
             )
         except Exception as e:
+            if proc is not None and proc.poll() is None:
+                proc.kill()
+                proc.wait()
+            re_raise_interrupt(e)
             return json.dumps({"error": str(e)})

@@ -3,6 +3,8 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 
+from app.models import AgentState
+from app.registry import registry
 from app.routes.nodes import router as nodes_router
 from app.settings import STEWARD_ROLE_INCLUDED_TOOLS
 from app.tools import MINIMUM_TOOLS
@@ -91,3 +93,24 @@ def test_assistant_cannot_be_terminated_via_nodes_api(client: TestClient):
 
     assert response.status_code == 400
     assert response.json() == {"detail": "Cannot terminate assistant"}
+
+
+def test_assistant_can_be_interrupted_via_nodes_api_when_running(client: TestClient):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+    assistant.set_state(AgentState.RUNNING, "processing")
+
+    response = client.post(f"/api/nodes/{assistant_id}/interrupt")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "interrupting"}
+    assert assistant._interrupt_requested.is_set()
+
+
+def test_interrupt_ignores_non_running_node(client: TestClient):
+    assistant_id = _get_assistant_id(client)
+    response = client.post(f"/api/nodes/{assistant_id}/interrupt")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ignored"}

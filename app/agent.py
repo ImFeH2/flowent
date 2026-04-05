@@ -60,6 +60,8 @@ class WakeSignal:
 class StreamingContentState:
     mode: str = "pending"
     pending_chunks: list[str] = field(default_factory=list)
+    content_buffer: str = ""
+    thinking_buffer: str = ""
     emitted_human_content: bool = False
     streaming_message_id: str | None = None
     streamed_message_body: str = ""
@@ -71,6 +73,10 @@ class RoutedContentResult:
     had_routed_header: bool = False
     route_errors: list[str] = field(default_factory=list)
     had_additional_routed_headers: bool = False
+
+
+class InterruptRequestedError(Exception):
+    pass
 
 
 _HEADER_RE = re.compile(r"^@([^:\n]+):[ \t]*(.*)$", re.DOTALL)
@@ -189,6 +195,7 @@ class Agent:
         self.connections: list[str] = []
         self.history: list[HistoryEntry] = []
         self._terminate = threading.Event()
+        self._interrupt_requested = threading.Event()
         self._idle_state_event = threading.Event()
         self._idle_started_at: float | None = None
         self._idle_started_by_tool_call_id: str | None = None
@@ -286,8 +293,12 @@ class Agent:
     def request_sleep(self, *, seconds: float) -> str:
         duration = max(0.0, seconds)
         started_at = _time.perf_counter()
-        if duration > 0:
-            self._terminate.wait(timeout=duration)
+        remaining = duration
+        while remaining > 0 and not self._terminate.is_set():
+            self._raise_if_interrupt_requested()
+            step_started_at = _time.perf_counter()
+            self._terminate.wait(timeout=min(remaining, 0.1))
+            remaining -= _time.perf_counter() - step_started_at
         elapsed = max(0.0, _time.perf_counter() - started_at)
         return f"slept {elapsed:.2f}s"
 
@@ -455,56 +466,69 @@ class Agent:
                         len(self.history),
                     )
                     stream_state = StreamingContentState()
-
-                    response = gateway.chat(
-                        messages=messages,
-                        tools=tools_schema or None,
-                        on_chunk=partial(self._handle_llm_chunk, stream_state),
-                        role_name=self.config.role_name,
-                    )
-
-                    self._log.debug(
-                        "LLM response: content_len={}, thinking_len={}, tool_calls={}",
-                        len(response.content) if response.content else 0,
-                        len(response.thinking) if response.thinking else 0,
-                        [tc.name for tc in response.tool_calls]
-                        if response.tool_calls
-                        else None,
-                    )
-
-                    if response.thinking:
-                        self._append_history(
-                            AssistantThinking(content=response.thinking),
+                    try:
+                        response = gateway.chat(
+                            messages=messages,
+                            tools=tools_schema or None,
+                            on_chunk=partial(self._handle_llm_chunk, stream_state),
+                            role_name=self.config.role_name,
                         )
+                        self._raise_if_interrupt_requested()
 
-                    if response.tool_calls:
                         self._log.debug(
-                            "Processing {} tool call(s)",
-                            len(response.tool_calls),
+                            "LLM response: content_len={}, thinking_len={}, tool_calls={}",
+                            len(response.content) if response.content else 0,
+                            len(response.thinking) if response.thinking else 0,
+                            [tc.name for tc in response.tool_calls]
+                            if response.tool_calls
+                            else None,
                         )
-                        if response.content:
+
+                        if response.thinking:
+                            self._append_history(
+                                AssistantThinking(content=response.thinking),
+                            )
+                            stream_state.thinking_buffer = ""
+
+                        if response.tool_calls:
+                            self._log.debug(
+                                "Processing {} tool call(s)",
+                                len(response.tool_calls),
+                            )
+                            if response.content:
+                                self._record_content_output(
+                                    response.content,
+                                    emitted_human_content=stream_state.emitted_human_content,
+                                    message_id=stream_state.streaming_message_id,
+                                )
+                                stream_state.content_buffer = ""
+                                stream_state.pending_chunks.clear()
+                            self._raise_if_interrupt_requested()
+                            for tc in response.tool_calls:
+                                self._handle_tool_call(tc.name, tc.arguments, tc.id)
+                                self._raise_if_interrupt_requested()
+                                if self._terminate.is_set():
+                                    break
+                        elif response.content:
                             self._record_content_output(
                                 response.content,
                                 emitted_human_content=stream_state.emitted_human_content,
                                 message_id=stream_state.streaming_message_id,
                             )
-                        for tc in response.tool_calls:
-                            self._handle_tool_call(tc.name, tc.arguments, tc.id)
-                            if self._terminate.is_set():
-                                break
-                    elif response.content:
-                        self._record_content_output(
-                            response.content,
-                            emitted_human_content=stream_state.emitted_human_content,
-                            message_id=stream_state.streaming_message_id,
-                        )
-                        self._log.debug(
-                            "No tool calls, continuing execution after text response"
-                        )
-                    else:
-                        self._log.warning(
-                            "LLM returned empty response (no content, no tool_calls)",
-                        )
+                            stream_state.content_buffer = ""
+                            stream_state.pending_chunks.clear()
+                            self._log.debug(
+                                "No tool calls, continuing execution after text response"
+                            )
+                        else:
+                            self._log.warning(
+                                "LLM returned empty response (no content, no tool_calls)",
+                            )
+                    except InterruptRequestedError:
+                        self._handle_interrupt(stream_state)
+                        if self._terminate.is_set():
+                            break
+                        continue
 
                 except Exception as exc:
                     self._log.exception("Agent error")
@@ -770,8 +794,10 @@ class Agent:
         chunk_type: str,
         text: str,
     ) -> None:
+        self._raise_if_interrupt_requested()
         delta: ContentDelta | ThinkingDelta
         if chunk_type == "content":
+            state.content_buffer += text
             if state.mode == "plain":
                 delta = ContentDelta(text=text)
                 event_bus.emit(
@@ -832,6 +858,7 @@ class Agent:
                 )
             return
         elif chunk_type == "thinking":
+            state.thinking_buffer += text
             delta = ThinkingDelta(text=text)
         else:
             return
@@ -1050,6 +1077,27 @@ class Agent:
         ):
             return None
         return first_todo
+
+    def _raise_if_interrupt_requested(self) -> None:
+        if self._interrupt_requested.is_set():
+            raise InterruptRequestedError()
+
+    def _handle_interrupt(self, stream_state: StreamingContentState | None) -> None:
+        if stream_state is not None:
+            if stream_state.thinking_buffer:
+                self._append_history(
+                    AssistantThinking(content=stream_state.thinking_buffer),
+                )
+            if stream_state.content_buffer:
+                self._record_content_output(
+                    stream_state.content_buffer,
+                    emitted_human_content=stream_state.emitted_human_content,
+                    message_id=stream_state.streaming_message_id,
+                )
+        self._interrupt_requested.clear()
+        self._pending_input_turn = False
+        self.set_state(AgentState.IDLE, "interrupted by human")
+        self._wait_for_input()
 
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = [
@@ -1286,8 +1334,11 @@ class Agent:
             streaming=True,
         )
         self._append_history(streaming_entry)
+        streamed_result_parts: list[str] = []
 
         def _on_tool_output(text: str) -> None:
+            self._raise_if_interrupt_requested()
+            streamed_result_parts.append(text)
             delta = ToolResultDelta(tool_call_id=call_id, text=text)
             event_bus.emit(
                 Event(
@@ -1296,15 +1347,18 @@ class Agent:
                     data=delta.serialize(),
                 ),
             )
+            self._raise_if_interrupt_requested()
 
         t0 = _time.perf_counter()
         try:
+            self._raise_if_interrupt_requested()
             result = tool.execute(
                 self,
                 arguments,
                 on_output=_on_tool_output,
                 tool_call_id=call_id,
             )
+            self._raise_if_interrupt_requested()
             elapsed = _time.perf_counter() - t0
             self._log.debug(
                 "Tool {} completed in {:.2f}s, result_len={}",
@@ -1315,6 +1369,10 @@ class Agent:
 
             self._finalize_tool_call(call_id, name, arguments, result)
             return result
+        except InterruptRequestedError:
+            partial_result = "".join(streamed_result_parts) or None
+            self._finalize_tool_call(call_id, name, arguments, partial_result)
+            raise
         except Exception as e:
             elapsed = _time.perf_counter() - t0
             self._log.exception("Tool {} failed after {:.2f}s", name, elapsed)
@@ -1422,6 +1480,12 @@ class Agent:
                 resume_reason="termination requested",
             )
         )
+
+    def request_interrupt(self) -> bool:
+        if self.state != AgentState.RUNNING:
+            return False
+        self._interrupt_requested.set()
+        return True
 
     def terminate_and_wait(self, timeout: float = 10.0) -> None:
         self.request_termination("shutdown")

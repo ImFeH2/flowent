@@ -3,11 +3,12 @@ import threading
 
 from loguru import logger
 
-from app.agent import Agent, extract_routed_content
+from app.agent import Agent, InterruptRequestedError, extract_routed_content
 from app.events import event_bus
 from app.models import (
     AgentState,
     AssistantText,
+    AssistantThinking,
     ErrorEntry,
     EventType,
     LLMResponse,
@@ -120,6 +121,72 @@ def test_finalize_termination_removes_bidirectional_connections():
         assert worker.get_connections_snapshot() == []
     finally:
         registry.reset()
+
+
+def test_agent_interrupts_streaming_response_and_returns_to_idle(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+    registry.reset()
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    registry.register(assistant)
+    events = []
+    wait_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            assistant._append_history(
+                ReceivedMessage(content="start working", from_id="human")
+            )
+            assistant.set_state(AgentState.RUNNING, "received message from human")
+            return
+        assistant.request_termination("done")
+
+    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+        assert on_chunk is not None
+        on_chunk("thinking", "Drafting plan")
+        on_chunk("content", "Working")
+        assert assistant.request_interrupt() is True
+        on_chunk("content", " on the task")
+        raise AssertionError("interrupt should stop streaming before completion")
+
+    monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        assistant._run()
+    finally:
+        registry.reset()
+
+    history = assistant.get_history_snapshot()
+
+    assert any(
+        isinstance(entry, AssistantThinking) and entry.content == "Drafting plan"
+        for entry in history
+    )
+    assert any(
+        isinstance(entry, AssistantText) and entry.content == "Working"
+        for entry in history
+    )
+    assert any(
+        event.type == EventType.NODE_STATE_CHANGED
+        and event.data.get("new_state") == "idle"
+        for event in events
+    )
+
+
+def test_request_sleep_raises_interrupt_when_running_agent_is_interrupted():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    agent.set_state(AgentState.RUNNING, "sleeping")
+    assert agent.request_interrupt() is True
+
+    try:
+        agent.request_sleep(seconds=0.2)
+    except InterruptRequestedError:
+        pass
+    else:
+        raise AssertionError("expected interrupt during sleep")
 
 
 def test_provider_resolution_error_is_recorded_in_history(monkeypatch):

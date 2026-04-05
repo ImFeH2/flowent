@@ -39,6 +39,13 @@ class Tool(ABC):
         }
 
 
+def re_raise_interrupt(exc: BaseException) -> None:
+    from app.agent import InterruptRequestedError
+
+    if isinstance(exc, InterruptRequestedError):
+        raise exc
+
+
 class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}

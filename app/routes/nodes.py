@@ -156,6 +156,16 @@ async def terminate_node(node_id: str) -> dict:
     return {"status": "terminating"}
 
 
+@router.post("/api/nodes/{node_id}/interrupt")
+async def interrupt_node(node_id: str) -> dict:
+    node = registry.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+    if not node.request_interrupt():
+        return {"status": "ignored"}
+    return {"status": "interrupting"}
+
+
 @router.patch("/api/nodes/{node_id}/position")
 async def update_node_position(node_id: str, req: UpdateNodePositionRequest) -> dict:
     from app.graph_service import update_node_position

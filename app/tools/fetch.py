@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import httpx
 from loguru import logger
 
-from app.tools import Tool
+from app.tools import Tool, re_raise_interrupt
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -74,5 +74,6 @@ class FetchTool(Tool):
                 }
             )
         except Exception as e:
+            re_raise_interrupt(e)
             logger.warning("HTTP request failed: {} {} - {}", method, url, e)
             return json.dumps({"error": str(e)})

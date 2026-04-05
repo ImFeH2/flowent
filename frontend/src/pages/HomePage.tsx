@@ -58,6 +58,7 @@ import {
   createTabRequest,
   deleteTabRequest,
   dispatchNodeMessageRequest,
+  interruptNode,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -1075,6 +1076,7 @@ function AgentDetailPanel({
   agent: Node;
   onClose: () => void;
 }) {
+  const [interrupting, setInterrupting] = useState(false);
   const { agents } = useAgentNodesRuntime();
   const { tabs } = useAgentTabsRuntime();
   const { detail, error, loading } = useAgentDetail(
@@ -1143,6 +1145,26 @@ function AgentDetailPanel({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          {detailState === "running" ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={interrupting}
+              onClick={() => {
+                setInterrupting(true);
+                interruptNode(agent.id)
+                  .catch(() => {
+                    toast.error("Failed to interrupt node");
+                  })
+                  .finally(() => {
+                    setInterrupting(false);
+                  });
+              }}
+            >
+              {interrupting ? "Interrupting..." : "Interrupt"}
+            </Button>
+          ) : null}
           <PanelActionButton title="Close details" onClick={onClose}>
             <X className="size-4" />
           </PanelActionButton>

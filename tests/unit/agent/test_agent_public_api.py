@@ -139,6 +139,25 @@ def test_request_termination_enqueues_wake_signal_immediately():
     assert signal.resume_reason == "termination requested"
 
 
+def test_request_interrupt_marks_running_agent():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    agent.set_state(AgentState.RUNNING, "processing")
+
+    interrupted = agent.request_interrupt()
+
+    assert interrupted is True
+    assert agent._interrupt_requested.is_set()
+
+
+def test_request_interrupt_ignores_non_running_agent():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+
+    interrupted = agent.request_interrupt()
+
+    assert interrupted is False
+    assert not agent._interrupt_requested.is_set()
+
+
 def test_contacts_tool_uses_agent_public_api(monkeypatch):
     agent = Agent(
         NodeConfig(node_type=NodeType.AGENT, tools=["contacts"]),

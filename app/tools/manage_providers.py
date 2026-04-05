@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from app.agent import Agent
     from app.settings import ProviderConfig
 
-from app.tools import Tool
+from app.tools import Tool, re_raise_interrupt
 
 
 def _serialize_provider(provider: ProviderConfig) -> dict[str, str]:
@@ -167,6 +167,7 @@ class ManageProvidersTool(Tool):
                         on_output(f"{model_id}\n")
                 return json.dumps(model_ids)
             except Exception as exc:
+                re_raise_interrupt(exc)
                 logger.error(
                     "Failed to list models for provider '{}': {}",
                     provider_id,

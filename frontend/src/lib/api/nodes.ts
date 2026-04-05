@@ -34,6 +34,13 @@ export async function terminateNode(nodeId: string): Promise<void> {
   });
 }
 
+export async function interruptNode(nodeId: string): Promise<void> {
+  await requestVoid(`/api/nodes/${nodeId}/interrupt`, {
+    method: "POST",
+    errorMessage: "Failed to interrupt node",
+  });
+}
+
 export async function dispatchNodeMessageRequest(
   nodeId: string,
   content: string,

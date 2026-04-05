@@ -16,6 +16,7 @@ const {
   deleteTabRequestMock,
   dispatchNodeMessageRequestMock,
   createTabEdgeRequestMock,
+  interruptNodeMock,
   toastErrorMock,
 } = vi.hoisted(() => ({
   createTabRequestMock: vi.fn(),
@@ -23,6 +24,7 @@ const {
   deleteTabRequestMock: vi.fn(),
   dispatchNodeMessageRequestMock: vi.fn(),
   createTabEdgeRequestMock: vi.fn(),
+  interruptNodeMock: vi.fn(),
   toastErrorMock: vi.fn(),
 }));
 
@@ -32,6 +34,7 @@ const {
   useAgentConnectionRuntimeMock,
   useAgentActivityRuntimeMock,
   useAgentHistoryRuntimeMock,
+  useAgentDetailMock,
   useAgentUIMock,
 } = vi.hoisted(() => ({
   useAgentNodesRuntimeMock: vi.fn(),
@@ -39,6 +42,7 @@ const {
   useAgentConnectionRuntimeMock: vi.fn(),
   useAgentActivityRuntimeMock: vi.fn(),
   useAgentHistoryRuntimeMock: vi.fn(),
+  useAgentDetailMock: vi.fn(),
   useAgentUIMock: vi.fn(),
 }));
 
@@ -51,6 +55,7 @@ vi.mock("@/lib/api", () => ({
     dispatchNodeMessageRequestMock(...args),
   createTabEdgeRequest: (...args: unknown[]) =>
     createTabEdgeRequestMock(...args),
+  interruptNode: (...args: unknown[]) => interruptNodeMock(...args),
 }));
 
 vi.mock("@/context/AgentContext", () => ({
@@ -77,11 +82,7 @@ vi.mock("@/hooks/useAssistantChat", () => ({
 }));
 
 vi.mock("@/hooks/useAgentDetail", () => ({
-  useAgentDetail: () => ({
-    detail: null,
-    error: null,
-    loading: false,
-  }),
+  useAgentDetail: (...args: unknown[]) => useAgentDetailMock(...args),
 }));
 
 vi.mock("@/hooks/useMeasuredHeight", () => ({
@@ -160,6 +161,7 @@ describe("HomePage", () => {
     deleteTabRequestMock.mockReset();
     dispatchNodeMessageRequestMock.mockReset();
     createTabEdgeRequestMock.mockReset();
+    interruptNodeMock.mockReset();
     toastErrorMock.mockReset();
 
     const assistant = buildNode({
@@ -193,6 +195,11 @@ describe("HomePage", () => {
       agentHistories: new Map(),
       clearAgentHistory: vi.fn(),
       streamingDeltas: new Map(),
+    });
+    useAgentDetailMock.mockReturnValue({
+      detail: null,
+      error: null,
+      loading: false,
     });
     useAgentUIMock.mockReturnValue({
       activeTabId: "tab-1",
@@ -268,6 +275,118 @@ describe("HomePage", () => {
         name: "Release Reviewer",
       }),
     );
+  });
+
+  it("shows an interrupt action for a running assistant detail view", async () => {
+    const assistant = buildNode({
+      id: "assistant",
+      node_type: "assistant",
+      tab_id: null,
+      role_name: "Steward",
+      state: "running",
+    });
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([[assistant.id, assistant]]),
+    });
+    useAgentUIMock.mockReturnValue({
+      activeTabId: "tab-1",
+      pendingAssistantMessages: [],
+      selectedAgentId: assistant.id,
+      selectAgent: vi.fn(),
+      setActiveTabId: vi.fn(),
+    });
+    useAgentDetailMock.mockReturnValue({
+      detail: {
+        id: assistant.id,
+        node_type: "assistant",
+        tab_id: null,
+        state: "running",
+        name: "Assistant",
+        contacts: [],
+        connections: [],
+        role_name: "Steward",
+        todos: [],
+        tools: [],
+        write_dirs: [],
+        allow_network: true,
+        position: null,
+        history: [],
+      },
+      error: null,
+      loading: false,
+    });
+    interruptNodeMock.mockResolvedValue(undefined);
+
+    render(<HomePage />);
+
+    const interruptButton = screen.getAllByRole("button", {
+      name: "Interrupt",
+    })[screen.getAllByRole("button", { name: "Interrupt" }).length - 1];
+    fireEvent.click(interruptButton);
+
+    await waitFor(() => {
+      expect(interruptNodeMock).toHaveBeenCalledWith("assistant");
+    });
+  });
+
+  it("shows the same interrupt action for a running task node detail view", async () => {
+    const worker = buildNode({
+      id: "agent-1",
+      name: "Docs Worker",
+      state: "running",
+    });
+    const assistant = buildNode({
+      id: "assistant",
+      node_type: "assistant",
+      tab_id: null,
+      role_name: "Steward",
+    });
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([
+        [assistant.id, assistant],
+        [worker.id, worker],
+      ]),
+    });
+    useAgentUIMock.mockReturnValue({
+      activeTabId: "tab-1",
+      pendingAssistantMessages: [],
+      selectedAgentId: worker.id,
+      selectAgent: vi.fn(),
+      setActiveTabId: vi.fn(),
+    });
+    useAgentDetailMock.mockReturnValue({
+      detail: {
+        id: worker.id,
+        node_type: "agent",
+        tab_id: "tab-1",
+        state: "running",
+        name: "Docs Worker",
+        contacts: ["assistant"],
+        connections: [],
+        role_name: "Worker",
+        todos: [],
+        tools: [],
+        write_dirs: [],
+        allow_network: false,
+        position: null,
+        history: [],
+      },
+      error: null,
+      loading: false,
+    });
+    interruptNodeMock.mockResolvedValue(undefined);
+
+    render(<HomePage />);
+
+    const interruptButtons = screen.getAllByRole("button", {
+      name: "Interrupt",
+    });
+    const interruptButton = interruptButtons[interruptButtons.length - 1];
+    fireEvent.click(interruptButton);
+
+    await waitFor(() => {
+      expect(interruptNodeMock).toHaveBeenCalledWith("agent-1");
+    });
   });
 
   it("deletes a tab through the confirmation dialog", async () => {

@@ -12,7 +12,7 @@ def test_empty_tools_list_grants_minimum_tools():
         "idle",
         "sleep",
         "todo",
-        "list_connections",
+        "contacts",
     ]
 
 
@@ -25,7 +25,7 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
         "idle",
         "sleep",
         "todo",
-        "list_connections",
+        "contacts",
     ]
 
 
@@ -64,7 +64,7 @@ def test_tool_registry_grants_tab_graph_tools_when_explicitly_allowed():
         "idle",
         "sleep",
         "todo",
-        "list_connections",
+        "contacts",
         "create_tab",
         "delete_tab",
         "create_agent",

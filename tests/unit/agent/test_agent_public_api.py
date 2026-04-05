@@ -12,8 +12,8 @@ from app.models import (
 )
 from app.registry import registry
 from app.settings import RoleConfig, Settings
+from app.tools.contacts import ContactsTool
 from app.tools.idle import IdleTool
-from app.tools.list_connections import ListConnectionsTool
 from app.tools.list_roles import ListRolesTool
 from app.tools.list_tabs import ListTabsTool
 from app.tools.list_tools import ListToolsTool
@@ -139,14 +139,14 @@ def test_request_termination_enqueues_wake_signal_immediately():
     assert signal.resume_reason == "termination requested"
 
 
-def test_list_connections_tool_uses_agent_public_api(monkeypatch):
+def test_contacts_tool_uses_agent_public_api(monkeypatch):
     agent = Agent(
-        NodeConfig(node_type=NodeType.AGENT, tools=["list_connections"]),
+        NodeConfig(node_type=NodeType.AGENT, tools=["contacts"]),
         uuid="agent-a",
     )
     expected = [
         {
-            "uuid": "agent-b",
+            "id": "agent-b",
             "node_type": "agent",
             "role_name": "Worker",
             "name": "Worker",
@@ -154,55 +154,104 @@ def test_list_connections_tool_uses_agent_public_api(monkeypatch):
         }
     ]
 
-    monkeypatch.setattr(agent, "get_connections_info", lambda: expected)
+    monkeypatch.setattr(agent, "get_contacts_info", lambda: expected)
 
-    result = json.loads(ListConnectionsTool().execute(agent, {}))
+    result = json.loads(ContactsTool().execute(agent, {}))
 
-    assert result == {"connections": expected}
+    assert result == {"contacts": expected}
 
 
-def test_agent_get_connections_info_returns_connected_node_metadata():
+def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
     registry.reset()
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    agent = Agent(
+        NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"),
+        uuid="agent-a",
+    )
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
+        uuid="assistant-a",
+    )
     peer = Agent(
-        NodeConfig(node_type=NodeType.AGENT, role_name="Worker", name="Worker"),
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Worker",
+            name="Worker",
+            tab_id="tab-1",
+        ),
         uuid="agent-b",
     )
     registry.register(agent)
+    registry.register(assistant)
     registry.register(peer)
     agent.add_connection(peer.uuid)
 
     try:
-        assert agent.get_connections_info() == [
+        assert agent.get_contacts_info() == [
             {
-                "uuid": "agent-b",
+                "id": "assistant-a",
+                "node_type": "assistant",
+                "role_name": "Steward",
+                "name": "Assistant",
+                "state": "initializing",
+            },
+            {
+                "id": "agent-b",
                 "node_type": "agent",
                 "role_name": "Worker",
                 "name": "Worker",
                 "state": "initializing",
-            }
+            },
         ]
     finally:
         registry.reset()
 
 
-def test_agent_get_connections_info_excludes_assistant_without_direct_edge():
+def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
     registry.reset()
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    agent = Agent(
+        NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"),
+        uuid="agent-a",
+    )
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
         uuid="assistant-a",
     )
+    peer = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Reviewer",
+            name="Reviewer",
+            tab_id="tab-1",
+        ),
+        uuid="agent-b",
+    )
     registry.register(agent)
     registry.register(assistant)
+    registry.register(peer)
+    peer.add_connection(agent.uuid)
 
     try:
-        assert agent.get_connections_info() == []
+        assert agent.get_contacts_info() == [
+            {
+                "id": "assistant-a",
+                "node_type": "assistant",
+                "role_name": "Steward",
+                "name": "Assistant",
+                "state": "initializing",
+            },
+            {
+                "id": "agent-b",
+                "node_type": "agent",
+                "role_name": "Reviewer",
+                "name": "Reviewer",
+                "state": "initializing",
+            },
+        ]
     finally:
         registry.reset()
 
 
-def test_assistant_get_connections_info_lists_registered_nodes():
+def test_assistant_get_contacts_info_lists_registered_task_nodes():
     registry.reset()
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
@@ -216,9 +265,9 @@ def test_assistant_get_connections_info_lists_registered_nodes():
     registry.register(worker)
 
     try:
-        assert assistant.get_connections_info() == [
+        assert assistant.get_contacts_info() == [
             {
-                "uuid": "agent-b",
+                "id": "agent-b",
                 "node_type": "agent",
                 "role_name": "Worker",
                 "name": "Worker",
@@ -266,7 +315,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "idle",
                 "sleep",
                 "todo",
-                "list_connections",
+                "contacts",
                 "read",
                 "exec",
             ],
@@ -293,7 +342,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "idle",
                 "sleep",
                 "todo",
-                "list_connections",
+                "contacts",
             ],
             "optional_tools": [
                 "create_tab",
@@ -330,7 +379,7 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "idle",
         "sleep",
         "todo",
-        "list_connections",
+        "contacts",
         "read",
         "edit",
         "exec",

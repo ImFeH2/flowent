@@ -30,7 +30,7 @@ const TOOL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   idle: Clock,
   sleep: Clock,
   todo: ListTodo,
-  list_connections: Network,
+  contacts: Network,
   list_tools: Wrench,
   list_roles: Users,
   list_tabs: LayoutDashboard,

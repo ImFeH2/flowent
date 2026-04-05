@@ -440,6 +440,6 @@ def test_steward_prompt_requires_same_response_dispatch_and_no_rebroadcast():
     )
     assert "Do not re-send a task to a node" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "Do not insert tool calls such as `list_connections` between dispatch responses"
+        "Do not insert tool calls such as `contacts` between dispatch responses"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )

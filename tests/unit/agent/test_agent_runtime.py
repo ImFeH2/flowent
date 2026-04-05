@@ -285,6 +285,61 @@ def test_route_content_output_delivers_to_single_target_when_header_present(
     ]
 
 
+def test_route_content_output_delivers_to_contact_from_incoming_edge(monkeypatch):
+    registry.reset()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
+    registry.register(child)
+    registry.register(peer)
+    peer.add_connection(child.uuid)
+    events = []
+
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        routed_result = child._route_content_output("@peer: reply with the findings")
+    finally:
+        registry.reset()
+
+    peer_signal = peer._wake_queue.get_nowait()
+    message_id = routed_result.sent_messages[0].message_id
+
+    assert peer_signal.payload == {
+        "message": {
+            "from": "child",
+            "content": "reply with the findings",
+            "message_id": message_id,
+        }
+    }
+    assert routed_result.route_errors == []
+    assert routed_result.sent_messages[0].to_ids == ["peer"]
+    assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
+        {
+            "to_id": "peer",
+            "content": "reply with the findings",
+            "message_id": message_id,
+        },
+    ]
+
+
+def test_route_content_output_reports_error_when_target_is_not_in_contacts():
+    registry.reset()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
+    registry.register(child)
+    registry.register(peer)
+
+    try:
+        routed_result = child._route_content_output("@peer: reply with the findings")
+    finally:
+        registry.reset()
+
+    assert routed_result.sent_messages == []
+    assert routed_result.route_errors == [
+        "Routing failed: target `peer` is not in contacts."
+    ]
+
+
 def test_route_content_output_does_not_deliver_plain_content(monkeypatch):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
@@ -763,7 +818,7 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
                         "role_name": "Worker",
                         "tab_id": "tab-1",
                         "name": "Directory Worker",
-                        "tools": ["idle", "sleep", "todo", "list_connections", "read"],
+                        "tools": ["idle", "sleep", "todo", "contacts", "read"],
                         "write_dirs": [],
                         "allow_network": False,
                     },
@@ -799,7 +854,7 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
         {
             "role": "tool",
             "tool_call_id": "call-create-agent",
-            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": "Directory Worker", "tools": ["idle", "sleep", "todo", "list_connections", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
+            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": "Directory Worker", "tools": ["idle", "sleep", "todo", "contacts", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
         },
         {
             "role": "user",
@@ -828,7 +883,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
                         "role_name": "Worker",
                         "tab_id": "tab-1",
                         "name": None,
-                        "tools": ["idle", "sleep", "todo", "list_connections", "read"],
+                        "tools": ["idle", "sleep", "todo", "contacts", "read"],
                         "write_dirs": [],
                         "allow_network": False,
                     },
@@ -864,7 +919,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
         {
             "role": "tool",
             "tool_call_id": "call-create-agent",
-            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": null, "tools": ["idle", "sleep", "todo", "list_connections", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
+            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": null, "tools": ["idle", "sleep", "todo", "contacts", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
         },
         {
             "role": "user",
@@ -895,7 +950,7 @@ def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkey
                         "role_name": "Worker",
                         "tab_id": "tab-1",
                         "name": "Directory Worker",
-                        "tools": ["idle", "sleep", "todo", "list_connections", "read"],
+                        "tools": ["idle", "sleep", "todo", "contacts", "read"],
                         "write_dirs": [],
                         "allow_network": False,
                     },
@@ -937,7 +992,7 @@ def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkey
         {
             "role": "tool",
             "tool_call_id": "call-create-agent",
-            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": "Directory Worker", "tools": ["idle", "sleep", "todo", "list_connections", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
+            "content": '{"id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff", "config": {"node_type": "agent", "role_name": "Worker", "tab_id": "tab-1", "name": "Directory Worker", "tools": ["idle", "sleep", "todo", "contacts", "read"], "write_dirs": [], "allow_network": false}, "state": "initializing", "todos": [], "history": [], "position": null, "created_at": 1.0, "updated_at": 1.0}',
         },
         {
             "role": "assistant",

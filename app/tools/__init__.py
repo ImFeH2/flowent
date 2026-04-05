@@ -12,7 +12,7 @@ MINIMUM_TOOLS = (
     "idle",
     "sleep",
     "todo",
-    "list_connections",
+    "contacts",
 )
 
 
@@ -65,6 +65,7 @@ class ToolRegistry:
 
 def build_tool_registry() -> ToolRegistry:
     from app.tools.connect import ConnectTool
+    from app.tools.contacts import ContactsTool
     from app.tools.create_agent import CreateAgentTool
     from app.tools.create_tab import CreateTabTool
     from app.tools.delete_tab import DeleteTabTool
@@ -72,7 +73,6 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.exec import ExecTool
     from app.tools.fetch import FetchTool
     from app.tools.idle import IdleTool
-    from app.tools.list_connections import ListConnectionsTool
     from app.tools.list_roles import ListRolesTool
     from app.tools.list_tabs import ListTabsTool
     from app.tools.list_tools import ListToolsTool
@@ -89,7 +89,7 @@ def build_tool_registry() -> ToolRegistry:
         IdleTool,
         SleepTool,
         TodoTool,
-        ListConnectionsTool,
+        ContactsTool,
         CreateTabTool,
         DeleteTabTool,
         CreateAgentTool,

@@ -302,33 +302,69 @@ class Agent:
             return 0.0
         return max(0.0, _time.perf_counter() - started_at)
 
-    def get_connections_info(self) -> list[dict[str, Any]]:
+    def get_contact_ids_snapshot(self) -> list[str]:
+        from app.registry import registry
+
+        if self.node_type == NodeType.ASSISTANT:
+            return [
+                node.uuid
+                for node in registry.get_all()
+                if node.uuid != self.uuid and node.node_type != NodeType.ASSISTANT
+            ]
+
+        seen_ids: set[str] = set()
+        contact_ids: list[str] = []
+
+        def append_contact(node_id: str) -> None:
+            if node_id == self.uuid or node_id in seen_ids:
+                return
+            if registry.get(node_id) is None:
+                return
+            seen_ids.add(node_id)
+            contact_ids.append(node_id)
+
+        assistant = registry.get_assistant()
+        if assistant is not None:
+            append_contact(assistant.uuid)
+
+        with self._connections_lock:
+            for node_id in self.connections:
+                append_contact(node_id)
+
+        if self.config.tab_id is None:
+            return contact_ids
+
+        for node in registry.get_all():
+            if node.uuid == self.uuid or node.node_type != NodeType.AGENT:
+                continue
+            if node.config.tab_id != self.config.tab_id:
+                continue
+            if node.is_connected_to(self.uuid):
+                append_contact(node.uuid)
+
+        return contact_ids
+
+    def get_contacts_info(self) -> list[dict[str, Any]]:
         from app.registry import registry
 
         result: list[dict[str, Any]] = []
-        if self.node_type == NodeType.ASSISTANT:
-            connection_ids = [
-                node.uuid for node in registry.get_all() if node.uuid != self.uuid
-            ]
-        else:
-            with self._connections_lock:
-                connection_ids = list(self.connections)
-
-        for cid in connection_ids:
-            node = registry.get(cid)
+        for contact_id in self.get_contact_ids_snapshot():
+            node = registry.get(contact_id)
             if node is None:
                 continue
             result.append(
                 {
-                    "uuid": node.uuid,
+                    "id": node.uuid,
                     "node_type": node.config.node_type.value,
                     "role_name": node.config.role_name,
                     "name": node.config.name,
                     "state": node.state.value,
                 }
             )
-
         return result
+
+    def can_contact(self, node_id: str) -> bool:
+        return node_id in set(self.get_contact_ids_snapshot())
 
     def wait_until_idle(self, timeout: float | None = None) -> bool:
         if self.state == AgentState.IDLE:
@@ -974,15 +1010,11 @@ class Agent:
                     f"Routing failed: target `{target_ref}` was not found."
                 )
                 continue
-            if (
-                self.node_type != NodeType.ASSISTANT
-                and target.node_type != NodeType.ASSISTANT
-                and not self.is_connected_to(target.uuid)
-            ):
+            if not self.can_contact(target.uuid):
                 if log_failures:
                     self._log.warning("@target routing failed: {}", target_ref)
                 route_errors.append(
-                    f"Routing failed: target `{target_ref}` is not directly connected."
+                    f"Routing failed: target `{target_ref}` is not in contacts."
                 )
                 continue
             if target.uuid in seen_target_ids:

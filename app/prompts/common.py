@@ -81,10 +81,10 @@ CONNECT_TOOL_GUIDANCE = """\
 - Use `connect` to establish additional directed message edges inside a task tab when the current graph topology needs them.
 """
 
-LIST_CONNECTIONS_TOOL_GUIDANCE = """\
-## List Connections Tool Rules
+CONTACTS_TOOL_GUIDANCE = """\
+## Contacts Tool Rules
 
-- Use `list_connections` to inspect the nodes you can currently message directly.
+- Use `contacts` to inspect the agents you can currently message directly.
 """
 
 LIST_ROLES_TOOL_GUIDANCE = """\
@@ -123,8 +123,8 @@ COMMUNICATION_USAGE_GUIDANCE = """\
 - Each response can produce only one content block. If you need to message multiple nodes, do it across multiple consecutive responses with one `@target:` header each time.
 - Prefer using node names rather than UUIDs for `@target:` routing. Names are more readable and less error-prone. Short UUID prefixes are also supported when unambiguous.
 - A single content block is either plain output or a `@target:` routed message, never both. A content block supports only one routed header; later `@...:` lines are treated as body text for the first target. Plain content that does not start with `@target:` will not be seen by any other node.
-- Use `list_connections` to discover connected node names and UUIDs before sending.
-- When you finish your assigned task, route the result to the appropriate destination using `@<name-or-uuid>: result`. The destination is the node specified in your task instructions; if no specific destination was given, route back to the node that assigned you the task. Plain content without `@target:` will not reach any other node. If you are unsure where to send results, use `list_connections` to find connected nodes.
+- Use `contacts` to discover current contact names and ids before sending.
+- When you finish your assigned task, route the result to the appropriate destination using `@<name-or-uuid>: result`. The destination is the node specified in your task instructions; if no specific destination was given, route back to the node that assigned you the task. Plain content without `@target:` will not reach any other node. If you are unsure where to send results, use `contacts` to inspect your current contacts.
 - Do not call `idle` after completing a task without first routing the result to its destination.
 - Do NOT output content just to "think out loud" between tool calls. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
@@ -189,8 +189,8 @@ def _build_conditional_tool_guidance(tools: list[str]) -> list[str]:
         parts.append(DELEGATION_GENERAL_GUIDANCE.strip())
     if "connect" in tool_names:
         parts.append(CONNECT_TOOL_GUIDANCE.strip())
-    if "list_connections" in tool_names:
-        parts.append(LIST_CONNECTIONS_TOOL_GUIDANCE.strip())
+    if "contacts" in tool_names:
+        parts.append(CONTACTS_TOOL_GUIDANCE.strip())
     if "list_roles" in tool_names:
         parts.append(LIST_ROLES_TOOL_GUIDANCE.strip())
     if "list_tabs" in tool_names:

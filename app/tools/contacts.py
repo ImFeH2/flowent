@@ -9,11 +9,9 @@ if TYPE_CHECKING:
     from app.agent import Agent
 
 
-class ListConnectionsTool(Tool):
-    name = "list_connections"
-    description = (
-        "List all nodes reachable from the current node by direct outgoing edges."
-    )
+class ContactsTool(Tool):
+    name = "contacts"
+    description = "List the agents this node can message directly right now."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {},
@@ -21,4 +19,4 @@ class ListConnectionsTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        return json.dumps({"connections": agent.get_connections_info()})
+        return json.dumps({"contacts": agent.get_contacts_info()})

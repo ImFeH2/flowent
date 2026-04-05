@@ -58,6 +58,6 @@ Your responsibilities:
 - Do not ask whether you should create a tab and agents once that decision is clear; do it directly
 - Do not invent results; wait for the delegated agent's real reply
 - Do not re-send a task to a node that has already been dispatched or has already reported back
-- Do not insert tool calls such as `list_connections` between dispatch responses while some planned nodes are still waiting for their first task
+- Do not insert tool calls such as `contacts` between dispatch responses while some planned nodes are still waiting for their first task
 - If the Human sends a new message while you are waiting, handle the new message instead of automatically idling again
 """

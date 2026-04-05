@@ -106,78 +106,85 @@ class OpenAIProvider(LLMProvider):
         tool_calls_accum: dict[int, dict[str, Any]] = {}
         chunk_count = 0
         think_parser = ThinkTagParser()
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
 
-        with self._client.stream(
-            "POST",
-            url,
-            headers=self._headers(),
-            content=json.dumps(payload),
-        ) as response:
-            if register_interrupt is not None:
-                register_interrupt(response.close)
-            if response.status_code != 200:
-                body = response.read().decode()
-                elapsed = time.perf_counter() - t0
-                logger.error(
-                    "LLM API error [provider={}, model={}, type=openai]: {} - {} ({:.2f}s)",
-                    self._provider_name,
-                    self._model,
-                    response.status_code,
-                    body[:500],
-                    elapsed,
-                )
-                raise RuntimeError(
-                    f"LLM API error\n"
-                    f"Provider: {self._provider_name}\n"
-                    f"Type: openai\n"
-                    f"Model: {self._model}\n"
-                    f"Base URL: {self._api_base_url}\n"
-                    f"Status: {response.status_code}\n"
-                    f"Response: {body}",
-                )
+        try:
+            with client.stream(
+                "POST",
+                url,
+                headers=self._headers(),
+                content=json.dumps(payload),
+            ) as response:
+                if register_interrupt is not None:
+                    register_interrupt(response.close)
+                if response.status_code != 200:
+                    body = response.read().decode()
+                    elapsed = time.perf_counter() - t0
+                    logger.error(
+                        "LLM API error [provider={}, model={}, type=openai]: {} - {} ({:.2f}s)",
+                        self._provider_name,
+                        self._model,
+                        response.status_code,
+                        body[:500],
+                        elapsed,
+                    )
+                    raise RuntimeError(
+                        f"LLM API error\n"
+                        f"Provider: {self._provider_name}\n"
+                        f"Type: openai\n"
+                        f"Model: {self._model}\n"
+                        f"Base URL: {self._api_base_url}\n"
+                        f"Status: {response.status_code}\n"
+                        f"Response: {body}",
+                    )
 
-            for chunk in iter_sse_json(response, done_token="[DONE]"):
-                chunk_count += 1
-                choices = chunk.get("choices")
-                if not choices:
-                    continue
-                delta = choices[0].get("delta", {})
+                for chunk in iter_sse_json(response, done_token="[DONE]"):
+                    chunk_count += 1
+                    choices = chunk.get("choices")
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
 
-                content_text, thinking_text = _extract_delta_parts(delta)
+                    content_text, thinking_text = _extract_delta_parts(delta)
 
-                if thinking_text:
-                    thinking_parts.append(thinking_text)
-                    if on_chunk:
-                        on_chunk("thinking", thinking_text)
+                    if thinking_text:
+                        thinking_parts.append(thinking_text)
+                        if on_chunk:
+                            on_chunk("thinking", thinking_text)
 
-                if content_text:
-                    for chunk_type, text in think_parser.feed(content_text):
-                        if chunk_type == "thinking":
-                            thinking_parts.append(text)
-                            if on_chunk:
-                                on_chunk("thinking", text)
-                        else:
-                            content_parts.append(text)
-                            if on_chunk:
-                                on_chunk("content", text)
+                    if content_text:
+                        for chunk_type, text in think_parser.feed(content_text):
+                            if chunk_type == "thinking":
+                                thinking_parts.append(text)
+                                if on_chunk:
+                                    on_chunk("thinking", text)
+                            else:
+                                content_parts.append(text)
+                                if on_chunk:
+                                    on_chunk("content", text)
 
-                if delta.get("tool_calls"):
-                    for tc_delta in delta["tool_calls"]:
-                        idx = tc_delta["index"]
-                        if idx not in tool_calls_accum:
-                            tool_calls_accum[idx] = {
-                                "id": "",
-                                "name": "",
-                                "arguments": "",
-                            }
-                        acc = tool_calls_accum[idx]
-                        if tc_delta.get("id"):
-                            acc["id"] = tc_delta["id"]
-                        fn = tc_delta.get("function", {})
-                        if fn.get("name"):
-                            acc["name"] = fn["name"]
-                        if fn.get("arguments"):
-                            acc["arguments"] += fn["arguments"]
+                    if delta.get("tool_calls"):
+                        for tc_delta in delta["tool_calls"]:
+                            idx = tc_delta["index"]
+                            if idx not in tool_calls_accum:
+                                tool_calls_accum[idx] = {
+                                    "id": "",
+                                    "name": "",
+                                    "arguments": "",
+                                }
+                            acc = tool_calls_accum[idx]
+                            if tc_delta.get("id"):
+                                acc["id"] = tc_delta["id"]
+                            fn = tc_delta.get("function", {})
+                            if fn.get("name"):
+                                acc["name"] = fn["name"]
+                            if fn.get("arguments"):
+                                acc["arguments"] += fn["arguments"]
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)
 
         for chunk_type, text in think_parser.flush():
             if chunk_type == "thinking":
@@ -220,10 +227,16 @@ class OpenAIProvider(LLMProvider):
 
         return LLMResponse(content=content or "", thinking=thinking)
 
-    def list_models(self) -> list[ModelInfo]:
+    def list_models(
+        self,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
+    ) -> list[ModelInfo]:
         url = f"{self._api_base_url}/models"
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
         try:
-            resp = self._client.get(url, headers=self._headers())
+            resp = client.get(url, headers=self._headers())
             resp.raise_for_status()
             data = resp.json()
             models = data.get("data", [])
@@ -235,3 +248,6 @@ class OpenAIProvider(LLMProvider):
                 e,
             )
             return []
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)

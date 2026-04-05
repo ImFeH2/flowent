@@ -273,7 +273,7 @@ def test_manage_providers_list_models_streams_model_ids(monkeypatch):
     monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
     monkeypatch.setattr(
         "app.providers.gateway.gateway.list_models_for",
-        lambda provider_id: [
+        lambda provider_id, register_interrupt=None: [
             ModelInfo(id=f"{provider_id}-a"),
             ModelInfo(id=f"{provider_id}-b"),
         ],

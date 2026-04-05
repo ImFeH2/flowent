@@ -254,123 +254,130 @@ class OpenAIResponsesProvider(LLMProvider):
         reasoning_tokens = 0
 
         current_tool: dict[str, Any] = {}
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
 
-        with self._client.stream(
-            "POST",
-            url,
-            headers=self._headers(),
-            content=json.dumps(payload),
-        ) as response:
-            if register_interrupt is not None:
-                register_interrupt(response.close)
-            if response.status_code != 200:
-                body = response.read().decode()
-                elapsed = time.perf_counter() - t0
-                logger.error(
-                    "LLM API error [provider={}, model={}, type=openai_responses]: {} - {} ({:.2f}s)",
-                    self._provider_name,
-                    self._model,
-                    response.status_code,
-                    body[:500],
-                    elapsed,
-                )
-                raise RuntimeError(
-                    f"LLM API error\n"
-                    f"Provider: {self._provider_name}\n"
-                    f"Type: openai_responses\n"
-                    f"Model: {self._model}\n"
-                    f"Base URL: {self._api_base_url}\n"
-                    f"Status: {response.status_code}\n"
-                    f"Response: {body}",
-                )
+        try:
+            with client.stream(
+                "POST",
+                url,
+                headers=self._headers(),
+                content=json.dumps(payload),
+            ) as response:
+                if register_interrupt is not None:
+                    register_interrupt(response.close)
+                if response.status_code != 200:
+                    body = response.read().decode()
+                    elapsed = time.perf_counter() - t0
+                    logger.error(
+                        "LLM API error [provider={}, model={}, type=openai_responses]: {} - {} ({:.2f}s)",
+                        self._provider_name,
+                        self._model,
+                        response.status_code,
+                        body[:500],
+                        elapsed,
+                    )
+                    raise RuntimeError(
+                        f"LLM API error\n"
+                        f"Provider: {self._provider_name}\n"
+                        f"Type: openai_responses\n"
+                        f"Model: {self._model}\n"
+                        f"Base URL: {self._api_base_url}\n"
+                        f"Status: {response.status_code}\n"
+                        f"Response: {body}",
+                    )
 
-            for line in response.iter_lines():
-                if not line or line.startswith(":"):
-                    continue
-                if not line.startswith("data: "):
-                    continue
-                data_str = line[6:]
-                if data_str.strip() == "[DONE]":
-                    break
+                for line in response.iter_lines():
+                    if not line or line.startswith(":"):
+                        continue
+                    if not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
 
-                try:
-                    event = json.loads(data_str)
-                except json.JSONDecodeError:
-                    continue
+                    try:
+                        event = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
 
-                chunk_count += 1
-                event_type = event.get("type", "")
+                    chunk_count += 1
+                    event_type = event.get("type", "")
 
-                if event_type in REASONING_DELTA_EVENT_TYPES:
-                    text = event.get("delta", "")
-                    if text:
-                        saw_reasoning_text = True
-                        thinking_parts.append(text)
-                        if on_chunk:
-                            on_chunk("thinking", text)
+                    if event_type in REASONING_DELTA_EVENT_TYPES:
+                        text = event.get("delta", "")
+                        if text:
+                            saw_reasoning_text = True
+                            thinking_parts.append(text)
+                            if on_chunk:
+                                on_chunk("thinking", text)
 
-                elif event_type == "response.output_text.delta":
-                    text = event.get("delta", "")
-                    if text:
-                        content_parts.append(text)
-                        if on_chunk:
-                            on_chunk("content", text)
+                    elif event_type == "response.output_text.delta":
+                        text = event.get("delta", "")
+                        if text:
+                            content_parts.append(text)
+                            if on_chunk:
+                                on_chunk("content", text)
 
-                elif event_type == "response.function_call_arguments.delta":
-                    delta = event.get("delta", "")
-                    current_tool.setdefault("arguments", "")
-                    current_tool["arguments"] += delta
+                    elif event_type == "response.function_call_arguments.delta":
+                        delta = event.get("delta", "")
+                        current_tool.setdefault("arguments", "")
+                        current_tool["arguments"] += delta
 
-                elif event_type == "response.output_item.added":
-                    item = event.get("item", {})
-                    if item.get("type") == "reasoning":
-                        saw_reasoning_item = True
-                    elif item.get("type") == "function_call":
-                        current_tool = {
-                            "id": item.get("call_id", ""),
-                            "name": item.get("name", ""),
-                            "arguments": "",
-                        }
+                    elif event_type == "response.output_item.added":
+                        item = event.get("item", {})
+                        if item.get("type") == "reasoning":
+                            saw_reasoning_item = True
+                        elif item.get("type") == "function_call":
+                            current_tool = {
+                                "id": item.get("call_id", ""),
+                                "name": item.get("name", ""),
+                                "arguments": "",
+                            }
 
-                elif event_type == "response.output_item.done":
-                    item = event.get("item", {})
-                    if item.get("type") == "reasoning":
-                        saw_reasoning_item = True
-                        if not saw_reasoning_text:
-                            reasoning_text = _extract_reasoning_text_from_item(item)
-                            if reasoning_text:
-                                saw_reasoning_text = True
-                                thinking_parts.append(reasoning_text)
-                                if on_chunk:
-                                    on_chunk("thinking", reasoning_text)
-                    elif item.get("type") == "function_call":
-                        call_id = item.get("call_id") or current_tool.get("id", "")
-                        name = item.get("name") or current_tool.get("name", "")
-                        args_str = item.get("arguments") or current_tool.get(
-                            "arguments", "{}"
-                        )
-                        try:
-                            args = json.loads(args_str)
-                        except json.JSONDecodeError:
-                            args = {}
-                        tool_calls.append(
-                            ToolCall(id=call_id, name=name, arguments=args)
-                        )
-                        current_tool = {}
-
-                elif event_type == "response.completed":
-                    response_data = event.get("response", {})
-                    if isinstance(response_data, dict):
-                        reasoning_tokens = _extract_reasoning_tokens(response_data)
-                        if not saw_reasoning_text:
-                            reasoning_text = _extract_reasoning_text_from_output(
-                                response_data.get("output")
+                    elif event_type == "response.output_item.done":
+                        item = event.get("item", {})
+                        if item.get("type") == "reasoning":
+                            saw_reasoning_item = True
+                            if not saw_reasoning_text:
+                                reasoning_text = _extract_reasoning_text_from_item(item)
+                                if reasoning_text:
+                                    saw_reasoning_text = True
+                                    thinking_parts.append(reasoning_text)
+                                    if on_chunk:
+                                        on_chunk("thinking", reasoning_text)
+                        elif item.get("type") == "function_call":
+                            call_id = item.get("call_id") or current_tool.get("id", "")
+                            name = item.get("name") or current_tool.get("name", "")
+                            args_str = item.get("arguments") or current_tool.get(
+                                "arguments", "{}"
                             )
-                            if reasoning_text:
-                                saw_reasoning_text = True
-                                thinking_parts.append(reasoning_text)
-                                if on_chunk:
-                                    on_chunk("thinking", reasoning_text)
+                            try:
+                                args = json.loads(args_str)
+                            except json.JSONDecodeError:
+                                args = {}
+                            tool_calls.append(
+                                ToolCall(id=call_id, name=name, arguments=args)
+                            )
+                            current_tool = {}
+
+                    elif event_type == "response.completed":
+                        response_data = event.get("response", {})
+                        if isinstance(response_data, dict):
+                            reasoning_tokens = _extract_reasoning_tokens(response_data)
+                            if not saw_reasoning_text:
+                                reasoning_text = _extract_reasoning_text_from_output(
+                                    response_data.get("output")
+                                )
+                                if reasoning_text:
+                                    saw_reasoning_text = True
+                                    thinking_parts.append(reasoning_text)
+                                    if on_chunk:
+                                        on_chunk("thinking", reasoning_text)
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)
 
         elapsed = time.perf_counter() - t0
         content = "".join(content_parts) or None
@@ -395,10 +402,16 @@ class OpenAIResponsesProvider(LLMProvider):
 
         return LLMResponse(content=content or "", thinking=thinking)
 
-    def list_models(self) -> list[ModelInfo]:
+    def list_models(
+        self,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
+    ) -> list[ModelInfo]:
         url = f"{self._api_base_url}/models"
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
         try:
-            resp = self._client.get(url, headers=self._headers())
+            resp = client.get(url, headers=self._headers())
             resp.raise_for_status()
             data = resp.json()
             models = data.get("data", [])
@@ -410,3 +423,6 @@ class OpenAIResponsesProvider(LLMProvider):
                 e,
             )
             return []
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)

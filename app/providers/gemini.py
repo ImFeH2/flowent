@@ -185,58 +185,65 @@ class GeminiProvider(LLMProvider):
         content_parts: list[str] = []
         tool_calls_list: list[ToolCall] = []
         chunk_count = 0
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
 
-        with self._client.stream(
-            "POST",
-            url,
-            headers={"Content-Type": "application/json"},
-            content=json.dumps(payload),
-        ) as response:
-            if register_interrupt is not None:
-                register_interrupt(response.close)
-            if response.status_code != 200:
-                body = response.read().decode()
-                elapsed = time.perf_counter() - t0
-                logger.error(
-                    "LLM API error [provider={}, model={}, type=gemini]: {} - {} ({:.2f}s)",
-                    self._provider_name,
-                    self._model,
-                    response.status_code,
-                    body[:500],
-                    elapsed,
-                )
-                raise RuntimeError(
-                    f"LLM API error\n"
-                    f"Provider: {self._provider_name}\n"
-                    f"Type: gemini\n"
-                    f"Model: {self._model}\n"
-                    f"Base URL: {self._api_base_url}\n"
-                    f"Status: {response.status_code}\n"
-                    f"Response: {body}",
-                )
+        try:
+            with client.stream(
+                "POST",
+                url,
+                headers={"Content-Type": "application/json"},
+                content=json.dumps(payload),
+            ) as response:
+                if register_interrupt is not None:
+                    register_interrupt(response.close)
+                if response.status_code != 200:
+                    body = response.read().decode()
+                    elapsed = time.perf_counter() - t0
+                    logger.error(
+                        "LLM API error [provider={}, model={}, type=gemini]: {} - {} ({:.2f}s)",
+                        self._provider_name,
+                        self._model,
+                        response.status_code,
+                        body[:500],
+                        elapsed,
+                    )
+                    raise RuntimeError(
+                        f"LLM API error\n"
+                        f"Provider: {self._provider_name}\n"
+                        f"Type: gemini\n"
+                        f"Model: {self._model}\n"
+                        f"Base URL: {self._api_base_url}\n"
+                        f"Status: {response.status_code}\n"
+                        f"Response: {body}",
+                    )
 
-            for chunk in iter_sse_json(response):
-                chunk_count += 1
-                candidates = chunk.get("candidates", [])
-                if not candidates:
-                    continue
+                for chunk in iter_sse_json(response):
+                    chunk_count += 1
+                    candidates = chunk.get("candidates", [])
+                    if not candidates:
+                        continue
 
-                parts = candidates[0].get("content", {}).get("parts", [])
-                for part in parts:
-                    if "text" in part:
-                        text = part["text"]
-                        content_parts.append(text)
-                        if on_chunk:
-                            on_chunk("content", text)
-                    elif "functionCall" in part:
-                        fc = part["functionCall"]
-                        tool_calls_list.append(
-                            ToolCall(
-                                id=str(uuid.uuid4()),
-                                name=fc.get("name", ""),
-                                arguments=fc.get("args", {}),
-                            ),
-                        )
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    for part in parts:
+                        if "text" in part:
+                            text = part["text"]
+                            content_parts.append(text)
+                            if on_chunk:
+                                on_chunk("content", text)
+                        elif "functionCall" in part:
+                            fc = part["functionCall"]
+                            tool_calls_list.append(
+                                ToolCall(
+                                    id=str(uuid.uuid4()),
+                                    name=fc.get("name", ""),
+                                    arguments=fc.get("args", {}),
+                                ),
+                            )
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)
 
         elapsed = time.perf_counter() - t0
         content = "".join(content_parts) or None
@@ -255,10 +262,16 @@ class GeminiProvider(LLMProvider):
 
         return LLMResponse(content=content or "")
 
-    def list_models(self) -> list[ModelInfo]:
+    def list_models(
+        self,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
+    ) -> list[ModelInfo]:
         url = f"{self._api_base_url}/v1beta/models?key={self._api_key}"
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
         try:
-            resp = self._client.get(url)
+            resp = client.get(url)
             resp.raise_for_status()
             data = resp.json()
             models = data.get("models", [])
@@ -276,3 +289,6 @@ class GeminiProvider(LLMProvider):
                 e,
             )
             return []
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)

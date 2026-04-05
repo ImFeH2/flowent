@@ -161,7 +161,13 @@ class ManageProvidersTool(Tool):
             try:
                 if on_output is not None:
                     on_output(f"Listing models for {provider_id}\n")
-                model_ids = [model.id for model in gateway.list_models_for(provider_id)]
+                model_ids = [
+                    model.id
+                    for model in gateway.list_models_for(
+                        provider_id,
+                        register_interrupt=agent.set_interrupt_callback,
+                    )
+                ]
                 if on_output is not None:
                     for model_id in model_ids:
                         on_output(f"{model_id}\n")
@@ -174,5 +180,7 @@ class ManageProvidersTool(Tool):
                     exc,
                 )
                 return json.dumps({"error": str(exc)})
+            finally:
+                agent.set_interrupt_callback(None)
 
         return json.dumps({"error": f"Unsupported action: {action}"})

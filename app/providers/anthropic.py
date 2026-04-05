@@ -191,75 +191,84 @@ class AnthropicProvider(LLMProvider):
         tool_calls_accum: dict[int, dict[str, Any]] = {}
         current_block_idx = -1
         event_count = 0
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
 
-        with self._client.stream(
-            "POST",
-            url,
-            headers=self._headers(),
-            content=json.dumps(payload),
-        ) as response:
-            if register_interrupt is not None:
-                register_interrupt(response.close)
-            if response.status_code != 200:
-                body = response.read().decode()
-                elapsed = time.perf_counter() - t0
-                logger.error(
-                    "LLM API error [provider={}, model={}, type=anthropic]: {} - {} ({:.2f}s)",
-                    self._provider_name,
-                    self._model,
-                    response.status_code,
-                    body[:500],
-                    elapsed,
-                )
-                raise RuntimeError(
-                    f"LLM API error\n"
-                    f"Provider: {self._provider_name}\n"
-                    f"Type: anthropic\n"
-                    f"Model: {self._model}\n"
-                    f"Base URL: {self._api_base_url}\n"
-                    f"Status: {response.status_code}\n"
-                    f"Response: {body}",
-                )
+        try:
+            with client.stream(
+                "POST",
+                url,
+                headers=self._headers(),
+                content=json.dumps(payload),
+            ) as response:
+                if register_interrupt is not None:
+                    register_interrupt(response.close)
+                if response.status_code != 200:
+                    body = response.read().decode()
+                    elapsed = time.perf_counter() - t0
+                    logger.error(
+                        "LLM API error [provider={}, model={}, type=anthropic]: {} - {} ({:.2f}s)",
+                        self._provider_name,
+                        self._model,
+                        response.status_code,
+                        body[:500],
+                        elapsed,
+                    )
+                    raise RuntimeError(
+                        f"LLM API error\n"
+                        f"Provider: {self._provider_name}\n"
+                        f"Type: anthropic\n"
+                        f"Model: {self._model}\n"
+                        f"Base URL: {self._api_base_url}\n"
+                        f"Status: {response.status_code}\n"
+                        f"Response: {body}",
+                    )
 
-            for event in iter_sse_json(response):
-                event_count += 1
-                event_type = event.get("type", "")
+                for event in iter_sse_json(response):
+                    event_count += 1
+                    event_type = event.get("type", "")
 
-                if event_type == "content_block_start":
-                    current_block_idx += 1
-                    block = event.get("content_block", {})
-                    if block.get("type") == "tool_use":
-                        tool_calls_accum[current_block_idx] = {
-                            "id": block.get("id", str(uuid.uuid4())),
-                            "name": block.get("name", ""),
-                            "arguments": "",
-                        }
+                    if event_type == "content_block_start":
+                        current_block_idx += 1
+                        block = event.get("content_block", {})
+                        if block.get("type") == "tool_use":
+                            tool_calls_accum[current_block_idx] = {
+                                "id": block.get("id", str(uuid.uuid4())),
+                                "name": block.get("name", ""),
+                                "arguments": "",
+                            }
 
-                elif event_type == "content_block_delta":
-                    delta = event.get("delta", {})
-                    delta_type = delta.get("type", "")
+                    elif event_type == "content_block_delta":
+                        delta = event.get("delta", {})
+                        delta_type = delta.get("type", "")
 
-                    if delta_type == "text_delta":
-                        text = delta.get("text", "")
-                        if text:
-                            content_parts.append(text)
-                            if on_chunk:
-                                on_chunk("content", text)
+                        if delta_type == "text_delta":
+                            text = delta.get("text", "")
+                            if text:
+                                content_parts.append(text)
+                                if on_chunk:
+                                    on_chunk("content", text)
 
-                    elif delta_type == "thinking_delta":
-                        thinking = delta.get("thinking", "")
-                        if thinking:
-                            thinking_parts.append(thinking)
-                            if on_chunk:
-                                on_chunk("thinking", thinking)
+                        elif delta_type == "thinking_delta":
+                            thinking = delta.get("thinking", "")
+                            if thinking:
+                                thinking_parts.append(thinking)
+                                if on_chunk:
+                                    on_chunk("thinking", thinking)
 
-                    elif delta_type == "input_json_delta":
-                        partial = delta.get("partial_json", "")
-                        if current_block_idx in tool_calls_accum:
-                            tool_calls_accum[current_block_idx]["arguments"] += partial
+                        elif delta_type == "input_json_delta":
+                            partial = delta.get("partial_json", "")
+                            if current_block_idx in tool_calls_accum:
+                                tool_calls_accum[current_block_idx]["arguments"] += (
+                                    partial
+                                )
 
-                elif event_type == "message_stop":
-                    break
+                    elif event_type == "message_stop":
+                        break
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)
 
         elapsed = time.perf_counter() - t0
         content = "".join(content_parts) or None
@@ -294,10 +303,16 @@ class AnthropicProvider(LLMProvider):
 
         return LLMResponse(content=content or "", thinking=thinking)
 
-    def list_models(self) -> list[ModelInfo]:
+    def list_models(
+        self,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
+    ) -> list[ModelInfo]:
         url = f"{self._api_base_url}/v1/models"
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
         try:
-            resp = self._client.get(url, headers=self._headers())
+            resp = client.get(url, headers=self._headers())
             resp.raise_for_status()
             data = resp.json()
             models = data.get("data", [])
@@ -309,3 +324,6 @@ class AnthropicProvider(LLMProvider):
                 e,
             )
             return []
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)

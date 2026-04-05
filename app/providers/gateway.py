@@ -45,7 +45,11 @@ class ProviderGateway:
             model_params,
         )
 
-    def list_models_for(self, provider_id: str) -> list[ModelInfo]:
+    def list_models_for(
+        self,
+        provider_id: str,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
+    ) -> list[ModelInfo]:
         from app.providers.registry import create_provider
         from app.settings import find_provider, get_settings
 
@@ -61,7 +65,7 @@ class ProviderGateway:
             model="",
             provider_name=cfg.name,
         )
-        return provider.list_models()
+        return provider.list_models(register_interrupt)
 
     def _resolve(
         self,

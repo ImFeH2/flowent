@@ -71,71 +71,78 @@ class OllamaProvider(LLMProvider):
         tool_calls_list: list[ToolCall] = []
         chunk_count = 0
         think_parser = ThinkTagParser()
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
 
-        with self._client.stream(
-            "POST",
-            url,
-            headers={"Content-Type": "application/json"},
-            content=json.dumps(payload),
-        ) as response:
-            if register_interrupt is not None:
-                register_interrupt(response.close)
-            if response.status_code != 200:
-                body = response.read().decode()
-                elapsed = time.perf_counter() - t0
-                logger.error(
-                    "LLM API error [provider={}, model={}, type=ollama]: {} - {} ({:.2f}s)",
-                    self._provider_name,
-                    self._model,
-                    response.status_code,
-                    body[:500],
-                    elapsed,
-                )
-                raise RuntimeError(
-                    f"LLM API error\n"
-                    f"Provider: {self._provider_name}\n"
-                    f"Type: ollama\n"
-                    f"Model: {self._model}\n"
-                    f"Base URL: {self._api_base_url}\n"
-                    f"Status: {response.status_code}\n"
-                    f"Response: {body}",
-                )
-
-            for line in response.iter_lines():
-                if not line:
-                    continue
-
-                try:
-                    chunk = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                chunk_count += 1
-                message = chunk.get("message", {})
-                text = message.get("content", "")
-                if text:
-                    for chunk_type, parsed in think_parser.feed(text):
-                        if chunk_type == "thinking":
-                            thinking_parts.append(parsed)
-                            if on_chunk:
-                                on_chunk("thinking", parsed)
-                        else:
-                            content_parts.append(parsed)
-                            if on_chunk:
-                                on_chunk("content", parsed)
-
-                for tc in message.get("tool_calls", []):
-                    fn = tc.get("function", {})
-                    tool_calls_list.append(
-                        ToolCall(
-                            id=str(uuid.uuid4()),
-                            name=fn.get("name", ""),
-                            arguments=fn.get("arguments", {}),
-                        ),
+        try:
+            with client.stream(
+                "POST",
+                url,
+                headers={"Content-Type": "application/json"},
+                content=json.dumps(payload),
+            ) as response:
+                if register_interrupt is not None:
+                    register_interrupt(response.close)
+                if response.status_code != 200:
+                    body = response.read().decode()
+                    elapsed = time.perf_counter() - t0
+                    logger.error(
+                        "LLM API error [provider={}, model={}, type=ollama]: {} - {} ({:.2f}s)",
+                        self._provider_name,
+                        self._model,
+                        response.status_code,
+                        body[:500],
+                        elapsed,
+                    )
+                    raise RuntimeError(
+                        f"LLM API error\n"
+                        f"Provider: {self._provider_name}\n"
+                        f"Type: ollama\n"
+                        f"Model: {self._model}\n"
+                        f"Base URL: {self._api_base_url}\n"
+                        f"Status: {response.status_code}\n"
+                        f"Response: {body}",
                     )
 
-                if chunk.get("done", False):
-                    break
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+
+                    chunk_count += 1
+                    message = chunk.get("message", {})
+                    text = message.get("content", "")
+                    if text:
+                        for chunk_type, parsed in think_parser.feed(text):
+                            if chunk_type == "thinking":
+                                thinking_parts.append(parsed)
+                                if on_chunk:
+                                    on_chunk("thinking", parsed)
+                            else:
+                                content_parts.append(parsed)
+                                if on_chunk:
+                                    on_chunk("content", parsed)
+
+                    for tc in message.get("tool_calls", []):
+                        fn = tc.get("function", {})
+                        tool_calls_list.append(
+                            ToolCall(
+                                id=str(uuid.uuid4()),
+                                name=fn.get("name", ""),
+                                arguments=fn.get("arguments", {}),
+                            ),
+                        )
+
+                    if chunk.get("done", False):
+                        break
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)
 
         for chunk_type, text in think_parser.flush():
             if chunk_type == "thinking":
@@ -170,10 +177,16 @@ class OllamaProvider(LLMProvider):
 
         return LLMResponse(content=content or "", thinking=thinking)
 
-    def list_models(self) -> list[ModelInfo]:
+    def list_models(
+        self,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
+    ) -> list[ModelInfo]:
         url = f"{self._api_base_url}/api/tags"
+        client = self._client
+        if register_interrupt is not None:
+            register_interrupt(client.close)
         try:
-            resp = self._client.get(url)
+            resp = client.get(url)
             resp.raise_for_status()
             data = resp.json()
             models = data.get("models", [])
@@ -185,3 +198,6 @@ class OllamaProvider(LLMProvider):
                 e,
             )
             return []
+        finally:
+            if getattr(client, "is_closed", False):
+                self._client = httpx.Client(timeout=120.0)

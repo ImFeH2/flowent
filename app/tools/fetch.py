@@ -49,6 +49,10 @@ class FetchTool(Tool):
                     content=args.get("body"),
                 ) as response,
             ):
+                close_response = getattr(response, "close", None)
+                agent.set_interrupt_callback(
+                    close_response if callable(close_response) else None
+                )
                 if on_output is not None:
                     on_output(f"{method} {url}\n")
                     on_output(f"HTTP {response.status_code}\n\n")
@@ -74,6 +78,8 @@ class FetchTool(Tool):
                 }
             )
         except Exception as e:
-            re_raise_interrupt(e)
+            re_raise_interrupt(agent, e)
             logger.warning("HTTP request failed: {} {} - {}", method, url, e)
             return json.dumps({"error": str(e)})
+        finally:
+            agent.set_interrupt_callback(None)

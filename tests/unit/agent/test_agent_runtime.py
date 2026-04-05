@@ -42,7 +42,13 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
             return
         raise AssertionError("agent should not auto-idle after pure assistant text")
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         llm_messages.append(messages)
         if len(llm_messages) == 2:
             agent.request_termination("done")
@@ -81,7 +87,13 @@ def test_agent_unregisters_from_registry_after_termination_request(monkeypatch):
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         agent.request_termination("done")
         return LLMResponse()
 
@@ -142,7 +154,13 @@ def test_agent_interrupts_streaming_response_and_returns_to_idle(monkeypatch):
             return
         assistant.request_termination("done")
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         assert on_chunk is not None
         on_chunk("thinking", "Drafting plan")
         on_chunk("content", "Working")
@@ -189,6 +207,66 @@ def test_request_sleep_raises_interrupt_when_running_agent_is_interrupted():
         raise AssertionError("expected interrupt during sleep")
 
 
+def test_agent_interrupts_blocked_provider_without_streaming_output(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+    registry.reset()
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    registry.register(assistant)
+    events = []
+    wait_calls = 0
+    provider_started = threading.Event()
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            assistant._append_history(
+                ReceivedMessage(content="start working", from_id="human")
+            )
+            assistant.set_state(AgentState.RUNNING, "received message from human")
+            return
+        assistant.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        closed = threading.Event()
+        assert register_interrupt is not None
+        register_interrupt(closed.set)
+        provider_started.set()
+        while not closed.wait(0.01):
+            continue
+        raise RuntimeError("stream closed")
+
+    def request_interrupt() -> None:
+        provider_started.wait(timeout=1.0)
+        assistant.request_interrupt()
+
+    interrupter = threading.Thread(target=request_interrupt, daemon=True)
+    interrupter.start()
+
+    monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    try:
+        assistant._run()
+    finally:
+        registry.reset()
+
+    interrupter.join(timeout=1.0)
+
+    assert any(
+        event.type == EventType.NODE_STATE_CHANGED
+        and event.data.get("new_state") == "idle"
+        for event in events
+    )
+
+
 def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-y")
     wait_calls = 0
@@ -207,9 +285,9 @@ def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(
         "app.agent.gateway.chat",
-        lambda messages, tools=None, on_chunk=None, role_name=None: (
-            _ for _ in ()
-        ).throw(RuntimeError("No active provider configured")),
+        lambda messages, tools=None, on_chunk=None, register_interrupt=None, role_name=None: (
+            (_ for _ in ()).throw(RuntimeError("No active provider configured"))
+        ),
     )
 
     agent._run()
@@ -237,7 +315,13 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
         )
         assistant.set_state(AgentState.RUNNING, "received message from human")
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         if on_chunk is not None:
             on_chunk("content", "Working on it")
         return LLMResponse(
@@ -691,7 +775,13 @@ def test_routed_message_emits_streaming_preview_for_sender_and_receiver(monkeypa
         child._append_history(ReceivedMessage(content="start", from_id="human"))
         child.set_state(AgentState.RUNNING, "received message from human")
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         response = next(responses)
         if response.content and on_chunk is not None:
             for chunk in ["@peer: inv", "estigate", " the error"]:
@@ -1193,7 +1283,13 @@ def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
         )
         assistant.set_state(AgentState.RUNNING, "received message from human")
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         response = next(responses)
         if response.content and on_chunk is not None:
             on_chunk("content", response.content)
@@ -1251,7 +1347,13 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
         )
         agent.set_state(AgentState.RUNNING, "received message from tester")
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         llm_messages.append(messages)
         if len(llm_messages) == 1:
             timer = threading.Timer(
@@ -1326,7 +1428,13 @@ def test_agent_contextualizes_plain_loguru_calls(monkeypatch):
         agent._append_history(ReceivedMessage(content="do the task", from_id="tester"))
         agent.set_state(AgentState.RUNNING, "received message from tester")
 
-    def fake_chat(messages, tools=None, on_chunk=None, role_name=None):
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
         logger.info("plain log inside agent")
         agent.request_termination("done")
         return LLMResponse()

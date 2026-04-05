@@ -167,7 +167,7 @@ class ManageProvidersTool(Tool):
                         on_output(f"{model_id}\n")
                 return json.dumps(model_ids)
             except Exception as exc:
-                re_raise_interrupt(exc)
+                re_raise_interrupt(agent, exc)
                 logger.error(
                     "Failed to list models for provider '{}': {}",
                     provider_id,

@@ -317,11 +317,12 @@ describe("HomePage", () => {
     });
     interruptNodeMock.mockResolvedValue(undefined);
 
-    render(<HomePage />);
+    const view = render(<HomePage />);
 
-    const interruptButton = screen.getAllByRole("button", {
+    const interruptButtons = within(view.container).getAllByRole("button", {
       name: "Interrupt",
-    })[screen.getAllByRole("button", { name: "Interrupt" }).length - 1];
+    });
+    const interruptButton = interruptButtons[interruptButtons.length - 1];
     fireEvent.click(interruptButton);
 
     await waitFor(() => {
@@ -376,9 +377,9 @@ describe("HomePage", () => {
     });
     interruptNodeMock.mockResolvedValue(undefined);
 
-    render(<HomePage />);
+    const view = render(<HomePage />);
 
-    const interruptButtons = screen.getAllByRole("button", {
+    const interruptButtons = within(view.container).getAllByRole("button", {
       name: "Interrupt",
     });
     const interruptButton = interruptButtons[interruptButtons.length - 1];

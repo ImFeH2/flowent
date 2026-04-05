@@ -138,5 +138,5 @@ class EditTool(Tool):
                 }
             )
         except Exception as e:
-            re_raise_interrupt(e)
+            re_raise_interrupt(agent, e)
             return json.dumps({"error": str(e)})

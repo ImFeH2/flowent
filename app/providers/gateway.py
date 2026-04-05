@@ -25,6 +25,7 @@ class ProviderGateway:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
         role_name: str | None = None,
     ) -> LLMResponse:
         from app.settings import find_role, get_settings
@@ -36,7 +37,13 @@ class ProviderGateway:
             settings.model.params,
             role_cfg.model_params if role_cfg is not None else None,
         )
-        return provider.chat(messages, tools, on_chunk, model_params)
+        return provider.chat(
+            messages,
+            tools,
+            on_chunk,
+            register_interrupt,
+            model_params,
+        )
 
     def list_models_for(self, provider_id: str) -> list[ModelInfo]:
         from app.providers.registry import create_provider

@@ -33,6 +33,7 @@ class OllamaProvider(LLMProvider):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
         model_params: ModelParams | None = None,
     ) -> LLMResponse:
         url = f"{self._api_base_url}/api/chat"
@@ -77,6 +78,8 @@ class OllamaProvider(LLMProvider):
             headers={"Content-Type": "application/json"},
             content=json.dumps(payload),
         ) as response:
+            if register_interrupt is not None:
+                register_interrupt(response.close)
             if response.status_code != 200:
                 body = response.read().decode()
                 elapsed = time.perf_counter() - t0

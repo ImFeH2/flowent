@@ -66,6 +66,9 @@ class ExecTool(Tool):
                 text=True,
                 cwd=str(cwd),
             )
+            agent.set_interrupt_callback(
+                lambda: proc.kill() if proc.poll() is None else None
+            )
 
             stdout_lines: list[str] = []
             stderr_lines: list[str] = []
@@ -108,5 +111,7 @@ class ExecTool(Tool):
             if proc is not None and proc.poll() is None:
                 proc.kill()
                 proc.wait()
-            re_raise_interrupt(e)
+            re_raise_interrupt(agent, e)
             return json.dumps({"error": str(e)})
+        finally:
+            agent.set_interrupt_callback(None)

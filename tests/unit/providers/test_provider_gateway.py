@@ -77,7 +77,14 @@ def test_gateway_prefers_role_model(monkeypatch):
     )
 
     class ProviderStub:
-        def chat(self, messages, tools=None, on_chunk=None, model_params=None):
+        def chat(
+            self,
+            messages,
+            tools=None,
+            on_chunk=None,
+            register_interrupt=None,
+            model_params=None,
+        ):
             captured["message_count"] = str(len(messages))
             captured["reasoning_effort"] = str(model_params.reasoning_effort)
             captured["verbosity"] = str(model_params.verbosity)
@@ -136,7 +143,14 @@ def test_gateway_omits_model_params_when_all_values_are_empty(monkeypatch):
     )
 
     class ProviderStub:
-        def chat(self, messages, tools=None, on_chunk=None, model_params=None):
+        def chat(
+            self,
+            messages,
+            tools=None,
+            on_chunk=None,
+            register_interrupt=None,
+            model_params=None,
+        ):
             captured["is_none"] = model_params is None
             return type(
                 "Response",

@@ -96,7 +96,7 @@ class ReadTool(Tool):
                 )
                 return json.dumps({"path": path_str, "entries": entries})
             except Exception as e:
-                re_raise_interrupt(e)
+                re_raise_interrupt(agent, e)
                 return json.dumps({"error": str(e)})
 
         if real_path.is_file():
@@ -146,7 +146,7 @@ class ReadTool(Tool):
                     }
                 )
             except Exception as e:
-                re_raise_interrupt(e)
+                re_raise_interrupt(agent, e)
                 return json.dumps({"error": str(e)})
 
         return json.dumps({"error": f"Not found: {path_str}"})

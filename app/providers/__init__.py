@@ -13,6 +13,7 @@ class LLMProvider(Protocol):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         on_chunk: Callable[[str, str], None] | None = None,
+        register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
         model_params: ModelParams | None = None,
     ) -> LLMResponse: ...
 

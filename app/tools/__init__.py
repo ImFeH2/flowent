@@ -39,10 +39,10 @@ class Tool(ABC):
         }
 
 
-def re_raise_interrupt(exc: BaseException) -> None:
+def re_raise_interrupt(agent: Agent, exc: BaseException) -> None:
     from app.agent import InterruptRequestedError
 
-    if isinstance(exc, InterruptRequestedError):
+    if isinstance(exc, InterruptRequestedError) or agent.is_interrupt_requested():
         raise exc
 
 

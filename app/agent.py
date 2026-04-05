@@ -6,6 +6,7 @@ import threading
 import time as _time
 import traceback
 import uuid as _uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import lru_cache, partial
 from queue import Empty, Queue
@@ -196,6 +197,8 @@ class Agent:
         self.history: list[HistoryEntry] = []
         self._terminate = threading.Event()
         self._interrupt_requested = threading.Event()
+        self._interrupt_callback_lock = threading.Lock()
+        self._interrupt_callback: Callable[[], None] | None = None
         self._idle_state_event = threading.Event()
         self._idle_started_at: float | None = None
         self._idle_started_by_tool_call_id: str | None = None
@@ -467,12 +470,20 @@ class Agent:
                     )
                     stream_state = StreamingContentState()
                     try:
-                        response = gateway.chat(
-                            messages=messages,
-                            tools=tools_schema or None,
-                            on_chunk=partial(self._handle_llm_chunk, stream_state),
-                            role_name=self.config.role_name,
-                        )
+                        try:
+                            response = gateway.chat(
+                                messages=messages,
+                                tools=tools_schema or None,
+                                on_chunk=partial(self._handle_llm_chunk, stream_state),
+                                register_interrupt=self.set_interrupt_callback,
+                                role_name=self.config.role_name,
+                            )
+                        except Exception:
+                            if self._interrupt_requested.is_set():
+                                raise InterruptRequestedError() from None
+                            raise
+                        finally:
+                            self.set_interrupt_callback(None)
                         self._raise_if_interrupt_requested()
 
                         self._log.debug(
@@ -531,6 +542,8 @@ class Agent:
                         continue
 
                 except Exception as exc:
+                    self._interrupt_requested.clear()
+                    self.set_interrupt_callback(None)
                     self._log.exception("Agent error")
                     tb_str = traceback.format_exc()
                     self._append_history(
@@ -1095,6 +1108,7 @@ class Agent:
                     message_id=stream_state.streaming_message_id,
                 )
         self._interrupt_requested.clear()
+        self.set_interrupt_callback(None)
         self._pending_input_turn = False
         self.set_state(AgentState.IDLE, "interrupted by human")
         self._wait_for_input()
@@ -1485,7 +1499,27 @@ class Agent:
         if self.state != AgentState.RUNNING:
             return False
         self._interrupt_requested.set()
+        self._invoke_interrupt_callback()
         return True
+
+    def is_interrupt_requested(self) -> bool:
+        return self._interrupt_requested.is_set()
+
+    def set_interrupt_callback(self, callback: Callable[[], None] | None) -> None:
+        with self._interrupt_callback_lock:
+            self._interrupt_callback = callback
+        if callback is not None and self._interrupt_requested.is_set():
+            self._invoke_interrupt_callback()
+
+    def _invoke_interrupt_callback(self) -> None:
+        with self._interrupt_callback_lock:
+            callback = self._interrupt_callback
+        if callback is None:
+            return
+        try:
+            callback()
+        except Exception:
+            self._log.debug("Interrupt callback raised")
 
     def terminate_and_wait(self, timeout: float = 10.0) -> None:
         self.request_termination("shutdown")

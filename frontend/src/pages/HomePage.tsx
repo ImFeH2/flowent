@@ -87,12 +87,12 @@ import {
 } from "@/components/WorkspaceCommandDialog";
 
 const WORKSPACE_PANEL_ID = "workspace-panel-width";
-const MIN_PANEL_WIDTH = 320;
-const MIN_FORMATION_WIDTH = 320;
-const MAX_PANEL_WIDTH = 1400;
-const DEFAULT_PANEL_RATIO = 2 / 5;
-const DEFAULT_PANEL_WIDTH = 560;
-const COMPACT_PANEL_MIN_WIDTH = 280;
+const MIN_PANEL_WIDTH = 296;
+const MIN_FORMATION_WIDTH = 300;
+const MAX_PANEL_WIDTH = 960;
+const DEFAULT_PANEL_RATIO = 0.34;
+const DEFAULT_PANEL_WIDTH = 448;
+const COMPACT_PANEL_MIN_WIDTH = 300;
 
 type WorkspaceDialogKind =
   | "create-tab"
@@ -430,27 +430,27 @@ export function HomePage() {
   return (
     <div
       ref={workspaceRef}
-      className="relative isolate flex h-full overflow-hidden rounded-[1rem] border border-white/6 bg-[linear-gradient(180deg,rgba(13,13,14,0.86),rgba(8,8,9,0.82))] shadow-[0_16px_42px_-32px_rgba(0,0,0,0.78)] [contain:paint]"
+      className="relative isolate flex h-full overflow-hidden rounded-[0.9rem] border border-white/6 bg-[linear-gradient(180deg,rgba(12,12,13,0.88),rgba(8,8,9,0.84))] shadow-[0_16px_42px_-34px_rgba(0,0,0,0.78)] [contain:paint]"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_16%,transparent_82%,rgba(255,255,255,0.015))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),transparent_14%,transparent_84%,rgba(255,255,255,0.01))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="relative z-30 border-b border-white/8 bg-[rgba(13,13,14,0.86)]">
+        <div className="relative z-30 border-b border-white/8 bg-[rgba(12,12,13,0.84)]">
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/8" />
-          <div className="pointer-events-auto relative z-10 flex items-end gap-1 overflow-x-auto px-3 pb-0 pr-16 pt-2.5 scrollbar-none">
+          <div className="pointer-events-auto relative z-10 flex items-end gap-1 overflow-x-auto px-2.5 pb-0 pr-14 pt-2 scrollbar-none">
             {Array.from(tabs.values()).map((tab) => (
               <div
                 key={tab.id}
-                className="group relative min-w-[132px] max-w-[220px] shrink-0"
+                className="group relative min-w-[116px] max-w-[190px] shrink-0"
               >
                 <button
                   type="button"
                   onClick={() => setActiveTabId(tab.id)}
                   className={cn(
-                    "relative -mb-px flex h-11 w-full items-center rounded-t-[10px] border px-3.5 pr-10 text-left text-[13px] font-medium transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                    "relative -mb-px flex h-9 w-full items-center rounded-t-[9px] border px-3 pr-9 text-left text-[12px] font-medium transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
                     activeTabId === tab.id
-                      ? "border-white/8 border-b-[rgba(13,13,14,0.86)] bg-white/[0.04] text-white"
-                      : "border-transparent bg-transparent text-white/52 hover:border-white/6 hover:bg-white/[0.025] hover:text-white/82",
+                      ? "border-white/8 border-b-[rgba(12,12,13,0.84)] bg-white/[0.035] text-white"
+                      : "border-transparent bg-transparent text-white/52 hover:border-white/6 hover:bg-white/[0.022] hover:text-white/82",
                   )}
                 >
                   <span
@@ -473,7 +473,7 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "absolute right-2.5 top-1/2 z-20 -translate-y-1/2 rounded-md p-1 text-white/36 transition-[opacity,color,background-color] duration-150 hover:bg-white/[0.04] hover:text-white/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                    "absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-md p-1 text-white/34 transition-[opacity,color,background-color] duration-150 hover:bg-white/[0.04] hover:text-white/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
                     activeTabId === tab.id
                       ? "opacity-100"
                       : "opacity-0 group-hover:opacity-100",
@@ -489,22 +489,22 @@ export function HomePage() {
               onClick={() => {
                 openCreateTabDialog();
               }}
-              className="mb-1 flex size-9 shrink-0 items-center justify-center rounded-md border border-white/8 bg-transparent text-white/58 transition-[background-color,border-color,color] duration-150 hover:border-white/12 hover:bg-white/[0.035] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              className="mb-1 flex size-8 shrink-0 items-center justify-center rounded-md border border-white/8 bg-transparent text-white/58 transition-[background-color,border-color,color] duration-150 hover:border-white/12 hover:bg-white/[0.035] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
             >
-              <Plus className="size-4" />
+              <Plus className="size-3.5" />
             </button>
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_14%_10%,rgba(255,255,255,0.04),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.012),transparent_24%)]" />
+        <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_14%_10%,rgba(255,255,255,0.03),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.01),transparent_22%)]" />
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-[linear-gradient(90deg,transparent,rgba(8,8,9,0.14))]" />
 
         <div className="relative flex-1">
           <AgentGraph />
           <div
             className={cn(
-              "absolute top-5 z-40 flex max-w-[calc(100%-2.5rem)] flex-wrap items-center gap-1.5",
-              isCompactWorkspace ? "left-16" : "left-5",
+              "absolute top-4 z-40 flex max-w-[calc(100%-2.5rem)] flex-wrap items-center gap-1.5",
+              isCompactWorkspace ? "left-14" : "left-4",
             )}
           >
             <BadgeChip tone="primary">
@@ -520,7 +520,7 @@ export function HomePage() {
             </BadgeChip>
           </div>
 
-          <div className="pointer-events-auto absolute bottom-6 left-1/2 z-40 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center rounded-2xl border border-white/10 bg-[rgba(12,12,13,0.78)] p-1 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md">
+          <div className="pointer-events-auto absolute bottom-4 left-1/2 z-40 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-[14px] border border-white/10 bg-[rgba(12,12,13,0.76)] p-0.5 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md">
             <ToolbarButton
               disabled={!activeTabId}
               onClick={openCreateAgentDialog}
@@ -549,7 +549,7 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="absolute right-5 top-5 z-30 sm:right-6 sm:top-6">
+        <div className="absolute right-4 top-4 z-30 sm:right-5 sm:top-5">
           <PanelToggleButton expanded={panelVisible} onClick={togglePanel} />
         </div>
       </div>
@@ -575,7 +575,7 @@ export function HomePage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 18 }}
                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-y-3 right-3 z-20 shrink-0 overflow-hidden rounded-[1rem] border border-white/10 bg-[linear-gradient(180deg,rgba(14,14,15,0.94),rgba(11,11,12,0.92))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
+                className="absolute inset-y-2.5 right-2.5 z-20 shrink-0 overflow-hidden rounded-[0.95rem] border border-white/10 bg-[linear-gradient(180deg,rgba(14,14,15,0.94),rgba(11,11,12,0.92))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
                 style={{ width: `${resolvedPanelWidth}px` }}
               >
                 <div
@@ -1034,7 +1034,7 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex shrink-0 items-center gap-2 rounded-xl border border-transparent bg-transparent px-3.5 py-2 text-[12px] font-medium text-white/70 transition-[background-color,border-color,color] duration-150 hover:border-white/8 hover:bg-white/[0.04] hover:text-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:bg-transparent"
+      className="flex shrink-0 items-center gap-1.5 rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-white/68 transition-[background-color,border-color,color] duration-150 hover:border-white/8 hover:bg-white/[0.04] hover:text-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:bg-transparent"
     >
       {children}
     </button>
@@ -1042,7 +1042,7 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <div aria-hidden="true" className="h-5 w-px shrink-0 bg-white/8" />;
+  return <div aria-hidden="true" className="h-4 w-px shrink-0 bg-white/8" />;
 }
 
 function BadgeChip({
@@ -1055,7 +1055,7 @@ function BadgeChip({
   return (
     <div
       className={cn(
-        "pointer-events-auto relative isolate flex items-center gap-2 rounded-full border border-white/8 bg-[rgba(12,12,13,0.72)] px-3 py-1.5 text-[12px] font-medium text-white/76 backdrop-blur-sm",
+        "pointer-events-auto relative isolate flex items-center gap-1.5 rounded-full border border-white/8 bg-[rgba(12,12,13,0.7)] px-2.5 py-1 text-[11px] font-medium text-white/74 backdrop-blur-sm",
         tone === "primary"
           ? "border-white/14 bg-white/[0.05] text-white/88"
           : "",
@@ -1110,17 +1110,17 @@ function AgentDetailPanel({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-white/6 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-white/6 px-3.5 py-2.5">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-md bg-primary/8">
+          <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
             {agent.node_type === "assistant" ? (
-              <Shield className="size-4 text-primary" />
+              <Shield className="size-3.5 text-primary" />
             ) : (
-              <Bot className="size-4 text-primary" />
+              <Bot className="size-3.5 text-primary" />
             )}
           </div>
           <div>
-            <p className="font-semibold">{label}</p>
+            <p className="text-[13px] font-semibold">{label}</p>
             <p className="font-mono text-[10px] text-muted-foreground">
               {agent.id.slice(0, 8)}
             </p>
@@ -1133,9 +1133,9 @@ function AgentDetailPanel({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-4">
-          <div className="grid gap-4 border-b border-white/6 pb-4 sm:grid-cols-3">
+      <div className="flex-1 overflow-y-auto p-3.5">
+        <div className="space-y-3.5">
+          <div className="grid gap-3.5 border-b border-white/6 pb-3.5 sm:grid-cols-3">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Status
@@ -1150,7 +1150,7 @@ function AgentDetailPanel({
               </div>
             </div>
 
-            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-4">
+            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Connections
               </p>
@@ -1159,7 +1159,7 @@ function AgentDetailPanel({
               </p>
             </div>
 
-            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-4">
+            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Task Tab
               </p>
@@ -1358,10 +1358,10 @@ function AssistantChatPanel() {
 
   return (
     <div className="relative flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b border-white/6 px-4 py-3">
+      <div className="flex items-center gap-2.5 border-b border-white/6 px-3.5 py-2.5">
         <div className="flex-1">
-          <p className="font-semibold">Assistant</p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[13px] font-semibold">Assistant</p>
+          <p className="text-[10px] text-muted-foreground">
             {assistantRoleName
               ? `Role: ${assistantRoleName} · ${
                   connected ? "Online" : "Connecting..."
@@ -1385,7 +1385,7 @@ function AssistantChatPanel() {
 
         <div
           ref={composerRef}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(8,8,9,0.18)_24%,rgba(8,8,9,0.76)_68%,rgba(8,8,9,0.95)_100%)] px-3 pb-3 pt-10"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(8,8,9,0.12)_18%,rgba(8,8,9,0.72)_60%,rgba(8,8,9,0.94)_100%)] px-2.5 pb-2.5 pt-8"
         >
           <AssistantChatComposer
             disabled={!input.trim() || sending}
@@ -1428,7 +1428,7 @@ function PanelToggleButton({
       title={title}
       aria-label={title}
       className={cn(
-        "pointer-events-auto relative isolate flex size-10 items-center justify-center rounded-lg bg-black/[0.16] text-muted-foreground backdrop-blur-lg transition-[background-color,color] duration-150 hover:bg-white/[0.05] hover:text-foreground [contain:paint]",
+        "pointer-events-auto relative isolate flex size-9 items-center justify-center rounded-md border border-white/8 bg-black/[0.16] text-muted-foreground backdrop-blur-lg transition-[background-color,color] duration-150 hover:bg-white/[0.05] hover:text-foreground [contain:paint]",
         className,
       )}
     >
@@ -1454,7 +1454,7 @@ function PanelActionButton({
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-white/[0.045] hover:text-foreground"
+      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-white/[0.045] hover:text-foreground"
     >
       {children}
     </button>
@@ -1469,7 +1469,7 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-white/6 pt-4">
+    <section className="border-t border-white/6 pt-3.5">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </p>

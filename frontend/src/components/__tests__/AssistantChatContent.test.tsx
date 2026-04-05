@@ -203,7 +203,7 @@ describe("AssistantChatMessages", () => {
       screen.getByText("Workspace message").parentElement?.parentElement;
     expect(workspaceBubble).not.toBeNull();
     expect(workspaceBubble).toHaveClass(
-      "bg-white/[0.12]",
+      "bg-white/[0.1]",
       "text-white",
       "border-white/8",
     );
@@ -309,9 +309,9 @@ describe("AssistantChatComposer", () => {
 
     expect(composerShell).not.toBeNull();
     expect(composerShell).toContainElement(sendButton);
-    expect(composerShell?.className).toContain("border-white/18");
+    expect(composerShell?.className).toContain("border-white/14");
     expect(composerShell?.className).toContain(
-      "shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_18px_38px_-24px_rgba(0,0,0,0.88),0_10px_18px_-14px_rgba(255,255,255,0.08)]",
+      "shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_14px_30px_-22px_rgba(0,0,0,0.82),0_8px_16px_-14px_rgba(255,255,255,0.06)]",
     );
 
     const originalGetComputedStyle = window.getComputedStyle;

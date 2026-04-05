@@ -35,8 +35,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
       className={cn(
         "relative flex h-full flex-col",
         isFloating
-          ? "overflow-hidden rounded-[1.5rem] border border-glass-border bg-glass-bg text-foreground shadow-2xl backdrop-blur-2xl"
-          : "overflow-hidden rounded-3xl border border-glass-border bg-surface-raised shadow-[0_24px_70px_-45px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+          ? "overflow-hidden rounded-[1.25rem] border border-glass-border bg-glass-bg text-foreground shadow-2xl backdrop-blur-2xl"
+          : "overflow-hidden rounded-[1rem] border border-glass-border bg-surface-raised shadow-[0_22px_64px_-42px_rgba(0,0,0,0.45)] backdrop-blur-xl",
       )}
     >
       <div
@@ -61,10 +61,10 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
         <div
           ref={composerRef}
           className={cn(
-            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4",
+            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3.5 pb-3.5",
             isFloating
-              ? "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.12)_24%,rgba(10,10,11,0.72)_68%,rgba(10,10,11,0.92)_100%)] pt-10"
-              : "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.18)_26%,rgba(10,10,11,0.78)_70%,rgba(10,10,11,0.96)_100%)] pt-12",
+              ? "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.08)_20%,rgba(10,10,11,0.68)_64%,rgba(10,10,11,0.9)_100%)] pt-8"
+              : "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.12)_22%,rgba(10,10,11,0.74)_64%,rgba(10,10,11,0.94)_100%)] pt-9",
           )}
         >
           <AssistantChatComposer
@@ -92,11 +92,11 @@ function PanelHeader({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 border-b px-4 py-3",
+        "flex items-center gap-2 border-b px-3.5 py-2.5",
         floating ? "border-glass-border" : "border-glass-border bg-surface-2",
       )}
     >
-      <span className="text-sm font-semibold text-foreground">
+      <span className="text-[13px] font-semibold text-foreground">
         Assistant Chat
       </span>
       <StatusBadge connected={connected} />

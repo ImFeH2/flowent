@@ -237,7 +237,7 @@ describe("AgentGraph", () => {
     expect(workerNode).toHaveStyle({
       width: `${getAgentNodeWidth("Worker")}px`,
     });
-    expect(workerNode).toHaveClass("h-[62px]");
+    expect(workerNode).toHaveClass("h-14");
   });
 
   it("renders only nodes from the active task tab", async () => {

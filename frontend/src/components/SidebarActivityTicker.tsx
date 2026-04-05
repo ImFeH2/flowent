@@ -11,9 +11,9 @@ const MAX_VISIBLE_ACTIVITY_ITEMS = 24;
 const LABEL_FONT_SIZE =
   "clamp(9.5px, calc(9.5px + (var(--sidebar-activity-width) - 180px) * 0.003636), 10.3px)";
 const TICKER_FONT_SIZE =
-  "clamp(10.5px, calc(10.5px + (var(--sidebar-activity-width) - 180px) * 0.002273), 11px)";
+  "clamp(10px, calc(10px + (var(--sidebar-activity-width) - 180px) * 0.002273), 10.6px)";
 const ROW_HEIGHT =
-  "clamp(22px, calc(22px + (var(--sidebar-activity-width) - 180px) * 0.018182), 26px)";
+  "clamp(20px, calc(20px + (var(--sidebar-activity-width) - 180px) * 0.016364), 24px)";
 const ITEM_GAP =
   "clamp(7px, calc(7px + (var(--sidebar-activity-width) - 180px) * 0.013636), 10px)";
 const EVENT_DOT_SIZE =
@@ -181,7 +181,7 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
 
   return (
     <div
-      className="flex items-center gap-3 overflow-hidden"
+      className="flex items-center gap-2.5 overflow-hidden"
       style={responsiveStyles}
     >
       <div className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/62">

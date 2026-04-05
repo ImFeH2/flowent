@@ -68,8 +68,8 @@ export function AssistantChatMessages({
         scrollPaddingBottom: `${baseBottomPadding + bottomInset}px`,
       }}
       className={cn(
-        "flex-1 space-y-3 overflow-y-auto",
-        isWorkspace ? "px-3.5 pt-3.5" : "px-4 pt-4",
+        "flex-1 space-y-2.5 overflow-y-auto",
+        isWorkspace ? "px-3 pt-3" : "px-3.5 pt-3.5",
       )}
     >
       {visibleItems.length === 0 &&
@@ -135,15 +135,18 @@ export function AssistantChatComposer({
       className={cn(
         overlay
           ? "w-full pointer-events-auto"
-          : cn("border-t border-white/6", isWorkspace ? "p-3" : "px-4 py-3"),
+          : cn(
+              "border-t border-white/6",
+              isWorkspace ? "p-2.5" : "px-3.5 py-2.5",
+            ),
       )}
     >
       <div
         className={cn(
-          "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[0.85rem] border px-2 py-1.5 transition-[border-color,background-color,box-shadow] duration-200",
+          "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[0.8rem] border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
           isWorkspace
-            ? "border-white/18 bg-black/[0.24] shadow-[0_0_0_1px_rgba(255,255,255,0.03),0_18px_38px_-24px_rgba(0,0,0,0.88),0_10px_18px_-14px_rgba(255,255,255,0.08)] hover:border-white/26 focus-within:border-white/34 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_22px_46px_-26px_rgba(0,0,0,0.92),0_12px_24px_-16px_rgba(255,255,255,0.12)]"
-            : "border-white/14 bg-surface-2/92 shadow-[0_0_0_1px_rgba(255,255,255,0.025),0_18px_36px_-24px_rgba(0,0,0,0.72),0_8px_16px_-12px_rgba(255,255,255,0.05)] backdrop-blur-xl hover:border-white/22 focus-within:border-white/28 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_22px_42px_-26px_rgba(0,0,0,0.78),0_10px_20px_-14px_rgba(255,255,255,0.08)]",
+            ? "border-white/14 bg-black/[0.18] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_14px_30px_-22px_rgba(0,0,0,0.82),0_8px_16px_-14px_rgba(255,255,255,0.06)] hover:border-white/22 focus-within:border-white/28 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_38px_-24px_rgba(0,0,0,0.88),0_10px_20px_-16px_rgba(255,255,255,0.08)]"
+            : "border-white/12 bg-surface-2/90 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_16px_32px_-24px_rgba(0,0,0,0.72),0_8px_16px_-14px_rgba(255,255,255,0.05)] backdrop-blur-xl hover:border-white/18 focus-within:border-white/24 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_36px_-24px_rgba(0,0,0,0.78),0_9px_18px_-14px_rgba(255,255,255,0.08)]",
         )}
       >
         <textarea
@@ -158,8 +161,8 @@ export function AssistantChatComposer({
           }
           rows={1}
           className={cn(
-            "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-sm leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
-            isWorkspace ? "rounded-[0.6rem]" : "rounded-[0.65rem]",
+            "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
+            isWorkspace ? "rounded-[0.55rem]" : "rounded-[0.6rem]",
           )}
         />
         <button
@@ -273,10 +276,10 @@ function HumanBubble({
     <div className="group mt-2 flex min-w-0 flex-col items-end">
       <div
         className={cn(
-          "min-w-0 overflow-hidden px-3 py-2 text-sm [overflow-wrap:anywhere]",
+          "min-w-0 overflow-hidden px-2.5 py-1.5 text-[13px] [overflow-wrap:anywhere]",
           isWorkspace
-            ? "max-w-[85%] rounded-md border border-white/8 bg-white/[0.12] text-white"
-            : "max-w-[80%] rounded-xl border border-white/10 bg-white/[0.08] text-white",
+            ? "max-w-[84%] rounded-[10px] border border-white/8 bg-white/[0.1] text-white"
+            : "max-w-[80%] rounded-[12px] border border-white/10 bg-white/[0.08] text-white",
           pending && "opacity-80",
         )}
       >
@@ -340,8 +343,8 @@ function MessageActivityCard({
   return (
     <div
       className={cn(
-        "min-w-0 w-full px-2.5 py-1.5",
-        isWorkspace ? "border-l border-white/8 pl-3.5" : "rounded-xl",
+        "min-w-0 w-full px-2 py-1.5",
+        isWorkspace ? "border-l border-white/8 pl-3" : "rounded-[12px]",
         tone === "received" &&
           "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.012))]",
         tone === "sent" &&
@@ -364,7 +367,7 @@ function MessageActivityCard({
         <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-current">
           {icon}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-semibold leading-none text-foreground/90">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold leading-none text-foreground/88">
           {label}
         </span>
         <span className="ml-auto" onClick={(event) => event.stopPropagation()}>
@@ -391,8 +394,8 @@ function MessageActivityCard({
           <RichContentBlock
             content={content}
             streaming={streaming}
-            markdownClassName="text-[13px] text-foreground/80"
-            preClassName="text-foreground/75"
+            markdownClassName="text-[12px] text-foreground/78"
+            preClassName="text-foreground/74"
           />
         </div>
       ) : null}
@@ -535,8 +538,8 @@ function ActivityDisclosure({
   return (
     <div
       className={cn(
-        "min-w-0 w-full px-2.5 py-1.5",
-        isWorkspace ? "border-l border-white/8 pl-3.5" : "rounded-xl",
+        "min-w-0 w-full px-2 py-1.5",
+        isWorkspace ? "border-l border-white/8 pl-3" : "rounded-[12px]",
         tone === "thinking" &&
           "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),rgba(255,255,255,0.01))]",
         tone === "tool" &&
@@ -552,7 +555,7 @@ function ActivityDisclosure({
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[12px] font-semibold leading-none text-foreground/90">
+          <span className="block truncate text-[11px] font-semibold leading-none text-foreground/88">
             {label}
           </span>
         </span>
@@ -573,7 +576,7 @@ function ActivityDisclosure({
         />
       </button>
 
-      {open ? <div className="mt-3 min-w-0">{children}</div> : null}
+      {open ? <div className="mt-2.5 min-w-0">{children}</div> : null}
     </div>
   );
 }

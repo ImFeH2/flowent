@@ -69,9 +69,9 @@ function AppContent() {
   const isCompactLayout = useMediaQuery("(max-width: 980px)");
   const [sidebarWidth, setSidebarWidth] = usePanelWidth(
     "sidebar-width",
-    256,
-    180,
-    400,
+    232,
+    196,
+    320,
   );
   const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
 
@@ -91,9 +91,9 @@ function AppContent() {
   };
 
   return (
-    <div className="relative h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.042),transparent_22%),radial-gradient(circle_at_78%_14%,rgba(255,255,255,0.022),transparent_18%),linear-gradient(180deg,#040404_0%,#080808_100%)]">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.025),transparent_18%,transparent_82%,rgba(255,255,255,0.015))]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:24px_24px]" />
+    <div className="relative h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.032),transparent_18%),radial-gradient(circle_at_72%_12%,rgba(255,255,255,0.012),transparent_18%),linear-gradient(180deg,#050505_0%,#070707_100%)]">
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_16%,transparent_86%,rgba(255,255,255,0.012))]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.022] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:20px_20px]" />
 
       {isCompactLayout ? (
         <AnimatePresence>
@@ -106,7 +106,7 @@ function AppContent() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.18 }}
-                className="absolute inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+                className="absolute inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
                 onClick={() => setSidebarDrawerOpen(false)}
               />
               <motion.div
@@ -145,8 +145,8 @@ function AppContent() {
           className={cn(
             "relative isolate h-full overflow-hidden backdrop-blur-xl [contain:paint]",
             isWorkspace
-              ? "bg-[linear-gradient(180deg,rgba(11,11,12,0.88),rgba(9,9,10,0.84))]"
-              : "bg-[linear-gradient(180deg,rgba(15,15,16,0.92),rgba(10,10,11,0.88))]",
+              ? "bg-[linear-gradient(180deg,rgba(11,11,12,0.9),rgba(9,9,10,0.86))]"
+              : "bg-[linear-gradient(180deg,rgba(13,13,14,0.9),rgba(10,10,11,0.88))]",
           )}
         >
           {isCompactLayout ? (
@@ -154,7 +154,7 @@ function AppContent() {
               type="button"
               aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
               onClick={() => setSidebarDrawerOpen((current) => !current)}
-              className="absolute left-4 top-4 z-30 flex size-10 items-center justify-center rounded-lg border border-white/10 bg-black/24 text-white/72 backdrop-blur-xl transition-colors hover:bg-white/[0.06] hover:text-white"
+              className="absolute left-3.5 top-3.5 z-30 flex size-9 items-center justify-center rounded-md border border-white/10 bg-black/28 text-white/72 backdrop-blur-xl transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               {sidebarOpen ? (
                 <PanelLeftClose className="size-4" />
@@ -163,14 +163,14 @@ function AppContent() {
               )}
             </button>
           ) : null}
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.024),transparent_18%,transparent_80%,rgba(255,255,255,0.014))]" />
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_16%,transparent_84%,rgba(255,255,255,0.012))]" />
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
           <Toaster
             theme="dark"
             position="bottom-right"
             toastOptions={{
               className:
-                "rounded-md border border-border bg-surface-2 text-foreground shadow-xl",
+                "rounded-md border border-border bg-surface-2 text-foreground shadow-[0_24px_60px_-32px_rgba(0,0,0,0.85)]",
             }}
           />
           <AnimatePresence mode="wait">

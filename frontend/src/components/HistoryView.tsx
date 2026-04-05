@@ -29,7 +29,7 @@ export function HistoryView({
   nodes,
 }: HistoryViewProps) {
   return (
-    <div className="space-y-1.5 p-3">
+    <div className="space-y-1.5 p-2.5">
       {history.map((entry, index) => (
         <HistoryItem
           key={`${index}-${entry.timestamp}-${entry.type}-${entry.message_id ?? ""}-${entry.tool_call_id ?? ""}`}
@@ -119,7 +119,7 @@ function HistoryItem({
         <CollapsibleBlock
           label="System"
           icon={<Terminal className="size-3 text-muted-foreground" />}
-          className="border-border/50 bg-surface-1/30"
+          className="border-border/40 bg-surface-1/24"
           defaultOpen={false}
         >
           <MarkdownOrJsonBlock
@@ -135,7 +135,7 @@ function HistoryItem({
         <CollapsibleBlock
           label={`From ${getNodeLabel(entry.from_id ?? "", nodes)}`}
           icon={<MessageSquare className="size-3 text-foreground/70" />}
-          className="border-white/10 bg-white/[0.03]"
+          className="border-white/10 bg-white/[0.024]"
           labelClassName="text-foreground/70"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={entry.streaming ?? false}
@@ -154,7 +154,7 @@ function HistoryItem({
         <CollapsibleBlock
           label="Thinking"
           icon={<Brain className="size-3 text-foreground/72" />}
-          className="border-white/10 bg-white/[0.034]"
+          className="border-white/10 bg-white/[0.026]"
           labelClassName="text-foreground/72"
           defaultOpen={false}
         >
@@ -173,7 +173,7 @@ function HistoryItem({
         <CollapsibleBlock
           label={`To ${targets.join(", ") || "Unknown"}`}
           icon={<Send className="size-3 text-foreground/58" />}
-          className="border-white/8 bg-white/[0.02]"
+          className="border-white/8 bg-white/[0.016]"
           labelClassName="text-foreground/72"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={entry.streaming ?? false}
@@ -193,7 +193,7 @@ function HistoryItem({
         <CollapsibleBlock
           label={agentLabel}
           icon={<Bot className="size-3 text-foreground/84" />}
-          className="border-white/12 bg-surface-2/72"
+          className="border-white/12 bg-surface-2/62"
           labelClassName="text-foreground/84"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
@@ -214,7 +214,7 @@ function HistoryItem({
         <CollapsibleBlock
           label={entry.tool_name ?? "tool"}
           icon={<Wrench className="size-3 text-foreground/66" />}
-          className="border-white/8 bg-surface-1/62"
+          className="border-white/8 bg-surface-1/5"
           labelClassName="text-foreground/72"
           defaultOpen={false}
         >
@@ -250,7 +250,7 @@ function HistoryItem({
         <CollapsibleBlock
           label="Error"
           icon={<AlertCircle className="size-3 text-white/84" />}
-          className="border-white/16 bg-white/[0.045]"
+          className="border-white/16 bg-white/[0.038]"
           labelClassName="text-white/78"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
@@ -293,7 +293,7 @@ function CollapsibleBlock({
   return (
     <div className={cn("rounded border", className)}>
       <div
-        className="flex cursor-pointer items-center gap-1.5 px-2 py-1.5 select-none"
+        className="flex cursor-pointer items-center gap-1.5 px-2 py-1.25 select-none"
         onClick={toggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -338,7 +338,7 @@ function CollapsibleBlock({
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className={cn("px-2.5 pb-2", contentClassName)}>
+            <div className={cn("px-2.5 pb-2 pt-0.5", contentClassName)}>
               {children}
             </div>
           </motion.div>

@@ -38,11 +38,12 @@ export function Sidebar({
 
   const { isDragging, startDrag } = usePanelDrag(width, onWidthChange, "right");
   const widthProgress = Math.max(0, Math.min(1, (width - 180) / 220));
-  const headerPaddingY = 16 + widthProgress * 6;
-  const titleFontSizeRem = 1.08 + widthProgress * 0.24;
-  const subtitleFontSizePx = 10.5 + widthProgress * 1.25;
-  const subtitleMarginTopPx = 3 + widthProgress * 2;
-  const statusFontSizePx = 10.5 + widthProgress * 0.5;
+  const headerPaddingY = 12 + widthProgress * 4;
+  const titleFontSizeRem = 1.02 + widthProgress * 0.16;
+  const subtitleFontSizePx = 10 + widthProgress * 0.8;
+  const subtitleMarginTopPx = 2 + widthProgress * 1.2;
+  const statusFontSizePx = 10 + widthProgress * 0.4;
+  const showDescriptions = width > 214;
 
   const navigate = (page: PageId) => {
     setCurrentPage(page);
@@ -53,22 +54,22 @@ export function Sidebar({
     <aside
       style={{ width: `${width}px` }}
       className={cn(
-        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border border-white/6 border-r-white/[0.11] bg-[linear-gradient(180deg,rgba(7,7,8,0.96),rgba(5,5,6,0.94))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl [contain:paint]",
+        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border border-white/6 border-r-white/[0.11] bg-[linear-gradient(180deg,rgba(8,8,9,0.96),rgba(5,5,6,0.95))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl [contain:paint]",
         autoHide ? "h-full" : "fixed inset-y-0 left-0 h-auto",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.022),transparent_22%,transparent_82%,rgba(255,255,255,0.01))]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.016),transparent_20%,transparent_84%,rgba(255,255,255,0.008))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="flex h-full flex-col overflow-hidden">
         <div
-          className="shrink-0 border-b border-white/[0.1] px-4"
+          className="shrink-0 border-b border-white/[0.08] px-4"
           style={{
             paddingTop: `${headerPaddingY}px`,
             paddingBottom: `${headerPaddingY}px`,
           }}
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h1
                 className="truncate font-semibold tracking-[-0.03em] text-foreground"
@@ -77,7 +78,7 @@ export function Sidebar({
                 Autopoe
               </h1>
               <p
-                className="truncate font-medium tracking-[0.02em] text-muted-foreground"
+                className="truncate font-medium tracking-[0.02em] text-muted-foreground/84"
                 style={{
                   marginTop: `${subtitleMarginTopPx.toFixed(2)}px`,
                   fontSize: `${subtitleFontSizePx.toFixed(2)}px`,
@@ -87,7 +88,7 @@ export function Sidebar({
               </p>
             </div>
             <div
-              className="flex shrink-0 items-center gap-2 self-center"
+              className="flex shrink-0 items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1"
               style={{ fontSize: `${statusFontSizePx.toFixed(2)}px` }}
             >
               <span
@@ -98,61 +99,65 @@ export function Sidebar({
                     : "bg-white/24 text-white/24",
                 )}
               />
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-foreground/88">
                 {connected ? "Connected" : "Reconnecting"}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="shrink-0 px-4 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/60">
+        <div className="shrink-0 px-4 pb-2 pt-3.5 text-[9px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/52">
           Navigation
         </div>
 
-        <nav className="min-h-0 flex-1 space-y-1.5 px-3 overflow-y-auto">
+        <nav className="min-h-0 flex-1 space-y-1 px-3 pb-3 overflow-y-auto">
           {NAV_ITEMS.map(({ id, label }) => (
             <button
               key={id}
               type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150",
+                "group flex w-full items-start gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150",
                 currentPage === id
-                  ? "bg-white/[0.06] text-foreground"
-                  : "text-muted-foreground hover:bg-white/[0.034] hover:text-foreground",
+                  ? "bg-white/[0.05] text-foreground"
+                  : "text-muted-foreground hover:bg-white/[0.028] hover:text-foreground",
               )}
             >
               <span
                 className={cn(
-                  "h-7 w-px shrink-0 rounded-full transition-[opacity,background-color] duration-150",
+                  "mt-0.5 h-5 w-px shrink-0 rounded-full transition-[opacity,background-color] duration-150",
                   currentPage === id
                     ? "bg-white/72 opacity-100"
                     : "bg-white/0 opacity-0 group-hover:bg-white/8 group-hover:opacity-100",
                 )}
               />
               <div className="min-w-0 text-left">
-                <span className="block truncate font-medium">{label}</span>
-                <span className="block truncate text-[11px] text-muted-foreground/75">
-                  {id === "workspace"
-                    ? "Task tabs, graph canvas, and assistant panels"
-                    : id === "providers"
-                      ? "Model backends and catalogs"
-                      : id === "roles"
-                        ? "Behavior templates and overrides"
-                        : id === "prompts"
-                          ? "Global system guidance"
-                          : id === "tools"
-                            ? "Available runtime capabilities"
-                            : id === "channels"
-                              ? "External messaging integrations"
-                              : "Runtime defaults and event log"}
+                <span className="block truncate text-[13px] font-medium leading-5">
+                  {label}
                 </span>
+                {showDescriptions ? (
+                  <span className="block truncate text-[10px] leading-4 text-muted-foreground/68">
+                    {id === "workspace"
+                      ? "Task tabs, graph canvas, and assistant panels"
+                      : id === "providers"
+                        ? "Model backends and catalogs"
+                        : id === "roles"
+                          ? "Behavior templates and overrides"
+                          : id === "prompts"
+                            ? "Global system guidance"
+                            : id === "tools"
+                              ? "Available runtime capabilities"
+                              : id === "channels"
+                                ? "External messaging integrations"
+                                : "Runtime defaults and event log"}
+                  </span>
+                ) : null}
               </div>
             </button>
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-white/[0.1] px-4 py-3">
+        <div className="shrink-0 border-t border-white/[0.08] px-4 py-2.5">
           <SidebarActivityTicker width={width} />
         </div>
       </div>

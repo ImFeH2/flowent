@@ -87,8 +87,8 @@ export function AgentNode({ data }: NodeProps) {
       onMouseMove={(event) => updateMouseEffect(event.clientX, event.clientY)}
       onMouseLeave={resetMouseEffect}
       className={cn(
-        "relative isolate flex h-[62px] min-w-0 items-center gap-3 overflow-visible rounded-md border px-4 py-3",
-        "shadow-[0_10px_24px_rgba(0,0,0,0.32)]",
+        "relative isolate flex h-14 min-w-0 items-center gap-2.5 overflow-visible rounded-[10px] border px-3 py-2.5",
+        "shadow-[0_10px_24px_rgba(0,0,0,0.24)]",
         "bg-graph-node-bg",
         "transition-[border-color] duration-300",
         leaving && "pointer-events-none",
@@ -117,31 +117,31 @@ export function AgentNode({ data }: NodeProps) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!z-10 !size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className="!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg"
       />
 
       <div
         className={cn(
-          "relative z-10 flex size-9 shrink-0 items-center justify-center border",
+          "relative z-10 flex size-8 shrink-0 items-center justify-center border",
           nodeTypeIconStyle[node_type],
         )}
       >
-        <Icon className="size-5" />
+        <Icon className="size-4.5" />
       </div>
 
-      <div className="relative z-10 flex min-w-0 flex-1 items-center justify-between gap-3">
+      <div className="relative z-10 flex min-w-0 flex-1 items-center justify-between gap-2">
         <span
-          className="truncate text-sm font-semibold text-foreground"
+          className="truncate text-[13px] font-semibold text-foreground"
           title={latestTodo ?? undefined}
         >
           {label}
         </span>
 
         <div
-          className="relative flex items-center pr-1"
+          className="relative flex items-center pr-0.5"
           title={isToolActive ? "Active" : state}
         >
-          <span className="relative flex size-3">
+          <span className="relative flex size-2.5">
             {(isRunning || isToolActive) && (
               <span
                 className={cn(
@@ -152,7 +152,7 @@ export function AgentNode({ data }: NodeProps) {
             )}
             <span
               className={cn(
-                "relative inline-flex size-3 rounded-full border border-card shadow-sm",
+                "relative inline-flex size-2.5 rounded-full border border-card shadow-sm",
                 isToolActive ? "bg-graph-attention" : stateColor[state],
               )}
             />
@@ -164,9 +164,9 @@ export function AgentNode({ data }: NodeProps) {
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-7 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap"
+          className="absolute -bottom-6 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap"
         >
-          <span className="rounded-sm border border-graph-attention/30 bg-surface-2 px-2 py-1 text-[10px] font-mono text-graph-attention-text shadow-lg backdrop-blur-sm">
+          <span className="rounded-sm border border-graph-attention/24 bg-surface-2/92 px-1.5 py-0.5 text-[9px] font-mono text-graph-attention-text shadow-lg backdrop-blur-sm">
             {toolCall}
           </span>
         </motion.div>
@@ -175,7 +175,7 @@ export function AgentNode({ data }: NodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!z-10 !size-2.5 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className="!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg"
       />
     </motion.div>
   );

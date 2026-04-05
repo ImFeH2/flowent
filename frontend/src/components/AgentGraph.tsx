@@ -673,7 +673,7 @@ export function AgentGraph() {
         eyebrow: "Workspace",
         title: "No task tabs yet",
         description: "Create a task tab to start building an agent graph.",
-        hint: "Use the + button in the tab bar to open your first workspace.",
+        hint: "Use the + button in the tab strip to open your first workspace.",
       };
     }
     if (!activeTabId) {
@@ -688,8 +688,8 @@ export function AgentGraph() {
       eyebrow: "Empty canvas",
       title: "This task tab is ready for its first agent",
       description:
-        "Add agents, connect them, or ask Assistant to scaffold the graph for you.",
-      hint: "Start with a worker, a reviewer, or a conductor for orchestration.",
+        "Add agents, connect them, or ask Assistant to scaffold the graph.",
+      hint: "Start with a worker, a reviewer, or a conductor.",
     };
   }, [activeTabId, tabs.size]);
 
@@ -697,21 +697,21 @@ export function AgentGraph() {
     <div ref={containerRef} className="relative flex h-full flex-col">
       <div className="relative flex-1 overflow-hidden">
         {animatedNodes.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 py-10">
-            <div className="w-full max-w-[27rem] rounded-[22px] border border-white/8 bg-[rgba(12,12,13,0.62)] px-7 py-6 text-center shadow-[0_16px_36px_-28px_rgba(0,0,0,0.72)] backdrop-blur-sm">
-              <div className="mx-auto flex size-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/72">
-                <Network className="size-5" />
+          <div className="flex h-full items-center justify-center px-5 py-8">
+            <div className="w-full max-w-[22rem] rounded-[18px] border border-white/7 bg-[rgba(12,12,13,0.48)] px-5 py-5 text-center shadow-[0_18px_42px_-32px_rgba(0,0,0,0.72)] backdrop-blur-sm">
+              <div className="mx-auto flex size-10 items-center justify-center rounded-[12px] border border-white/8 bg-white/[0.03] text-white/68">
+                <Network className="size-4.5" />
               </div>
-              <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.28em] text-white/36">
+              <p className="mt-3.5 text-[9px] font-semibold uppercase tracking-[0.28em] text-white/34">
                 {emptyState.eyebrow}
               </p>
-              <p className="mt-3 text-[20px] font-semibold leading-tight text-white/92">
+              <p className="mt-2.5 text-[18px] font-semibold leading-tight text-white/92">
                 {emptyState.title}
               </p>
-              <p className="mt-2 text-sm leading-6 text-white/58">
+              <p className="mt-2 text-[13px] leading-6 text-white/60">
                 {emptyState.description}
               </p>
-              <p className="mt-4 text-[12px] leading-5 text-white/36">
+              <p className="mt-3 text-[11px] leading-5 text-white/34">
                 {emptyState.hint}
               </p>
             </div>
@@ -743,7 +743,7 @@ export function AgentGraph() {
             maxZoom={VIEWPORT_MAX_ZOOM}
             className="bg-graph-bg"
           >
-            <Background color="var(--graph-grid)" gap={32} size={0.8} />
+            <Background color="var(--graph-grid)" gap={28} size={0.72} />
             <svg aria-hidden="true" focusable="false">
               <defs>
                 <linearGradient

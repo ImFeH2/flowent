@@ -1,11 +1,20 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CopyButtonProps {
   text: string;
+  className?: string;
+  iconClassName?: string;
+  copiedClassName?: string;
 }
 
-export function CopyButton({ text }: CopyButtonProps) {
+export function CopyButton({
+  text,
+  className,
+  iconClassName,
+  copiedClassName,
+}: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -19,13 +28,16 @@ export function CopyButton({ text }: CopyButtonProps) {
   return (
     <button
       onClick={handleCopy}
-      className="rounded p-0.5 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
+      className={cn(
+        "rounded p-0.5 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all",
+        className,
+      )}
       title="Copy"
     >
       {copied ? (
-        <Check className="size-3 text-white/88" />
+        <Check className={cn("size-3 text-white/88", copiedClassName)} />
       ) : (
-        <Copy className="size-3" />
+        <Copy className={cn("size-3", iconClassName)} />
       )}
     </button>
   );

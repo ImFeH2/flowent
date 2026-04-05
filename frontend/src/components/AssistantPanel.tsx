@@ -110,8 +110,8 @@ function StatusBadge({ connected }: { connected: boolean }) {
       className={cn(
         "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
         connected
-          ? "border border-white/12 bg-white/[0.08] text-white/88"
-          : "border border-white/10 bg-white/[0.03] text-white/58",
+          ? "border border-graph-status-idle/12 bg-graph-status-idle/[0.08] text-graph-status-idle/88"
+          : "border border-graph-status-initializing/10 bg-graph-status-initializing/[0.03] text-graph-status-initializing/58",
       )}
     >
       {connected ? "Online" : "Offline"}

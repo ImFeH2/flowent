@@ -511,7 +511,9 @@ export function HomePage() {
               <Radio
                 className={cn(
                   "size-3.5 shrink-0",
-                  connected ? "text-white/88" : "text-white/38",
+                  connected
+                    ? "text-graph-status-idle/88"
+                    : "text-graph-status-initializing/38",
                 )}
               />
               <span className="whitespace-nowrap">

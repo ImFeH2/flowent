@@ -189,8 +189,8 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
           className={cn(
             "size-1.5 rounded-full transition-all duration-300",
             recentBurstCount > 0
-              ? "bg-white shadow-[0_0_10px_rgba(255,255,255,0.32)]"
-              : "bg-white/20",
+              ? "bg-graph-status-idle shadow-[0_0_10px_var(--graph-status-idle)]"
+              : "bg-graph-status-idle/20",
           )}
         />
         <span style={{ fontSize: LABEL_FONT_SIZE }}>Live</span>
@@ -234,11 +234,11 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
                   className={cn(
                     "shrink-0 rounded-full",
                     currentItem.tone === "alert"
-                      ? "bg-white/94"
+                      ? "bg-graph-status-error/94"
                       : currentItem.tone === "thinking"
-                        ? "bg-white/62"
+                        ? "bg-graph-status-initializing/62"
                         : currentItem.tone === "active"
-                          ? "bg-white/80"
+                          ? "bg-graph-status-running/80"
                           : "bg-white/28",
                   )}
                   style={{

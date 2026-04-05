@@ -127,10 +127,10 @@
   --graph-edge-active: oklch(0.98 0 0 / 86%);
   --graph-glow: oklch(0.98 0 0 / 12%);
   --graph-assistant: oklch(0.94 0.002 260);
-  --graph-status-running: oklch(0.96 0.002 260);
-  --graph-status-idle: oklch(0.66 0.002 260);
-  --graph-status-initializing: oklch(0.82 0.002 260);
-  --graph-status-error: oklch(0.91 0.002 260);
+  --graph-status-running: oklch(0.8 0.11 228);
+  --graph-status-idle: oklch(0.72 0.14 156);
+  --graph-status-initializing: oklch(0.8 0.12 86);
+  --graph-status-error: oklch(0.72 0.15 26);
   --graph-status-terminated: oklch(0.42 0.002 260);
   --scrollbar-thumb: oklch(0.34 0.002 260);
   --scrollbar-thumb-hover: oklch(0.44 0.002 260);

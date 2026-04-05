@@ -95,8 +95,8 @@ export function Sidebar({
                 className={cn(
                   "size-2 rounded-full shadow-[0_0_10px_currentColor]",
                   connected
-                    ? "bg-white text-white"
-                    : "bg-white/24 text-white/24",
+                    ? "bg-graph-status-idle text-graph-status-idle"
+                    : "bg-graph-status-initializing text-graph-status-initializing",
                 )}
               />
               <span className="font-medium text-foreground/88">

@@ -249,16 +249,23 @@ function HistoryItem({
       return (
         <CollapsibleBlock
           label="Error"
-          icon={<AlertCircle className="size-3 text-white/84" />}
-          className="border-white/16 bg-white/[0.038]"
-          labelClassName="text-white/78"
-          actions={<CopyButton text={entry.content ?? ""} />}
+          icon={<AlertCircle className="size-3 text-graph-status-error/84" />}
+          className="border-graph-status-error/16 bg-graph-status-error/[0.038]"
+          labelClassName="text-graph-status-error/78"
+          actions={
+            <CopyButton
+              text={entry.content ?? ""}
+              className="text-graph-status-error/84 hover:text-graph-status-error/84"
+              iconClassName="text-graph-status-error/84"
+              copiedClassName="text-graph-status-error/84"
+            />
+          }
           defaultOpen={false}
         >
           <MarkdownOrJsonBlock
             content={entry.content}
-            markdownClassName="text-white/84"
-            preClassName="text-white/84 leading-relaxed"
+            markdownClassName="text-graph-status-error/84"
+            preClassName="text-graph-status-error/84 leading-relaxed"
           />
         </CollapsibleBlock>
       );

@@ -28,11 +28,12 @@ export const stateColor: Record<AgentState, string> = {
 
 export const stateBadgeColor: Record<AgentState, string> = {
   running:
-    "border-white/18 bg-white/[0.12] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
-  idle: "border-white/10 bg-white/[0.04] text-white/72",
-  initializing: "border-white/14 bg-white/[0.07] text-white/84",
+    "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]",
+  idle: "border-graph-status-idle/10 bg-graph-status-idle/[0.04] text-graph-status-idle/72",
+  initializing:
+    "border-graph-status-initializing/14 bg-graph-status-initializing/[0.07] text-graph-status-initializing/84",
   error:
-    "border-white/20 bg-white/[0.09] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]",
+    "border-graph-status-error/20 bg-graph-status-error/[0.09] text-graph-status-error shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]",
   terminated: "border-white/8 bg-white/[0.03] text-white/56",
 };
 

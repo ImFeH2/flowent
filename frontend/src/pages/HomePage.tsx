@@ -1082,6 +1082,7 @@ function AgentDetailPanel({
     agent.node_type === "assistant",
   );
   const detailState = detail?.state ?? agent.state;
+  const detailContacts = detail?.contacts ?? [];
   const detailConnections = detail?.connections ?? agent.connections;
   const detailTodos = detail?.todos ?? agent.todos;
   const detailHistory = detail?.history ?? [];
@@ -1107,6 +1108,19 @@ function AgentDetailPanel({
             nodeType: connectedAgent.node_type,
           })
         : connectionId.slice(0, 8),
+    };
+  });
+  const contactItems = detailContacts.map((contactId) => {
+    const contactAgent = agents.get(contactId);
+    return {
+      id: contactId,
+      label: contactAgent
+        ? getNodeLabel({
+            name: contactAgent.name,
+            roleName: contactAgent.role_name,
+            nodeType: contactAgent.node_type,
+          })
+        : contactId.slice(0, 8),
     };
   });
 
@@ -1154,10 +1168,10 @@ function AgentDetailPanel({
 
             <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Connections
+                Contacts
               </p>
               <p className="mt-2 text-sm text-foreground">
-                {detailConnections.length} connected nodes
+                {detailContacts.length} reachable nodes
               </p>
             </div>
 
@@ -1212,11 +1226,28 @@ function AgentDetailPanel({
             )}
           </DetailSection>
 
-          <DetailSection title="Connections">
-            {connectionItems.length === 0 ? (
+          <DetailSection title="Contacts">
+            {contactItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No direct connections
+                No direct contacts
               </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {contactItems.map((contact) => (
+                  <span
+                    key={contact.id}
+                    className="rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
+                  >
+                    {contact.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </DetailSection>
+
+          <DetailSection title="Graph Connections">
+            {connectionItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No graph edges</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {connectionItems.map((connection) => (

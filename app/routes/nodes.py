@@ -123,6 +123,7 @@ async def get_node(node_id: str) -> dict:
         "tab_id": target_config.tab_id,
         "role_name": target_config.role_name,
         "state": record_state.value,
+        "contacts": node.get_contact_ids_snapshot() if node is not None else [],
         "connections": (
             [edge.to_node_id for edge in edges if edge.from_node_id == record_id]
             if target_config.tab_id

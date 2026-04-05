@@ -47,6 +47,7 @@ def test_get_node_detail_includes_runtime_config(client: TestClient):
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == assistant_id
+    assert isinstance(data["contacts"], list)
     assert isinstance(data["history"], list)
     assert isinstance(data["tools"], list)
     assert isinstance(data["write_dirs"], list)

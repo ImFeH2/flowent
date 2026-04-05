@@ -94,6 +94,8 @@ class GraphNodeRecord:
 
     @classmethod
     def from_mapping(cls, data: dict[str, object]) -> GraphNodeRecord:
+        from app.settings import normalize_tool_names
+
         raw_config = data.get("config")
         config = raw_config if isinstance(raw_config, dict) else {}
         raw_todos = data.get("todos")
@@ -143,13 +145,15 @@ class GraphNodeRecord:
                 name=str(config["name"])
                 if isinstance(config.get("name"), str)
                 else None,
-                tools=[
-                    str(item)
-                    for item in config.get("tools", [])
-                    if isinstance(item, str)
-                ]
-                if isinstance(config.get("tools"), list)
-                else [],
+                tools=normalize_tool_names(
+                    [
+                        str(item)
+                        for item in config.get("tools", [])
+                        if isinstance(item, str)
+                    ]
+                    if isinstance(config.get("tools"), list)
+                    else []
+                ),
                 write_dirs=[
                     str(item)
                     for item in config.get("write_dirs", [])

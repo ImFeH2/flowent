@@ -7,10 +7,15 @@ from app.tools import MINIMUM_TOOLS
 
 
 def get_system_prompt(config: NodeConfig) -> str:
-    from app.settings import STEWARD_ROLE_NAME, find_role, get_settings
+    from app.settings import (
+        STEWARD_ROLE_NAME,
+        find_role,
+        get_settings,
+        normalize_tool_names,
+    )
 
     settings = get_settings()
-    tools = list(dict.fromkeys([*config.tools, *MINIMUM_TOOLS]))
+    tools = normalize_tool_names([*config.tools, *MINIMUM_TOOLS])
 
     if config.node_type == NodeType.ASSISTANT:
         role_name = (

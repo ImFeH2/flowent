@@ -22,6 +22,7 @@ function buildDetail(history: HistoryEntry[] = []): NodeDetail {
     node_type: "assistant",
     state: "idle",
     name: null,
+    contacts: [],
     connections: [],
     role_name: "Steward",
     todos: [],

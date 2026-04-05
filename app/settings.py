@@ -91,7 +91,7 @@ CONDUCTOR_ROLE_INCLUDED_TOOLS = [
 ]
 MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high", "xhigh"})
 MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
-REMOVED_TOOL_NAMES = frozenset({"exit"})
+REMOVED_TOOL_NAMES = frozenset({"exit", "list_connections"})
 
 
 @dataclass

@@ -97,6 +97,7 @@ export interface NodeDetail {
   tab_id?: string | null;
   state: AgentState;
   name: string | null;
+  contacts: string[];
   connections: string[];
   role_name: string | null;
   todos: TodoItem[];

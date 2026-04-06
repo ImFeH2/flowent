@@ -62,7 +62,7 @@ def test_manage_providers_create_persists_provider(monkeypatch):
                 "action": "create",
                 "name": "Test Provider",
                 "type": "openai_compatible",
-                "base_url": "https://api.example.com/v1",
+                "base_url": "https://api.example.com",
             },
         )
     )
@@ -73,6 +73,7 @@ def test_manage_providers_create_persists_provider(monkeypatch):
     assert "api_key" not in result
     assert len(settings.providers) == 1
     assert settings.providers[0].name == "Test Provider"
+    assert settings.providers[0].base_url == "https://api.example.com/v1"
     assert saved == [settings]
     assert invalidations == ["invalidate"]
 
@@ -156,6 +157,35 @@ def test_manage_providers_update_rejects_unknown_provider(monkeypatch):
     )
 
     assert result == {"error": "Provider 'missing' not found"}
+
+
+def test_manage_providers_update_rejects_mismatched_base_url_suffix(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_compatible",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ]
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {"action": "update", "id": "provider-1", "type": "gemini"},
+        )
+    )
+
+    assert result == {
+        "error": "Provider base_url suffix '/v1' does not match type 'gemini' "
+        "(expected '/v1beta')"
+    }
 
 
 def test_manage_providers_delete_removes_provider(monkeypatch):

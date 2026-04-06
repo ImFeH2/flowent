@@ -3,6 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from app.providers import LLMProvider
+from app.providers.base_url import resolve_provider_base_url
 
 
 class ProviderType(StrEnum):
@@ -20,13 +21,14 @@ def create_provider(
     provider_name: str = "",
 ) -> LLMProvider:
     pt = provider_type.lower()
+    resolved_base_url = resolve_provider_base_url(pt, base_url)
 
     if pt == ProviderType.OPENAI_COMPATIBLE:
         from app.providers.openai import OpenAIProvider
 
         return OpenAIProvider(
             provider_name=provider_name,
-            api_base_url=base_url,
+            api_base_url=resolved_base_url,
             api_key=api_key,
             model=model,
         )
@@ -36,7 +38,7 @@ def create_provider(
 
         return OpenAIResponsesProvider(
             provider_name=provider_name,
-            api_base_url=base_url,
+            api_base_url=resolved_base_url,
             api_key=api_key,
             model=model,
         )
@@ -46,7 +48,7 @@ def create_provider(
 
         return AnthropicProvider(
             provider_name=provider_name,
-            api_base_url=base_url,
+            api_base_url=resolved_base_url,
             api_key=api_key,
             model=model,
         )
@@ -56,7 +58,7 @@ def create_provider(
 
         return GeminiProvider(
             provider_name=provider_name,
-            api_base_url=base_url,
+            api_base_url=resolved_base_url,
             api_key=api_key,
             model=model,
         )

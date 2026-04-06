@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.agent import Agent
     from app.settings import ProviderConfig
 
+from app.providers.base_url import resolve_provider_base_url
 from app.tools import Tool, re_raise_interrupt
 
 
@@ -106,12 +107,16 @@ class ManageProvidersTool(Tool):
                 return json.dumps({"error": "type is required"})
             if not isinstance(base_url, str) or not base_url.strip():
                 return json.dumps({"error": "base_url is required"})
+            try:
+                resolved_base_url = resolve_provider_base_url(provider_type, base_url)
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
 
             provider = ProviderConfig(
                 id=str(uuid.uuid4()),
                 name=name,
                 type=provider_type,
-                base_url=base_url,
+                base_url=resolved_base_url,
                 api_key=api_key or "",
             )
             settings.providers.append(provider)
@@ -126,12 +131,29 @@ class ManageProvidersTool(Tool):
             for provider in settings.providers:
                 if provider.id != provider_id:
                     continue
+                next_type = (
+                    provider_type
+                    if isinstance(provider_type, str) and provider_type is not None
+                    else provider.type
+                )
+                next_base_url = (
+                    base_url
+                    if isinstance(base_url, str) and base_url is not None
+                    else provider.base_url
+                )
+                try:
+                    resolved_base_url = resolve_provider_base_url(
+                        next_type,
+                        next_base_url,
+                    )
+                except ValueError as exc:
+                    return json.dumps({"error": str(exc)})
                 if name is not None:
                     provider.name = name
                 if provider_type is not None:
                     provider.type = provider_type
-                if base_url is not None:
-                    provider.base_url = base_url
+                if base_url is not None or provider_type is not None:
+                    provider.base_url = resolved_base_url
                 if api_key is not None:
                     provider.api_key = api_key
                 save_settings(settings)

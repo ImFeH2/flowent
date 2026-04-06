@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   Check,
@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { SectionHeader, SettingsRow } from "@/components/layout/PageScaffold";
 import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
+import { buildProviderRequestPreview } from "@/lib/providerUrls";
 import type { Provider } from "@/types";
 import { cn } from "@/lib/utils";
 import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
@@ -75,6 +76,10 @@ export function ProvidersPage() {
   );
 
   const selectedProvider = providers.find((p) => p.id === selectedId);
+  const endpointPreview = useMemo(
+    () => buildProviderRequestPreview(draft.type, draft.base_url),
+    [draft.base_url, draft.type],
+  );
 
   const refreshProviders = useCallback(async () => {
     setLoading(true);
@@ -134,6 +139,14 @@ export function ProvidersPage() {
       toast.error("Provider name is required");
       return;
     }
+    if (!draft.base_url.trim()) {
+      toast.error("Provider base URL is required");
+      return;
+    }
+    if (endpointPreview.error) {
+      toast.error(endpointPreview.error);
+      return;
+    }
     setSaving(true);
     try {
       if (isCreating) {
@@ -141,12 +154,24 @@ export function ProvidersPage() {
         setProviders((prev) => [...prev, created]);
         setIsCreating(false);
         setSelectedId(created.id);
+        setDraft({
+          name: created.name,
+          type: created.type,
+          base_url: created.base_url,
+          api_key: created.api_key,
+        });
         toast.success("Provider created");
       } else if (selectedId) {
         const updated = await updateProvider(selectedId, draft);
         setProviders((prev) =>
           prev.map((p) => (p.id === selectedId ? updated : p)),
         );
+        setDraft({
+          name: updated.name,
+          type: updated.type,
+          base_url: updated.base_url,
+          api_key: updated.api_key,
+        });
         toast.success("Provider updated");
       }
     } catch {
@@ -397,6 +422,31 @@ export function ProvidersPage() {
                       placeholder="https://api.openai.com/v1"
                       className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                     />
+                  </SettingsRow>
+                  <SettingsRow
+                    label="Request Preview"
+                    description="Final request endpoint derived from type and base URL"
+                  >
+                    <div
+                      className={cn(
+                        "w-full rounded-md border px-3 py-2 text-sm",
+                        endpointPreview.error
+                          ? "border-destructive/30 bg-destructive/5 text-destructive"
+                          : "border-white/8 bg-black/[0.22] text-foreground",
+                      )}
+                    >
+                      {endpointPreview.error ? (
+                        endpointPreview.error
+                      ) : endpointPreview.previewUrl ? (
+                        <code className="font-mono text-[12px]">
+                          {endpointPreview.previewUrl}
+                        </code>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          Enter a base URL to preview the final request endpoint
+                        </span>
+                      )}
+                    </div>
                   </SettingsRow>
                   <SettingsRow
                     label="API Key"

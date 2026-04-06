@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
+from app.providers.base_url import resolve_provider_base_url
 from app.settings import (
     ProviderConfig,
     get_settings,
@@ -43,11 +44,15 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
     from app.providers.gateway import gateway
 
     settings = get_settings()
+    try:
+        resolved_base_url = resolve_provider_base_url(req.type, req.base_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     provider = ProviderConfig(
         id=str(uuid.uuid4()),
         name=req.name,
         type=req.type,
-        base_url=req.base_url,
+        base_url=resolved_base_url,
         api_key=req.api_key,
     )
     settings.providers.append(provider)
@@ -66,12 +71,19 @@ async def update_provider(
     for p in settings.providers:
         if p.id != provider_id:
             continue
+        next_name = req.name if req.name is not None else p.name
+        next_type = req.type if req.type is not None else p.type
+        next_base_url = req.base_url if req.base_url is not None else p.base_url
+        try:
+            resolved_base_url = resolve_provider_base_url(next_type, next_base_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if req.name is not None:
-            p.name = req.name
+            p.name = next_name
         if req.type is not None:
-            p.type = req.type
-        if req.base_url is not None:
-            p.base_url = req.base_url
+            p.type = next_type
+        if req.base_url is not None or req.type is not None:
+            p.base_url = resolved_base_url
         if req.api_key is not None:
             p.api_key = req.api_key
         save_settings(settings)

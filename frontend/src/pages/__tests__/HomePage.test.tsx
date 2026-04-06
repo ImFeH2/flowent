@@ -277,7 +277,7 @@ describe("HomePage", () => {
     );
   });
 
-  it("shows an interrupt action for a running assistant detail view", async () => {
+  it("opens assistant details from the workspace panel and interrupts a running assistant", async () => {
     const assistant = buildNode({
       id: "assistant",
       node_type: "assistant",
@@ -291,7 +291,7 @@ describe("HomePage", () => {
     useAgentUIMock.mockReturnValue({
       activeTabId: "tab-1",
       pendingAssistantMessages: [],
-      selectedAgentId: assistant.id,
+      selectedAgentId: null,
       selectAgent: vi.fn(),
       setActiveTabId: vi.fn(),
     });
@@ -318,6 +318,10 @@ describe("HomePage", () => {
     interruptNodeMock.mockResolvedValue(undefined);
 
     const view = render(<HomePage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Assistant Details" }));
+
+    expect(screen.getAllByText("Status").length).toBeGreaterThan(0);
 
     const interruptButtons = within(view.container).getAllByRole("button", {
       name: "Interrupt",

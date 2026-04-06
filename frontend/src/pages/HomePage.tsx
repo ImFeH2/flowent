@@ -103,6 +103,8 @@ type WorkspaceDialogKind =
   | "delete-tab"
   | null;
 
+type AssistantPanelView = "chat" | "detail";
+
 export function HomePage() {
   const { agents } = useAgentNodesRuntime();
   const { tabs } = useAgentTabsRuntime();
@@ -117,6 +119,9 @@ export function HomePage() {
     setActiveTabId,
   } = useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
+  const [assistantPanelView, setAssistantPanelView] =
+    useState<AssistantPanelView>("chat");
+  const [interruptingAssistant, setInterruptingAssistant] = useState(false);
   const isCompactWorkspace = useMediaQuery("(max-width: 1180px)");
   const [activeDialog, setActiveDialog] = useState<WorkspaceDialogKind>(null);
   const [pendingAction, setPendingAction] = useState<WorkspaceDialogKind>(null);
@@ -235,8 +240,11 @@ export function HomePage() {
     );
   }, [isCompactWorkspace, panelWidth]);
   const assistantNode = getAssistantNode(agents);
+  const assistantId = assistantNode?.id ?? null;
+  const assistantDetailVisible =
+    assistantPanelView === "detail" && assistantNode !== null;
+  const assistantInterruptVisible = assistantNode?.state === "running";
   const assistantPanelRunning = useMemo(() => {
-    const assistantId = assistantNode?.id ?? null;
     const assistantDeltas = assistantId
       ? (streamingDeltas.get(assistantId) ?? [])
       : [];
@@ -256,6 +264,29 @@ export function HomePage() {
     streamingDeltas,
   ]);
 
+  const handleOpenAssistantDetails = useCallback(() => {
+    setPanelOpen(true);
+    setAssistantPanelView("detail");
+  }, []);
+
+  const handleCloseAssistantDetails = useCallback(() => {
+    setAssistantPanelView("chat");
+  }, []);
+
+  const handleInterruptAssistant = useCallback(() => {
+    if (!assistantId || interruptingAssistant) {
+      return;
+    }
+    setInterruptingAssistant(true);
+    interruptNode(assistantId)
+      .catch(() => {
+        toast.error("Failed to interrupt assistant");
+      })
+      .finally(() => {
+        setInterruptingAssistant(false);
+      });
+  }, [assistantId, interruptingAssistant]);
+
   const togglePanel = () => {
     if (panelVisible) {
       if (selectedAgentId) {
@@ -265,6 +296,26 @@ export function HomePage() {
       return;
     }
     setPanelOpen(true);
+  };
+
+  const renderAssistantPanel = () => {
+    if (assistantDetailVisible && assistantNode) {
+      return (
+        <AgentDetailPanel
+          agent={assistantNode}
+          onClose={handleCloseAssistantDetails}
+        />
+      );
+    }
+
+    return (
+      <AssistantChatPanel
+        interrupting={interruptingAssistant}
+        onInterrupt={handleInterruptAssistant}
+        onOpenDetails={handleOpenAssistantDetails}
+        showInterrupt={assistantInterruptVisible}
+      />
+    );
   };
 
   const openCreateTabDialog = () => {
@@ -606,7 +657,7 @@ export function HomePage() {
                       )}
                       aria-hidden={selectedAgent ? true : undefined}
                     >
-                      <AssistantChatPanel />
+                      {renderAssistantPanel()}
                     </motion.div>
 
                     <AnimatePresence>
@@ -672,7 +723,7 @@ export function HomePage() {
                     )}
                     aria-hidden={selectedAgent ? true : undefined}
                   >
-                    <AssistantChatPanel />
+                    {renderAssistantPanel()}
                   </motion.div>
 
                   <AnimatePresence>
@@ -1394,7 +1445,17 @@ function AgentDetailPanel({
   );
 }
 
-function AssistantChatPanel() {
+function AssistantChatPanel({
+  interrupting,
+  onInterrupt,
+  onOpenDetails,
+  showInterrupt,
+}: {
+  interrupting: boolean;
+  onInterrupt: () => void;
+  onOpenDetails: () => void;
+  showInterrupt: boolean;
+}) {
   const { agents } = useAgentNodesRuntime();
   const {
     connected,
@@ -1425,6 +1486,27 @@ function AssistantChatPanel() {
                 ? "Online"
                 : "Connecting..."}
           </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {showInterrupt ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={interrupting}
+              onClick={onInterrupt}
+            >
+              {interrupting ? "Interrupting..." : "Interrupt"}
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onOpenDetails}
+          >
+            Assistant Details
+          </Button>
         </div>
       </div>
 

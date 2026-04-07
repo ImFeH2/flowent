@@ -87,6 +87,22 @@ def test_get_assistant_detail_includes_tools_and_permissions(client: TestClient)
     assert data["allow_network"] is True
 
 
+def test_get_node_detail_includes_state_entries_in_history(client: TestClient):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+    assistant.set_state(AgentState.RUNNING, "processing")
+
+    response = client.get(f"/api/nodes/{assistant_id}")
+
+    assert response.status_code == 200
+    history = response.json()["history"]
+    assert any(
+        entry["type"] == "StateEntry" and entry["state"] == "running"
+        for entry in history
+    )
+
+
 def test_assistant_cannot_be_terminated_via_nodes_api(client: TestClient):
     assistant_id = _get_assistant_id(client)
     response = client.post(f"/api/nodes/{assistant_id}/terminate")

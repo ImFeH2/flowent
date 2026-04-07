@@ -46,7 +46,7 @@ def restart_telegram_channel() -> None:
 def bootstrap_runtime() -> None:
     from app.agent import Agent
     from app.graph_runtime import connect_nodes
-    from app.models import AgentState, NodeConfig, NodeType
+    from app.models import AgentState, NodeConfig, NodeType, StateEntry
     from app.settings import (
         STEWARD_ROLE_INCLUDED_TOOLS,
         ensure_builtin_roles,
@@ -99,6 +99,11 @@ def bootstrap_runtime() -> None:
             uuid=record.id,
         )
         node.history = list(record.history)
+        if not any(isinstance(entry, StateEntry) for entry in node.history):
+            node.history.insert(
+                0,
+                StateEntry(state=record.state.value, reason="restored"),
+            )
         node.todos = list(record.todos)
         registry.register(node)
         node.start()

@@ -16,9 +16,9 @@ interface WorkspaceCommandDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   icon: LucideIcon;
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   children: ReactNode;
   footer: ReactNode;
   className?: string;
@@ -50,28 +50,34 @@ export function WorkspaceCommandDialog({
             </button>
           </DialogClose>
 
-          <DialogHeader className="relative z-10 gap-3 pr-9">
+          <DialogHeader className="relative z-10 gap-2 pr-9">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-white/12 bg-white/[0.05] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_14px_28px_-22px_rgba(255,255,255,0.14)]">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] border border-white/12 bg-white/[0.05] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_14px_28px_-22px_rgba(255,255,255,0.14)]">
                 <Icon className="size-4.5" />
               </div>
-              <div className="min-w-0">
-                <p className="text-[9px] font-semibold uppercase tracking-[0.24em] text-white/45">
-                  {eyebrow}
-                </p>
-                <DialogTitle className="mt-1 text-[1.05rem] text-white">
+              <div className="min-w-0 flex flex-wrap items-center gap-2">
+                <DialogTitle className="text-[1.02rem] text-white">
                   {title}
                 </DialogTitle>
+                {eyebrow ? (
+                  <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-white/58">
+                    {eyebrow}
+                  </span>
+                ) : null}
               </div>
             </div>
-            <DialogDescription className="max-w-[32rem] text-[13px] leading-6 text-white/62">
-              {description}
-            </DialogDescription>
+            {description ? (
+              <DialogDescription className="pl-[2.9rem] text-[12px] leading-5 text-white/60">
+                {description}
+              </DialogDescription>
+            ) : (
+              <DialogDescription className="sr-only">{title}</DialogDescription>
+            )}
           </DialogHeader>
 
-          <div className="relative z-10 mt-5 space-y-3.5">{children}</div>
+          <div className="relative z-10 mt-4 space-y-3">{children}</div>
 
-          <DialogFooter className="relative z-10 mt-5 border-t border-white/8 pt-3.5">
+          <DialogFooter className="relative z-10 mt-4 border-t border-white/8 pt-3.5">
             {footer}
           </DialogFooter>
         </div>
@@ -106,7 +112,7 @@ export function WorkspaceDialogField({
 
 export function WorkspaceDialogMeta({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[0.9rem] border border-white/8 bg-white/[0.03] px-3 py-2.5 text-[13px] text-white/68 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]">
+    <div className="rounded-[0.85rem] border border-white/8 bg-white/[0.03] px-3 py-2 text-[12px] text-white/68 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]">
       {children}
     </div>
   );

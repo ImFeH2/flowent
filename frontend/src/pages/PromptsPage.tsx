@@ -61,10 +61,7 @@ export function PromptsPage() {
   }
 
   return (
-    <PageScaffold
-      title="Prompts"
-      description="Configure the global system prompt layer and the custom runtime post prompt layer."
-    >
+    <PageScaffold title="Prompts">
       <div className="mx-auto flex h-full max-w-3xl flex-col">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-4 text-xs text-muted-foreground/60">
@@ -78,12 +75,12 @@ export function PromptsPage() {
         </div>
         <div className="grid min-h-0 flex-1 gap-4">
           <div className="flex min-h-0 flex-col">
-            <div className="mb-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">
                 Custom Prompt
               </p>
-              <p className="text-xs text-muted-foreground/70">
-                Appended to every node&apos;s system prompt.
+              <p className="text-[11px] text-muted-foreground/72">
+                Appended to every node&apos;s system prompt
               </p>
             </div>
             <div className="relative flex min-h-0 flex-1">
@@ -99,13 +96,12 @@ export function PromptsPage() {
             </div>
           </div>
           <div className="flex min-h-0 flex-col">
-            <div className="mb-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">
                 Custom Post Prompt
               </p>
-              <p className="text-xs text-muted-foreground/70">
-                Appended after the built-in runtime post prompt on every
-                request.
+              <p className="text-[11px] text-muted-foreground/72">
+                Added after the built-in runtime post prompt
               </p>
             </div>
             <div className="relative flex min-h-0 flex-1">

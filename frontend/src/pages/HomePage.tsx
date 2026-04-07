@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
-import type { Node } from "@/types";
+import type { HistoryEntry, Node } from "@/types";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -758,9 +758,7 @@ export function HomePage() {
           }
         }}
         icon={FilePlus2}
-        eyebrow="Workspace"
-        title="Create Task Tab"
-        description="Open a persistent task workspace with a clear title and an optional goal so both you and the Assistant can revisit it later."
+        title="Create Tab"
         footer={
           <>
             <Button
@@ -810,9 +808,7 @@ export function HomePage() {
           }
         }}
         icon={Bot}
-        eyebrow="Agent Graph"
         title="Add Agent"
-        description="Add a peer node to the current tab. Start with the role and optional display name, then wire it into the graph."
         footer={
           <>
             <Button
@@ -870,9 +866,7 @@ export function HomePage() {
           }
         }}
         icon={CircuitBoard}
-        eyebrow="Topology"
         title="Connect Agents"
-        description="Create a directed edge between two peers in the current tab so they can message each other directly."
         footer={
           <>
             <Button
@@ -967,9 +961,7 @@ export function HomePage() {
           }
         }}
         icon={Sparkles}
-        eyebrow="Dispatch"
         title="Send Task"
-        description="Write the first concrete instruction for the selected agent. This goes straight into that node's queue."
         footer={
           <>
             <Button
@@ -1145,6 +1137,13 @@ function AgentDetailPanel({
   const detailAllowNetwork = detail?.allow_network ?? false;
   const detailTabId = detail?.tab_id ?? agent.tab_id ?? null;
   const detailTab = detailTabId ? (tabs.get(detailTabId) ?? null) : null;
+  const stateTimeline = detailHistory.filter(
+    (entry): entry is HistoryEntry & { type: "StateEntry" } =>
+      entry.type === "StateEntry",
+  );
+  const visibleHistory = detailHistory.filter(
+    (entry) => entry.type !== "StateEntry",
+  );
   const label = getNodeLabel({
     name: agent.name,
     roleName: agent.role_name,
@@ -1188,11 +1187,11 @@ function AgentDetailPanel({
               <Bot className="size-3.5 text-primary" />
             )}
           </div>
-          <div>
+          <div className="min-w-0 flex flex-wrap items-center gap-2">
             <p className="text-[13px] font-semibold">{label}</p>
-            <p className="font-mono text-[10px] text-muted-foreground">
+            <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] text-muted-foreground/78">
               {agent.id.slice(0, 8)}
-            </p>
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -1296,6 +1295,45 @@ function AgentDetailPanel({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No task metadata</p>
+            )}
+          </DetailSection>
+
+          <DetailSection title="State Timeline">
+            {stateTimeline.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No state changes yet
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {stateTimeline
+                  .slice(-6)
+                  .reverse()
+                  .map((entry) => (
+                    <div
+                      key={`${entry.timestamp}-${entry.state ?? "unknown"}`}
+                      className="flex items-start justify-between gap-3 rounded-md border border-white/8 bg-white/[0.02] px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <Badge
+                          variant="outline"
+                          className={
+                            stateBadgeColor[entry.state ?? detailState]
+                          }
+                        >
+                          {(entry.state ?? detailState).toUpperCase()}
+                        </Badge>
+                        {entry.reason ? (
+                          <p className="mt-1 text-xs text-muted-foreground/78">
+                            {entry.reason}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground/64">
+                        {formatDetailTimestamp(entry.timestamp)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
             )}
           </DetailSection>
 
@@ -1427,13 +1465,13 @@ function AgentDetailPanel({
               </div>
             ) : error ? (
               <div className="text-sm text-destructive">{error}</div>
-            ) : detailHistory.length === 0 ? (
+            ) : visibleHistory.length === 0 ? (
               <div className="text-sm text-muted-foreground">
                 No history yet.
               </div>
             ) : (
               <HistoryView
-                history={detailHistory}
+                history={visibleHistory}
                 agentLabel={label}
                 nodes={agents}
               />
@@ -1475,17 +1513,16 @@ function AssistantChatPanel({
   return (
     <div className="relative flex h-full flex-col">
       <div className="flex items-center gap-2.5 border-b border-white/6 px-3.5 py-2.5">
-        <div className="flex-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <p className="text-[13px] font-semibold">Assistant</p>
-          <p className="text-[10px] text-muted-foreground">
-            {assistantRoleName
-              ? `Role: ${assistantRoleName} · ${
-                  connected ? "Online" : "Connecting..."
-                }`
-              : connected
-                ? "Online"
-                : "Connecting..."}
-          </p>
+          {assistantRoleName ? (
+            <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+              {assistantRoleName}
+            </span>
+          ) : null}
+          <span className="text-[11px] text-muted-foreground/72">
+            {connected ? "Online" : "Connecting..."}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           {showInterrupt ? (
@@ -1613,4 +1650,15 @@ function DetailSection({
       <div className="mt-2">{children}</div>
     </section>
   );
+}
+
+function formatDetailTimestamp(timestamp: number | undefined): string {
+  if (!timestamp) {
+    return "—";
+  }
+  return new Date(timestamp * 1000).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }

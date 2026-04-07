@@ -17,6 +17,7 @@ from app.models.history import (
     HistoryEntry,
     ReceivedMessage,
     SentMessage,
+    StateEntry,
     SystemEntry,
     ToolCall,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "SentMessage",
     "SentMessageDelta",
     "Serializable",
+    "StateEntry",
     "StreamingDelta",
     "SystemEntry",
     "Tab",

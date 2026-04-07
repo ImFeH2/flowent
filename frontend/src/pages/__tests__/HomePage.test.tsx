@@ -310,7 +310,20 @@ describe("HomePage", () => {
         write_dirs: [],
         allow_network: true,
         position: null,
-        history: [],
+        history: [
+          {
+            type: "StateEntry",
+            state: "idle",
+            reason: "created",
+            timestamp: 1,
+          },
+          {
+            type: "StateEntry",
+            state: "running",
+            reason: "processing",
+            timestamp: 2,
+          },
+        ],
       },
       error: null,
       loading: false,
@@ -322,6 +335,8 @@ describe("HomePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Assistant Details" }));
 
     expect(screen.getAllByText("Status").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("State Timeline").length).toBeGreaterThan(0);
+    expect(screen.getByText("processing")).toBeInTheDocument();
 
     const interruptButtons = within(view.container).getAllByRole("button", {
       name: "Interrupt",

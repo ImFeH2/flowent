@@ -423,7 +423,6 @@ export function RolesPage() {
   return (
     <PageScaffold
       title="Roles"
-      description="Define reusable agent behaviors"
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -446,11 +445,11 @@ export function RolesPage() {
         <div className="h-full min-h-0 overflow-y-auto pr-2">
           <div className="mx-auto max-w-3xl pb-6">
             <div className="mb-6 flex items-center justify-between">
-              <div>
-                <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
-                  {panelEyebrow}
-                </p>
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-base font-semibold">{panelTitle}</h2>
+                <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+                  {panelEyebrow}
+                </span>
               </div>
               <Button
                 onClick={handleCancel}
@@ -463,16 +462,9 @@ export function RolesPage() {
             </div>
 
             <section>
-              <SectionHeader
-                eyebrow="Identity"
-                title="Role Identity"
-                description="Define the role name and baseline prompt used by agents created with this role."
-              />
+              <SectionHeader title="Identity" eyebrow="Role" />
 
-              <SettingsRow
-                label="Role Name"
-                description="Unique role identifier used when creating agents."
-              >
+              <SettingsRow label="Role Name" description="Unique ID">
                 <input
                   type="text"
                   value={draft.name}
@@ -489,12 +481,11 @@ export function RolesPage() {
               </SettingsRow>
 
               <div className="mt-5 space-y-2">
-                <div>
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="text-sm font-medium">System Prompt</label>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Inserted after the built-in collaboration prompt and global
-                    custom prompt.
-                  </p>
+                  <span className="text-[11px] text-muted-foreground/72">
+                    Appended after the built-in collaboration prompt
+                  </span>
                 </div>
                 <textarea
                   value={draft.system_prompt}
@@ -524,11 +515,7 @@ export function RolesPage() {
             </section>
 
             <section className="mt-6 border-t border-white/6 pt-6">
-              <SectionHeader
-                eyebrow="Model"
-                title="Model Configuration"
-                description="Choose whether this role follows Settings or uses its own provider and model override."
-              />
+              <SectionHeader title="Model" eyebrow="Optional Override" />
 
               <div className="space-y-4">
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -662,8 +649,8 @@ export function RolesPage() {
                             : "focus:border-white/16 focus:outline-none",
                         )}
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Select a discovered model or enter a model ID manually.
+                      <p className="text-[11px] text-muted-foreground/72">
+                        Catalog or manual ID
                       </p>
                     </div>
                   </div>
@@ -677,11 +664,7 @@ export function RolesPage() {
             </section>
 
             <section className="mt-6 border-t border-white/6 pt-6">
-              <SectionHeader
-                eyebrow="Parameters"
-                title="Model Parameters"
-                description="Optionally override the canonical model parameters for this role."
-              />
+              <SectionHeader title="Parameters" eyebrow="Canonical" />
 
               <div className="space-y-4">
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -742,11 +725,7 @@ export function RolesPage() {
             </section>
 
             <section className="mt-6 border-t border-white/6 pt-6">
-              <SectionHeader
-                eyebrow="Tools"
-                title="Tool Configuration"
-                description="Minimum tools are injected by the framework. Configure the remaining tools as Allowed, Included, or Excluded."
-              />
+              <SectionHeader title="Tools" eyebrow="Minimum tools injected" />
 
               <div className="overflow-hidden rounded-md border border-white/6 bg-black/[0.18]">
                 {configurableTools.map((tool) => {
@@ -756,9 +735,14 @@ export function RolesPage() {
                       key={tool.name}
                       className="flex items-center justify-between gap-4 border-b border-white/6 px-4 py-3 last:border-b-0"
                     >
-                      <div className="min-w-0">
-                        <p className="font-mono text-sm">{tool.name}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                      <div
+                        className="min-w-0 flex flex-1 items-center gap-2"
+                        title={tool.description}
+                      >
+                        <p className="shrink-0 font-mono text-sm">
+                          {tool.name}
+                        </p>
+                        <p className="truncate text-[11px] text-muted-foreground/72">
                           {tool.description}
                         </p>
                       </div>

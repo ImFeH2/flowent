@@ -154,7 +154,6 @@ export function SettingsPage() {
   return (
     <PageScaffold
       title="Settings"
-      description="Configure Assistant and AI model preferences"
       actions={
         <Button onClick={() => void handleSave()} disabled={saving}>
           <Save className="size-4" />
@@ -165,16 +164,9 @@ export function SettingsPage() {
       <div className="h-full min-h-0 overflow-y-auto pr-2">
         <div className="mx-auto max-w-3xl pb-6">
           <section>
-            <SectionHeader
-              eyebrow="Assistant"
-              title="Assistant Configuration"
-              description="Choose the role that powers the system assistant."
-            />
+            <SectionHeader title="Assistant" eyebrow="System" />
             <div>
-              <SettingsRow
-                label="Assistant Role"
-                description="The Assistant uses this role's prompt and model configuration. The default system role is Steward."
-              >
+              <SettingsRow label="Assistant Role" description="System role">
                 <Select
                   value={settings.assistant.role_name}
                   onValueChange={(value) =>
@@ -202,15 +194,11 @@ export function SettingsPage() {
           </section>
 
           <section className="mt-8 border-t border-white/6 pt-8">
-            <SectionHeader
-              eyebrow="Model"
-              title="Model Configuration"
-              description="Set the default provider and model used when a role does not define its own override."
-            />
+            <SectionHeader title="Model Defaults" eyebrow="Fallback" />
             <div>
               <SettingsRow
                 label="Active Provider"
-                description="Choose the provider used for roles that do not define their own model override."
+                description="Used when roles do not override"
               >
                 <Select
                   value={settings.model.active_provider_id}
@@ -243,10 +231,7 @@ export function SettingsPage() {
                 ) : null}
               </SettingsRow>
 
-              <SettingsRow
-                label="Model"
-                description="Select a catalog model when available, or enter a model ID manually."
-              >
+              <SettingsRow label="Model" description="Catalog or manual ID">
                 <div className="mb-1.5 flex justify-end">
                   <Button
                     onClick={refreshModels}
@@ -313,7 +298,6 @@ export function SettingsPage() {
 
               <SettingsRow
                 label="Default Model Parameters"
-                description="These canonical parameters are merged into each request first. Roles can override selected fields. Unsupported parameters are ignored by the active provider."
                 valueClassName="w-72"
               >
                 <ModelParamsFields
@@ -339,9 +323,6 @@ export function SettingsPage() {
 
           <div className="mt-8 border-t border-white/6 pt-4 text-sm text-muted-foreground">
             <p>Autopoe Agent Studio v{appVersion ?? "—"}</p>
-            <p className="mt-1 text-xs">
-              A multi-agent collaboration framework.
-            </p>
           </div>
         </div>
       </div>

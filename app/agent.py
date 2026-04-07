@@ -31,6 +31,7 @@ from app.models import (
     ReceivedMessageDelta,
     SentMessage,
     SentMessageDelta,
+    StateEntry,
     SystemEntry,
     ThinkingDelta,
     TodoItem,
@@ -195,6 +196,7 @@ class Agent:
         self.todos: list[TodoItem] = []
         self.connections: list[str] = []
         self.history: list[HistoryEntry] = []
+        self.history.append(StateEntry(state=self.state.value, reason="created"))
         self._terminate = threading.Event()
         self._interrupt_requested = threading.Event()
         self._interrupt_callback_lock = threading.Lock()
@@ -1463,6 +1465,10 @@ class Agent:
                 self._idle_started_by_tool_call_id = None
             self._idle_state_event.clear()
         if old != state or force_emit:
+            if old != state:
+                self._append_history(
+                    StateEntry(state=state.value, reason=reason),
+                )
             self._log.debug(
                 "State: {} -> {}{}",
                 old.value,

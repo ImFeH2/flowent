@@ -61,6 +61,7 @@ function ToolCard({
   return (
     <div
       onClick={onToggle}
+      title={tool.description}
       className={cn(
         "group cursor-pointer rounded-xl border border-white/[0.07] bg-white/[0.025] p-4 transition-all duration-150 hover:-translate-y-px hover:border-white/[0.12] hover:bg-white/[0.045]",
         expanded && "border-white/[0.12] bg-white/[0.04]",
@@ -71,9 +72,6 @@ function ToolCard({
       </div>
 
       <code className="block text-sm font-mono font-medium">{tool.name}</code>
-      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-        {tool.description}
-      </p>
 
       <AnimatePresence initial={false}>
         {expanded && tool.parameters && (
@@ -86,6 +84,9 @@ function ToolCard({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mt-3 border-t border-white/8 pt-3">
+              <p className="mb-2 text-xs leading-relaxed text-muted-foreground/78">
+                {tool.description}
+              </p>
               <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
                 Parameters
               </p>
@@ -136,7 +137,7 @@ export function ToolsPage() {
   };
 
   return (
-    <PageScaffold title="Tools" description="Available tools for agents to use">
+    <PageScaffold title="Tools">
       <div className="flex h-full flex-col">
         <div className="mb-4 flex items-center gap-3">
           <div className="relative max-w-sm flex-1">

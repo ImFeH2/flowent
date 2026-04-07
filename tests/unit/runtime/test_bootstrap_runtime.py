@@ -4,6 +4,7 @@ from uuid import UUID
 
 import app.settings as settings_module
 from app.agent import Agent
+from app.models import StateEntry
 from app.registry import registry
 from app.runtime import bootstrap_runtime
 from app.settings import (
@@ -229,5 +230,78 @@ def test_bootstrap_runtime_falls_back_to_steward_when_assistant_role_missing(
         assert assistant is not None
         assert assistant.config.role_name == STEWARD_ROLE_NAME
         assert settings_module.get_settings().assistant.role_name == STEWARD_ROLE_NAME
+    finally:
+        registry.reset()
+
+
+def test_bootstrap_runtime_backfills_state_history_for_restored_nodes(
+    monkeypatch,
+    tmp_path,
+):
+    registry.reset()
+    settings_file = tmp_path / "settings.json"
+    workspace_file = tmp_path / "workspace.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_file.write_text(
+        json.dumps(
+            {
+                "tabs": [
+                    {
+                        "id": "tab-1",
+                        "title": "Restore",
+                        "goal": "",
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "nodes": [
+                    {
+                        "id": "node-1",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Worker",
+                            "tab_id": "tab-1",
+                            "name": "Restored Worker",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "idle",
+                        "todos": [],
+                        "history": [],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        restored = registry.get("node-1")
+        assert restored is not None
+        assert any(
+            isinstance(entry, StateEntry) and entry.state == "idle"
+            for entry in restored.history
+        )
     finally:
         registry.reset()

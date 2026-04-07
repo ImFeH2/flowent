@@ -39,11 +39,8 @@ export function Sidebar({
   const { isDragging, startDrag } = usePanelDrag(width, onWidthChange, "right");
   const widthProgress = Math.max(0, Math.min(1, (width - 180) / 220));
   const headerPaddingY = 12 + widthProgress * 4;
-  const titleFontSizeRem = 1.02 + widthProgress * 0.16;
-  const subtitleFontSizePx = 10 + widthProgress * 0.8;
-  const subtitleMarginTopPx = 2 + widthProgress * 1.2;
+  const titleFontSizeRem = 1.02 + widthProgress * 0.14;
   const statusFontSizePx = 10 + widthProgress * 0.4;
-  const showDescriptions = width > 214;
 
   const navigate = (page: PageId) => {
     setCurrentPage(page);
@@ -70,22 +67,16 @@ export function Sidebar({
           }}
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex flex-wrap items-center gap-2">
               <h1
                 className="truncate font-semibold tracking-[-0.03em] text-foreground"
                 style={{ fontSize: `${titleFontSizeRem.toFixed(3)}rem` }}
               >
                 Autopoe
               </h1>
-              <p
-                className="truncate font-medium tracking-[0.02em] text-muted-foreground/84"
-                style={{
-                  marginTop: `${subtitleMarginTopPx.toFixed(2)}px`,
-                  fontSize: `${subtitleFontSizePx.toFixed(2)}px`,
-                }}
-              >
+              <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
                 Agent Studio
-              </p>
+              </span>
             </div>
             <div
               className="flex shrink-0 items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1"
@@ -117,7 +108,7 @@ export function Sidebar({
               type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-start gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150",
+                "group flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150",
                 currentPage === id
                   ? "bg-white/[0.05] text-foreground"
                   : "text-muted-foreground hover:bg-white/[0.028] hover:text-foreground",
@@ -131,28 +122,9 @@ export function Sidebar({
                     : "bg-white/0 opacity-0 group-hover:bg-white/8 group-hover:opacity-100",
                 )}
               />
-              <div className="min-w-0 text-left">
-                <span className="block truncate text-[13px] font-medium leading-5">
-                  {label}
-                </span>
-                {showDescriptions ? (
-                  <span className="block truncate text-[10px] leading-4 text-muted-foreground/68">
-                    {id === "workspace"
-                      ? "Task tabs, graph canvas, and assistant panels"
-                      : id === "providers"
-                        ? "Model backends and catalogs"
-                        : id === "roles"
-                          ? "Behavior templates and overrides"
-                          : id === "prompts"
-                            ? "Global system guidance"
-                            : id === "tools"
-                              ? "Available runtime capabilities"
-                              : id === "channels"
-                                ? "External messaging integrations"
-                                : "Runtime defaults and event log"}
-                  </span>
-                ) : null}
-              </div>
+              <span className="min-w-0 flex-1 truncate text-left text-[13px] font-medium leading-5">
+                {label}
+              </span>
             </button>
           ))}
         </nav>

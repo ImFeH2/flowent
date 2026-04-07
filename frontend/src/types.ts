@@ -72,12 +72,15 @@ export type HistoryEntryType =
   | "AssistantText"
   | "SentMessage"
   | "AssistantThinking"
+  | "StateEntry"
   | "ToolCall"
   | "ErrorEntry";
 
 export interface HistoryEntry {
   type: HistoryEntryType;
   content?: string | null;
+  state?: AgentState | null;
+  reason?: string | null;
   from_id?: string | null;
   to_ids?: string[] | null;
   message_id?: string | null;

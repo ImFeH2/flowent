@@ -103,6 +103,26 @@ describe("HistoryView", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders state history entries with reasons", () => {
+    render(
+      <HistoryView
+        history={[
+          {
+            type: "StateEntry",
+            state: "running",
+            reason: "processing",
+            timestamp: 1,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /State RUNNING/i }));
+
+    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByText("processing")).toBeInTheDocument();
+  });
+
   it("shows streaming message content immediately", () => {
     render(
       <HistoryView

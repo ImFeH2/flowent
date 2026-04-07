@@ -740,17 +740,17 @@ def test_record_content_output_records_sent_message_in_history(monkeypatch):
         registry.reset()
 
     history = child.get_history_snapshot()
-    assert len(history) == 1
-    assert isinstance(history[0], SentMessage)
-    assert history[0].content == "investigate the error"
-    assert history[0].to_ids == ["peer"]
-    assert history[0].message_id is not None
+    sent_entries = [entry for entry in history if isinstance(entry, SentMessage)]
+    assert len(sent_entries) == 1
+    assert sent_entries[0].content == "investigate the error"
+    assert sent_entries[0].to_ids == ["peer"]
+    assert sent_entries[0].message_id is not None
     assert not any(isinstance(entry, AssistantText) for entry in history)
     assert peer._wake_queue.get_nowait().payload == {
         "message": {
             "from": "child",
             "content": "investigate the error",
-            "message_id": history[0].message_id,
+            "message_id": sent_entries[0].message_id,
         }
     }
     assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
@@ -905,8 +905,10 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry(monke
     messages = agent._build_messages()
     history = agent.get_history_snapshot()
 
-    assert len(history) == 1
-    assert isinstance(history[0], ReceivedMessage)
+    received_entries = [
+        entry for entry in history if isinstance(entry, ReceivedMessage)
+    ]
+    assert len(received_entries) == 1
     assert messages == [
         {"role": "system", "content": messages[0]["content"]},
         {"role": "user", "content": '<message from="human">begin</message>'},
@@ -935,8 +937,10 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
     messages = agent._build_messages()
     history = agent.get_history_snapshot()
 
-    assert len(history) == 1
-    assert isinstance(history[0], ReceivedMessage)
+    received_entries = [
+        entry for entry in history if isinstance(entry, ReceivedMessage)
+    ]
+    assert len(received_entries) == 1
     assert messages == [
         {"role": "system", "content": messages[0]["content"]},
         {"role": "user", "content": '<message from="human">begin</message>'},

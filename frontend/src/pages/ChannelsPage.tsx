@@ -128,24 +128,16 @@ export function ChannelsPage() {
   }
 
   return (
-    <PageScaffold
-      title="Channels"
-      description="External messaging integrations"
-    >
+    <PageScaffold title="Channels">
       <div className="h-full min-h-0 overflow-y-auto pr-2">
         <div className="mx-auto max-w-3xl pb-6">
           <SoftPanel className="space-y-6">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
-                  Telegram
-                </p>
-                <h2 className="mt-1 text-base font-semibold">Bot Channel</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Only private chats are supported in this first version.
-                  Unapproved chats are listed here by chat ID so you can approve
-                  them directly from the Web UI.
-                </p>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold">Telegram</h2>
+                <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+                  Private chats only
+                </span>
               </div>
               <Badge
                 variant="outline"
@@ -160,11 +152,12 @@ export function ChannelsPage() {
             </div>
 
             <section>
-              <label className="text-sm font-medium">Bot Token</label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Token from @BotFather. Leave untouched to keep the current
-                token.
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm font-medium">Bot Token</label>
+                <span className="text-[11px] text-muted-foreground/72">
+                  Leave empty to keep the current token
+                </span>
+              </div>
               <div className="relative mt-3">
                 <input
                   type={showToken ? "text" : "password"}
@@ -193,12 +186,14 @@ export function ChannelsPage() {
             </section>
 
             <section className="border-t border-white/6 pt-5">
-              <label className="text-sm font-medium">
-                Pending Private Chats
-              </label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Private chats that contacted the bot but are not approved yet.
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm font-medium">
+                  Pending Private Chats
+                </label>
+                <span className="text-[11px] text-muted-foreground/72">
+                  {settings.pending_chats.length} waiting
+                </span>
+              </div>
               {settings.pending_chats.length === 0 ? (
                 <p className="mt-3 text-sm text-muted-foreground">
                   No pending chats.
@@ -257,13 +252,14 @@ export function ChannelsPage() {
             </section>
 
             <section className="border-t border-white/6 pt-5">
-              <label className="text-sm font-medium">
-                Approved Private Chats
-              </label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Approved chats can send messages to the Assistant and receive
-                Assistant output.
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm font-medium">
+                  Approved Private Chats
+                </label>
+                <span className="text-[11px] text-muted-foreground/72">
+                  {settings.approved_chats.length} active
+                </span>
+              </div>
               {settings.approved_chats.length === 0 ? (
                 <p className="mt-3 text-sm text-muted-foreground">
                   No approved chats yet.

@@ -9,6 +9,7 @@ import {
   Terminal,
   Bot,
   AlertCircle,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, Node } from "@/types";
@@ -164,6 +165,26 @@ function HistoryItem({
             markdownClassName="text-foreground/82"
             preClassName="text-foreground/82 leading-relaxed"
           />
+        </CollapsibleBlock>
+      );
+
+    case "StateEntry":
+      return (
+        <CollapsibleBlock
+          label={entry.state ? `State ${entry.state.toUpperCase()}` : "State"}
+          icon={<Workflow className="size-3 text-foreground/62" />}
+          className="border-white/8 bg-white/[0.016]"
+          labelClassName="text-foreground/72"
+          defaultOpen={false}
+        >
+          <div className="space-y-1 text-[11px] leading-relaxed text-foreground/84">
+            <p className="font-mono uppercase tracking-[0.08em] text-foreground/78">
+              {entry.state ?? "unknown"}
+            </p>
+            {entry.reason ? (
+              <p className="text-muted-foreground">{entry.reason}</p>
+            ) : null}
+          </div>
         </CollapsibleBlock>
       );
 

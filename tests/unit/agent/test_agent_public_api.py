@@ -8,6 +8,7 @@ from app.models import (
     NodeConfig,
     NodeType,
     ReceivedMessage,
+    StateEntry,
     TodoItem,
 )
 from app.registry import registry
@@ -56,9 +57,12 @@ def test_idle_tool_blocks_until_message_and_returns_idle_duration():
     assert len(result) == 1
     assert result[0].startswith("idle ")
     assert result[0].endswith("s")
-    assert isinstance(agent.history[-1], ReceivedMessage)
-    assert agent.history[-1].from_id == "tester"
-    assert agent.history[-1].content == "hello from queue"
+    received_entries = [
+        entry for entry in agent.history if isinstance(entry, ReceivedMessage)
+    ]
+    assert len(received_entries) == 1
+    assert received_entries[0].from_id == "tester"
+    assert received_entries[0].content == "hello from queue"
 
 
 def test_idle_tool_returns_immediately_when_runtime_notice_is_pending():
@@ -156,6 +160,28 @@ def test_request_interrupt_ignores_non_running_agent():
 
     assert interrupted is False
     assert not agent._interrupt_requested.is_set()
+
+
+def test_state_changes_are_recorded_in_history():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+
+    agent.set_state(AgentState.RUNNING, "processing")
+    agent.set_state(AgentState.IDLE, "completed")
+
+    state_entries = [
+        entry for entry in agent.get_history_snapshot() if isinstance(entry, StateEntry)
+    ]
+
+    assert [entry.state for entry in state_entries] == [
+        "initializing",
+        "running",
+        "idle",
+    ]
+    assert [entry.reason for entry in state_entries] == [
+        "created",
+        "processing",
+        "completed",
+    ]
 
 
 def test_contacts_tool_uses_agent_public_api(monkeypatch):

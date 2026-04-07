@@ -294,13 +294,13 @@ export function ProvidersPage() {
                         : "bg-transparent",
                     )}
                   />
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex flex-1 items-center gap-2">
                     <p className="truncate text-sm font-medium">
                       {provider.name}
                     </p>
-                    <p className="truncate text-[11px] text-muted-foreground">
+                    <span className="shrink-0 rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
                       {providerTypeLabel(provider.type)}
-                    </p>
+                    </span>
                   </div>
                   <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
@@ -364,15 +364,8 @@ export function ProvidersPage() {
 
             <div className="flex-1 overflow-y-auto">
               <div className="mx-auto max-w-xl py-6">
-                <SectionHeader
-                  eyebrow="Provider"
-                  title="Identity"
-                  description="Display name and API type"
-                />
-                <SettingsRow
-                  label="Name"
-                  description="Display name for this provider"
-                >
+                <SectionHeader title="Identity" eyebrow="Provider" />
+                <SettingsRow label="Name">
                   <input
                     type="text"
                     value={draft.name}
@@ -383,10 +376,7 @@ export function ProvidersPage() {
                     className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                   />
                 </SettingsRow>
-                <SettingsRow
-                  label="Type"
-                  description="API format used by this provider"
-                >
+                <SettingsRow label="Type">
                   <Select
                     value={draft.type}
                     onValueChange={(value) =>
@@ -407,12 +397,8 @@ export function ProvidersPage() {
                 </SettingsRow>
 
                 <div className="mt-8 border-t border-white/6 pt-8">
-                  <SectionHeader
-                    eyebrow="Connection"
-                    title="Endpoint"
-                    description="API endpoint and authentication"
-                  />
-                  <SettingsRow label="Base URL" description="API endpoint URL">
+                  <SectionHeader title="Connection" eyebrow="Endpoint" />
+                  <SettingsRow label="Base URL">
                     <input
                       type="text"
                       value={draft.base_url}
@@ -425,7 +411,7 @@ export function ProvidersPage() {
                   </SettingsRow>
                   <SettingsRow
                     label="Request Preview"
-                    description="Final request endpoint derived from type and base URL"
+                    description="Resolved endpoint"
                   >
                     <div
                       className={cn(
@@ -448,10 +434,7 @@ export function ProvidersPage() {
                       )}
                     </div>
                   </SettingsRow>
-                  <SettingsRow
-                    label="API Key"
-                    description="Authentication key (optional)"
-                  >
+                  <SettingsRow label="API Key" description="Optional">
                     <div className="relative">
                       <input
                         type={showKey ? "text" : "password"}

@@ -15,6 +15,7 @@ import {
   LoaderCircle,
   MessageSquare,
   Send,
+  Square,
   Sparkles,
   Wrench,
 } from "lucide-react";
@@ -33,16 +34,23 @@ interface AssistantChatMessagesProps {
   items: AssistantChatItem[];
   nodes?: Map<string, Node>;
   onScroll: UIEventHandler<HTMLDivElement>;
+  runningHint?: {
+    label: string;
+    toolName?: string | null;
+  } | null;
   variant: AssistantChatVariant;
 }
 
 interface AssistantChatComposerProps {
+  busy?: boolean;
   disabled: boolean;
   input: string;
   onChange: (value: string) => void;
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>;
   onSend: () => void;
+  onStop?: () => void;
   overlay?: boolean;
+  stopping?: boolean;
   variant: AssistantChatVariant;
 }
 
@@ -52,6 +60,7 @@ export function AssistantChatMessages({
   items,
   nodes,
   onScroll,
+  runningHint = null,
   variant,
 }: AssistantChatMessagesProps) {
   const isWorkspace = variant === "workspace";
@@ -73,6 +82,7 @@ export function AssistantChatMessages({
       )}
     >
       {visibleItems.length === 0 &&
+        !runningHint &&
         (isWorkspace ? (
           <WorkspaceEmptyState />
         ) : (
@@ -87,21 +97,34 @@ export function AssistantChatMessages({
           variant={variant}
         />
       ))}
+
+      {runningHint ? (
+        <AssistantRunningHint
+          label={runningHint.label}
+          toolName={runningHint.toolName}
+          variant={variant}
+        />
+      ) : null}
     </div>
   );
 }
 
 export function AssistantChatComposer({
+  busy = false,
   disabled,
   input,
   onChange,
   onKeyDown,
   onSend,
+  onStop,
   overlay = false,
+  stopping = false,
   variant,
 }: AssistantChatComposerProps) {
   const isWorkspace = variant === "workspace";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const actionLabel = busy ? (stopping ? "Stopping..." : "Stop") : "Send";
+  const actionDisabled = busy ? stopping || !onStop : disabled;
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -167,18 +190,69 @@ export function AssistantChatComposer({
         />
         <button
           type="button"
-          onClick={onSend}
-          disabled={disabled}
-          aria-label="Send message"
+          onClick={busy ? onStop : onSend}
+          disabled={actionDisabled}
+          aria-label={busy ? "Stop assistant" : "Send message"}
           className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+            "flex shrink-0 items-center justify-center rounded-full transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
             isWorkspace
-              ? "bg-primary/[0.92] text-primary-foreground hover:bg-primary/[0.86]"
-              : "bg-primary text-primary-foreground hover:bg-primary/90",
+              ? "h-8 gap-1.5 px-3 bg-primary/[0.92] text-primary-foreground hover:bg-primary/[0.86]"
+              : "size-7 bg-primary text-primary-foreground hover:bg-primary/90",
+            busy && isWorkspace
+              ? "bg-white/[0.1] text-white hover:bg-white/[0.16]"
+              : "",
           )}
         >
-          <ArrowUp className="size-4" strokeWidth={2.5} />
+          {busy ? (
+            <Square className="size-3.5 fill-current" strokeWidth={2.4} />
+          ) : (
+            <ArrowUp className="size-4" strokeWidth={2.5} />
+          )}
+          {isWorkspace ? (
+            <span className="text-[11px] font-medium">{actionLabel}</span>
+          ) : null}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function AssistantRunningHint({
+  label,
+  toolName,
+  variant,
+}: {
+  label: string;
+  toolName?: string | null;
+  variant: AssistantChatVariant;
+}) {
+  const isWorkspace = variant === "workspace";
+
+  return (
+    <div className="flex min-w-0 items-center">
+      <div
+        className={cn(
+          "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] text-muted-foreground/82",
+          isWorkspace
+            ? "border-white/10 bg-white/[0.04]"
+            : "border-white/8 bg-white/[0.03]",
+        )}
+      >
+        <span className="flex items-center gap-1.5">
+          {[0, 1, 2].map((index) => (
+            <span
+              key={index}
+              className="size-1.5 rounded-full bg-white/55 animate-pulse"
+              style={{ animationDelay: `${index * 140}ms` }}
+            />
+          ))}
+        </span>
+        <span>{label}</span>
+        {toolName ? (
+          <span className="truncate rounded-full border border-white/8 bg-black/[0.16] px-2 py-0.5 font-mono text-[10px] text-white/72">
+            {toolName}
+          </span>
+        ) : null}
       </div>
     </div>
   );

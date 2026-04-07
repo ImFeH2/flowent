@@ -17,7 +17,7 @@ import {
 } from "@/context/AgentContext";
 import { getAssistantNodeId } from "@/lib/assistant";
 import { mergeHistoryWithDeltas } from "@/lib/history";
-import type { AssistantChatItem, NodeDetail } from "@/types";
+import type { AssistantChatItem, HistoryEntry, NodeDetail } from "@/types";
 
 export function useAssistantChat() {
   const { agents } = useAgentNodesRuntime();
@@ -97,13 +97,49 @@ export function useAssistantChat() {
   const assistantActivity = useMemo(() => {
     const pendingCount = pendingAssistantMessages.length;
     const deltas = assistantId ? (streamingDeltas.get(assistantId) ?? []) : [];
+    const running =
+      connected &&
+      (pendingCount > 0 ||
+        assistantNode?.state === "running" ||
+        activeToolCalls.has(assistantId ?? "") ||
+        deltas.length > 0);
+    const lastHumanIndex = [...timelineItems]
+      .map((item, index) => ({ item, index }))
+      .reverse()
+      .find(({ item }) =>
+        item.type === "PendingHumanMessage"
+          ? true
+          : item.type === "ReceivedMessage" &&
+            item.from_id === "human" &&
+            Boolean(item.content),
+      )?.index;
+    const turnItems =
+      lastHumanIndex === undefined
+        ? []
+        : timelineItems.slice(lastHumanIndex + 1);
+    const hasAssistantText = turnItems.some(
+      (item) => item.type === "AssistantText" && Boolean(item.content?.trim()),
+    );
+    const lastToolCall = [...turnItems]
+      .reverse()
+      .find(
+        (item): item is HistoryEntry & { type: "ToolCall" } =>
+          item.type === "ToolCall",
+      );
+    const activeToolName = assistantId
+      ? (activeToolCalls.get(assistantId) ?? null)
+      : null;
+    const toolName = activeToolName ?? lastToolCall?.tool_name ?? null;
+
     return {
-      running:
-        connected &&
-        (pendingCount > 0 ||
-          assistantNode?.state === "running" ||
-          activeToolCalls.has(assistantId ?? "") ||
-          deltas.length > 0),
+      running,
+      runningHint:
+        running && lastHumanIndex !== undefined && !hasAssistantText
+          ? {
+              label: toolName ? "Running tools..." : "Thinking...",
+              toolName,
+            }
+          : null,
     };
   }, [
     activeToolCalls,
@@ -112,6 +148,7 @@ export function useAssistantChat() {
     connected,
     pendingAssistantMessages.length,
     streamingDeltas,
+    timelineItems,
   ]);
 
   useEffect(() => {

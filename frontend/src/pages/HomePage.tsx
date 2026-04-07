@@ -1506,6 +1506,7 @@ function AssistantChatPanel({
 }) {
   const { agents } = useAgentNodesRuntime();
   const {
+    assistantActivity,
     connected,
     handleKeyDown,
     input,
@@ -1563,6 +1564,7 @@ function AssistantChatPanel({
           items={timelineItems}
           nodes={agents}
           onScroll={onMessagesScroll}
+          runningHint={assistantActivity.runningHint}
           scrollRef={scrollRef}
           variant="workspace"
         />
@@ -1572,12 +1574,15 @@ function AssistantChatPanel({
           className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(8,8,9,0.12)_18%,rgba(8,8,9,0.72)_60%,rgba(8,8,9,0.94)_100%)] px-2.5 pb-2.5 pt-8"
         >
           <AssistantChatComposer
+            busy={assistantActivity.running}
             disabled={!input.trim() || sending}
             input={input}
             onChange={setInput}
             onKeyDown={handleKeyDown}
             onSend={() => void sendMessage()}
+            onStop={onInterrupt}
             overlay
+            stopping={interrupting}
             variant="workspace"
           />
         </div>

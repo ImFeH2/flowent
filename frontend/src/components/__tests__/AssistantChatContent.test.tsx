@@ -170,6 +170,34 @@ describe("AssistantChatMessages", () => {
     expect(scrollRef.current?.style.scrollPaddingBottom).toBe("134px");
   });
 
+  it("renders an inline running hint at the end of the timeline", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "PendingHumanMessage",
+            id: "pending-2",
+            from: "human",
+            content: "Inspect the deployment issue",
+            timestamp: 10,
+          },
+        ]}
+        onScroll={() => {}}
+        runningHint={{
+          label: "Running tools...",
+          toolName: "manage_roles",
+        }}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    expect(screen.getByText("Running tools...")).toBeInTheDocument();
+    expect(screen.getByText("manage_roles")).toBeInTheDocument();
+  });
+
   it("renders human bubbles with gray surfaces and white text", () => {
     const workspaceScrollRef = createRef<HTMLDivElement>();
     const panelScrollRef = createRef<HTMLDivElement>();
@@ -292,13 +320,14 @@ describe("AssistantChatMessages", () => {
 
 describe("AssistantChatComposer", () => {
   it("keeps the send action inside the composer shell and grows with multiline input", () => {
+    const onSend = vi.fn();
     const { rerender } = render(
       <AssistantChatComposer
         disabled={false}
         input=""
         onChange={() => {}}
         onKeyDown={() => {}}
-        onSend={() => {}}
+        onSend={onSend}
         variant="workspace"
       />,
     );
@@ -341,7 +370,7 @@ describe("AssistantChatComposer", () => {
         input={"line 1\nline 2\nline 3\nline 4"}
         onChange={() => {}}
         onKeyDown={() => {}}
-        onSend={() => {}}
+        onSend={onSend}
         variant="workspace"
       />,
     );
@@ -360,7 +389,7 @@ describe("AssistantChatComposer", () => {
         input={"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11"}
         onChange={() => {}}
         onKeyDown={() => {}}
-        onSend={() => {}}
+        onSend={onSend}
         variant="workspace"
       />,
     );
@@ -369,5 +398,31 @@ describe("AssistantChatComposer", () => {
     expect(textarea.style.overflowY).toBe("auto");
 
     getComputedStyleSpy.mockRestore();
+  });
+
+  it("switches the workspace action to stop while the assistant is running", () => {
+    const onSend = vi.fn();
+    const onStop = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        busy
+        disabled
+        input=""
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onSend={onSend}
+        onStop={onStop}
+        variant="workspace"
+      />,
+    );
+
+    const stopButton = screen.getByRole("button", { name: "Stop assistant" });
+    expect(stopButton).toHaveTextContent("Stop");
+
+    fireEvent.click(stopButton);
+
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(onSend).not.toHaveBeenCalled();
   });
 });

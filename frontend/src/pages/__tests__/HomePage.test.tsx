@@ -69,6 +69,10 @@ vi.mock("@/context/AgentContext", () => ({
 
 vi.mock("@/hooks/useAssistantChat", () => ({
   useAssistantChat: () => ({
+    assistantActivity: {
+      running: false,
+      runningHint: null,
+    },
     connected: true,
     handleKeyDown: vi.fn(),
     input: "",

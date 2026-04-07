@@ -336,179 +336,185 @@ export function ProvidersPage() {
             onMouseDown={startDrag}
           />
         </div>
-      </div>
 
-      <div className="min-w-0 flex-1 overflow-hidden bg-white/[0.012]">
-        {isCreating || selectedProvider ? (
-          <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b border-white/6 px-6 py-4">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {isCreating ? "New Provider" : selectedProvider?.name}
-                </h2>{" "}
-                <p className="text-sm text-muted-foreground">
-                  {isCreating
-                    ? "Configure a new LLM provider"
-                    : `ID: ${selectedProvider?.id}`}
-                </p>
+        <div className="min-w-0 flex-1 overflow-hidden bg-white/[0.012]">
+          {isCreating || selectedProvider ? (
+            <div className="flex h-full flex-col">
+              <div className="flex items-center justify-between border-b border-white/6 px-6 py-4">
+                <div>
+                  <h2 className="text-lg font-semibold">
+                    {isCreating ? "New Provider" : selectedProvider?.name}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {isCreating
+                      ? "Configure a new LLM provider"
+                      : `ID: ${selectedProvider?.id}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasChanges && (
+                    <>
+                      <Button
+                        onClick={handleCancel}
+                        disabled={saving}
+                        variant="ghost"
+                        className="border border-white/8 text-foreground hover:bg-white/[0.05]"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => void handleSave()}
+                        disabled={saving}
+                      >
+                        <Check className="size-4" />
+                        {saving ? "Saving..." : "Save"}
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {hasChanges && (
-                  <>
-                    <Button
-                      onClick={handleCancel}
-                      disabled={saving}
-                      variant="ghost"
-                      className="border border-white/8 text-foreground hover:bg-white/[0.05]"
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={() => void handleSave()} disabled={saving}>
-                      <Check className="size-4" />
-                      {saving ? "Saving..." : "Save"}
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-xl py-6">
-                <SectionHeader
-                  title="Identity"
-                  eyebrow="Provider"
-                  description="Set the provider name and runtime type used across roles and settings."
-                />
-                <SettingsRow label="Name">
-                  <input
-                    type="text"
-                    value={draft.name}
-                    onChange={(e) =>
-                      setDraft({ ...draft, name: e.target.value })
-                    }
-                    placeholder="e.g., OpenAI Production"
-                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
-                  />
-                </SettingsRow>
-                <SettingsRow label="Type">
-                  <Select
-                    value={draft.type}
-                    onValueChange={(value) =>
-                      setDraft({ ...draft, type: value })
-                    }
-                  >
-                    <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {providerTypeOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </SettingsRow>
-
-                <div className="mt-8 border-t border-white/6 pt-8">
+              <div className="flex-1 overflow-y-auto">
+                <div className="mx-auto max-w-xl py-6">
                   <SectionHeader
-                    title="Endpoint"
-                    eyebrow="Endpoint"
-                    description="Configure the base URL, inspect the resolved request preview, and optionally store an API key."
+                    title="Identity"
+                    eyebrow="Provider"
+                    description="Set the provider name and runtime type used across roles and settings."
                   />
-                  <SettingsRow label="Base URL">
+                  <SettingsRow label="Name">
                     <input
                       type="text"
-                      value={draft.base_url}
+                      value={draft.name}
                       onChange={(e) =>
-                        setDraft({ ...draft, base_url: e.target.value })
+                        setDraft({ ...draft, name: e.target.value })
                       }
-                      placeholder="https://api.openai.com/v1"
+                      placeholder="e.g., OpenAI Production"
                       className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                     />
                   </SettingsRow>
-                  <SettingsRow
-                    label="Request Preview"
-                    description="Resolved endpoint"
-                  >
-                    <div
-                      className={cn(
-                        "w-full rounded-md border px-3 py-2 text-sm",
-                        endpointPreview.error
-                          ? "border-destructive/30 bg-destructive/5 text-destructive"
-                          : "border-white/8 bg-black/[0.22] text-foreground",
-                      )}
+                  <SettingsRow label="Type">
+                    <Select
+                      value={draft.type}
+                      onValueChange={(value) =>
+                        setDraft({ ...draft, type: value })
+                      }
                     >
-                      {endpointPreview.error ? (
-                        endpointPreview.error
-                      ) : endpointPreview.previewUrl ? (
-                        <code className="font-mono text-[12px]">
-                          {endpointPreview.previewUrl}
-                        </code>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          Enter a base URL to preview the final request endpoint
-                        </span>
-                      )}
-                    </div>
+                      <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {providerTypeOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </SettingsRow>
-                  <SettingsRow label="API Key" description="Optional">
-                    <div className="relative">
-                      <input
-                        type={showKey ? "text" : "password"}
-                        value={draft.api_key}
-                        onChange={(e) =>
-                          setDraft({ ...draft, api_key: e.target.value })
-                        }
-                        placeholder="sk-..."
-                        className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-9 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
-                      />
-                      <Button
-                        type="button"
-                        onClick={() => setShowKey(!showKey)}
-                        variant="ghost"
-                        size="icon-xs"
-                        className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
-                      >
-                        {showKey ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </SettingsRow>
-                </div>
 
-                {!isCreating && selectedProvider && (
-                  <div className="mt-8 border-t border-white/6 pt-4">
-                    <p className="text-xs text-muted-foreground">
-                      ID:{" "}
-                      <code className="font-mono">{selectedProvider.id}</code>
-                    </p>
+                  <div className="mt-8 border-t border-white/6 pt-8">
+                    <SectionHeader
+                      title="Endpoint"
+                      eyebrow="Endpoint"
+                      description="Configure the base URL, inspect the resolved request preview, and optionally store an API key."
+                    />
+                    <SettingsRow label="Base URL">
+                      <input
+                        type="text"
+                        value={draft.base_url}
+                        onChange={(e) =>
+                          setDraft({ ...draft, base_url: e.target.value })
+                        }
+                        placeholder="https://api.openai.com/v1"
+                        className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                      />
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Request Preview"
+                      description="Resolved endpoint"
+                    >
+                      <div
+                        className={cn(
+                          "w-full rounded-md border px-3 py-2 text-sm",
+                          endpointPreview.error
+                            ? "border-destructive/30 bg-destructive/5 text-destructive"
+                            : "border-white/8 bg-black/[0.22] text-foreground",
+                        )}
+                      >
+                        {endpointPreview.error ? (
+                          endpointPreview.error
+                        ) : endpointPreview.previewUrl ? (
+                          <code className="font-mono text-[12px]">
+                            {endpointPreview.previewUrl}
+                          </code>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            Enter a base URL to preview the final request
+                            endpoint
+                          </span>
+                        )}
+                      </div>
+                    </SettingsRow>
+                    <SettingsRow label="API Key" description="Optional">
+                      <div className="relative">
+                        <input
+                          type={showKey ? "text" : "password"}
+                          value={draft.api_key}
+                          onChange={(e) =>
+                            setDraft({ ...draft, api_key: e.target.value })
+                          }
+                          placeholder="sk-..."
+                          className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-9 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => setShowKey(!showKey)}
+                          variant="ghost"
+                          size="icon-xs"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
+                        >
+                          {showKey ? (
+                            <EyeOff className="size-4" />
+                          ) : (
+                            <Eye className="size-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </SettingsRow>
                   </div>
-                )}
+
+                  {!isCreating && selectedProvider && (
+                    <div className="mt-8 border-t border-white/6 pt-4">
+                      <p className="text-xs text-muted-foreground">
+                        ID:{" "}
+                        <code className="font-mono">{selectedProvider.id}</code>
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex h-full flex-col items-center justify-center text-center"
-          >
-            <Server className="size-8 text-muted-foreground/60" />
-            <h3 className="mt-4 text-lg font-semibold">No Provider Selected</h3>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-              Select a provider from the list to edit, or create a new one to
-              get started.
-            </p>
-            <Button onClick={handleCreateNew} className="mt-4">
-              <Plus className="size-4" />
-              Add Provider
-            </Button>
-          </motion.div>
-        )}
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex h-full flex-col items-center justify-center text-center"
+            >
+              <Server className="size-8 text-muted-foreground/60" />
+              <h3 className="mt-4 text-lg font-semibold">
+                No Provider Selected
+              </h3>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Select a provider from the list to edit, or create a new one to
+                get started.
+              </p>
+              <Button onClick={handleCreateNew} className="mt-4">
+                <Plus className="size-4" />
+                Add Provider
+              </Button>
+            </motion.div>
+          )}
+        </div>
       </div>
       <AlertDialog
         open={providerToDelete !== null}

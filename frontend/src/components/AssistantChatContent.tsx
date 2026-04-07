@@ -66,7 +66,9 @@ export function AssistantChatMessages({
   const isWorkspace = variant === "workspace";
   const isFloating = variant === "floating";
   const baseBottomPadding = isWorkspace ? 14 : 16;
-  const visibleItems = items.filter((item) => item.type !== "SystemEntry");
+  const visibleItems = items.filter(
+    (item) => item.type !== "SystemEntry" && item.type !== "StateEntry",
+  );
 
   return (
     <div

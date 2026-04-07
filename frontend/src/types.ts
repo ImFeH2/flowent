@@ -23,6 +23,7 @@ export type DisplayEventType =
 
 export type UpdateEventType =
   | DisplayEventType
+  | "history_cleared"
   | "history_entry_added"
   | "history_entry_delta";
 

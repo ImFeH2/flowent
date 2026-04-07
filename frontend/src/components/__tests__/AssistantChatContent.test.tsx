@@ -198,6 +198,30 @@ describe("AssistantChatMessages", () => {
     expect(screen.getByText("manage_roles")).toBeInTheDocument();
   });
 
+  it("shows the empty state when only state entries remain after a chat clear", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "StateEntry",
+            state: "idle",
+            reason: "assistant chat cleared",
+            timestamp: 1,
+          },
+        ]}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    expect(screen.getAllByText("Start a conversation").length).toBeGreaterThan(
+      0,
+    );
+  });
+
   it("renders human bubbles with gray surfaces and white text", () => {
     const workspaceScrollRef = createRef<HTMLDivElement>();
     const panelScrollRef = createRef<HTMLDivElement>();

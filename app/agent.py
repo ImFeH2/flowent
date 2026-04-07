@@ -433,6 +433,53 @@ class Agent:
         )
         self._persist_workspace_node()
 
+    def _clear_pending_message_wakeups(self) -> None:
+        preserved_signals: list[WakeSignal] = []
+
+        while True:
+            try:
+                signal = self._wake_queue.get_nowait()
+            except Empty:
+                break
+
+            if signal.reason != "message":
+                preserved_signals.append(signal)
+
+        for signal in preserved_signals:
+            self._wake_queue.put(signal)
+
+    def clear_chat_history(self, *, interrupt_timeout: float = 5.0) -> None:
+        if self.node_type != NodeType.ASSISTANT:
+            raise RuntimeError("Only assistant chat history can be cleared")
+
+        if self.state == AgentState.RUNNING:
+            if not self.request_interrupt():
+                raise RuntimeError("Assistant is not interruptible")
+            if not self.wait_until_idle(timeout=interrupt_timeout):
+                raise TimeoutError("Assistant did not reach idle before clearing")
+
+        self._clear_pending_message_wakeups()
+        with self._runtime_notice_lock:
+            self._pending_runtime_notices.clear()
+        with self._history_lock:
+            self.history = [
+                entry
+                for entry in self.history
+                if isinstance(entry, (SystemEntry, StateEntry))
+            ]
+            self._pending_input_turn = False
+            self._turn_started_with_pending_input = False
+            self._turn_made_progress = False
+
+        event_bus.emit(
+            Event(
+                type=EventType.HISTORY_CLEARED,
+                agent_id=self.uuid,
+                data={"scope": "assistant_chat"},
+            )
+        )
+        self._persist_workspace_node()
+
     def _run(self) -> None:
         with logger.contextualize(
             agent_id=self.uuid[:8],

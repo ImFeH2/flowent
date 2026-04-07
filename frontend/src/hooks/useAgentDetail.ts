@@ -4,7 +4,10 @@ import {
   useAgentNodesRuntime,
 } from "@/context/AgentContext";
 import { fetchNodeDetail } from "@/lib/api";
-import { mergeHistoryWithDeltas } from "@/lib/history";
+import {
+  clearConversationHistory,
+  mergeHistoryWithDeltas,
+} from "@/lib/history";
 import type { NodeDetail } from "@/types";
 
 export function useAgentDetail(
@@ -16,8 +19,31 @@ export function useAgentDetail(
   const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const { agents } = useAgentNodesRuntime();
-  const { agentHistories, clearAgentHistory, streamingDeltas } =
-    useAgentHistoryRuntime();
+  const {
+    agentHistories,
+    clearAgentHistory,
+    historyClearedAt,
+    streamingDeltas,
+  } = useAgentHistoryRuntime();
+  const detailHistoryClearedAt = agentId
+    ? (historyClearedAt.get(agentId) ?? 0)
+    : 0;
+
+  useEffect(() => {
+    if (!detailHistoryClearedAt) {
+      return;
+    }
+
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            history: clearConversationHistory(current.history),
+          }
+        : current,
+    );
+    setFetchedAt(Date.now());
+  }, [detailHistoryClearedAt]);
 
   useEffect(() => {
     if (!agentId) {
@@ -60,7 +86,12 @@ export function useAgentDetail(
       cancelled = true;
       controller.abort();
     };
-  }, [agentId, clearAgentHistory, preserveIncrementalHistory]);
+  }, [
+    agentId,
+    clearAgentHistory,
+    detailHistoryClearedAt,
+    preserveIncrementalHistory,
+  ]);
 
   const merged = useMemo(() => {
     if (!detail || !agentId) return null;

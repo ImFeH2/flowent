@@ -7,7 +7,7 @@ import {
   type UIEvent,
 } from "react";
 import { toast } from "sonner";
-import { fetchNodeDetail } from "@/lib/api";
+import { clearAssistantChatRequest, fetchNodeDetail } from "@/lib/api";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -16,19 +16,27 @@ import {
   useAgentUI,
 } from "@/context/AgentContext";
 import { getAssistantNodeId } from "@/lib/assistant";
-import { mergeHistoryWithDeltas } from "@/lib/history";
+import {
+  clearConversationHistory,
+  mergeHistoryWithDeltas,
+} from "@/lib/history";
 import type { AssistantChatItem, HistoryEntry, NodeDetail } from "@/types";
 
 export function useAssistantChat() {
   const { agents } = useAgentNodesRuntime();
   const { connected } = useAgentConnectionRuntime();
-  const { agentHistories, clearAgentHistory, streamingDeltas } =
-    useAgentHistoryRuntime();
+  const {
+    agentHistories,
+    clearAgentHistory,
+    historyClearedAt,
+    streamingDeltas,
+  } = useAgentHistoryRuntime();
   const { activeToolCalls } = useAgentActivityRuntime();
   const { pendingAssistantMessages, sendAssistantMessage } = useAgentUI();
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [input, setInput] = useState("");
+  const [clearing, setClearing] = useState(false);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
@@ -37,6 +45,25 @@ export function useAssistantChat() {
     () => (assistantId ? (agents.get(assistantId) ?? null) : null),
     [agents, assistantId],
   );
+  const assistantHistoryClearedAt = assistantId
+    ? (historyClearedAt.get(assistantId) ?? 0)
+    : 0;
+
+  useEffect(() => {
+    if (!assistantHistoryClearedAt) {
+      return;
+    }
+
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            history: clearConversationHistory(current.history),
+          }
+        : current,
+    );
+    setFetchedAt(Date.now());
+  }, [assistantHistoryClearedAt]);
 
   useEffect(() => {
     if (!connected || !assistantId) {
@@ -69,7 +96,7 @@ export function useAssistantChat() {
       cancelled = true;
       controller.abort();
     };
-  }, [assistantId, clearAgentHistory, connected]);
+  }, [assistantHistoryClearedAt, assistantId, clearAgentHistory, connected]);
 
   const timelineItems = useMemo<AssistantChatItem[]>(() => {
     const history = assistantId
@@ -182,6 +209,25 @@ export function useAssistantChat() {
     }
   };
 
+  const clearChat = async () => {
+    if (!assistantId || clearing) {
+      return;
+    }
+
+    setClearing(true);
+    try {
+      await clearAssistantChatRequest(assistantId);
+      clearAgentHistory(assistantId);
+      const data = await fetchNodeDetail(assistantId);
+      setDetail(data);
+      setFetchedAt(Date.now());
+    } catch {
+      toast.error("Failed to clear assistant chat");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -195,7 +241,9 @@ export function useAssistantChat() {
     input,
     onMessagesScroll,
     scrollRef,
+    clearing,
     sending,
+    clearChat,
     sendMessage,
     setInput,
     timelineItems,

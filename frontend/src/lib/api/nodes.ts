@@ -41,6 +41,13 @@ export async function interruptNode(nodeId: string): Promise<void> {
   });
 }
 
+export async function clearAssistantChatRequest(nodeId: string): Promise<void> {
+  await requestVoid(`/api/nodes/${nodeId}/clear-chat`, {
+    method: "POST",
+    errorMessage: "Failed to clear assistant chat",
+  });
+}
+
 export async function dispatchNodeMessageRequest(
   nodeId: string,
   content: string,

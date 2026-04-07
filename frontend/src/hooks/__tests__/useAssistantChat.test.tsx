@@ -1,8 +1,9 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAssistantChat } from "@/hooks/useAssistantChat";
 import type { HistoryEntry, Node, NodeDetail } from "@/types";
 
+const clearAssistantChatRequestMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
 const useAgentConnectionRuntimeMock = vi.fn();
 const useAgentHistoryRuntimeMock = vi.fn();
@@ -19,6 +20,8 @@ vi.mock("@/context/AgentContext", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
+  clearAssistantChatRequest: (...args: unknown[]) =>
+    clearAssistantChatRequestMock(...args),
   fetchNodeDetail: (...args: unknown[]) => fetchNodeDetailMock(...args),
 }));
 
@@ -53,6 +56,7 @@ function buildDetail(history: HistoryEntry[]): NodeDetail {
 
 describe("useAssistantChat", () => {
   beforeEach(() => {
+    clearAssistantChatRequestMock.mockReset();
     useAgentActivityRuntimeMock.mockReset();
     useAgentConnectionRuntimeMock.mockReset();
     useAgentHistoryRuntimeMock.mockReset();
@@ -66,6 +70,7 @@ describe("useAssistantChat", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories: new Map(),
       clearAgentHistory: vi.fn(),
+      historyClearedAt: new Map(),
       streamingDeltas: new Map(),
     });
     useAgentUIMock.mockReturnValue({
@@ -147,5 +152,50 @@ describe("useAssistantChat", () => {
         toolName: "manage_roles",
       });
     });
+  });
+
+  it("clears assistant chat and reloads the empty conversation detail", async () => {
+    const clearAgentHistoryMock = vi.fn();
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("idle")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
+      agentHistories: new Map(),
+      clearAgentHistory: clearAgentHistoryMock,
+      historyClearedAt: new Map(),
+      streamingDeltas: new Map(),
+    });
+    fetchNodeDetailMock
+      .mockResolvedValueOnce(
+        buildDetail([
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Old conversation",
+            timestamp: 1,
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(buildDetail([]));
+    clearAssistantChatRequestMock.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(result.current.timelineItems).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.clearChat();
+    });
+
+    expect(clearAssistantChatRequestMock).toHaveBeenCalledWith("assistant");
+    expect(clearAgentHistoryMock).toHaveBeenCalledWith("assistant");
+    expect(result.current.timelineItems).toHaveLength(0);
   });
 });

@@ -19,6 +19,7 @@ class EventType(StrEnum):
     NODE_DISCONNECTED = "node_disconnected"
     ASSISTANT_CONTENT = "assistant_content"
     TOOL_CALLED = "tool_called"
+    HISTORY_CLEARED = "history_cleared"
     HISTORY_ENTRY_ADDED = "history_entry_added"
     HISTORY_ENTRY_DELTA = "history_entry_delta"
 

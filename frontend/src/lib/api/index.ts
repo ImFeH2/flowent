@@ -3,6 +3,7 @@ export {
   fetchNodeDetail,
   terminateNode,
   interruptNode,
+  clearAssistantChatRequest,
   dispatchNodeMessageRequest,
   updateNodePositionRequest,
 } from "./nodes";

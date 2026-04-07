@@ -166,6 +166,24 @@ async def interrupt_node(node_id: str) -> dict:
     return {"status": "interrupting"}
 
 
+@router.post("/api/nodes/{node_id}/clear-chat")
+async def clear_node_chat(node_id: str) -> dict:
+    from app.models import NodeType
+
+    node = registry.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+    if node.config.node_type != NodeType.ASSISTANT:
+        raise HTTPException(status_code=400, detail="Can only clear assistant chat")
+
+    try:
+        node.clear_chat_history()
+    except TimeoutError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return {"status": "cleared"}
+
+
 @router.patch("/api/nodes/{node_id}/position")
 async def update_node_position(node_id: str, req: UpdateNodePositionRequest) -> dict:
     from app.graph_service import update_node_position

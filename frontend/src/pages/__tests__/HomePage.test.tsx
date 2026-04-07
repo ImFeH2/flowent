@@ -11,6 +11,7 @@ import type { Node, TaskTab } from "@/types";
 import type { ReactNode } from "react";
 
 const {
+  clearChatMock,
   createTabRequestMock,
   createTabNodeRequestMock,
   deleteTabRequestMock,
@@ -19,6 +20,7 @@ const {
   interruptNodeMock,
   toastErrorMock,
 } = vi.hoisted(() => ({
+  clearChatMock: vi.fn(),
   createTabRequestMock: vi.fn(),
   createTabNodeRequestMock: vi.fn(),
   deleteTabRequestMock: vi.fn(),
@@ -73,6 +75,8 @@ vi.mock("@/hooks/useAssistantChat", () => ({
       running: false,
       runningHint: null,
     },
+    clearChat: (...args: unknown[]) => clearChatMock(...args),
+    clearing: false,
     connected: true,
     handleKeyDown: vi.fn(),
     input: "",
@@ -160,6 +164,7 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
 
 describe("HomePage", () => {
   beforeEach(() => {
+    clearChatMock.mockReset();
     createTabRequestMock.mockReset();
     createTabNodeRequestMock.mockReset();
     deleteTabRequestMock.mockReset();
@@ -198,6 +203,7 @@ describe("HomePage", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories: new Map(),
       clearAgentHistory: vi.fn(),
+      historyClearedAt: new Map(),
       streamingDeltas: new Map(),
     });
     useAgentDetailMock.mockReturnValue({
@@ -350,6 +356,25 @@ describe("HomePage", () => {
 
     await waitFor(() => {
       expect(interruptNodeMock).toHaveBeenCalledWith("assistant");
+    });
+  });
+
+  it("clears assistant chat from the workspace panel header", async () => {
+    clearChatMock.mockResolvedValue(undefined);
+    useAgentUIMock.mockReturnValue({
+      activeTabId: "tab-1",
+      pendingAssistantMessages: [],
+      selectedAgentId: null,
+      selectAgent: vi.fn(),
+      setActiveTabId: vi.fn(),
+    });
+
+    render(<HomePage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear Chat" }));
+
+    await waitFor(() => {
+      expect(clearChatMock).toHaveBeenCalledTimes(1);
     });
   });
 

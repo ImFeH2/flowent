@@ -1507,6 +1507,8 @@ function AssistantChatPanel({
   const { agents } = useAgentNodesRuntime();
   const {
     assistantActivity,
+    clearChat,
+    clearing,
     connected,
     handleKeyDown,
     input,
@@ -1541,7 +1543,7 @@ function AssistantChatPanel({
               type="button"
               size="sm"
               variant="outline"
-              disabled={interrupting}
+              disabled={interrupting || clearing}
               onClick={onInterrupt}
             >
               {interrupting ? "Interrupting..." : "Interrupt"}
@@ -1551,6 +1553,16 @@ function AssistantChatPanel({
             type="button"
             size="sm"
             variant="outline"
+            disabled={clearing}
+            onClick={() => void clearChat()}
+          >
+            {clearing ? "Clearing..." : "Clear Chat"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={clearing}
             onClick={onOpenDetails}
           >
             Assistant Details

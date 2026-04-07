@@ -49,6 +49,7 @@ interface AgentRuntimeContextValue {
   connected: boolean;
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
+  historyClearedAt: Map<string, number>;
   streamingDeltas: Map<string, StreamingDelta[]>;
   activeMessages: ActiveMessage[];
   activeToolCalls: Map<string, string>;
@@ -69,6 +70,7 @@ interface AgentConnectionContextValue {
 interface AgentHistoryContextValue {
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
+  historyClearedAt: Map<string, number>;
   streamingDeltas: Map<string, StreamingDelta[]>;
 }
 
@@ -129,6 +131,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [streamingDeltas, setStreamingDeltas] = useState<
     Map<string, StreamingDelta[]>
   >(() => new Map());
+  const [historyClearedAt, setHistoryClearedAt] = useState<Map<string, number>>(
+    () => new Map(),
+  );
   const [activeMessages, setActiveMessages] = useState<ActiveMessage[]>([]);
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, string>>(
     () => new Map(),
@@ -334,6 +339,44 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           next.set(event.agent_id, [...list, delta]);
           return next;
         });
+      }
+
+      if (event.type === "history_cleared") {
+        const agentId = event.agent_id;
+        const clearedAt = normalizeEventTimestampMs(event.timestamp);
+        setHistoryClearedAt((prev) => {
+          const next = new Map(prev);
+          next.set(agentId, clearedAt);
+          return next;
+        });
+        setAgentHistories((prev) => {
+          if (!prev.has(agentId)) {
+            return prev;
+          }
+          const next = new Map(prev);
+          next.delete(agentId);
+          return next;
+        });
+        setStreamingDeltas((prev) => {
+          if (!prev.has(agentId)) {
+            return prev;
+          }
+          const next = new Map(prev);
+          next.delete(agentId);
+          return next;
+        });
+        setActiveToolCalls((prev) => {
+          if (!prev.has(agentId)) {
+            return prev;
+          }
+          const next = new Map(prev);
+          next.delete(agentId);
+          return next;
+        });
+        setRecentActivities((prev) =>
+          prev.filter((activity) => activity.agentId !== agentId),
+        );
+        setPendingAssistantMessages([]);
       }
 
       if (event.type === "history_entry_added") {
@@ -551,9 +594,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     () => ({
       agentHistories,
       clearAgentHistory,
+      historyClearedAt,
       streamingDeltas,
     }),
-    [agentHistories, clearAgentHistory, streamingDeltas],
+    [agentHistories, clearAgentHistory, historyClearedAt, streamingDeltas],
   );
 
   const activityValue = useMemo(
@@ -662,8 +706,12 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
   const { agents } = useAgentNodesRuntime();
   const { tabs } = useAgentTabsRuntime();
   const { connected } = useAgentConnectionRuntime();
-  const { agentHistories, clearAgentHistory, streamingDeltas } =
-    useAgentHistoryRuntime();
+  const {
+    agentHistories,
+    clearAgentHistory,
+    historyClearedAt,
+    streamingDeltas,
+  } = useAgentHistoryRuntime();
   const { activeMessages, activeToolCalls } = useAgentActivityRuntime();
 
   return useMemo(
@@ -673,6 +721,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
       connected,
       agentHistories,
       clearAgentHistory,
+      historyClearedAt,
       streamingDeltas,
       activeMessages,
       activeToolCalls,
@@ -683,6 +732,7 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
       connected,
       agentHistories,
       clearAgentHistory,
+      historyClearedAt,
       streamingDeltas,
       activeMessages,
       activeToolCalls,

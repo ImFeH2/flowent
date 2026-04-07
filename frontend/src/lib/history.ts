@@ -1,5 +1,13 @@
 import type { HistoryEntry, StreamingDelta } from "@/types";
 
+export function clearConversationHistory(
+  history: HistoryEntry[],
+): HistoryEntry[] {
+  return history.filter(
+    (entry) => entry.type === "SystemEntry" || entry.type === "StateEntry",
+  );
+}
+
 export function historyTimestampToMs(timestamp: number): number {
   return timestamp > 1_000_000_000_000
     ? timestamp

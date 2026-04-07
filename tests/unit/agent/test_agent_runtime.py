@@ -17,6 +17,8 @@ from app.models import (
     NodeType,
     ReceivedMessage,
     SentMessage,
+    StateEntry,
+    SystemEntry,
     TodoItem,
     ToolCall,
     ToolCallResult,
@@ -70,6 +72,51 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
         msg.get("role") == "assistant"
         and msg.get("content") == "working through the task"
         for msg in llm_messages[1]
+    )
+
+
+def test_clear_assistant_chat_history_drops_conversation_entries():
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant.history.extend(
+        [
+            SystemEntry(content="system prompt"),
+            ReceivedMessage(content="hello", from_id="human"),
+            AssistantThinking(content="planning"),
+            AssistantText(content="hi"),
+            ToolCall(
+                tool_name="idle",
+                tool_call_id="tool-1",
+                arguments={},
+                result="idle 1.00s",
+            ),
+            ErrorEntry(content="boom"),
+        ]
+    )
+
+    assistant.clear_chat_history()
+
+    assert all(
+        isinstance(entry, (SystemEntry, StateEntry))
+        for entry in assistant.get_history_snapshot()
+    )
+
+
+def test_clear_assistant_chat_history_interrupts_running_agent(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant.set_state(AgentState.RUNNING, "processing")
+    assistant.history.append(ReceivedMessage(content="hello", from_id="human"))
+
+    def fake_request_interrupt() -> bool:
+        assistant.set_state(AgentState.IDLE, "interrupted by clear chat")
+        return True
+
+    monkeypatch.setattr(assistant, "request_interrupt", fake_request_interrupt)
+
+    assistant.clear_chat_history()
+
+    assert assistant.state == AgentState.IDLE
+    assert not any(
+        isinstance(entry, ReceivedMessage) for entry in assistant.get_history_snapshot()
     )
 
 

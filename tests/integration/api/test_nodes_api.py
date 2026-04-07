@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 
-from app.models import AgentState
+from app.models import AgentState, AssistantText, ReceivedMessage
 from app.registry import registry
 from app.routes.nodes import router as nodes_router
 from app.settings import STEWARD_ROLE_INCLUDED_TOOLS
@@ -130,3 +130,22 @@ def test_interrupt_ignores_non_running_node(client: TestClient):
 
     assert response.status_code == 200
     assert response.json() == {"status": "ignored"}
+
+
+def test_assistant_chat_can_be_cleared_via_nodes_api(client: TestClient):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+    assistant.history.append(ReceivedMessage(content="Old message", from_id="human"))
+    assistant.history.append(AssistantText(content="Old reply"))
+
+    response = client.post(f"/api/nodes/{assistant_id}/clear-chat")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "cleared"}
+
+    detail = client.get(f"/api/nodes/{assistant_id}").json()
+    assert not any(
+        entry["type"] in {"ReceivedMessage", "AssistantText"}
+        for entry in detail["history"]
+    )

@@ -71,6 +71,7 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory,
+      historyClearedAt: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue(buildDetail());
@@ -102,6 +103,7 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory,
+      historyClearedAt: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue({
@@ -135,6 +137,7 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory: vi.fn(),
+      historyClearedAt: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([sharedEntry]));
@@ -177,6 +180,7 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory: vi.fn(),
+      historyClearedAt: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([fetchedState]));

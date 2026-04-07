@@ -113,6 +113,13 @@ function getHistoryEntryDedupKey(entry: HistoryEntry): string {
         entry.result ?? "",
         entry.streaming ? "streaming" : "final",
       ].join(":");
+    case "StateEntry":
+      return [
+        entry.type,
+        timestamp,
+        entry.state ?? "",
+        entry.reason ?? "",
+      ].join(":");
     default:
       return [entry.type, timestamp, entry.content ?? ""].join(":");
   }

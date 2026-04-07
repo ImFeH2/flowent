@@ -240,7 +240,7 @@ describe("HomePage", () => {
     fireEvent.change(screen.getByLabelText("Tab goal"), {
       target: { value: "Coordinate the launch work" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create Tab" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Task Tab" }));
 
     await waitFor(() =>
       expect(createTabRequestMock).toHaveBeenCalledWith(

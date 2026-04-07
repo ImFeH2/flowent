@@ -128,16 +128,23 @@ export function ChannelsPage() {
   }
 
   return (
-    <PageScaffold title="Channels">
+    <PageScaffold
+      title="Channels"
+      description="External messaging integrations."
+    >
       <div className="h-full min-h-0 overflow-y-auto pr-2">
         <div className="mx-auto max-w-3xl pb-6">
           <SoftPanel className="space-y-6">
             <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold">Telegram</h2>
-                <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
-                  Private chats only
-                </span>
+              <div>
+                <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+                  Telegram
+                </p>
+                <h2 className="mt-1 text-base font-semibold">Bot Channel</h2>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground/76">
+                  Configure the Telegram bot token and approve or revoke private
+                  chats that can talk to the Assistant.
+                </p>
               </div>
               <Badge
                 variant="outline"

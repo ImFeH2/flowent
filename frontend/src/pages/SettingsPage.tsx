@@ -154,6 +154,7 @@ export function SettingsPage() {
   return (
     <PageScaffold
       title="Settings"
+      description="Configure the default Assistant role, provider, model, and canonical model parameters."
       actions={
         <Button onClick={() => void handleSave()} disabled={saving}>
           <Save className="size-4" />
@@ -164,7 +165,11 @@ export function SettingsPage() {
       <div className="h-full min-h-0 overflow-y-auto pr-2">
         <div className="mx-auto max-w-3xl pb-6">
           <section>
-            <SectionHeader title="Assistant" eyebrow="System" />
+            <SectionHeader
+              eyebrow="Assistant"
+              title="Assistant Configuration"
+              description="Choose the role that powers the system assistant."
+            />
             <div>
               <SettingsRow label="Assistant Role" description="System role">
                 <Select
@@ -194,7 +199,11 @@ export function SettingsPage() {
           </section>
 
           <section className="mt-8 border-t border-white/6 pt-8">
-            <SectionHeader title="Model Defaults" eyebrow="Fallback" />
+            <SectionHeader
+              eyebrow="Model"
+              title="Model Configuration"
+              description="Set the default provider, model, and canonical parameters used when a role does not define its own override."
+            />
             <div>
               <SettingsRow
                 label="Active Provider"
@@ -323,6 +332,9 @@ export function SettingsPage() {
 
           <div className="mt-8 border-t border-white/6 pt-4 text-sm text-muted-foreground">
             <p>Autopoe Agent Studio v{appVersion ?? "—"}</p>
+            <p className="mt-1 text-xs">
+              A multi-agent collaboration framework.
+            </p>
           </div>
         </div>
       </div>

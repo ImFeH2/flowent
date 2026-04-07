@@ -61,12 +61,15 @@ export function PromptsPage() {
   }
 
   return (
-    <PageScaffold title="Prompts">
+    <PageScaffold
+      title="Prompts"
+      description="Edit the global custom prompt layer and the runtime post prompt layer."
+    >
       <div className="mx-auto flex h-full max-w-3xl flex-col">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-4 text-xs text-muted-foreground/60">
-            <span>{customPrompt.length} custom</span>
-            <span>{customPostPrompt.length} custom post</span>
+            <span>Custom Prompt {customPrompt.length}</span>
+            <span>Custom Post Prompt {customPostPrompt.length}</span>
           </div>
           <Button onClick={() => void handleSave()} disabled={saving}>
             <Save className="size-4" />

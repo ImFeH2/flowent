@@ -55,15 +55,15 @@ export function WorkspaceCommandDialog({
               <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] border border-white/12 bg-white/[0.05] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_14px_28px_-22px_rgba(255,255,255,0.14)]">
                 <Icon className="size-4.5" />
               </div>
-              <div className="min-w-0 flex flex-wrap items-center gap-2">
-                <DialogTitle className="text-[1.02rem] text-white">
+              <div className="min-w-0">
+                {eyebrow ? (
+                  <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-white/42">
+                    {eyebrow}
+                  </p>
+                ) : null}
+                <DialogTitle className="mt-1 text-[1.02rem] text-white">
                   {title}
                 </DialogTitle>
-                {eyebrow ? (
-                  <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-white/58">
-                    {eyebrow}
-                  </span>
-                ) : null}
               </div>
             </div>
             {description ? (

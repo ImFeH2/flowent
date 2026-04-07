@@ -40,7 +40,10 @@ export function Sidebar({
   const widthProgress = Math.max(0, Math.min(1, (width - 180) / 220));
   const headerPaddingY = 12 + widthProgress * 4;
   const titleFontSizeRem = 1.02 + widthProgress * 0.14;
+  const subtitleFontSizePx = 10 + widthProgress * 0.8;
+  const subtitleMarginTopPx = 2 + widthProgress * 1.2;
   const statusFontSizePx = 10 + widthProgress * 0.4;
+  const showDescriptions = width > 214;
 
   const navigate = (page: PageId) => {
     setCurrentPage(page);
@@ -67,16 +70,22 @@ export function Sidebar({
           }}
         >
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex flex-wrap items-center gap-2">
+            <div className="min-w-0">
               <h1
                 className="truncate font-semibold tracking-[-0.03em] text-foreground"
                 style={{ fontSize: `${titleFontSizeRem.toFixed(3)}rem` }}
               >
                 Autopoe
               </h1>
-              <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+              <p
+                className="truncate font-medium tracking-[0.02em] text-muted-foreground/84"
+                style={{
+                  marginTop: `${subtitleMarginTopPx.toFixed(2)}px`,
+                  fontSize: `${subtitleFontSizePx.toFixed(2)}px`,
+                }}
+              >
                 Agent Studio
-              </span>
+              </p>
             </div>
             <div
               className="flex shrink-0 items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1"
@@ -86,8 +95,8 @@ export function Sidebar({
                 className={cn(
                   "size-2 rounded-full shadow-[0_0_10px_currentColor]",
                   connected
-                    ? "bg-graph-status-idle text-graph-status-idle"
-                    : "bg-graph-status-initializing text-graph-status-initializing",
+                    ? "bg-emerald-400 text-emerald-400"
+                    : "bg-amber-300 text-amber-300",
                 )}
               />
               <span className="font-medium text-foreground/88">
@@ -108,7 +117,7 @@ export function Sidebar({
               type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150",
+                "group flex w-full items-start gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150",
                 currentPage === id
                   ? "bg-white/[0.05] text-foreground"
                   : "text-muted-foreground hover:bg-white/[0.028] hover:text-foreground",
@@ -122,9 +131,28 @@ export function Sidebar({
                     : "bg-white/0 opacity-0 group-hover:bg-white/8 group-hover:opacity-100",
                 )}
               />
-              <span className="min-w-0 flex-1 truncate text-left text-[13px] font-medium leading-5">
-                {label}
-              </span>
+              <div className="min-w-0 text-left">
+                <span className="block truncate text-[13px] font-medium leading-5">
+                  {label}
+                </span>
+                {showDescriptions ? (
+                  <span className="block truncate text-[10px] leading-4 text-muted-foreground/68">
+                    {id === "workspace"
+                      ? "Task tabs, graph canvas, and assistant panels"
+                      : id === "providers"
+                        ? "Model backends and catalogs"
+                        : id === "roles"
+                          ? "Behavior templates and overrides"
+                          : id === "prompts"
+                            ? "Global system guidance"
+                            : id === "tools"
+                              ? "Available runtime capabilities"
+                              : id === "channels"
+                                ? "External messaging integrations"
+                                : "Runtime defaults and event log"}
+                  </span>
+                ) : null}
+              </div>
             </button>
           ))}
         </nav>

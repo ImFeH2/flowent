@@ -758,7 +758,9 @@ export function HomePage() {
           }
         }}
         icon={FilePlus2}
-        title="Create Tab"
+        eyebrow="Workspace"
+        title="Create Task Tab"
+        description="Open a persistent task workspace with a clear title and an optional goal so both you and the Assistant can revisit it later."
         footer={
           <>
             <Button
@@ -774,7 +776,9 @@ export function HomePage() {
                 !createTabTitle.trim() || pendingAction === "create-tab"
               }
             >
-              {pendingAction === "create-tab" ? "Creating..." : "Create Tab"}
+              {pendingAction === "create-tab"
+                ? "Creating..."
+                : "Create Task Tab"}
             </Button>
           </>
         }
@@ -808,7 +812,9 @@ export function HomePage() {
           }
         }}
         icon={Bot}
+        eyebrow="Agent Graph"
         title="Add Agent"
+        description="Add a peer node to the current tab. Start with the role and optional display name, then wire it into the graph."
         footer={
           <>
             <Button
@@ -866,7 +872,9 @@ export function HomePage() {
           }
         }}
         icon={CircuitBoard}
+        eyebrow="Topology"
         title="Connect Agents"
+        description="Create a directed edge between two peers in the current tab so they can message each other directly."
         footer={
           <>
             <Button
@@ -961,7 +969,9 @@ export function HomePage() {
           }
         }}
         icon={Sparkles}
+        eyebrow="Dispatch"
         title="Send Task"
+        description="Write the first concrete instruction for the selected agent. This goes straight into that node's queue."
         footer={
           <>
             <Button

@@ -28,16 +28,16 @@ export function PageScaffold({
         className,
       )}
     >
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-white/6 pb-3">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-white/6 pb-4">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-[1.32rem] font-semibold tracking-[-0.025em] text-foreground">
-              {title}
-            </h1>
-            {description ? (
-              <p className="text-xs text-muted-foreground/72">{description}</p>
-            ) : null}
-          </div>
+          <h1 className="text-[1.38rem] font-semibold tracking-[-0.025em] text-foreground">
+            {title}
+          </h1>
+          {description ? (
+            <p className="mt-1 max-w-[42rem] text-sm leading-6 text-muted-foreground/78">
+              {description}
+            </p>
+          ) : null}
         </div>
         {actions ? (
           <div className="flex items-center gap-2">{actions}</div>
@@ -71,17 +71,15 @@ export function SectionHeader({
   description?: string;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {eyebrow ? (
-          <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
-            {eyebrow}
-          </span>
-        ) : null}
-      </div>
+    <div className="mb-5">
+      {eyebrow ? (
+        <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+          {eyebrow}
+        </p>
+      ) : null}
+      <h2 className="text-base font-semibold">{title}</h2>
       {description ? (
-        <p className="max-w-[32rem] text-[11px] text-muted-foreground/72">
+        <p className="mt-1 text-sm leading-6 text-muted-foreground/76">
           {description}
         </p>
       ) : null}

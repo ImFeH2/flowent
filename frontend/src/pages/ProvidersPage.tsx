@@ -17,7 +17,11 @@ import {
   fetchProviders,
   updateProvider,
 } from "@/lib/api";
-import { SectionHeader, SettingsRow } from "@/components/layout/PageScaffold";
+import {
+  PageScaffold,
+  SectionHeader,
+  SettingsRow,
+} from "@/components/layout/PageScaffold";
 import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
 import { buildProviderRequestPreview } from "@/lib/providerUrls";
 import type { Provider } from "@/types";
@@ -210,122 +214,128 @@ export function ProvidersPage() {
       : false;
 
   return (
-    <div className="flex h-full">
-      <div
-        style={{ width: `${panelWidth}px` }}
-        className="relative flex shrink-0 flex-col border-r border-white/6 bg-black/[0.18]"
-      >
-        <div className="flex shrink-0 items-center justify-between border-b border-white/6 px-4 py-3">
-          <div className="min-w-0 flex items-center gap-2">
-            <Server className="size-4 shrink-0 text-primary" />
-            <span className="font-semibold truncate">Providers</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              onClick={() => void refreshProviders()}
-              disabled={loading}
-              variant="ghost"
-              size="icon-sm"
-              className="text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
-              title="Refresh"
-            >
-              <RefreshCw
-                className={cn("size-3.5", loading && "animate-spin")}
-              />
-            </Button>
-            <Button
-              onClick={handleCreateNew}
-              size="icon-sm"
-              title="Add Provider"
-            >
-              <Plus className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
-          {loading ? (
-            <div className="space-y-2 py-4">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-12 rounded-md skeleton-shimmer" />
-              ))}
+    <PageScaffold
+      title="Providers"
+      description="Manage available LLM providers and preview their resolved request endpoints."
+      className="overflow-hidden"
+    >
+      <div className="flex min-h-0 flex-1">
+        <div
+          style={{ width: `${panelWidth}px` }}
+          className="relative flex shrink-0 flex-col border-r border-white/6 bg-black/[0.18]"
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-white/6 px-4 py-3">
+            <div className="min-w-0 flex items-center gap-2">
+              <Server className="size-4 shrink-0 text-primary" />
+              <span className="font-semibold truncate">Providers</span>
             </div>
-          ) : providers.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="py-10 text-center"
-            >
-              <p className="text-sm text-muted-foreground">No providers</p>
-              <Button onClick={handleCreateNew} size="sm" className="mt-3">
-                <Plus className="size-3.5" />
-                Add your first provider
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                onClick={() => void refreshProviders()}
+                disabled={loading}
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
+                title="Refresh"
+              >
+                <RefreshCw
+                  className={cn("size-3.5", loading && "animate-spin")}
+                />
               </Button>
-            </motion.div>
-          ) : (
-            <div className="space-y-1">
-              {providers.map((provider, i) => (
-                <motion.div
-                  key={provider.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleSelect(provider)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleSelect(provider);
-                    }
-                  }}
-                  className={cn(
-                    "group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-all",
-                    selectedId === provider.id
-                      ? "bg-white/[0.065] text-foreground"
-                      : "hover:bg-white/[0.04]",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "h-7 w-px shrink-0 rounded-full",
-                      selectedId === provider.id
-                        ? "bg-primary/70"
-                        : "bg-transparent",
-                    )}
-                  />
-                  <div className="min-w-0 flex flex-1 items-center gap-2">
-                    <p className="truncate text-sm font-medium">
-                      {provider.name}
-                    </p>
-                    <span className="shrink-0 rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
-                      {providerTypeLabel(provider.type)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setProviderToDelete(provider);
-                      }}
-                      variant="ghost"
-                      size="icon-xs"
-                      className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="size-3" />
-                    </Button>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </div>
-                </motion.div>
-              ))}
+              <Button
+                onClick={handleCreateNew}
+                size="icon-sm"
+                title="Add Provider"
+              >
+                <Plus className="size-3.5" />
+              </Button>
             </div>
-          )}
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {loading ? (
+              <div className="space-y-2 py-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-12 rounded-md skeleton-shimmer" />
+                ))}
+              </div>
+            ) : providers.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="py-10 text-center"
+              >
+                <p className="text-sm text-muted-foreground">No providers</p>
+                <Button onClick={handleCreateNew} size="sm" className="mt-3">
+                  <Plus className="size-3.5" />
+                  Add your first provider
+                </Button>
+              </motion.div>
+            ) : (
+              <div className="space-y-1">
+                {providers.map((provider, i) => (
+                  <motion.div
+                    key={provider.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleSelect(provider)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleSelect(provider);
+                      }
+                    }}
+                    className={cn(
+                      "group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-all",
+                      selectedId === provider.id
+                        ? "bg-white/[0.065] text-foreground"
+                        : "hover:bg-white/[0.04]",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-7 w-px shrink-0 rounded-full",
+                        selectedId === provider.id
+                          ? "bg-primary/70"
+                          : "bg-transparent",
+                      )}
+                    />
+                    <div className="min-w-0 flex flex-1 items-center gap-2">
+                      <p className="truncate text-sm font-medium">
+                        {provider.name}
+                      </p>
+                      <span className="shrink-0 rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+                        {providerTypeLabel(provider.type)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+                      <Button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setProviderToDelete(provider);
+                        }}
+                        variant="ghost"
+                        size="icon-xs"
+                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="size-3" />
+                      </Button>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+          <PanelResizer
+            position="right"
+            isDragging={isDragging}
+            onMouseDown={startDrag}
+          />
         </div>
-        <PanelResizer
-          position="right"
-          isDragging={isDragging}
-          onMouseDown={startDrag}
-        />
       </div>
 
       <div className="min-w-0 flex-1 overflow-hidden bg-white/[0.012]">
@@ -364,7 +374,11 @@ export function ProvidersPage() {
 
             <div className="flex-1 overflow-y-auto">
               <div className="mx-auto max-w-xl py-6">
-                <SectionHeader title="Identity" eyebrow="Provider" />
+                <SectionHeader
+                  title="Identity"
+                  eyebrow="Provider"
+                  description="Set the provider name and runtime type used across roles and settings."
+                />
                 <SettingsRow label="Name">
                   <input
                     type="text"
@@ -397,7 +411,11 @@ export function ProvidersPage() {
                 </SettingsRow>
 
                 <div className="mt-8 border-t border-white/6 pt-8">
-                  <SectionHeader title="Connection" eyebrow="Endpoint" />
+                  <SectionHeader
+                    title="Endpoint"
+                    eyebrow="Endpoint"
+                    description="Configure the base URL, inspect the resolved request preview, and optionally store an API key."
+                  />
                   <SettingsRow label="Base URL">
                     <input
                       type="text"
@@ -521,6 +539,6 @@ export function ProvidersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageScaffold>
   );
 }

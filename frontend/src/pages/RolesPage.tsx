@@ -423,6 +423,7 @@ export function RolesPage() {
   return (
     <PageScaffold
       title="Roles"
+      description="Define reusable agent behaviors, model overrides, parameter overrides, and tool boundaries."
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -462,7 +463,11 @@ export function RolesPage() {
             </div>
 
             <section>
-              <SectionHeader title="Identity" eyebrow="Role" />
+              <SectionHeader
+                eyebrow="Identity"
+                title="Role Identity"
+                description="Define the role name and baseline prompt used by agents created with this role."
+              />
 
               <SettingsRow label="Role Name" description="Unique ID">
                 <input
@@ -515,7 +520,11 @@ export function RolesPage() {
             </section>
 
             <section className="mt-6 border-t border-white/6 pt-6">
-              <SectionHeader title="Model" eyebrow="Optional Override" />
+              <SectionHeader
+                eyebrow="Model"
+                title="Model Configuration"
+                description="Choose whether this role follows Settings or uses its own provider and model override."
+              />
 
               <div className="space-y-4">
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -664,7 +673,11 @@ export function RolesPage() {
             </section>
 
             <section className="mt-6 border-t border-white/6 pt-6">
-              <SectionHeader title="Parameters" eyebrow="Canonical" />
+              <SectionHeader
+                eyebrow="Parameters"
+                title="Model Parameters"
+                description="Optionally override the canonical model parameters for this role."
+              />
 
               <div className="space-y-4">
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -725,7 +738,11 @@ export function RolesPage() {
             </section>
 
             <section className="mt-6 border-t border-white/6 pt-6">
-              <SectionHeader title="Tools" eyebrow="Minimum tools injected" />
+              <SectionHeader
+                eyebrow="Tools"
+                title="Tool Configuration"
+                description="Minimum tools are injected by the framework. Configure the remaining tools as Allowed, Included, or Excluded."
+              />
 
               <div className="overflow-hidden rounded-md border border-white/6 bg-black/[0.18]">
                 {configurableTools.map((tool) => {

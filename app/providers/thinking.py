@@ -58,3 +58,22 @@ class ThinkTagParser:
             self._pending = ""
 
         return results
+
+
+def split_thinking_content(text: str) -> tuple[str, str]:
+    parser = ThinkTagParser()
+    chunks = parser.feed(text)
+    chunks.extend(parser.flush())
+
+    content_parts: list[str] = []
+    thinking_parts: list[str] = []
+
+    for chunk_type, chunk_text in chunks:
+        if not chunk_text:
+            continue
+        if chunk_type == "thinking":
+            thinking_parts.append(chunk_text)
+        else:
+            content_parts.append(chunk_text)
+
+    return "".join(content_parts), "".join(thinking_parts)

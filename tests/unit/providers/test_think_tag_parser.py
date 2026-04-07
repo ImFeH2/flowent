@@ -1,4 +1,4 @@
-from app.providers.thinking import ThinkTagParser
+from app.providers.thinking import ThinkTagParser, split_thinking_content
 
 
 def test_normal_thinking_and_content():
@@ -25,3 +25,12 @@ def test_newlines_after_think_tags():
 
     results = parser.feed("This is the answer.")
     assert results == [("content", "This is the answer.")]
+
+
+def test_split_thinking_content_separates_thinking_from_plain_text():
+    content, thinking = split_thinking_content(
+        "<think>Draft plan</think>\nFinal answer"
+    )
+
+    assert content == "Final answer"
+    assert thinking == "Draft plan"

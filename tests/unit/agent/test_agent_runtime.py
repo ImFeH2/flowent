@@ -73,6 +73,104 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
     )
 
 
+def test_agent_normalizes_think_tags_in_final_content(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    wait_calls = 0
+    llm_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            agent._append_history(
+                ReceivedMessage(content="reply to me", from_id="human")
+            )
+            agent.set_state(AgentState.RUNNING, "received message from human")
+            return
+        agent.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls
+        llm_calls += 1
+        if llm_calls == 2:
+            agent.request_termination("done")
+            return LLMResponse()
+        return LLMResponse(content="<think>Drafting plan</think>\nHello there")
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    agent._run()
+
+    history = agent.get_history_snapshot()
+
+    assert any(
+        isinstance(entry, AssistantThinking) and entry.content == "Drafting plan"
+        for entry in history
+    )
+    assert any(
+        isinstance(entry, AssistantText) and entry.content == "Hello there"
+        for entry in history
+    )
+    assert not any(
+        isinstance(entry, AssistantText) and "<think>" in entry.content
+        for entry in history
+    )
+
+
+def test_agent_dedupes_structured_thinking_and_raw_think_tags(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    wait_calls = 0
+    llm_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            agent._append_history(
+                ReceivedMessage(content="reply to me", from_id="human")
+            )
+            agent.set_state(AgentState.RUNNING, "received message from human")
+            return
+        agent.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls
+        llm_calls += 1
+        if llm_calls == 2:
+            agent.request_termination("done")
+            return LLMResponse()
+        return LLMResponse(
+            content="<think>Drafting plan</think>\nHello there",
+            thinking="Drafting plan",
+        )
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    agent._run()
+
+    thinking_entries = [
+        entry.content
+        for entry in agent.get_history_snapshot()
+        if isinstance(entry, AssistantThinking)
+    ]
+
+    assert thinking_entries == ["Drafting plan"]
+
+
 def test_agent_unregisters_from_registry_after_termination_request(monkeypatch):
     registry.reset()
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-x")
@@ -192,6 +290,110 @@ def test_agent_interrupts_streaming_response_and_returns_to_idle(monkeypatch):
         and event.data.get("new_state") == "idle"
         for event in events
     )
+
+
+def test_agent_normalizes_think_tags_in_streaming_content(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    wait_calls = 0
+    events = []
+    llm_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            assistant._append_history(
+                ReceivedMessage(content="reply to me", from_id="human")
+            )
+            assistant.set_state(AgentState.RUNNING, "received message from human")
+            return
+        assistant.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls
+        llm_calls += 1
+        if llm_calls == 2:
+            assistant.request_termination("done")
+            return LLMResponse()
+        assert on_chunk is not None
+        on_chunk("content", "<think>Drafting plan</think>\nHello there")
+        return LLMResponse(content="<think>Drafting plan</think>\nHello there")
+
+    monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+
+    assistant._run()
+
+    history = assistant.get_history_snapshot()
+    assistant_content_events = [
+        event.data.get("content")
+        for event in events
+        if event.type == EventType.ASSISTANT_CONTENT
+    ]
+
+    assert any(
+        isinstance(entry, AssistantThinking) and entry.content == "Drafting plan"
+        for entry in history
+    )
+    assert any(
+        isinstance(entry, AssistantText) and entry.content == "Hello there"
+        for entry in history
+    )
+    assert assistant_content_events == ["Hello there"]
+
+
+def test_agent_does_not_duplicate_thinking_when_provider_returns_both(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    wait_calls = 0
+    llm_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            assistant._append_history(
+                ReceivedMessage(content="reply to me", from_id="human")
+            )
+            assistant.set_state(AgentState.RUNNING, "received message from human")
+            return
+        assistant.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls
+        llm_calls += 1
+        if llm_calls == 2:
+            assistant.request_termination("done")
+            return LLMResponse()
+        return LLMResponse(
+            content="<think>Drafting plan</think>\nHello there",
+            thinking="Drafting plan",
+        )
+
+    monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    assistant._run()
+
+    thinking_entries = [
+        entry
+        for entry in assistant.get_history_snapshot()
+        if isinstance(entry, AssistantThinking)
+    ]
+
+    assert [entry.content for entry in thinking_entries] == ["Drafting plan"]
 
 
 def test_request_sleep_raises_interrupt_when_running_agent_is_interrupted():

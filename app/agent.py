@@ -40,6 +40,7 @@ from app.models import (
 )
 from app.prompts import get_system_prompt
 from app.providers.gateway import gateway
+from app.providers.thinking import ThinkTagParser, split_thinking_content
 from app.security import authorize
 from app.settings import get_settings
 
@@ -64,6 +65,8 @@ class StreamingContentState:
     pending_chunks: list[str] = field(default_factory=list)
     content_buffer: str = ""
     thinking_buffer: str = ""
+    saw_content_chunks: bool = False
+    think_parser: ThinkTagParser = field(default_factory=ThinkTagParser)
     emitted_human_content: bool = False
     streaming_message_id: str | None = None
     streamed_message_body: str = ""
@@ -487,6 +490,7 @@ class Agent:
                         finally:
                             self.set_interrupt_callback(None)
                         self._raise_if_interrupt_requested()
+                        self._flush_streaming_think_parser(stream_state)
 
                         self._log.debug(
                             "LLM response: content_len={}, thinking_len={}, tool_calls={}",
@@ -497,9 +501,20 @@ class Agent:
                             else None,
                         )
 
-                        if response.thinking:
+                        final_thinking = (
+                            response.thinking or stream_state.thinking_buffer
+                        )
+                        final_content = (
+                            stream_state.content_buffer
+                            if stream_state.saw_content_chunks
+                            else response.content
+                        )
+                        if final_content and final_thinking:
+                            final_content, _ = split_thinking_content(final_content)
+
+                        if final_thinking:
                             self._append_history(
-                                AssistantThinking(content=response.thinking),
+                                AssistantThinking(content=final_thinking),
                             )
                             stream_state.thinking_buffer = ""
 
@@ -508,9 +523,9 @@ class Agent:
                                 "Processing {} tool call(s)",
                                 len(response.tool_calls),
                             )
-                            if response.content:
+                            if final_content:
                                 self._record_content_output(
-                                    response.content,
+                                    final_content,
                                     emitted_human_content=stream_state.emitted_human_content,
                                     message_id=stream_state.streaming_message_id,
                                 )
@@ -522,9 +537,9 @@ class Agent:
                                 self._raise_if_interrupt_requested()
                                 if self._terminate.is_set():
                                     break
-                        elif response.content:
+                        elif final_content:
                             self._record_content_output(
-                                response.content,
+                                final_content,
                                 emitted_human_content=stream_state.emitted_human_content,
                                 message_id=stream_state.streaming_message_id,
                             )
@@ -810,51 +825,28 @@ class Agent:
         text: str,
     ) -> None:
         self._raise_if_interrupt_requested()
-        delta: ContentDelta | ThinkingDelta
         if chunk_type == "content":
-            state.content_buffer += text
-            if state.mode == "plain":
-                delta = ContentDelta(text=text)
-                event_bus.emit(
-                    Event(
-                        type=EventType.HISTORY_ENTRY_DELTA,
-                        agent_id=self.uuid,
-                        data=delta.serialize(),
-                    ),
-                )
-                if self.node_type == NodeType.ASSISTANT:
-                    state.emitted_human_content = True
-                    event_bus.emit(
-                        Event(
-                            type=EventType.ASSISTANT_CONTENT,
-                            agent_id=self.uuid,
-                            data={"content": text},
-                        ),
-                    )
-                return
+            state.saw_content_chunks = True
+            for normalized_type, normalized_text in state.think_parser.feed(text):
+                if normalized_type == "thinking":
+                    self._handle_streaming_thinking_chunk(state, normalized_text)
+                else:
+                    self._handle_streaming_content_chunk(state, normalized_text)
+            return
+        if chunk_type != "thinking":
+            return
+        self._handle_streaming_thinking_chunk(state, text)
 
-            if state.mode == "routed":
-                state.pending_chunks.append(text)
-                self._emit_routed_message_preview(
-                    state,
-                    "".join(state.pending_chunks),
-                )
-                return
-
-            state.pending_chunks.append(text)
-            state.mode = classify_streaming_content("".join(state.pending_chunks))
-            if state.mode == "routed":
-                self._emit_routed_message_preview(
-                    state,
-                    "".join(state.pending_chunks),
-                )
-                return
-            if state.mode != "plain":
-                return
-
-            buffered_text = "".join(state.pending_chunks)
-            state.pending_chunks.clear()
-            delta = ContentDelta(text=buffered_text)
+    def _handle_streaming_content_chunk(
+        self,
+        state: StreamingContentState,
+        text: str,
+    ) -> None:
+        if not text:
+            return
+        state.content_buffer += text
+        if state.mode == "plain":
+            delta = ContentDelta(text=text)
             event_bus.emit(
                 Event(
                     type=EventType.HISTORY_ENTRY_DELTA,
@@ -868,16 +860,33 @@ class Agent:
                     Event(
                         type=EventType.ASSISTANT_CONTENT,
                         agent_id=self.uuid,
-                        data={"content": buffered_text},
+                        data={"content": text},
                     ),
                 )
             return
-        elif chunk_type == "thinking":
-            state.thinking_buffer += text
-            delta = ThinkingDelta(text=text)
-        else:
+
+        if state.mode == "routed":
+            state.pending_chunks.append(text)
+            self._emit_routed_message_preview(
+                state,
+                "".join(state.pending_chunks),
+            )
             return
 
+        state.pending_chunks.append(text)
+        state.mode = classify_streaming_content("".join(state.pending_chunks))
+        if state.mode == "routed":
+            self._emit_routed_message_preview(
+                state,
+                "".join(state.pending_chunks),
+            )
+            return
+        if state.mode != "plain":
+            return
+
+        buffered_text = "".join(state.pending_chunks)
+        state.pending_chunks.clear()
+        delta = ContentDelta(text=buffered_text)
         event_bus.emit(
             Event(
                 type=EventType.HISTORY_ENTRY_DELTA,
@@ -885,6 +894,39 @@ class Agent:
                 data=delta.serialize(),
             ),
         )
+        if self.node_type == NodeType.ASSISTANT:
+            state.emitted_human_content = True
+            event_bus.emit(
+                Event(
+                    type=EventType.ASSISTANT_CONTENT,
+                    agent_id=self.uuid,
+                    data={"content": buffered_text},
+                ),
+            )
+
+    def _handle_streaming_thinking_chunk(
+        self,
+        state: StreamingContentState,
+        text: str,
+    ) -> None:
+        if not text:
+            return
+        state.thinking_buffer += text
+        delta = ThinkingDelta(text=text)
+        event_bus.emit(
+            Event(
+                type=EventType.HISTORY_ENTRY_DELTA,
+                agent_id=self.uuid,
+                data=delta.serialize(),
+            ),
+        )
+
+    def _flush_streaming_think_parser(self, state: StreamingContentState) -> None:
+        for normalized_type, normalized_text in state.think_parser.flush():
+            if normalized_type == "thinking":
+                self._handle_streaming_thinking_chunk(state, normalized_text)
+            else:
+                self._handle_streaming_content_chunk(state, normalized_text)
 
     def _deliver_message(self, target: Agent, content: str, message_id: str) -> None:
         target.enqueue_message(
@@ -955,6 +997,13 @@ class Agent:
         emitted_human_content: bool,
         message_id: str | None = None,
     ) -> None:
+        normalized_content, normalized_thinking = split_thinking_content(content)
+
+        if normalized_thinking.strip():
+            self._mark_turn_progress()
+            self._append_history(AssistantThinking(content=normalized_thinking))
+
+        content = normalized_content
         plain_content, mixed_routed_suffix = (
             split_plain_content_before_later_routed_header(content)
         )
@@ -1099,6 +1148,7 @@ class Agent:
 
     def _handle_interrupt(self, stream_state: StreamingContentState | None) -> None:
         if stream_state is not None:
+            self._flush_streaming_think_parser(stream_state)
             if stream_state.thinking_buffer:
                 self._append_history(
                     AssistantThinking(content=stream_state.thinking_buffer),

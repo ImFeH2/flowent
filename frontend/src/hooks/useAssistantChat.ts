@@ -120,16 +120,16 @@ export function useAssistantChat() {
     const hasAssistantText = turnItems.some(
       (item) => item.type === "AssistantText" && Boolean(item.content?.trim()),
     );
-    const lastToolCall = [...turnItems]
+    const runningToolCall = [...turnItems]
       .reverse()
       .find(
         (item): item is HistoryEntry & { type: "ToolCall" } =>
-          item.type === "ToolCall",
+          item.type === "ToolCall" && item.streaming === true,
       );
     const activeToolName = assistantId
       ? (activeToolCalls.get(assistantId) ?? null)
       : null;
-    const toolName = activeToolName ?? lastToolCall?.tool_name ?? null;
+    const toolName = activeToolName ?? runningToolCall?.tool_name ?? null;
 
     return {
       running,

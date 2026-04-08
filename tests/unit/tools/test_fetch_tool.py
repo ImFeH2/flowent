@@ -16,8 +16,9 @@ class _FakeResponse:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def iter_text(self):
-        yield from self._chunks
+    def iter_content(self):
+        for chunk in self._chunks:
+            yield chunk.encode()
 
 
 class _FakeClient:
@@ -30,11 +31,11 @@ class _FakeClient:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def stream(self, *, method, url, headers=None, content=None):
+    def stream(self, method, url, headers=None, data=None):
         assert method == "GET"
         assert url == "https://example.com/data"
         assert headers is None
-        assert content is None
+        assert data is None
         return _FakeResponse(200, ["hello ", "world"])
 
 
@@ -44,7 +45,7 @@ def test_fetch_tool_streams_response_body_chunks(monkeypatch):
     )
     chunks: list[str] = []
 
-    monkeypatch.setattr("app.tools.fetch.httpx.Client", _FakeClient)
+    monkeypatch.setattr("app.tools.fetch.create_http_session", _FakeClient)
 
     result = json.loads(
         FetchTool().execute(

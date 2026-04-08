@@ -4,9 +4,9 @@ import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar
 
-import httpx
 from loguru import logger
 
+from app.network import create_http_session, iter_response_text
 from app.tools import Tool, re_raise_interrupt
 
 if TYPE_CHECKING:
@@ -41,12 +41,12 @@ class FetchTool(Tool):
         logger.debug("HTTP {} {}", method, url)
         try:
             with (
-                httpx.Client(timeout=30.0) as client,
+                create_http_session(timeout=30.0) as client,
                 client.stream(
-                    method=method,
-                    url=url,
+                    method,
+                    url,
                     headers=args.get("headers"),
-                    content=args.get("body"),
+                    data=args.get("body"),
                 ) as response,
             ):
                 close_response = getattr(response, "close", None)
@@ -59,7 +59,7 @@ class FetchTool(Tool):
 
                 remaining = 5000
                 body_parts: list[str] = []
-                for chunk in response.iter_text():
+                for chunk in iter_response_text(response):
                     if not chunk or remaining <= 0:
                         continue
                     if len(chunk) > remaining:

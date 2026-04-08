@@ -61,3 +61,28 @@ def build_network_error(
         ),
         transient=True,
     )
+
+
+def build_access_blocked_error(
+    *,
+    provider_name: str,
+    provider_type: str,
+    model: str,
+    base_url: str,
+    status_code: int | None = None,
+    detail: str,
+) -> LLMProviderError:
+    status_line = f"Status: {status_code}\n" if status_code is not None else ""
+    return LLMProviderError(
+        (
+            "LLM API access blocked\n"
+            f"Provider: {provider_name}\n"
+            f"Type: {provider_type}\n"
+            f"Model: {model}\n"
+            f"Base URL: {base_url}\n"
+            f"{status_line}"
+            f"Detail: {detail}"
+        ),
+        transient=False,
+        status_code=status_code,
+    )

@@ -4,11 +4,11 @@ import json
 from collections.abc import Iterator
 from typing import Any
 
-import httpx
+from app.network import iter_response_lines
 
 
-def iter_sse_data(response: httpx.Response) -> Iterator[str]:
-    for line in response.iter_lines():
+def iter_sse_data(response: Any) -> Iterator[str]:
+    for line in iter_response_lines(response):
         if not line or line.startswith(":"):
             continue
         if not line.startswith("data: "):
@@ -17,7 +17,7 @@ def iter_sse_data(response: httpx.Response) -> Iterator[str]:
 
 
 def iter_sse_json(
-    response: httpx.Response,
+    response: Any,
     done_token: str | None = None,
 ) -> Iterator[dict[str, Any]]:
     for payload in iter_sse_data(response):

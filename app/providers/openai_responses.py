@@ -5,13 +5,24 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-import httpx
 from loguru import logger
 
 from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
+from app.network import (
+    RequestException,
+    create_http_session,
+    iter_response_lines,
+    read_response_text,
+    response_looks_like_html,
+    truncate_text,
+)
 from app.providers import LLMProvider
-from app.providers.errors import build_network_error, build_status_error
+from app.providers.errors import (
+    build_access_blocked_error,
+    build_network_error,
+    build_status_error,
+)
 from app.settings import ModelParams
 
 REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
@@ -137,7 +148,7 @@ class OpenAIResponsesProvider(LLMProvider):
         self._api_base_url = api_base_url.rstrip("/")
         self._api_key = api_key
         self._model = model
-        self._client = httpx.Client(timeout=120.0)
+        self._client = create_http_session(timeout=120.0)
 
     def _headers(self) -> dict[str, str]:
         headers: dict[str, str] = {"Content-Type": "application/json"}
@@ -264,12 +275,12 @@ class OpenAIResponsesProvider(LLMProvider):
                 "POST",
                 url,
                 headers=self._headers(),
-                content=json.dumps(payload),
+                json=payload,
             ) as response:
                 if register_interrupt is not None:
                     register_interrupt(response.close)
                 if response.status_code != 200:
-                    body = response.read().decode()
+                    body = truncate_text(read_response_text(response))
                     elapsed = time.perf_counter() - t0
                     logger.error(
                         "LLM API error [provider={}, model={}, type=openai_responses]: {} - {} ({:.2f}s)",
@@ -287,8 +298,17 @@ class OpenAIResponsesProvider(LLMProvider):
                         status_code=response.status_code,
                         body=body,
                     )
+                if response_looks_like_html(response):
+                    raise build_access_blocked_error(
+                        provider_name=self._provider_name,
+                        provider_type="openai_responses",
+                        model=self._model,
+                        base_url=self._api_base_url,
+                        status_code=response.status_code,
+                        detail=truncate_text(read_response_text(response)),
+                    )
 
-                for line in response.iter_lines():
+                for line in iter_response_lines(response):
                     if not line or line.startswith(":"):
                         continue
                     if not line.startswith("data: "):
@@ -375,7 +395,7 @@ class OpenAIResponsesProvider(LLMProvider):
                                     thinking_parts.append(reasoning_text)
                                     if on_chunk:
                                         on_chunk("thinking", reasoning_text)
-        except httpx.TransportError as exc:
+        except RequestException as exc:
             elapsed = time.perf_counter() - t0
             logger.warning(
                 "LLM API transport error [provider={}, model={}, type=openai_responses]: {} ({:.2f}s)",
@@ -392,8 +412,10 @@ class OpenAIResponsesProvider(LLMProvider):
                 error=exc,
             ) from exc
         finally:
-            if getattr(client, "is_closed", False):
-                self._client = httpx.Client(timeout=120.0)
+            close_client = getattr(client, "close", None)
+            if callable(close_client):
+                close_client()
+                self._client = create_http_session(timeout=120.0)
 
         elapsed = time.perf_counter() - t0
         content = "".join(content_parts) or None
@@ -424,8 +446,9 @@ class OpenAIResponsesProvider(LLMProvider):
     ) -> list[ModelInfo]:
         url = f"{self._api_base_url}/models"
         client = self._client
-        if register_interrupt is not None:
-            register_interrupt(client.close)
+        close_client = getattr(client, "close", None)
+        if register_interrupt is not None and callable(close_client):
+            register_interrupt(close_client)
         try:
             resp = client.get(url, headers=self._headers())
             resp.raise_for_status()
@@ -440,5 +463,6 @@ class OpenAIResponsesProvider(LLMProvider):
             )
             return []
         finally:
-            if getattr(client, "is_closed", False):
-                self._client = httpx.Client(timeout=120.0)
+            if callable(close_client):
+                close_client()
+                self._client = create_http_session(timeout=120.0)

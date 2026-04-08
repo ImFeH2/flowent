@@ -7,6 +7,7 @@ description = "A structured multi-agent framework for coordinated AI collaborati
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "curl-cffi>=0.15.0",
     "fastapi[standard]",
     "httpx>=0.28.0",
     "loguru>=0.7.0",

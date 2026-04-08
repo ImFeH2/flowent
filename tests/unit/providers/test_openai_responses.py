@@ -15,9 +15,17 @@ from app.settings import ModelParams
 
 
 class _FakeStreamResponse:
-    def __init__(self, lines: list[str], status_code: int = 200) -> None:
+    def __init__(
+        self,
+        lines: list[str],
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        text: str = "",
+    ) -> None:
         self._lines = lines
         self.status_code = status_code
+        self.headers = headers or {}
+        self.text = text
 
     def __enter__(self) -> _FakeStreamResponse:
         return self
@@ -33,9 +41,17 @@ class _FakeStreamResponse:
 
 
 class _FakeClient:
-    def __init__(self, lines: list[str], status_code: int = 200) -> None:
+    def __init__(
+        self,
+        lines: list[str],
+        status_code: int = 200,
+        headers: dict[str, str] | None = None,
+        text: str = "",
+    ) -> None:
         self._lines = lines
         self._status_code = status_code
+        self._headers = headers or {}
+        self._text = text
         self.last_payload: dict[str, Any] | None = None
 
     def stream(
@@ -43,10 +59,15 @@ class _FakeClient:
         method: str,
         url: str,
         headers: dict[str, str],
-        content: str,
+        json: dict[str, Any],
     ) -> _FakeStreamResponse:
-        self.last_payload = json.loads(content)
-        return _FakeStreamResponse(self._lines, status_code=self._status_code)
+        self.last_payload = json
+        return _FakeStreamResponse(
+            self._lines,
+            status_code=self._status_code,
+            headers=self._headers,
+            text=self._text,
+        )
 
 
 def _make_data_lines(*events: dict[str, Any]) -> list[str]:
@@ -218,3 +239,23 @@ def test_openai_responses_marks_429_as_transient_error():
 
     assert excinfo.value.transient is True
     assert excinfo.value.status_code == 429
+
+
+def test_openai_responses_rejects_html_challenge_page():
+    provider = OpenAIResponsesProvider(
+        provider_name="Test Provider",
+        api_base_url="http://example.invalid",
+        api_key="secret",
+        model="gpt-5.2",
+    )
+    provider._client = _FakeClient(
+        [],
+        headers={"content-type": "text/html; charset=utf-8"},
+        text="<html><title>Just a moment...</title></html>",
+    )
+
+    with pytest.raises(LLMProviderError) as excinfo:
+        provider.chat(messages=[{"role": "user", "content": "Hello"}])
+
+    assert excinfo.value.transient is False
+    assert "access blocked" in str(excinfo.value)

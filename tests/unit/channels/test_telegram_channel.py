@@ -18,6 +18,31 @@ class DummyAssistant:
         self.messages.append(message)
 
 
+class _FakeTelegramResponse:
+    def __init__(self, status_code: int, payload: dict[str, object]) -> None:
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self) -> dict[str, object]:
+        return self._payload
+
+
+class _FakeAsyncSession:
+    def __init__(self, response: _FakeTelegramResponse) -> None:
+        self._response = response
+        self.requests: list[tuple[str, dict[str, object]]] = []
+
+    async def __aenter__(self) -> "_FakeAsyncSession":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> bool:
+        return False
+
+    async def post(self, url: str, data: dict[str, object]):
+        self.requests.append((url, data))
+        return self._response
+
+
 def test_telegram_channel_replies_with_private_only_message_for_group_chat(
     monkeypatch,
 ):
@@ -145,3 +170,34 @@ def test_telegram_channel_delivers_messages_from_approved_private_chat(monkeypat
     assert assistant.messages[0].from_id == "human"
     assert assistant.messages[0].to_id == assistant.uuid
     assert assistant.messages[0].content == "check status"
+
+
+def test_telegram_channel_call_api_uses_shared_async_transport(monkeypatch):
+    settings = Settings(telegram=TelegramSettings(bot_token="123456:ABCDE"))
+    fake_session = _FakeAsyncSession(
+        _FakeTelegramResponse(200, {"ok": True, "result": {"message_id": 1}})
+    )
+
+    monkeypatch.setattr("app.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.channels.telegram.create_async_http_session",
+        lambda timeout: fake_session,
+    )
+
+    channel = TelegramChannel()
+
+    result = asyncio.run(
+        channel._call_api(
+            "sendMessage",
+            {"chat_id": 3003, "text": "hello"},
+            parse_mode="Markdown",
+        )
+    )
+
+    assert result == {"message_id": 1}
+    assert fake_session.requests == [
+        (
+            "https://api.telegram.org/bot123456:ABCDE/sendMessage",
+            {"chat_id": 3003, "text": "hello", "parse_mode": "Markdown"},
+        )
+    ]

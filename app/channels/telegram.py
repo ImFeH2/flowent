@@ -5,11 +5,11 @@ import threading
 import time
 from typing import Any
 
-import httpx
 from loguru import logger
 
 from app.events import event_bus
 from app.models import Event, EventType, Message
+from app.network import create_async_http_session, is_success_status
 from app.registry import registry
 from app.settings import (
     TelegramPendingChat,
@@ -418,7 +418,7 @@ class TelegramChannel:
 
         while not self._stop_event.is_set():
             try:
-                async with httpx.AsyncClient(
+                async with create_async_http_session(
                     timeout=TELEGRAM_REQUEST_TIMEOUT_SECONDS
                 ) as client:
                     response = await client.post(
@@ -442,7 +442,9 @@ class TelegramChannel:
                 await asyncio.sleep(retry_after)
                 continue
 
-            if response.is_success and isinstance(response_data, dict):
+            if is_success_status(response.status_code) and isinstance(
+                response_data, dict
+            ):
                 if response_data.get("ok") is True:
                     return response_data.get("result")
                 logger.warning(

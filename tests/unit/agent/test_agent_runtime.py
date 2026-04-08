@@ -141,6 +141,15 @@ def test_agent_does_not_retry_non_transient_llm_errors(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.AGENT))
     wait_calls = 0
     llm_calls = 0
+    error_summary = (
+        "LLM API error\n"
+        "Provider: Test Provider\n"
+        "Type: openai\n"
+        "Model: gpt-5.2\n"
+        "Base URL: http://example.invalid\n"
+        "Status: 401\n"
+        "Detail: Invalid API key"
+    )
 
     def fake_wait_for_input() -> None:
         nonlocal wait_calls
@@ -163,7 +172,7 @@ def test_agent_does_not_retry_non_transient_llm_errors(monkeypatch):
         nonlocal llm_calls
         llm_calls += 1
         raise LLMProviderError(
-            "authentication failed",
+            error_summary,
             transient=False,
             status_code=401,
         )
@@ -180,7 +189,20 @@ def test_agent_does_not_retry_non_transient_llm_errors(monkeypatch):
     assert llm_calls == 1
     assert wait_calls == 2
     assert any(
-        isinstance(entry, ErrorEntry) and "authentication failed" in entry.content
+        isinstance(entry, ErrorEntry) and entry.content == error_summary
+        for entry in agent.get_history_snapshot()
+    )
+    assert any(
+        isinstance(entry, StateEntry)
+        and entry.state == AgentState.ERROR.value
+        and entry.reason == error_summary
+        for entry in agent.get_history_snapshot()
+    )
+    assert not any(
+        isinstance(entry, ErrorEntry)
+        and (
+            "traceback" in entry.content.lower() or "LLMProviderError:" in entry.content
+        )
         for entry in agent.get_history_snapshot()
     )
 

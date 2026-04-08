@@ -598,6 +598,17 @@ class Agent:
                             break
                         continue
 
+                except LLMProviderError as exc:
+                    self._interrupt_requested.clear()
+                    self.set_interrupt_callback(None)
+                    self._log.warning("Agent LLM provider error: {}", exc)
+                    error_summary = str(exc)
+                    self._append_history(ErrorEntry(content=error_summary))
+                    self.set_state(AgentState.ERROR, error_summary)
+                    self._wait_for_input()
+                    if self._terminate.is_set():
+                        break
+
                 except Exception as exc:
                     self._interrupt_requested.clear()
                     self.set_interrupt_callback(None)

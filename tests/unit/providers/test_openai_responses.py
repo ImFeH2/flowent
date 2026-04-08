@@ -259,3 +259,26 @@ def test_openai_responses_rejects_html_challenge_page():
 
     assert excinfo.value.transient is False
     assert "access blocked" in str(excinfo.value)
+
+
+def test_openai_responses_treats_non_200_html_as_access_blocked():
+    provider = OpenAIResponsesProvider(
+        provider_name="Test Provider",
+        api_base_url="http://example.invalid",
+        api_key="secret",
+        model="gpt-5.2",
+    )
+    provider._client = _FakeClient(
+        [],
+        status_code=403,
+        headers={"content-type": "text/html; charset=utf-8"},
+        text="<html><title>Attention Required</title></html>",
+    )
+
+    with pytest.raises(LLMProviderError) as excinfo:
+        provider.chat(messages=[{"role": "user", "content": "Hello"}])
+
+    assert excinfo.value.transient is False
+    assert excinfo.value.status_code == 403
+    assert "LLM API access blocked" in str(excinfo.value)
+    assert "<html>" not in str(excinfo.value)

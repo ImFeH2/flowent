@@ -130,6 +130,15 @@ class OpenAIProvider(LLMProvider):
             ) as response:
                 if register_interrupt is not None:
                     register_interrupt(response.close)
+                if response_looks_like_html(response):
+                    raise build_access_blocked_error(
+                        provider_name=self._provider_name,
+                        provider_type="openai",
+                        model=self._model,
+                        base_url=self._api_base_url,
+                        status_code=response.status_code,
+                        detail=truncate_text(read_response_text(response)),
+                    )
                 if response.status_code != 200:
                     body = truncate_text(read_response_text(response))
                     elapsed = time.perf_counter() - t0
@@ -148,15 +157,6 @@ class OpenAIProvider(LLMProvider):
                         base_url=self._api_base_url,
                         status_code=response.status_code,
                         body=body,
-                    )
-                if response_looks_like_html(response):
-                    raise build_access_blocked_error(
-                        provider_name=self._provider_name,
-                        provider_type="openai",
-                        model=self._model,
-                        base_url=self._api_base_url,
-                        status_code=response.status_code,
-                        detail=truncate_text(read_response_text(response)),
                     )
 
                 for chunk in iter_sse_json(response, done_token="[DONE]"):

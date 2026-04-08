@@ -287,7 +287,7 @@ describe("HomePage", () => {
     );
   });
 
-  it("opens assistant details from the workspace panel and interrupts a running assistant", async () => {
+  it("opens assistant details from the workspace panel and keeps interrupt only in the detail header", async () => {
     const assistant = buildNode({
       id: "assistant",
       node_type: "assistant",
@@ -342,16 +342,19 @@ describe("HomePage", () => {
 
     const view = render(<HomePage />);
 
+    expect(
+      within(view.container).queryByRole("button", { name: "Interrupt" }),
+    ).toBeNull();
+
     fireEvent.click(screen.getByRole("button", { name: "Assistant Details" }));
 
     expect(screen.getAllByText("Status").length).toBeGreaterThan(0);
     expect(screen.getAllByText("State Timeline").length).toBeGreaterThan(0);
     expect(screen.getByText("processing")).toBeInTheDocument();
 
-    const interruptButtons = within(view.container).getAllByRole("button", {
+    const interruptButton = within(view.container).getByRole("button", {
       name: "Interrupt",
     });
-    const interruptButton = interruptButtons[interruptButtons.length - 1];
     fireEvent.click(interruptButton);
 
     await waitFor(() => {

@@ -243,7 +243,6 @@ export function HomePage() {
   const assistantId = assistantNode?.id ?? null;
   const assistantDetailVisible =
     assistantPanelView === "detail" && assistantNode !== null;
-  const assistantInterruptVisible = assistantNode?.state === "running";
   const assistantPanelRunning = useMemo(() => {
     const assistantDeltas = assistantId
       ? (streamingDeltas.get(assistantId) ?? [])
@@ -313,7 +312,6 @@ export function HomePage() {
         interrupting={interruptingAssistant}
         onInterrupt={handleInterruptAssistant}
         onOpenDetails={handleOpenAssistantDetails}
-        showInterrupt={assistantInterruptVisible}
       />
     );
   };
@@ -1497,12 +1495,10 @@ function AssistantChatPanel({
   interrupting,
   onInterrupt,
   onOpenDetails,
-  showInterrupt,
 }: {
   interrupting: boolean;
   onInterrupt: () => void;
   onOpenDetails: () => void;
-  showInterrupt: boolean;
 }) {
   const { agents } = useAgentNodesRuntime();
   const {
@@ -1538,17 +1534,6 @@ function AssistantChatPanel({
           </span>
         </div>
         <div className="flex items-center gap-1.5">
-          {showInterrupt ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={interrupting || clearing}
-              onClick={onInterrupt}
-            >
-              {interrupting ? "Interrupting..." : "Interrupt"}
-            </Button>
-          ) : null}
           <Button
             type="button"
             size="sm"

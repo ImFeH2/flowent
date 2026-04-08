@@ -48,6 +48,7 @@ def test_roles_bootstrap_includes_tools_and_providers(client: TestClient, monkey
             "type": "openai_compatible",
             "base_url": "https://api.example.com/v1",
             "api_key": "secret",
+            "headers": {},
         }
     ]
     assert {role["name"] for role in payload["roles"]} == {"Steward", "Reviewer"}

@@ -36,6 +36,7 @@ def test_manage_providers_list_omits_api_keys(monkeypatch):
             "name": "Primary",
             "type": "openai_compatible",
             "base_url": "https://api.example.com/v1",
+            "headers": {},
         }
     ]
 
@@ -70,6 +71,7 @@ def test_manage_providers_create_persists_provider(monkeypatch):
     assert result["name"] == "Test Provider"
     assert result["type"] == "openai_compatible"
     assert result["base_url"] == "https://api.example.com/v1"
+    assert result["headers"] == {}
     assert "api_key" not in result
     assert len(settings.providers) == 1
     assert settings.providers[0].name == "Test Provider"
@@ -136,6 +138,7 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
         "name": "Old Name",
         "type": "openai_compatible",
         "base_url": "https://new.example.com/v1",
+        "headers": {},
     }
     assert settings.providers[0].name == "Old Name"
     assert settings.providers[0].type == "openai_compatible"
@@ -143,6 +146,85 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
     assert settings.providers[0].api_key == "secret"
     assert saved == [settings]
     assert invalidations == ["invalidate"]
+
+
+def test_manage_providers_create_persists_headers(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {
+                "action": "create",
+                "name": "Test Provider",
+                "type": "openai_compatible",
+                "base_url": "https://api.example.com",
+                "headers": {"X-Test": "value"},
+            },
+        )
+    )
+
+    assert result["headers"] == {"X-Test": "value"}
+    assert settings.providers[0].headers == {"X-Test": "value"}
+
+
+def test_manage_providers_update_persists_headers(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Old Name",
+                type="openai_compatible",
+                base_url="https://old.example.com/v1",
+                api_key="secret",
+                headers={"X-Old": "value"},
+            )
+        ]
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {
+                "action": "update",
+                "id": "provider-1",
+                "headers": {"X-New": "next"},
+            },
+        )
+    )
+
+    assert result["headers"] == {"X-New": "next"}
+    assert settings.providers[0].headers == {"X-New": "next"}
+
+
+def test_manage_providers_rejects_non_string_header_values(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
+    monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {
+                "action": "create",
+                "name": "Test Provider",
+                "type": "openai_compatible",
+                "base_url": "https://api.example.com",
+                "headers": {"X-Test": 1},
+            },
+        )
+    )
+
+    assert result == {"error": "headers must be a JSON object of string values"}
 
 
 def test_manage_providers_update_rejects_unknown_provider(monkeypatch):

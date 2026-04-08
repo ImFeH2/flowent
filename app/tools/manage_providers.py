@@ -12,15 +12,17 @@ if TYPE_CHECKING:
     from app.settings import ProviderConfig
 
 from app.providers.base_url import resolve_provider_base_url
+from app.settings import build_provider_headers
 from app.tools import Tool, re_raise_interrupt
 
 
-def _serialize_provider(provider: ProviderConfig) -> dict[str, str]:
+def _serialize_provider(provider: ProviderConfig) -> dict[str, object]:
     return {
         "id": provider.id,
         "name": provider.name,
         "type": provider.type,
         "base_url": provider.base_url,
+        "headers": dict(provider.headers),
     }
 
 
@@ -58,6 +60,11 @@ class ManageProvidersTool(Tool):
                 "type": "string",
                 "description": "Provider API key",
             },
+            "headers": {
+                "type": "object",
+                "description": "Provider request header overrides",
+                "additionalProperties": {"type": "string"},
+            },
         },
         "required": ["action"],
     }
@@ -78,6 +85,7 @@ class ManageProvidersTool(Tool):
         provider_type = args.get("type")
         base_url = args.get("base_url")
         api_key = args.get("api_key")
+        raw_headers = args.get("headers")
 
         if not isinstance(action, str):
             return json.dumps({"error": "action must be a string"})
@@ -92,6 +100,15 @@ class ManageProvidersTool(Tool):
             return json.dumps({"error": "base_url must be a string"})
         if api_key is not None and not isinstance(api_key, str):
             return json.dumps({"error": "api_key must be a string"})
+        if raw_headers is not None and not isinstance(raw_headers, dict):
+            return json.dumps({"error": "headers must be a JSON object"})
+
+        try:
+            headers = (
+                build_provider_headers(raw_headers) if raw_headers is not None else None
+            )
+        except ValueError as exc:
+            return json.dumps({"error": str(exc)})
 
         settings = get_settings()
 
@@ -118,6 +135,7 @@ class ManageProvidersTool(Tool):
                 type=provider_type,
                 base_url=resolved_base_url,
                 api_key=api_key or "",
+                headers=headers or {},
             )
             settings.providers.append(provider)
             save_settings(settings)
@@ -156,6 +174,8 @@ class ManageProvidersTool(Tool):
                     provider.base_url = resolved_base_url
                 if api_key is not None:
                     provider.api_key = api_key
+                if headers is not None:
+                    provider.headers = headers
                 save_settings(settings)
                 gateway.invalidate_cache()
                 return json.dumps(_serialize_provider(provider))

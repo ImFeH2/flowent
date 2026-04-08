@@ -17,6 +17,7 @@ def create_provider(
     provider_type: str,
     base_url: str,
     api_key: str = "",
+    headers: dict[str, str] | None = None,
     model: str = "",
     provider_name: str = "",
 ) -> LLMProvider:
@@ -30,6 +31,7 @@ def create_provider(
             provider_name=provider_name,
             api_base_url=resolved_base_url,
             api_key=api_key,
+            headers=headers or {},
             model=model,
         )
 
@@ -40,6 +42,7 @@ def create_provider(
             provider_name=provider_name,
             api_base_url=resolved_base_url,
             api_key=api_key,
+            headers=headers or {},
             model=model,
         )
 
@@ -50,6 +53,7 @@ def create_provider(
             provider_name=provider_name,
             api_base_url=resolved_base_url,
             api_key=api_key,
+            headers=headers or {},
             model=model,
         )
 
@@ -60,6 +64,7 @@ def create_provider(
             provider_name=provider_name,
             api_base_url=resolved_base_url,
             api_key=api_key,
+            headers=headers or {},
             model=model,
         )
 

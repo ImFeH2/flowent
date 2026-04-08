@@ -10,10 +10,20 @@ from app.models import LLMResponse, ModelInfo
 from app.providers import LLMProvider
 from app.settings import merge_model_params
 
+ProviderCacheKey = tuple[
+    str,
+    str,
+    str,
+    str,
+    tuple[tuple[str, str], ...],
+    str,
+    str,
+]
+
 
 class ProviderGateway:
     def __init__(self) -> None:
-        self._cache: dict[tuple[str, ...], LLMProvider] = {}
+        self._cache: dict[ProviderCacheKey, LLMProvider] = {}
         self._lock = threading.Lock()
 
     def invalidate_cache(self) -> None:
@@ -62,6 +72,7 @@ class ProviderGateway:
             provider_type=cfg.type,
             base_url=cfg.base_url,
             api_key=cfg.api_key,
+            headers=cfg.headers,
             model="",
             provider_name=cfg.name,
         )
@@ -109,6 +120,7 @@ class ProviderGateway:
             provider_type,
             base_url,
             api_key,
+            tuple(sorted(cfg.headers.items())),
             provider_name,
             model,
         )
@@ -128,6 +140,7 @@ class ProviderGateway:
                 provider_type=provider_type,
                 base_url=base_url,
                 api_key=api_key,
+                headers=cfg.headers,
                 model=model,
                 provider_name=provider_name,
             )

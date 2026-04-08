@@ -23,6 +23,7 @@ from app.providers.errors import (
     build_network_error,
     build_status_error,
 )
+from app.providers.headers import merge_headers
 from app.providers.sse import iter_sse_json
 from app.settings import ModelParams
 
@@ -33,20 +34,25 @@ class AnthropicProvider(LLMProvider):
         provider_name: str,
         api_base_url: str,
         api_key: str = "",
+        headers: dict[str, str] | None = None,
         model: str = "",
     ) -> None:
         self._provider_name = provider_name
         self._api_base_url = api_base_url.rstrip("/")
         self._api_key = api_key
+        self._header_overrides = dict(headers or {})
         self._model = model
         self._client = create_http_session(timeout=120.0)
 
     def _headers(self) -> dict[str, str]:
-        return {
-            "Content-Type": "application/json",
-            "x-api-key": self._api_key,
-            "anthropic-version": "2023-06-01",
-        }
+        return merge_headers(
+            {
+                "Content-Type": "application/json",
+                "x-api-key": self._api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            self._header_overrides,
+        )
 
     def _convert_messages(
         self,

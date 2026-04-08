@@ -86,6 +86,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                     "type": "openai_compatible",
                     "base_url": "https://api.example.com/v1",
                     "api_key": "secret",
+                    "headers": {},
                 }
             ],
             "roles": [
@@ -106,6 +107,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "type": "openai_compatible",
                 "base_url": "https://api.example.com/v1",
                 "api_key": "secret",
+                "headers": {},
             }
         ],
         "roles": [

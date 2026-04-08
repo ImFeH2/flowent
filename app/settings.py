@@ -107,6 +107,7 @@ class ProviderConfig:
     type: str
     base_url: str
     api_key: str
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -347,6 +348,40 @@ def build_model_max_retries(
     return raw_max_retries
 
 
+def build_provider_headers(
+    raw_headers: object,
+    *,
+    field_name: str = "headers",
+) -> dict[str, str]:
+    if raw_headers is None:
+        return {}
+    if not isinstance(raw_headers, dict):
+        raise ValueError(f"{field_name} must be a JSON object")
+
+    headers: dict[str, str] = {}
+    for key, value in raw_headers.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            raise ValueError(f"{field_name} must be a JSON object of string values")
+        headers[key] = value
+    return headers
+
+
+def _normalize_provider_headers(raw_headers: object) -> tuple[dict[str, str], bool]:
+    if raw_headers is None:
+        return {}, False
+    if not isinstance(raw_headers, dict):
+        return {}, True
+
+    headers: dict[str, str] = {}
+    migrated = False
+    for key, value in raw_headers.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            migrated = True
+            continue
+        headers[key] = value
+    return headers, migrated
+
+
 def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
     return {
         "id": provider.id,
@@ -354,6 +389,7 @@ def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
         "type": provider.type,
         "base_url": provider.base_url,
         "api_key": provider.api_key,
+        "headers": dict(provider.headers),
     }
 
 
@@ -829,6 +865,8 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     for provider in providers_raw:
         if not isinstance(provider, dict):
             continue
+        headers, headers_migrated = _normalize_provider_headers(provider.get("headers"))
+        migrated = migrated or headers_migrated
         providers.append(
             ProviderConfig(
                 id=str(provider.get("id", "")),
@@ -836,6 +874,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
                 type=str(provider.get("type", "openai_compatible")),
                 base_url=str(provider.get("base_url", "")),
                 api_key=str(provider.get("api_key", "")),
+                headers=headers,
             )
         )
 

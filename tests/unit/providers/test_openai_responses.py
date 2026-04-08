@@ -40,6 +40,23 @@ class _FakeStreamResponse:
         return b""
 
 
+class _FakeJsonResponse:
+    def __init__(
+        self,
+        payload: dict[str, Any] | None = None,
+        status_code: int = 200,
+    ) -> None:
+        self._payload = payload or {}
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(f"status {self.status_code}")
+
+    def json(self) -> dict[str, Any]:
+        return self._payload
+
+
 class _FakeClient:
     def __init__(
         self,
@@ -47,12 +64,15 @@ class _FakeClient:
         status_code: int = 200,
         headers: dict[str, str] | None = None,
         text: str = "",
+        json_payload: dict[str, Any] | None = None,
     ) -> None:
         self._lines = lines
         self._status_code = status_code
         self._headers = headers or {}
         self._text = text
+        self._json_payload = json_payload or {}
         self.last_payload: dict[str, Any] | None = None
+        self.last_headers: dict[str, str] | None = None
 
     def stream(
         self,
@@ -62,11 +82,19 @@ class _FakeClient:
         json: dict[str, Any],
     ) -> _FakeStreamResponse:
         self.last_payload = json
+        self.last_headers = headers
         return _FakeStreamResponse(
             self._lines,
             status_code=self._status_code,
             headers=self._headers,
             text=self._text,
+        )
+
+    def get(self, url: str, headers: dict[str, str]) -> _FakeJsonResponse:
+        self.last_headers = headers
+        return _FakeJsonResponse(
+            payload=self._json_payload,
+            status_code=self._status_code,
         )
 
 
@@ -223,6 +251,44 @@ def test_openai_responses_skips_reasoning_config_for_non_reasoning_models():
     assert "reasoning" not in provider._client.last_payload
     assert response.content == "Hello"
     assert response.thinking is None
+
+
+def test_openai_responses_applies_header_overrides_to_chat_and_model_list():
+    provider = OpenAIResponsesProvider(
+        provider_name="Test Provider",
+        api_base_url="http://example.invalid",
+        api_key="secret",
+        headers={
+            "authorization": "Bearer override",
+            "X-Test": "value",
+        },
+        model="gpt-5.2",
+    )
+    provider._client = _FakeClient(
+        _make_data_lines(
+            {"type": "response.output_text.delta", "delta": "Hello"},
+            {"type": "response.completed", "response": {"output": []}},
+        ),
+        json_payload={"data": [{"id": "gpt-5.2"}]},
+    )
+
+    response = provider.chat(messages=[{"role": "user", "content": "Say hi"}])
+
+    assert response.content == "Hello"
+    assert provider._client.last_headers == {
+        "Content-Type": "application/json",
+        "authorization": "Bearer override",
+        "X-Test": "value",
+    }
+
+    models = provider.list_models()
+
+    assert [model.id for model in models] == ["gpt-5.2"]
+    assert provider._client.last_headers == {
+        "Content-Type": "application/json",
+        "authorization": "Bearer override",
+        "X-Test": "value",
+    }
 
 
 def test_openai_responses_marks_429_as_transient_error():

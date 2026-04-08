@@ -23,6 +23,7 @@ from app.providers.errors import (
     build_network_error,
     build_status_error,
 )
+from app.providers.headers import merge_headers
 from app.settings import ModelParams
 
 REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
@@ -142,11 +143,13 @@ class OpenAIResponsesProvider(LLMProvider):
         provider_name: str,
         api_base_url: str,
         api_key: str = "",
+        headers: dict[str, str] | None = None,
         model: str = "",
     ) -> None:
         self._provider_name = provider_name
         self._api_base_url = api_base_url.rstrip("/")
         self._api_key = api_key
+        self._header_overrides = dict(headers or {})
         self._model = model
         self._client = create_http_session(timeout=120.0)
 
@@ -154,7 +157,7 @@ class OpenAIResponsesProvider(LLMProvider):
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        return headers
+        return merge_headers(headers, self._header_overrides)
 
     def _convert_tools(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         result = []

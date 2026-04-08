@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.providers.base_url import resolve_provider_base_url
 from app.settings import (
     ProviderConfig,
+    build_provider_headers,
     get_settings,
     save_settings,
     serialize_provider,
@@ -22,6 +23,7 @@ class CreateProviderRequest(BaseModel):
     type: str
     base_url: str
     api_key: str = ""
+    headers: dict[str, object] | None = None
 
 
 class UpdateProviderRequest(BaseModel):
@@ -29,6 +31,7 @@ class UpdateProviderRequest(BaseModel):
     type: str | None = None
     base_url: str | None = None
     api_key: str | None = None
+    headers: dict[str, object] | None = None
 
 
 @router.get("/api/providers")
@@ -46,6 +49,7 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
     settings = get_settings()
     try:
         resolved_base_url = resolve_provider_base_url(req.type, req.base_url)
+        headers = build_provider_headers(req.headers)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     provider = ProviderConfig(
@@ -54,6 +58,7 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
         type=req.type,
         base_url=resolved_base_url,
         api_key=req.api_key,
+        headers=headers,
     )
     settings.providers.append(provider)
     save_settings(settings)
@@ -76,6 +81,11 @@ async def update_provider(
         next_base_url = req.base_url if req.base_url is not None else p.base_url
         try:
             resolved_base_url = resolve_provider_base_url(next_type, next_base_url)
+            next_headers = (
+                build_provider_headers(req.headers)
+                if req.headers is not None
+                else dict(p.headers)
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if req.name is not None:
@@ -86,6 +96,8 @@ async def update_provider(
             p.base_url = resolved_base_url
         if req.api_key is not None:
             p.api_key = req.api_key
+        if req.headers is not None:
+            p.headers = next_headers
         save_settings(settings)
         gateway.invalidate_cache()
         return serialize_provider(p)

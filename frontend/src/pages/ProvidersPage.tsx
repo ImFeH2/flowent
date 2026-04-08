@@ -22,6 +22,10 @@ import {
   SectionHeader,
   SettingsRow,
 } from "@/components/layout/PageScaffold";
+import {
+  formatProviderHeaders,
+  parseProviderHeadersInput,
+} from "@/lib/providerHeaders";
 import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
 import { buildProviderRequestPreview } from "@/lib/providerUrls";
 import type { Provider } from "@/types";
@@ -47,13 +51,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type ProviderDraft = Omit<Provider, "id">;
+type ProviderDraft = Omit<Provider, "id" | "headers"> & {
+  headers_text: string;
+};
 
 const emptyDraft = (): ProviderDraft => ({
   name: "",
   type: "openai_compatible",
   base_url: "",
   api_key: "",
+  headers_text: "",
 });
 
 export function ProvidersPage() {
@@ -84,6 +91,10 @@ export function ProvidersPage() {
     () => buildProviderRequestPreview(draft.type, draft.base_url),
     [draft.base_url, draft.type],
   );
+  const parsedHeaders = useMemo(
+    () => parseProviderHeadersInput(draft.headers_text),
+    [draft.headers_text],
+  );
 
   const refreshProviders = useCallback(async () => {
     setLoading(true);
@@ -113,6 +124,7 @@ export function ProvidersPage() {
       type: provider.type,
       base_url: provider.base_url,
       api_key: provider.api_key,
+      headers_text: formatProviderHeaders(provider.headers),
     });
     setShowKey(false);
   };
@@ -134,6 +146,7 @@ export function ProvidersPage() {
         type: selectedProvider.type,
         base_url: selectedProvider.base_url,
         api_key: selectedProvider.api_key,
+        headers_text: formatProviderHeaders(selectedProvider.headers),
       });
     }
   };
@@ -151,10 +164,23 @@ export function ProvidersPage() {
       toast.error(endpointPreview.error);
       return;
     }
+    if (parsedHeaders.error) {
+      toast.error(parsedHeaders.error);
+      return;
+    }
+
+    const payload = {
+      name: draft.name,
+      type: draft.type,
+      base_url: draft.base_url,
+      api_key: draft.api_key,
+      headers: parsedHeaders.headers,
+    };
+
     setSaving(true);
     try {
       if (isCreating) {
-        const created = await createProvider(draft);
+        const created = await createProvider(payload);
         setProviders((prev) => [...prev, created]);
         setIsCreating(false);
         setSelectedId(created.id);
@@ -163,10 +189,11 @@ export function ProvidersPage() {
           type: created.type,
           base_url: created.base_url,
           api_key: created.api_key,
+          headers_text: formatProviderHeaders(created.headers),
         });
         toast.success("Provider created");
       } else if (selectedId) {
-        const updated = await updateProvider(selectedId, draft);
+        const updated = await updateProvider(selectedId, payload);
         setProviders((prev) =>
           prev.map((p) => (p.id === selectedId ? updated : p)),
         );
@@ -175,6 +202,7 @@ export function ProvidersPage() {
           type: updated.type,
           base_url: updated.base_url,
           api_key: updated.api_key,
+          headers_text: formatProviderHeaders(updated.headers),
         });
         toast.success("Provider updated");
       }
@@ -205,12 +233,16 @@ export function ProvidersPage() {
   };
 
   const hasChanges = isCreating
-    ? draft.name !== "" || draft.base_url !== "" || draft.api_key !== ""
+    ? draft.name !== "" ||
+      draft.base_url !== "" ||
+      draft.api_key !== "" ||
+      draft.headers_text !== ""
     : selectedProvider
       ? draft.name !== selectedProvider.name ||
         draft.type !== selectedProvider.type ||
         draft.base_url !== selectedProvider.base_url ||
-        draft.api_key !== selectedProvider.api_key
+        draft.api_key !== selectedProvider.api_key ||
+        draft.headers_text !== formatProviderHeaders(selectedProvider.headers)
       : false;
 
   return (
@@ -416,7 +448,7 @@ export function ProvidersPage() {
                     <SectionHeader
                       title="Endpoint"
                       eyebrow="Endpoint"
-                      description="Configure the base URL, inspect the resolved request preview, and optionally store an API key."
+                      description="Configure the base URL, inspect the resolved request preview, and optionally store API credentials or header overrides."
                     />
                     <SettingsRow label="Base URL">
                       <input
@@ -479,6 +511,41 @@ export function ProvidersPage() {
                             <Eye className="size-4" />
                           )}
                         </Button>
+                      </div>
+                    </SettingsRow>
+                    <SettingsRow
+                      label="Headers"
+                      description="Optional JSON object"
+                    >
+                      <div className="space-y-2">
+                        <textarea
+                          value={draft.headers_text}
+                          onChange={(e) =>
+                            setDraft({
+                              ...draft,
+                              headers_text: e.target.value,
+                            })
+                          }
+                          placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
+                          spellCheck={false}
+                          className={cn(
+                            "min-h-32 w-full rounded-md border bg-black/[0.22] px-3 py-2 font-mono text-sm transition-all placeholder:text-muted-foreground focus:outline-none",
+                            parsedHeaders.error
+                              ? "border-destructive/40 text-destructive focus:border-destructive/60"
+                              : "border-white/8 focus:border-white/16",
+                          )}
+                        />
+                        <p
+                          className={cn(
+                            "text-xs",
+                            parsedHeaders.error
+                              ? "text-destructive"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          {parsedHeaders.error ??
+                            "Leave blank for no overrides. Values must all be strings."}
+                        </p>
                       </div>
                     </SettingsRow>
                   </div>

@@ -24,6 +24,7 @@ from app.providers.errors import (
     build_network_error,
     build_status_error,
 )
+from app.providers.headers import merge_headers
 from app.providers.thinking import ThinkTagParser
 from app.settings import ModelParams
 
@@ -33,12 +34,20 @@ class OllamaProvider(LLMProvider):
         self,
         provider_name: str,
         api_base_url: str,
+        headers: dict[str, str] | None = None,
         model: str = "",
     ) -> None:
         self._provider_name = provider_name
         self._api_base_url = api_base_url.rstrip("/")
+        self._header_overrides = dict(headers or {})
         self._model = model
         self._client = create_http_session(timeout=120.0)
+
+    def _headers(self) -> dict[str, str]:
+        return merge_headers(
+            {"Content-Type": "application/json"},
+            self._header_overrides,
+        )
 
     def chat(
         self,
@@ -91,7 +100,7 @@ class OllamaProvider(LLMProvider):
             with client.stream(
                 "POST",
                 url,
-                headers={"Content-Type": "application/json"},
+                headers=self._headers(),
                 json=payload,
             ) as response:
                 if register_interrupt is not None:
@@ -225,7 +234,7 @@ class OllamaProvider(LLMProvider):
         if register_interrupt is not None and callable(close_client):
             register_interrupt(close_client)
         try:
-            resp = client.get(url)
+            resp = client.get(url, headers=self._headers())
             resp.raise_for_status()
             data = resp.json()
             models = data.get("models", [])

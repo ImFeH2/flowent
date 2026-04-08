@@ -169,3 +169,55 @@ def test_gateway_omits_model_params_when_all_values_are_empty(monkeypatch):
     gateway.chat(messages=[])
 
     assert captured["is_none"] is True
+
+
+def test_gateway_passes_provider_headers_to_registry(monkeypatch):
+    gateway = ProviderGateway()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-default",
+            ),
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Default Provider",
+                    type="openai_compatible",
+                    base_url="https://default.invalid",
+                    api_key="secret",
+                    headers={"X-Test": "value"},
+                )
+            ],
+        ),
+    )
+
+    class ProviderStub:
+        def chat(
+            self,
+            messages,
+            tools=None,
+            on_chunk=None,
+            register_interrupt=None,
+            model_params=None,
+        ):
+            return type(
+                "Response",
+                (),
+                {"content": "", "thinking": "", "tool_calls": []},
+            )()
+
+        def list_models(self):
+            return []
+
+    monkeypatch.setattr(
+        "app.providers.registry.create_provider",
+        lambda **kwargs: captured.update(kwargs) or ProviderStub(),
+    )
+
+    gateway.chat(messages=[])
+
+    assert captured["headers"] == {"X-Test": "value"}

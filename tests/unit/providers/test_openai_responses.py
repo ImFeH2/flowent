@@ -4,6 +4,9 @@ import json
 from collections.abc import Iterator
 from typing import Any, Literal
 
+import pytest
+
+from app.providers.errors import LLMProviderError
 from app.providers.openai_responses import (
     OpenAIResponsesProvider,
     _extract_reasoning_text_from_item,
@@ -30,8 +33,9 @@ class _FakeStreamResponse:
 
 
 class _FakeClient:
-    def __init__(self, lines: list[str]) -> None:
+    def __init__(self, lines: list[str], status_code: int = 200) -> None:
         self._lines = lines
+        self._status_code = status_code
         self.last_payload: dict[str, Any] | None = None
 
     def stream(
@@ -42,7 +46,7 @@ class _FakeClient:
         content: str,
     ) -> _FakeStreamResponse:
         self.last_payload = json.loads(content)
-        return _FakeStreamResponse(self._lines)
+        return _FakeStreamResponse(self._lines, status_code=self._status_code)
 
 
 def _make_data_lines(*events: dict[str, Any]) -> list[str]:
@@ -198,3 +202,19 @@ def test_openai_responses_skips_reasoning_config_for_non_reasoning_models():
     assert "reasoning" not in provider._client.last_payload
     assert response.content == "Hello"
     assert response.thinking is None
+
+
+def test_openai_responses_marks_429_as_transient_error():
+    provider = OpenAIResponsesProvider(
+        provider_name="Test Provider",
+        api_base_url="http://example.invalid",
+        api_key="secret",
+        model="gpt-5.2",
+    )
+    provider._client = _FakeClient([], status_code=429)
+
+    with pytest.raises(LLMProviderError) as excinfo:
+        provider.chat(messages=[{"role": "user", "content": "Retry me"}])
+
+    assert excinfo.value.transient is True
+    assert excinfo.value.status_code == 429

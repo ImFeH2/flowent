@@ -78,6 +78,31 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
     ]
 
 
+def test_load_settings_defaults_model_max_retries(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+
+    assert loaded.model.max_retries == 5
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["model"]["max_retries"] == 5
+
+
 def test_load_settings_drops_removed_exit_tool_from_roles(monkeypatch, tmp_path):
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(

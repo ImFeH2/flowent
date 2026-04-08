@@ -68,6 +68,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
             "model": {
                 "active_provider_id": "",
                 "active_model": "",
+                "max_retries": 5,
                 "params": {
                     "reasoning_effort": None,
                     "verbosity": None,
@@ -432,6 +433,31 @@ def test_update_settings_accepts_xhigh_reasoning_effort(monkeypatch):
 
     assert settings.model.params.reasoning_effort == "xhigh"
     assert result["settings"]["model"]["params"]["reasoning_effort"] == "xhigh"
+    assert saved == [settings]
+
+
+def test_update_settings_accepts_model_max_retries(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                model={"max_retries": 8},
+            )
+        )
+    )
+
+    assert settings.model.max_retries == 8
+    assert result["settings"]["model"]["max_retries"] == 8
     assert saved == [settings]
 
 

@@ -92,6 +92,7 @@ CONDUCTOR_ROLE_INCLUDED_TOOLS = [
 MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high", "xhigh"})
 MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
 REMOVED_TOOL_NAMES = frozenset({"exit", "list_connections"})
+DEFAULT_LLM_MAX_RETRIES = 5
 
 
 @dataclass
@@ -142,6 +143,7 @@ class ModelSettings:
     active_provider_id: str = ""
     active_model: str = ""
     params: ModelParams = field(default_factory=build_default_model_params)
+    max_retries: int = DEFAULT_LLM_MAX_RETRIES
 
 
 @dataclass
@@ -331,6 +333,18 @@ def build_model_params_from_mapping(raw_model_params: object) -> ModelParams | N
         top_p=top_p,
     )
     return None if is_empty_model_params(params) else params
+
+
+def build_model_max_retries(
+    raw_max_retries: object,
+    *,
+    field_name: str = "model.max_retries",
+) -> int:
+    if isinstance(raw_max_retries, bool) or not isinstance(raw_max_retries, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if raw_max_retries < 0:
+        raise ValueError(f"{field_name} must be greater than or equal to 0")
+    return raw_max_retries
 
 
 def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
@@ -784,10 +798,21 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         model_data.get("params")
     )
     migrated = migrated or model_params_migrated
+    raw_model_max_retries = model_data.get("max_retries")
+    if raw_model_max_retries is None:
+        model_max_retries = DEFAULT_LLM_MAX_RETRIES
+        migrated = True
+    else:
+        try:
+            model_max_retries = build_model_max_retries(raw_model_max_retries)
+        except ValueError:
+            model_max_retries = DEFAULT_LLM_MAX_RETRIES
+            migrated = True
     model_settings = ModelSettings(
         active_provider_id=str(model_data.get("active_provider_id", "")),
         active_model=str(model_data.get("active_model", "")),
         params=model_params,
+        max_retries=model_max_retries,
     )
     custom_prompt = str(data.get("custom_prompt", ""))
     if "custom_post_prompt" in data:

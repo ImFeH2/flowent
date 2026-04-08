@@ -1,5 +1,6 @@
 import json
 import threading
+import time
 
 from loguru import logger
 
@@ -23,8 +24,9 @@ from app.models import (
     ToolCall,
     ToolCallResult,
 )
+from app.providers.errors import LLMProviderError
 from app.registry import registry
-from app.settings import Settings
+from app.settings import ModelSettings, Settings
 
 
 def test_agent_keeps_running_after_pure_text_response(monkeypatch):
@@ -72,6 +74,171 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
         msg.get("role") == "assistant"
         and msg.get("content") == "working through the task"
         for msg in llm_messages[1]
+    )
+
+
+def test_agent_retries_transient_llm_errors_before_succeeding(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT))
+    wait_calls = 0
+    llm_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            agent._append_history(
+                ReceivedMessage(content="finish the task", from_id="tester")
+            )
+            agent.set_state(AgentState.RUNNING, "received message from tester")
+            return
+        raise AssertionError("agent should not return to idle while retrying")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls
+        llm_calls += 1
+        if llm_calls < 3:
+            raise LLMProviderError(
+                f"temporary failure {llm_calls}",
+                transient=True,
+                status_code=429,
+            )
+        if llm_calls == 4:
+            agent.request_termination("done")
+            return LLMResponse()
+        if llm_calls == 3:
+            return LLMResponse(content="Recovered answer")
+        raise AssertionError("unexpected extra LLM call")
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr(agent, "_get_llm_retry_delay", lambda retry_number: 0.0)
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(model=ModelSettings(max_retries=2)),
+    )
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    agent._run()
+
+    assert wait_calls == 1
+    assert llm_calls == 4
+    assert agent.state == AgentState.TERMINATED
+    assert not any(
+        isinstance(entry, ErrorEntry) for entry in agent.get_history_snapshot()
+    )
+    assert any(
+        isinstance(entry, AssistantText) and entry.content == "Recovered answer"
+        for entry in agent.get_history_snapshot()
+    )
+
+
+def test_agent_does_not_retry_non_transient_llm_errors(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT))
+    wait_calls = 0
+    llm_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            agent._append_history(
+                ReceivedMessage(content="finish the task", from_id="tester")
+            )
+            agent.set_state(AgentState.RUNNING, "received message from tester")
+            return
+        agent.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls
+        llm_calls += 1
+        raise LLMProviderError(
+            "authentication failed",
+            transient=False,
+            status_code=401,
+        )
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(model=ModelSettings(max_retries=5)),
+    )
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    agent._run()
+
+    assert llm_calls == 1
+    assert wait_calls == 2
+    assert any(
+        isinstance(entry, ErrorEntry) and "authentication failed" in entry.content
+        for entry in agent.get_history_snapshot()
+    )
+
+
+def test_agent_interrupt_stops_retry_backoff(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT))
+    wait_calls = 0
+    llm_calls = 0
+    interrupter: threading.Thread | None = None
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            agent._append_history(
+                ReceivedMessage(content="finish the task", from_id="tester")
+            )
+            agent.set_state(AgentState.RUNNING, "received message from tester")
+            return
+        agent.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls, interrupter
+        llm_calls += 1
+        if llm_calls == 1:
+            interrupter = threading.Thread(
+                target=lambda: (time.sleep(0.01), agent.request_interrupt())
+            )
+            interrupter.start()
+            raise LLMProviderError(
+                "temporary failure",
+                transient=True,
+                status_code=429,
+            )
+        raise AssertionError("interrupt should stop retry before next attempt")
+
+    monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr(agent, "_get_llm_retry_delay", lambda retry_number: 1.0)
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(model=ModelSettings(max_retries=5)),
+    )
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    agent._run()
+    if interrupter is not None:
+        interrupter.join(timeout=1.0)
+
+    assert llm_calls == 1
+    assert wait_calls == 2
+    assert not any(
+        isinstance(entry, ErrorEntry) for entry in agent.get_history_snapshot()
     )
 
 

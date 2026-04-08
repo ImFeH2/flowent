@@ -24,6 +24,7 @@ from app.models import (
     Event,
     EventType,
     HistoryEntry,
+    LLMResponse,
     Message,
     NodeConfig,
     NodeType,
@@ -39,6 +40,7 @@ from app.models import (
     ToolResultDelta,
 )
 from app.prompts import get_system_prompt
+from app.providers.errors import LLMProviderError
 from app.providers.gateway import gateway
 from app.providers.thinking import ThinkTagParser, split_thinking_content
 from app.security import authorize
@@ -81,7 +83,9 @@ class RoutedContentResult:
 
 
 class InterruptRequestedError(Exception):
-    pass
+    def __init__(self, stream_state: StreamingContentState | None = None) -> None:
+        super().__init__("interrupt requested")
+        self.stream_state = stream_state
 
 
 _HEADER_RE = re.compile(r"^@([^:\n]+):[ \t]*(.*)$", re.DOTALL)
@@ -520,23 +524,12 @@ class Agent:
                         len(tools_schema) if tools_schema else 0,
                         len(self.history),
                     )
-                    stream_state = StreamingContentState()
+                    stream_state: StreamingContentState | None = None
                     try:
-                        try:
-                            response = gateway.chat(
-                                messages=messages,
-                                tools=tools_schema or None,
-                                on_chunk=partial(self._handle_llm_chunk, stream_state),
-                                register_interrupt=self.set_interrupt_callback,
-                                role_name=self.config.role_name,
-                            )
-                        except Exception:
-                            if self._interrupt_requested.is_set():
-                                raise InterruptRequestedError() from None
-                            raise
-                        finally:
-                            self.set_interrupt_callback(None)
-                        self._raise_if_interrupt_requested()
+                        response, stream_state = self._chat_with_retries(
+                            messages=messages,
+                            tools_schema=tools_schema,
+                        )
                         self._flush_streaming_think_parser(stream_state)
 
                         self._log.debug(
@@ -599,8 +592,8 @@ class Agent:
                             self._log.warning(
                                 "LLM returned empty response (no content, no tool_calls)",
                             )
-                    except InterruptRequestedError:
-                        self._handle_interrupt(stream_state)
+                    except InterruptRequestedError as exc:
+                        self._handle_interrupt(exc.stream_state or stream_state)
                         if self._terminate.is_set():
                             break
                         continue
@@ -1192,6 +1185,62 @@ class Agent:
     def _raise_if_interrupt_requested(self) -> None:
         if self._interrupt_requested.is_set():
             raise InterruptRequestedError()
+
+    def _get_llm_max_retries(self) -> int:
+        return get_settings().model.max_retries
+
+    def _get_llm_retry_delay(self, retry_number: int) -> float:
+        return min(0.5 * (2 ** max(retry_number - 1, 0)), 8.0)
+
+    def _wait_for_llm_retry_delay(self, delay_seconds: float) -> None:
+        self.set_interrupt_callback(self._interrupt_requested.set)
+        try:
+            if self._interrupt_requested.wait(max(delay_seconds, 0.0)):
+                raise InterruptRequestedError()
+        finally:
+            self.set_interrupt_callback(None)
+
+    def _chat_with_retries(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools_schema: list[dict[str, Any]] | None,
+    ) -> tuple[LLMResponse, StreamingContentState]:
+        retry_limit = self._get_llm_max_retries()
+        retry_count = 0
+
+        while True:
+            stream_state = StreamingContentState()
+            try:
+                try:
+                    response = gateway.chat(
+                        messages=messages,
+                        tools=tools_schema or None,
+                        on_chunk=partial(self._handle_llm_chunk, stream_state),
+                        register_interrupt=self.set_interrupt_callback,
+                        role_name=self.config.role_name,
+                    )
+                except Exception:
+                    if self._interrupt_requested.is_set():
+                        raise InterruptRequestedError(stream_state) from None
+                    raise
+                finally:
+                    self.set_interrupt_callback(None)
+                self._raise_if_interrupt_requested()
+                return response, stream_state
+            except LLMProviderError as exc:
+                if not exc.transient or retry_count >= retry_limit:
+                    raise
+                retry_count += 1
+                delay_seconds = self._get_llm_retry_delay(retry_count)
+                self._log.warning(
+                    "Transient LLM error, retry {}/{} in {:.2f}s: {}",
+                    retry_count,
+                    retry_limit,
+                    delay_seconds,
+                    exc,
+                )
+                self._wait_for_llm_retry_delay(delay_seconds)
 
     def _handle_interrupt(self, stream_state: StreamingContentState | None) -> None:
         if stream_state is not None:

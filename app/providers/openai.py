@@ -11,6 +11,7 @@ from loguru import logger
 from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.providers import LLMProvider
+from app.providers.errors import build_network_error, build_status_error
 from app.providers.sse import iter_sse_json
 from app.providers.thinking import ThinkTagParser
 from app.settings import ModelParams
@@ -130,14 +131,13 @@ class OpenAIProvider(LLMProvider):
                         body[:500],
                         elapsed,
                     )
-                    raise RuntimeError(
-                        f"LLM API error\n"
-                        f"Provider: {self._provider_name}\n"
-                        f"Type: openai\n"
-                        f"Model: {self._model}\n"
-                        f"Base URL: {self._api_base_url}\n"
-                        f"Status: {response.status_code}\n"
-                        f"Response: {body}",
+                    raise build_status_error(
+                        provider_name=self._provider_name,
+                        provider_type="openai",
+                        model=self._model,
+                        base_url=self._api_base_url,
+                        status_code=response.status_code,
+                        body=body,
                     )
 
                 for chunk in iter_sse_json(response, done_token="[DONE]"):
@@ -182,6 +182,22 @@ class OpenAIProvider(LLMProvider):
                                 acc["name"] = fn["name"]
                             if fn.get("arguments"):
                                 acc["arguments"] += fn["arguments"]
+        except httpx.TransportError as exc:
+            elapsed = time.perf_counter() - t0
+            logger.warning(
+                "LLM API transport error [provider={}, model={}, type=openai]: {} ({:.2f}s)",
+                self._provider_name,
+                self._model,
+                exc,
+                elapsed,
+            )
+            raise build_network_error(
+                provider_name=self._provider_name,
+                provider_type="openai",
+                model=self._model,
+                base_url=self._api_base_url,
+                error=exc,
+            ) from exc
         finally:
             if getattr(client, "is_closed", False):
                 self._client = httpx.Client(timeout=120.0)

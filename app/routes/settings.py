@@ -13,6 +13,7 @@ from app.settings import (
     TelegramApprovedChat,
     TelegramSettings,
     build_default_model_params,
+    build_model_max_retries,
     build_model_params_from_mapping,
     find_role,
     get_settings,
@@ -87,12 +88,18 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         )
         active_model = req.model.get("active_model", current.model.active_model)
         params = current.model.params
+        max_retries = current.model.max_retries
         if "params" in req.model:
             try:
                 parsed_params = build_model_params_from_mapping(req.model.get("params"))
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             params = parsed_params or build_default_model_params()
+        if "max_retries" in req.model:
+            try:
+                max_retries = build_model_max_retries(req.model.get("max_retries"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
         current.model = ModelSettings(
             active_provider_id=active_provider_id
             if isinstance(active_provider_id, str)
@@ -101,6 +108,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             if isinstance(active_model, str)
             else current.model.active_model,
             params=params,
+            max_retries=max_retries,
         )
 
     save_settings(current)

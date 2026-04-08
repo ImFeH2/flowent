@@ -18,6 +18,7 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
         "model": {
             "active_provider_id": settings.model.active_provider_id,
             "active_model": settings.model.active_model,
+            "max_retries": settings.model.max_retries,
             "params": {
                 "reasoning_effort": settings.model.params.reasoning_effort,
                 "verbosity": settings.model.params.verbosity,
@@ -59,6 +60,10 @@ class ManageSettingsTool(Tool):
                 "type": "string",
                 "description": "Active model name for update",
             },
+            "max_retries": {
+                "type": "integer",
+                "description": "Maximum retries for transient LLM call failures",
+            },
             "model_params": {
                 "type": ["object", "null"],
                 "description": "Default canonical model parameter overrides",
@@ -90,6 +95,7 @@ class ManageSettingsTool(Tool):
         from app.registry import registry
         from app.settings import (
             build_default_model_params,
+            build_model_max_retries,
             build_model_params_from_mapping,
             find_role,
             get_settings,
@@ -100,6 +106,7 @@ class ManageSettingsTool(Tool):
         assistant_role_name = args.get("assistant_role_name")
         active_provider_id = args.get("active_provider_id")
         active_model = args.get("active_model")
+        max_retries = args.get("max_retries")
         model_params = args.get("model_params")
         timestamp_format = args.get("timestamp_format")
 
@@ -112,6 +119,11 @@ class ManageSettingsTool(Tool):
             return json.dumps({"error": "active_provider_id must be a string"})
         if active_model is not None and not isinstance(active_model, str):
             return json.dumps({"error": "active_model must be a string"})
+        if max_retries is not None:
+            try:
+                build_model_max_retries(max_retries, field_name="max_retries")
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
         if model_params is not None and not isinstance(
             model_params, (dict, type(None))
         ):
@@ -139,6 +151,11 @@ class ManageSettingsTool(Tool):
             settings.model.active_provider_id = active_provider_id
         if active_model is not None:
             settings.model.active_model = active_model
+        if max_retries is not None:
+            settings.model.max_retries = build_model_max_retries(
+                max_retries,
+                field_name="max_retries",
+            )
         if "model_params" in args:
             try:
                 settings.model.params = (

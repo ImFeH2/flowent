@@ -43,7 +43,9 @@ export function PageScaffold({
           <div className="flex items-center gap-2">{actions}</div>
         ) : null}
       </div>
-      <div className="min-h-0 flex-1">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 }

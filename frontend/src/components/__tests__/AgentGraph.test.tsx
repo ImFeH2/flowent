@@ -65,6 +65,9 @@ vi.mock("@xyflow/react", async () => {
     nodeTypes,
     onInit,
     onNodeClick,
+    onNodeMouseEnter,
+    onNodeMouseMove,
+    onNodeMouseLeave,
     onConnectStart,
     onConnectEnd,
     onNodeContextMenu,
@@ -86,6 +89,9 @@ vi.mock("@xyflow/react", async () => {
     nodeTypes: Record<string, React.ComponentType<MockNodeComponentProps>>;
     onInit?: (instance: { fitView: typeof fitViewMock }) => void;
     onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
+    onNodeMouseEnter?: (event: React.MouseEvent, node: { id: string }) => void;
+    onNodeMouseMove?: (event: React.MouseEvent, node: { id: string }) => void;
+    onNodeMouseLeave?: (event: React.MouseEvent, node: { id: string }) => void;
     onConnectStart?: () => void;
     onConnectEnd?: () => void;
     onNodeContextMenu?: (event: React.MouseEvent, node: { id: string }) => void;
@@ -130,6 +136,9 @@ vi.mock("@xyflow/react", async () => {
               className="react-flow__node"
               data-testid={`node-${node.id}`}
               onClick={(event) => onNodeClick?.(event, node)}
+              onMouseEnter={(event) => onNodeMouseEnter?.(event, node)}
+              onMouseMove={(event) => onNodeMouseMove?.(event, node)}
+              onMouseLeave={(event) => onNodeMouseLeave?.(event, node)}
               onContextMenu={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -398,6 +407,88 @@ describe("AgentGraph", () => {
     await waitFor(() => {
       expect(terminateNodeMock).toHaveBeenCalledWith("worker-1");
     });
+  });
+
+  it("renders graph context menus in a viewport portal instead of inside the workspace canvas", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+      }),
+    ]);
+
+    fireEvent.contextMenu(screen.getByTestId("node-worker-1"));
+
+    const stopWorker = await screen.findByRole("button", {
+      name: "Stop Agent",
+    });
+    expect(stopWorker).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("react-flow")).queryByRole("button", {
+        name: "Stop Agent",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders canvas context menus in a viewport portal instead of inside the workspace canvas", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+      }),
+    ]);
+
+    fireEvent.contextMenu(screen.getByTestId("react-flow"));
+
+    const fitView = await screen.findByRole("button", {
+      name: "Fit View",
+    });
+    expect(fitView).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("react-flow")).queryByRole("button", {
+        name: "Fit View",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders pane context menus in a viewport portal instead of inside the workspace canvas", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+      }),
+    ]);
+
+    fireEvent.contextMenu(screen.getByTestId("react-flow"));
+
+    const fitView = await screen.findByRole("button", {
+      name: "Fit View",
+    });
+    expect(fitView).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("react-flow")).queryByRole("button", {
+        name: "Fit View",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders node tooltips in a viewport portal instead of inside the workspace canvas", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+      }),
+    ]);
+
+    fireEvent.mouseEnter(screen.getByTestId("node-worker-1"), {
+      clientX: 240,
+      clientY: 180,
+    });
+
+    expect(await screen.findByText("Connections")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("react-flow")).queryByText("Connections"),
+    ).not.toBeInTheDocument();
   });
 
   it("re-fits the graph when the container is resized", async () => {

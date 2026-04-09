@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
+import { ViewportPortal } from "@/components/ViewportPortal";
 
 export interface ContextMenuItem {
   label: string;
@@ -57,37 +58,39 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   }, [onClose]);
 
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, scale: 0.96, y: -4 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.12, ease: "easeOut" }}
-      className="fixed z-[200] min-w-[160px] rounded-md border border-glass-border bg-surface-raised py-1 shadow-xl backdrop-blur-sm"
-      style={{ left: pos.left, top: pos.top }}
-    >
-      {items.map((item, i) =>
-        item === "divider" ? (
-          <div key={i} className="my-1 border-t border-glass-border" />
-        ) : (
-          <button
-            key={i}
-            disabled={item.disabled}
-            onClick={() => {
-              if (!item.disabled) {
-                item.onClick();
-                onClose();
-              }
-            }}
-            className={`w-full px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              item.danger
-                ? "text-white hover:bg-white/[0.08]"
-                : "text-foreground hover:bg-surface-3"
-            }`}
-          >
-            {item.label}
-          </button>
-        ),
-      )}
-    </motion.div>
+    <ViewportPortal>
+      <motion.div
+        ref={ref}
+        initial={{ opacity: 0, scale: 0.96, y: -4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.12, ease: "easeOut" }}
+        className="fixed z-[200] min-w-[160px] rounded-md border border-glass-border bg-surface-raised py-1 shadow-xl backdrop-blur-sm"
+        style={{ left: pos.left, top: pos.top }}
+      >
+        {items.map((item, i) =>
+          item === "divider" ? (
+            <div key={i} className="my-1 border-t border-glass-border" />
+          ) : (
+            <button
+              key={i}
+              disabled={item.disabled}
+              onClick={() => {
+                if (!item.disabled) {
+                  item.onClick();
+                  onClose();
+                }
+              }}
+              className={`w-full px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                item.danger
+                  ? "text-white hover:bg-white/[0.08]"
+                  : "text-foreground hover:bg-surface-3"
+              }`}
+            >
+              {item.label}
+            </button>
+          ),
+        )}
+      </motion.div>
+    </ViewportPortal>
   );
 }

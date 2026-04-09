@@ -3,10 +3,13 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
+from app.models import ModelInfo
 from app.routes.providers_route import (
     CreateProviderRequest,
+    ListModelsRequest,
     UpdateProviderRequest,
     create_provider,
+    list_provider_models,
     update_provider,
 )
 from app.settings import ProviderConfig, Settings
@@ -158,3 +161,36 @@ def test_create_provider_rejects_non_string_header_values(monkeypatch):
 
     assert exc.value.status_code == 400
     assert exc.value.detail == "headers must be a JSON object of string values"
+
+
+def test_list_provider_models_runs_gateway_in_threadpool(monkeypatch):
+    calls: list[tuple[str, tuple[object, ...]]] = []
+
+    def fake_list_models_for(provider_id: str) -> list[ModelInfo]:
+        calls.append(("gateway", (provider_id,)))
+        return [ModelInfo(id="gpt-5")]
+
+    async def fake_run_in_threadpool(func, *args):
+        calls.append(("threadpool", args))
+        return func(*args)
+
+    monkeypatch.setattr(
+        "app.providers.gateway.gateway.list_models_for",
+        fake_list_models_for,
+    )
+    monkeypatch.setattr(
+        "app.routes.providers_route.run_in_threadpool",
+        fake_run_in_threadpool,
+    )
+
+    result = asyncio.run(
+        list_provider_models(
+            ListModelsRequest(provider_id="provider-1"),
+        )
+    )
+
+    assert result == {"models": [{"id": "gpt-5"}]}
+    assert calls == [
+        ("threadpool", ("provider-1",)),
+        ("gateway", ("provider-1",)),
+    ]

@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from app.providers.base_url import resolve_provider_base_url
 from app.settings import (
@@ -133,7 +134,7 @@ async def list_provider_models(req: ListModelsRequest) -> dict[str, object]:
     from app.providers.gateway import gateway
 
     try:
-        models = gateway.list_models_for(req.provider_id)
+        models = await run_in_threadpool(gateway.list_models_for, req.provider_id)
         return {"models": [{"id": m.id} for m in models]}
     except Exception as e:
         logger.error("Failed to list models for provider '{}': {}", req.provider_id, e)

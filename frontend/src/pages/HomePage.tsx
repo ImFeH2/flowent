@@ -1501,6 +1501,8 @@ function AssistantChatPanel({
   onOpenDetails: () => void;
 }) {
   const { agents } = useAgentNodesRuntime();
+  const { height: composerHeight, ref: composerRef } =
+    useMeasuredHeight<HTMLDivElement>();
   const {
     assistantActivity,
     clearChat,
@@ -1514,10 +1516,8 @@ function AssistantChatPanel({
     sendMessage,
     setInput,
     timelineItems,
-  } = useAssistantChat();
+  } = useAssistantChat({ bottomInset: composerHeight });
   const assistantRoleName = getAssistantNode(agents)?.role_name ?? null;
-  const { height: composerHeight, ref: composerRef } =
-    useMeasuredHeight<HTMLDivElement>();
 
   return (
     <div className="relative flex h-full flex-col">
@@ -1568,7 +1568,10 @@ function AssistantChatPanel({
 
         <div
           ref={composerRef}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(8,8,9,0.12)_18%,rgba(8,8,9,0.72)_60%,rgba(8,8,9,0.94)_100%)] px-2.5 pb-2.5 pt-8"
+          style={{
+            paddingBottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
+          }}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(8,8,9,0.12)_18%,rgba(8,8,9,0.72)_60%,rgba(8,8,9,0.94)_100%)] px-2.5 pt-8"
         >
           <AssistantChatComposer
             busy={assistantActivity.running}

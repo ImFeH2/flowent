@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -22,7 +23,19 @@ import {
 } from "@/lib/history";
 import type { AssistantChatItem, HistoryEntry, NodeDetail } from "@/types";
 
-export function useAssistantChat() {
+const SCROLL_BOTTOM_EPSILON = 1;
+
+function isScrolledToBottom(element: HTMLDivElement) {
+  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+  return maxScrollTop - element.scrollTop <= SCROLL_BOTTOM_EPSILON;
+}
+
+interface UseAssistantChatOptions {
+  bottomInset?: number;
+}
+
+export function useAssistantChat(options: UseAssistantChatOptions = {}) {
+  const { bottomInset = 0 } = options;
   const { agents } = useAgentNodesRuntime();
   const { connected } = useAgentConnectionRuntime();
   const {
@@ -178,19 +191,54 @@ export function useAssistantChat() {
     timelineItems,
   ]);
 
-  useEffect(() => {
+  const runningHintKey = assistantActivity.runningHint
+    ? `${assistantActivity.runningHint.label}:${assistantActivity.runningHint.toolName ?? ""}`
+    : "";
+
+  useLayoutEffect(() => {
     const element = scrollRef.current;
     if (!element || !autoScrollRef.current) {
       return;
     }
-    element.scrollTop = element.scrollHeight;
-  }, [timelineItems]);
+    const raf = requestAnimationFrame(() => {
+      if (!autoScrollRef.current) {
+        return;
+      }
+      element.scrollTop = element.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [bottomInset, runningHintKey, timelineItems]);
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      if (!autoScrollRef.current) {
+        return;
+      }
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (!autoScrollRef.current) {
+          return;
+        }
+        element.scrollTop = element.scrollHeight;
+      });
+    });
+
+    observer.observe(element);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, []);
 
   const onMessagesScroll = (event: UIEvent<HTMLDivElement>) => {
-    const element = event.currentTarget;
-    const distanceToBottom =
-      element.scrollHeight - element.scrollTop - element.clientHeight;
-    autoScrollRef.current = distanceToBottom <= 24;
+    autoScrollRef.current = isScrolledToBottom(event.currentTarget);
   };
 
   const sendMessage = async () => {

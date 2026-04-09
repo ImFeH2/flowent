@@ -13,6 +13,8 @@ interface AssistantPanelProps {
 
 export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
   const { agents } = useAgentNodesRuntime();
+  const { height: composerHeight, ref: composerRef } =
+    useMeasuredHeight<HTMLDivElement>();
   const {
     assistantActivity = { running: false },
     connected,
@@ -24,11 +26,9 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
     sendMessage,
     setInput,
     timelineItems,
-  } = useAssistantChat();
+  } = useAssistantChat({ bottomInset: composerHeight });
   const isFloating = variant === "floating";
   const chatVariant = isFloating ? "floating" : "panel";
-  const { height: composerHeight, ref: composerRef } =
-    useMeasuredHeight<HTMLDivElement>();
 
   return (
     <div
@@ -60,8 +60,11 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
         />
         <div
           ref={composerRef}
+          style={{
+            paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
+          }}
           className={cn(
-            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3.5 pb-3.5",
+            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3.5",
             isFloating
               ? "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.08)_20%,rgba(10,10,11,0.68)_64%,rgba(10,10,11,0.9)_100%)] pt-8"
               : "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.12)_22%,rgba(10,10,11,0.74)_64%,rgba(10,10,11,0.94)_100%)] pt-9",

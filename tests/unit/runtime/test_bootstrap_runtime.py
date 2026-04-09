@@ -6,7 +6,7 @@ import app.settings as settings_module
 from app.agent import Agent
 from app.models import AgentState, StateEntry
 from app.registry import registry
-from app.runtime import bootstrap_runtime
+from app.runtime import bootstrap_runtime, shutdown_runtime
 from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
@@ -554,3 +554,88 @@ def test_bootstrap_runtime_skips_terminated_restored_nodes(monkeypatch, tmp_path
         assert persisted.state == AgentState.TERMINATED
     finally:
         _stop_all_agents()
+
+
+def test_shutdown_runtime_keeps_persistent_workspace_nodes_unterminated(
+    monkeypatch,
+    tmp_path,
+):
+    settings_file = tmp_path / "settings.json"
+    workspace_file = tmp_path / "workspace.json"
+    registry.reset()
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_file.write_text(
+        json.dumps(
+            {
+                "tabs": [
+                    {
+                        "id": "tab-1",
+                        "title": "Restore",
+                        "goal": "",
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "nodes": [
+                    {
+                        "id": "node-1",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Worker",
+                            "tab_id": "tab-1",
+                            "name": "Persistent Worker",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "idle",
+                        "todos": [],
+                        "history": [
+                            {
+                                "type": "StateEntry",
+                                "state": "idle",
+                                "reason": "restored",
+                            }
+                        ],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+
+    terminated: list[str] = []
+
+    def fake_terminate_and_wait(self: Agent, timeout: float = 10.0) -> None:
+        terminated.append(self.uuid)
+
+    monkeypatch.setattr(Agent, "terminate_and_wait", fake_terminate_and_wait)
+
+    bootstrap_runtime()
+    shutdown_runtime()
+
+    try:
+        assert len(terminated) == 1
+        assert terminated[0] != "node-1"
+        persisted = workspace_store.get_node_record("node-1")
+        assert persisted is not None
+        assert persisted.state == AgentState.IDLE
+    finally:
+        registry.reset()

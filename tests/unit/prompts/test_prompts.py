@@ -290,21 +290,24 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert LIST_TABS_TOOL_GUIDANCE in prompt
     assert LIST_TOOLS_TOOL_GUIDANCE in prompt
     assert MANAGE_TOOLS_GUIDANCE in prompt
+    assert CONNECT_TOOL_GUIDANCE not in prompt
     assert "## Tools Available" not in prompt
     assert "create_tab" in STEWARD_ROLE_SYSTEM_PROMPT
     assert "delete_tab" in STEWARD_ROLE_SYSTEM_PROMPT
     assert "create_agent" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "When a task contains two or more independent subtasks that can run in parallel"
+        "If the target tab does not yet have a Conductor owner"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert (
-        "When in doubt between a single Worker and multiple agents, prefer multiple agents."
+        "Do not directly assign execution work to a Worker as the default path."
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
-    assert "instruct each node where to send its result" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "use `list_roles`, `list_tabs`, and `list_tools` to inspect the current options before acting"
+        "task brief, not a raw copy of the Human's text" in STEWARD_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "ensure it has a Conductor owner, and hand the execution brief to that Conductor"
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert "call `idle` in the same response" in prompt
@@ -339,11 +342,16 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     assert LIST_TOOLS_TOOL_GUIDANCE in prompt
     assert "## Tools Available" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert (
-        "Prefer multi-agent parallelism over serial single-agent execution."
+        "You are the only owner-level Conductor for this tab"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
-        "specify where each node should send its result" in CONDUCTOR_ROLE_SYSTEM_PROMPT
+        "Do not default to creating a single Worker and handing it the entire task."
+        in CONDUCTOR_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "Regular task-node results should usually come back to you first"
+        in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
         "Prefer adding peer nodes to the current tab with `create_agent`"
@@ -430,13 +438,15 @@ def test_steward_included_tools_contains_list_roles_and_list_tools():
     assert "list_roles" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tabs" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tools" in STEWARD_ROLE_INCLUDED_TOOLS
+    assert "connect" not in STEWARD_ROLE_INCLUDED_TOOLS
+    assert "connect" not in STEWARD_ROLE_INCLUDED_TOOLS
+    assert "connect" in CONDUCTOR_ROLE_INCLUDED_TOOLS
 
 
 def test_steward_prompt_requires_same_response_dispatch_and_no_rebroadcast():
     assert "Each response can route to only one node." in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "keep sending one node-specific `@target:` task per response"
-        in STEWARD_ROLE_SYSTEM_PROMPT
+        "keep sending one `@target:` brief per response" in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert "Do not re-send a task to a node" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (

@@ -111,3 +111,29 @@ def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     node_ids = {node["id"] for node in nodes_response.json()["nodes"]}
     assert left_id not in node_ids
     assert right_id not in node_ids
+
+
+def test_create_tab_rejects_second_conductor_owner(client: TestClient):
+    create_tab_response = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    )
+
+    assert create_tab_response.status_code == 200
+    tab_id = create_tab_response.json()["id"]
+
+    first_conductor = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Conductor", "name": "Main Conductor"},
+    )
+    duplicate_conductor = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Conductor", "name": "Backup Conductor"},
+    )
+
+    assert first_conductor.status_code == 200
+    assert duplicate_conductor.status_code == 400
+    assert (
+        duplicate_conductor.json()["detail"]
+        == f"Tab '{tab_id}' already has a Conductor owner"
+    )

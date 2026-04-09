@@ -16,6 +16,7 @@ from app.models import (
 )
 from app.registry import registry
 from app.runtime import SYSTEM_NODE_TIMEOUT
+from app.settings import CONDUCTOR_ROLE_NAME
 from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
@@ -163,6 +164,13 @@ def create_agent_node(
         for existing in workspace_store.list_node_records():
             if existing.config.name == config.name:
                 return None, f"Node name '{config.name}' already exists"
+    if config.role_name == CONDUCTOR_ROLE_NAME:
+        for existing in workspace_store.list_node_records(tab_id):
+            if (
+                existing.config.role_name == CONDUCTOR_ROLE_NAME
+                and existing.state != AgentState.TERMINATED
+            ):
+                return None, f"Tab '{tab_id}' already has a Conductor owner"
 
     node_id = str(uuid.uuid4())
     record = GraphNodeRecord(

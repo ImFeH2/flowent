@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.graph_service import create_agent_node
-from app.models import NodePosition, NodeType
+from app.models import NodeType
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -49,14 +49,6 @@ class CreateAgentTool(Tool):
                 "description": "Whether the node can access the network",
                 "default": False,
             },
-            "x": {
-                "type": "number",
-                "description": "Optional x position in the tab graph",
-            },
-            "y": {
-                "type": "number",
-                "description": "Optional y position in the tab graph",
-            },
         },
         "required": ["role_name"],
     }
@@ -68,8 +60,6 @@ class CreateAgentTool(Tool):
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
-        x = args.get("x")
-        y = args.get("y")
 
         resolved_tab_id: str | None
         if tab_id is None:
@@ -128,14 +118,6 @@ class CreateAgentTool(Tool):
                     }
                 )
 
-        position = None
-        if x is not None or y is not None:
-            if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
-                return json.dumps(
-                    {"error": "x and y must both be numbers when provided"}
-                )
-            position = NodePosition(x=float(x), y=float(y))
-
         record, error = create_agent_node(
             role_name=role_name,
             tab_id=resolved_tab_id,
@@ -143,7 +125,6 @@ class CreateAgentTool(Tool):
             tools=tools,
             write_dirs=write_dirs,
             allow_network=allow_network,
-            position=position,
         )
         if error is not None or record is None:
             return json.dumps({"error": error or "Failed to create agent"})

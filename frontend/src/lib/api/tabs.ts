@@ -61,8 +61,6 @@ export async function createTabNodeRequest(
     tools?: string[];
     write_dirs?: string[];
     allow_network?: boolean;
-    x?: number;
-    y?: number;
   },
 ): Promise<void> {
   await requestVoid(`/api/tabs/${tabId}/nodes`, {

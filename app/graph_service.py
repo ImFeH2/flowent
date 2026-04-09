@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 import uuid
 
 from app.events import event_bus
@@ -12,7 +11,6 @@ from app.models import (
     GraphEdge,
     GraphNodeRecord,
     NodeConfig,
-    NodePosition,
     NodeType,
     Tab,
 )
@@ -146,7 +144,6 @@ def create_agent_node(
     tools: list[str] | None = None,
     write_dirs: list[str] | None = None,
     allow_network: bool = False,
-    position: NodePosition | None = None,
 ) -> tuple[GraphNodeRecord | None, str | None]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
@@ -173,17 +170,15 @@ def create_agent_node(
         config=config,
         state=AgentState.INITIALIZING,
     )
-    return _finalize_agent_creation(record=record, position=position)
+    return _finalize_agent_creation(record=record)
 
 
 def _finalize_agent_creation(
     *,
     record: GraphNodeRecord,
-    position: NodePosition | None,
 ) -> tuple[GraphNodeRecord | None, str | None]:
     from app.agent import Agent
 
-    record.position = position
     workspace_store.upsert_node_record(record)
     node = Agent(record.config, uuid=record.id)
     registry.register(node)
@@ -225,21 +220,6 @@ def create_edge(
     if source is not None and target is not None:
         connect_nodes(from_node_id, to_node_id)
     return edge, None
-
-
-def update_node_position(
-    *,
-    node_id: str,
-    x: float,
-    y: float,
-) -> tuple[GraphNodeRecord | None, str | None]:
-    record = workspace_store.get_node_record(node_id)
-    if record is None:
-        return None, f"Node '{node_id}' not found"
-    record.position = NodePosition(x=x, y=y)
-    record.updated_at = time.time()
-    workspace_store.upsert_node_record(record)
-    return record, None
 
 
 def dispatch_node_message(

@@ -62,15 +62,3 @@ export async function dispatchNodeMessageRequest(
     errorMessage: "Failed to send node message",
   });
 }
-
-export async function updateNodePositionRequest(
-  nodeId: string,
-  x: number,
-  y: number,
-): Promise<void> {
-  await requestVoid(`/api/nodes/${nodeId}/position`, {
-    method: "PATCH",
-    body: { x, y },
-    errorMessage: "Failed to save node position",
-  });
-}

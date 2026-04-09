@@ -10,11 +10,6 @@ from app.workspace_store import workspace_store
 router = APIRouter()
 
 
-class UpdateNodePositionRequest(BaseModel):
-    x: float
-    y: float
-
-
 class DispatchNodeMessageRequest(BaseModel):
     content: str
     from_id: str = "human"
@@ -182,16 +177,6 @@ async def clear_node_chat(node_id: str) -> dict:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return {"status": "cleared"}
-
-
-@router.patch("/api/nodes/{node_id}/position")
-async def update_node_position(node_id: str, req: UpdateNodePositionRequest) -> dict:
-    from app.graph_service import update_node_position
-
-    record, error = update_node_position(node_id=node_id, x=req.x, y=req.y)
-    if error is not None or record is None:
-        raise HTTPException(status_code=404, detail=error or "Node not found")
-    return record.serialize()
 
 
 @router.post("/api/nodes/{node_id}/messages")

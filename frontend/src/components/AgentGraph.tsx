@@ -36,11 +36,7 @@ import {
   useAgentTabsRuntime,
   useAgentUI,
 } from "@/context/AgentContext";
-import {
-  createTabEdgeRequest,
-  terminateNode,
-  updateNodePositionRequest,
-} from "@/lib/api";
+import { createTabEdgeRequest, terminateNode } from "@/lib/api";
 import { getNodeLabel } from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
@@ -83,13 +79,6 @@ interface AgentNodeData extends Record<string, unknown> {
   selected: boolean;
   toolCall: string | null;
   leaving: boolean;
-}
-
-function getDefaultTabNodePosition(index: number) {
-  return {
-    x: 120 + (index % 4) * 240,
-    y: 120 + Math.floor(index / 4) * 160,
-  };
 }
 
 function useTransientGraphElements(
@@ -337,57 +326,6 @@ export function AgentGraph() {
         })),
     );
 
-    if (activeTabId) {
-      const nodes: FlowNode[] = [];
-      visibleAgents.forEach((agent, index) => {
-        const data = transientData.get(agent.id);
-        if (!data) {
-          return;
-        }
-        nodes.push({
-          id: agent.id,
-          type: "agent",
-          position: agent.position ?? getDefaultTabNodePosition(index),
-          width: data.width,
-          height: AGENT_NODE_HEIGHT,
-          data,
-          className: "agent-graph-node-shell",
-        } satisfies FlowNode);
-      });
-
-      const edges = baseEdges.map((edge) => {
-        const activeMessage = activeEdgeMessages.get(edge.id);
-        return {
-          ...edge,
-          data: {
-            active: !!activeMessage,
-            flowDirection: activeMessage ? "forward" : null,
-            leaving: false,
-          },
-          animated: false,
-        } satisfies FlowEdge;
-      });
-
-      return {
-        nodes,
-        edges,
-        structureKey: `${activeTabId}:${visibleAgents
-          .map((agent) => {
-            const data = transientData.get(agent.id);
-            const position = agent.position ?? getDefaultTabNodePosition(0);
-            return `${agent.id}:${data?.label ?? ""}:${position.x}:${position.y}:${agent.connections
-              .filter((targetId) => visibleAgentIds.has(targetId))
-              .sort()
-              .join(",")}`;
-          })
-          .sort()
-          .join("|")}:${edges
-          .map((edge) => edge.id)
-          .sort()
-          .join("|")}`,
-      };
-    }
-
     const rawNodes: FlowNode[] = visibleAgents.flatMap((agent) => {
       const data = transientData.get(agent.id);
       if (!data) {
@@ -396,6 +334,7 @@ export function AgentGraph() {
       return [
         {
           id: agent.id,
+          type: "agent",
           position: { x: 0, y: 0 },
           width: data.width,
           height: AGENT_NODE_HEIGHT,
@@ -432,7 +371,7 @@ export function AgentGraph() {
     return {
       nodes,
       edges,
-      structureKey: `unassigned:${visibleAgents
+      structureKey: `${activeTabId ?? "unassigned"}:${visibleAgents
         .map((agent) => {
           const data = transientData.get(agent.id);
           return `${agent.id}:${data?.label ?? ""}:${agent.connections
@@ -546,26 +485,6 @@ export function AgentGraph() {
   const onConnectEnd = useCallback(() => {
     setConnecting(false);
   }, []);
-
-  const onNodeDragStop = useCallback(
-    (_event: unknown, node: FlowNode) => {
-      if (!activeTabId || node.type !== "agent") {
-        return;
-      }
-      void updateNodePositionRequest(
-        node.id,
-        node.position.x,
-        node.position.y,
-      ).catch((error) => {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to save node position",
-        );
-      });
-    },
-    [activeTabId],
-  );
 
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
@@ -765,12 +684,11 @@ export function AgentGraph() {
             onPaneClick={onPaneClick}
             onPaneContextMenu={onPaneContextMenu}
             onNodeContextMenu={onNodeContextMenu}
-            onNodeDragStop={onNodeDragStop}
             onConnect={onConnect}
             onConnectStart={onConnectStart}
             onConnectEnd={onConnectEnd}
             proOptions={{ hideAttribution: true }}
-            nodesDraggable={Boolean(activeTabId)}
+            nodesDraggable={false}
             nodesConnectable={Boolean(activeTabId)}
             panOnDrag
             zoomOnScroll

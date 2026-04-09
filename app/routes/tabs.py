@@ -27,8 +27,6 @@ class CreateTabNodeRequest(BaseModel):
     tools: list[str] = []
     write_dirs: list[str] = []
     allow_network: bool = False
-    x: float | None = None
-    y: float | None = None
 
 
 class CreateTabEdgeRequest(BaseModel):
@@ -104,11 +102,6 @@ async def delete_tab_route(tab_id: str) -> dict[str, object]:
 
 @router.post("/api/tabs/{tab_id}/nodes")
 async def create_tab_node(tab_id: str, req: CreateTabNodeRequest) -> dict[str, object]:
-    position = None
-    if req.x is not None and req.y is not None:
-        from app.models import NodePosition
-
-        position = NodePosition(x=req.x, y=req.y)
     record, error = create_agent_node(
         role_name=req.role_name,
         tab_id=tab_id,
@@ -116,7 +109,6 @@ async def create_tab_node(tab_id: str, req: CreateTabNodeRequest) -> dict[str, o
         tools=req.tools,
         write_dirs=req.write_dirs,
         allow_network=req.allow_network,
-        position=position,
     )
     if error is not None or record is None:
         raise HTTPException(status_code=400, detail=error or "Failed to create node")

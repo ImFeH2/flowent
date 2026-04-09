@@ -69,13 +69,20 @@ vi.mock("@xyflow/react", async () => {
     onConnectEnd,
     onNodeContextMenu,
     onPaneContextMenu,
+    nodesDraggable,
+    nodesConnectable,
     minZoom,
     maxZoom,
     zoomOnScroll,
     zoomOnPinch,
     children,
   }: {
-    nodes: Array<{ id: string; type: string; data: Record<string, unknown> }>;
+    nodes: Array<{
+      id: string;
+      type: string;
+      data: Record<string, unknown>;
+      position: { x: number; y: number };
+    }>;
     nodeTypes: Record<string, React.ComponentType<MockNodeComponentProps>>;
     onInit?: (instance: { fitView: typeof fitViewMock }) => void;
     onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
@@ -83,6 +90,8 @@ vi.mock("@xyflow/react", async () => {
     onConnectEnd?: () => void;
     onNodeContextMenu?: (event: React.MouseEvent, node: { id: string }) => void;
     onPaneContextMenu?: (event: React.MouseEvent) => void;
+    nodesDraggable?: boolean;
+    nodesConnectable?: boolean;
     minZoom?: number;
     maxZoom?: number;
     zoomOnScroll?: boolean;
@@ -90,6 +99,9 @@ vi.mock("@xyflow/react", async () => {
     children?: React.ReactNode;
   }) {
     reactFlowPropsMock({
+      nodes,
+      nodesDraggable,
+      nodesConnectable,
       minZoom,
       maxZoom,
       zoomOnScroll,
@@ -429,12 +441,52 @@ describe("AgentGraph", () => {
 
     await waitFor(() => {
       expect(reactFlowPropsMock).toHaveBeenCalledWith({
+        nodes: expect.any(Array),
+        nodesDraggable: false,
+        nodesConnectable: true,
         minZoom: 0.05,
         maxZoom: 6,
         zoomOnScroll: true,
         zoomOnPinch: true,
       });
     });
+  });
+
+  it("lays out active tab nodes from graph structure instead of stored positions", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Planner",
+        position: { x: 900, y: 700 },
+        connections: ["worker-2"],
+      }),
+      buildNode({
+        id: "worker-2",
+        role_name: "Reviewer",
+        position: { x: 40, y: 20 },
+        connections: [],
+      }),
+    ]);
+
+    await screen.findByText("Planner");
+
+    const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
+      | {
+          nodes: Array<{ id: string; position: { x: number; y: number } }>;
+        }
+      | undefined;
+    const plannerNode = latestProps?.nodes.find(
+      (node) => node.id === "worker-1",
+    );
+    const reviewerNode = latestProps?.nodes.find(
+      (node) => node.id === "worker-2",
+    );
+
+    expect(plannerNode?.position).not.toEqual({ x: 900, y: 700 });
+    expect(reviewerNode?.position).not.toEqual({ x: 40, y: 20 });
+    expect(reviewerNode?.position.y ?? 0).toBeGreaterThan(
+      plannerNode?.position.y ?? 0,
+    );
   });
 
   it("keeps removed nodes briefly for exit transitions before unmounting them", () => {

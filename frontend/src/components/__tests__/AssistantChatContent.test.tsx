@@ -443,6 +443,7 @@ describe("AssistantChatComposer", () => {
 
     const stopButton = screen.getByRole("button", { name: "Stop assistant" });
     expect(stopButton).toHaveTextContent("Stop");
+    expect(stopButton.className).toContain("bg-graph-status-error/[0.18]");
 
     fireEvent.click(stopButton);
 

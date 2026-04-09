@@ -402,6 +402,7 @@ describe("AgentGraph", () => {
       name: "Stop Agent",
     });
     expect(stopWorker).toBeEnabled();
+    expect(stopWorker.className).toContain("text-graph-status-error/90");
 
     await userEvent.setup().click(stopWorker);
     await waitFor(() => {

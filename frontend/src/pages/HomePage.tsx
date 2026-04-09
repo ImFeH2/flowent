@@ -1207,7 +1207,7 @@ function AgentDetailPanel({
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant="destructive"
               disabled={interrupting}
               onClick={() => {
                 setInterrupting(true);

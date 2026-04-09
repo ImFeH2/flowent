@@ -82,7 +82,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
               }}
               className={`w-full px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 item.danger
-                  ? "text-white hover:bg-white/[0.08]"
+                  ? "text-graph-status-error/90 hover:bg-graph-status-error/[0.12] hover:text-graph-status-error"
                   : "text-foreground hover:bg-surface-3"
               }`}
             >

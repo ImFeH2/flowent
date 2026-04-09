@@ -355,6 +355,7 @@ describe("HomePage", () => {
     const interruptButton = within(view.container).getByRole("button", {
       name: "Interrupt",
     });
+    expect(interruptButton).toHaveAttribute("data-variant", "destructive");
     fireEvent.click(interruptButton);
 
     await waitFor(() => {
@@ -434,6 +435,7 @@ describe("HomePage", () => {
       name: "Interrupt",
     });
     const interruptButton = interruptButtons[interruptButtons.length - 1];
+    expect(interruptButton).toHaveAttribute("data-variant", "destructive");
     fireEvent.click(interruptButton);
 
     await waitFor(() => {

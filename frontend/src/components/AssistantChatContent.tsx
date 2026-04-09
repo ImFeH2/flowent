@@ -201,7 +201,7 @@ export function AssistantChatComposer({
               ? "h-8 gap-1.5 px-3 bg-primary/[0.92] text-primary-foreground hover:bg-primary/[0.86]"
               : "size-7 bg-primary text-primary-foreground hover:bg-primary/90",
             busy && isWorkspace
-              ? "bg-white/[0.1] text-white hover:bg-white/[0.16]"
+              ? "bg-graph-status-error/[0.18] text-graph-status-error hover:bg-graph-status-error/[0.24]"
               : "",
           )}
         >

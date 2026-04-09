@@ -61,7 +61,7 @@ def test_gateway_requires_active_model(monkeypatch):
 
 def test_gateway_prefers_role_model(monkeypatch):
     gateway = ProviderGateway()
-    captured: dict[str, str] = {}
+    captured: dict[str, object] = {}
 
     monkeypatch.setattr(
         "app.settings.get_settings",
@@ -134,6 +134,7 @@ def test_gateway_prefers_role_model(monkeypatch):
                 {
                     "provider_name": kwargs["provider_name"],
                     "model": kwargs["model"],
+                    "request_timeout_seconds": kwargs["request_timeout_seconds"],
                 }
             )
             or ProviderStub()
@@ -144,6 +145,7 @@ def test_gateway_prefers_role_model(monkeypatch):
 
     assert captured["provider_name"] == "Role Provider"
     assert captured["model"] == "gpt-role"
+    assert captured["request_timeout_seconds"] == 10.0
     assert captured["reasoning_effort"] == "high"
     assert captured["verbosity"] == "medium"
 
@@ -251,3 +253,107 @@ def test_gateway_passes_provider_headers_to_registry(monkeypatch):
     gateway.chat(messages=[])
 
     assert captured["headers"] == {"X-Test": "value"}
+
+
+def test_gateway_list_models_does_not_reuse_model_timeout(monkeypatch):
+    gateway = ProviderGateway()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-default",
+                timeout_ms=9000,
+            ),
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Default Provider",
+                    type="openai_compatible",
+                    base_url="https://default.invalid",
+                    api_key="secret",
+                )
+            ],
+        ),
+    )
+
+    class ProviderStub:
+        def chat(
+            self,
+            messages,
+            tools=None,
+            on_chunk=None,
+            register_interrupt=None,
+            model_params=None,
+        ):
+            return type(
+                "Response",
+                (),
+                {"content": "", "thinking": "", "tool_calls": []},
+            )()
+
+        def list_models(self, register_interrupt=None):
+            return []
+
+    monkeypatch.setattr(
+        "app.providers.registry.create_provider",
+        lambda **kwargs: captured.update(kwargs) or ProviderStub(),
+    )
+
+    gateway.list_models_for("provider-1")
+
+    assert captured["request_timeout_seconds"] == 120.0
+
+
+def test_gateway_passes_custom_timeout_to_chat_provider(monkeypatch):
+    gateway = ProviderGateway()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-default",
+                timeout_ms=15000,
+            ),
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Default Provider",
+                    type="openai_compatible",
+                    base_url="https://default.invalid",
+                    api_key="secret",
+                )
+            ],
+        ),
+    )
+
+    class ProviderStub:
+        def chat(
+            self,
+            messages,
+            tools=None,
+            on_chunk=None,
+            register_interrupt=None,
+            model_params=None,
+        ):
+            return type(
+                "Response",
+                (),
+                {"content": "", "thinking": "", "tool_calls": []},
+            )()
+
+        def list_models(self, register_interrupt=None):
+            return []
+
+    monkeypatch.setattr(
+        "app.providers.registry.create_provider",
+        lambda **kwargs: captured.update(kwargs) or ProviderStub(),
+    )
+
+    gateway.chat(messages=[])
+
+    assert captured["request_timeout_seconds"] == 15.0

@@ -11,6 +11,8 @@ from app.providers import LLMProvider
 from app.providers.errors import build_configuration_error
 from app.settings import merge_model_params
 
+MODEL_DIRECTORY_TIMEOUT_SECONDS = 120.0
+
 ProviderCacheKey = tuple[
     str,
     str,
@@ -19,6 +21,7 @@ ProviderCacheKey = tuple[
     tuple[tuple[str, str], ...],
     str,
     str,
+    int,
 ]
 
 
@@ -76,6 +79,7 @@ class ProviderGateway:
             headers=cfg.headers,
             model="",
             provider_name=cfg.name,
+            request_timeout_seconds=MODEL_DIRECTORY_TIMEOUT_SECONDS,
         )
         return provider.list_models(register_interrupt)
 
@@ -125,6 +129,7 @@ class ProviderGateway:
         base_url = cfg.base_url
         api_key = cfg.api_key
         provider_name = cfg.name
+        request_timeout_seconds = settings.model.timeout_ms / 1000
         cache_key = (
             cfg.id,
             provider_type,
@@ -133,6 +138,7 @@ class ProviderGateway:
             tuple(sorted(cfg.headers.items())),
             provider_name,
             model,
+            settings.model.timeout_ms,
         )
 
         with self._lock:
@@ -153,6 +159,7 @@ class ProviderGateway:
                 headers=cfg.headers,
                 model=model,
                 provider_name=provider_name,
+                request_timeout_seconds=request_timeout_seconds,
             )
 
             self._cache[cache_key] = provider

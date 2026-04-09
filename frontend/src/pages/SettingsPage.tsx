@@ -33,6 +33,7 @@ interface UserSettings {
   model: {
     active_provider_id: string;
     active_model: string;
+    timeout_ms: number;
     params: ModelParams;
   };
 }
@@ -154,7 +155,7 @@ export function SettingsPage() {
   return (
     <PageScaffold
       title="Settings"
-      description="Configure the default Assistant role, provider, model, and canonical model parameters."
+      description="Configure the default Assistant role, provider, model, canonical model parameters, and request timeout."
       actions={
         <Button onClick={() => void handleSave()} disabled={saving}>
           <Save className="size-4" />
@@ -326,6 +327,46 @@ export function SettingsPage() {
                   reasoningDisableLabel={null}
                   helperText="Empty fields are omitted from outgoing provider requests. Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
                 />
+              </SettingsRow>
+
+              <SettingsRow
+                label="Request Timeout"
+                description="Single attempt budget"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      aria-label="Request Timeout"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={String(settings.model.timeout_ms)}
+                      onChange={(e) => {
+                        const nextValue = e.target.value.trim();
+                        if (!/^\d+$/.test(nextValue)) {
+                          return;
+                        }
+                        const parsed = Number.parseInt(nextValue, 10);
+                        if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+                          return;
+                        }
+                        setSettings({
+                          ...settings,
+                          model: {
+                            ...settings.model,
+                            timeout_ms: parsed,
+                          },
+                        });
+                      }}
+                      className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                    />
+                    <span className="text-xs text-muted-foreground">ms</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Applies to a single LLM request attempt. Default is 10000ms.
+                    Automatic retries can still make the full call take longer.
+                  </p>
+                </div>
               </SettingsRow>
             </div>
           </section>

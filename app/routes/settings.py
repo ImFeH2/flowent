@@ -15,6 +15,7 @@ from app.settings import (
     build_default_model_params,
     build_model_max_retries,
     build_model_params_from_mapping,
+    build_model_timeout_ms,
     find_role,
     get_settings,
     save_settings,
@@ -88,6 +89,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         )
         active_model = req.model.get("active_model", current.model.active_model)
         params = current.model.params
+        timeout_ms = current.model.timeout_ms
         max_retries = current.model.max_retries
         if "params" in req.model:
             try:
@@ -95,6 +97,11 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             params = parsed_params or build_default_model_params()
+        if "timeout_ms" in req.model:
+            try:
+                timeout_ms = build_model_timeout_ms(req.model.get("timeout_ms"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
         if "max_retries" in req.model:
             try:
                 max_retries = build_model_max_retries(req.model.get("max_retries"))
@@ -108,6 +115,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             if isinstance(active_model, str)
             else current.model.active_model,
             params=params,
+            timeout_ms=timeout_ms,
             max_retries=max_retries,
         )
 

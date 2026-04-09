@@ -31,6 +31,7 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
         "model": {
             "active_provider_id": "provider-1",
             "active_model": "gpt-4o",
+            "timeout_ms": 10000,
             "max_retries": 5,
             "params": {
                 "reasoning_effort": None,
@@ -75,6 +76,7 @@ def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
     assert result["model"] == {
         "active_provider_id": "provider-2",
         "active_model": "gpt-4.1",
+        "timeout_ms": 10000,
         "max_retries": 5,
         "params": {
             "reasoning_effort": None,
@@ -141,6 +143,47 @@ def test_manage_settings_update_changes_max_retries(monkeypatch):
 
     assert result["model"]["max_retries"] == 7
     assert settings.model.max_retries == 7
+
+
+def test_manage_settings_update_changes_timeout_ms(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "timeout_ms": 15000,
+            },
+        )
+    )
+
+    assert result["model"]["timeout_ms"] == 15000
+    assert settings.model.timeout_ms == 15000
+
+
+def test_manage_settings_update_rejects_non_positive_timeout_ms(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "timeout_ms": 0,
+            },
+        )
+    )
+
+    assert result == {"error": "timeout_ms must be greater than 0"}
 
 
 def test_manage_settings_update_rejects_unknown_assistant_role(monkeypatch):

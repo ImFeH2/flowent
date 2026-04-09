@@ -68,6 +68,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
             "model": {
                 "active_provider_id": "",
                 "active_model": "",
+                "timeout_ms": 10000,
                 "max_retries": 5,
                 "params": {
                     "reasoning_effort": None,
@@ -461,6 +462,51 @@ def test_update_settings_accepts_model_max_retries(monkeypatch):
     assert settings.model.max_retries == 8
     assert result["settings"]["model"]["max_retries"] == 8
     assert saved == [settings]
+
+
+def test_update_settings_accepts_model_timeout_ms(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                model={"timeout_ms": 15000},
+            )
+        )
+    )
+
+    assert settings.model.timeout_ms == 15000
+    assert result["settings"]["model"]["timeout_ms"] == 15000
+    assert saved == [settings]
+
+
+def test_update_settings_rejects_non_positive_model_timeout_ms(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(
+                    model={"timeout_ms": 0},
+                )
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "model.timeout_ms must be greater than 0"
 
 
 def test_update_settings_persists_assistant_role(monkeypatch):

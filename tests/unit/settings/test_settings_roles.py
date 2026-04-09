@@ -104,6 +104,31 @@ def test_load_settings_defaults_model_max_retries(monkeypatch, tmp_path):
     assert persisted["model"]["max_retries"] == 5
 
 
+def test_load_settings_defaults_model_timeout_ms(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+
+    assert loaded.model.timeout_ms == 10000
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["model"]["timeout_ms"] == 10000
+
+
 def test_load_settings_normalizes_provider_headers(monkeypatch, tmp_path):
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(

@@ -92,6 +92,7 @@ CONDUCTOR_ROLE_INCLUDED_TOOLS = [
 MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high", "xhigh"})
 MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
 REMOVED_TOOL_NAMES = frozenset({"exit", "list_connections"})
+DEFAULT_LLM_TIMEOUT_MS = 10000
 DEFAULT_LLM_MAX_RETRIES = 5
 
 
@@ -144,6 +145,7 @@ class ModelSettings:
     active_provider_id: str = ""
     active_model: str = ""
     params: ModelParams = field(default_factory=build_default_model_params)
+    timeout_ms: int = DEFAULT_LLM_TIMEOUT_MS
     max_retries: int = DEFAULT_LLM_MAX_RETRIES
 
 
@@ -346,6 +348,18 @@ def build_model_max_retries(
     if raw_max_retries < 0:
         raise ValueError(f"{field_name} must be greater than or equal to 0")
     return raw_max_retries
+
+
+def build_model_timeout_ms(
+    raw_timeout_ms: object,
+    *,
+    field_name: str = "model.timeout_ms",
+) -> int:
+    if isinstance(raw_timeout_ms, bool) or not isinstance(raw_timeout_ms, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if raw_timeout_ms <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return raw_timeout_ms
 
 
 def build_provider_headers(
@@ -844,10 +858,21 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         except ValueError:
             model_max_retries = DEFAULT_LLM_MAX_RETRIES
             migrated = True
+    raw_model_timeout_ms = model_data.get("timeout_ms")
+    if raw_model_timeout_ms is None:
+        model_timeout_ms = DEFAULT_LLM_TIMEOUT_MS
+        migrated = True
+    else:
+        try:
+            model_timeout_ms = build_model_timeout_ms(raw_model_timeout_ms)
+        except ValueError:
+            model_timeout_ms = DEFAULT_LLM_TIMEOUT_MS
+            migrated = True
     model_settings = ModelSettings(
         active_provider_id=str(model_data.get("active_provider_id", "")),
         active_model=str(model_data.get("active_model", "")),
         params=model_params,
+        timeout_ms=model_timeout_ms,
         max_retries=model_max_retries,
     )
     custom_prompt = str(data.get("custom_prompt", ""))

@@ -20,6 +20,7 @@ def create_provider(
     headers: dict[str, str] | None = None,
     model: str = "",
     provider_name: str = "",
+    request_timeout_seconds: float = 120.0,
 ) -> LLMProvider:
     pt = provider_type.lower()
     resolved_base_url = resolve_provider_base_url(pt, base_url)
@@ -33,6 +34,7 @@ def create_provider(
             api_key=api_key,
             headers=headers or {},
             model=model,
+            request_timeout_seconds=request_timeout_seconds,
         )
 
     if pt == ProviderType.OPENAI_RESPONSES:
@@ -44,6 +46,7 @@ def create_provider(
             api_key=api_key,
             headers=headers or {},
             model=model,
+            request_timeout_seconds=request_timeout_seconds,
         )
 
     if pt == ProviderType.ANTHROPIC:
@@ -55,6 +58,7 @@ def create_provider(
             api_key=api_key,
             headers=headers or {},
             model=model,
+            request_timeout_seconds=request_timeout_seconds,
         )
 
     if pt == ProviderType.GEMINI:
@@ -66,6 +70,7 @@ def create_provider(
             api_key=api_key,
             headers=headers or {},
             model=model,
+            request_timeout_seconds=request_timeout_seconds,
         )
 
     raise ValueError(f"Unknown provider type: {provider_type}")

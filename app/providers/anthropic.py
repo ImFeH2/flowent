@@ -36,13 +36,15 @@ class AnthropicProvider(LLMProvider):
         api_key: str = "",
         headers: dict[str, str] | None = None,
         model: str = "",
+        request_timeout_seconds: float = 120.0,
     ) -> None:
         self._provider_name = provider_name
         self._api_base_url = api_base_url.rstrip("/")
         self._api_key = api_key
         self._header_overrides = dict(headers or {})
         self._model = model
-        self._client = create_http_session(timeout=120.0)
+        self._request_timeout_seconds = request_timeout_seconds
+        self._client = create_http_session(timeout=self._request_timeout_seconds)
 
     def _headers(self) -> dict[str, str]:
         return merge_headers(
@@ -311,7 +313,9 @@ class AnthropicProvider(LLMProvider):
             close_client = getattr(client, "close", None)
             if callable(close_client):
                 close_client()
-                self._client = create_http_session(timeout=120.0)
+                self._client = create_http_session(
+                    timeout=self._request_timeout_seconds
+                )
 
         elapsed = time.perf_counter() - t0
         content = "".join(content_parts) or None
@@ -371,4 +375,6 @@ class AnthropicProvider(LLMProvider):
         finally:
             if callable(close_client):
                 close_client()
-                self._client = create_http_session(timeout=120.0)
+                self._client = create_http_session(
+                    timeout=self._request_timeout_seconds
+                )

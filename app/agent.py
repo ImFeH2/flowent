@@ -214,6 +214,7 @@ class Agent:
         self._wake_queue: Queue[WakeSignal] = Queue()
         self._thread: threading.Thread | None = None
         self._termination_reason: str = ""
+        self._preserve_workspace_state_on_exit = False
         self._connections_lock = threading.Lock()
         self._history_lock = threading.Lock()
         self._todos_lock = threading.Lock()
@@ -521,6 +522,12 @@ class Agent:
             self._wait_for_input()
 
             if self._terminate.is_set():
+                if self._should_preserve_workspace_state_on_exit():
+                    self._log.info(
+                        "Agent stopped for process exit with state {}",
+                        self.state.value,
+                    )
+                    return
                 self._finalize_termination("terminated before first message")
                 return
 
@@ -637,6 +644,13 @@ class Agent:
                     self._wait_for_input()
                     if self._terminate.is_set():
                         break
+
+            if self._should_preserve_workspace_state_on_exit():
+                self._log.info(
+                    "Agent stopped for process exit with state {}",
+                    self.state.value,
+                )
+                return
 
             self._finalize_termination(self._termination_reason or "finished")
 
@@ -1664,6 +1678,7 @@ class Agent:
         self._persist_workspace_node()
 
     def request_termination(self, reason: str = "") -> None:
+        self._preserve_workspace_state_on_exit = False
         self._termination_reason = reason
         self._terminate.set()
         self._wake_queue.put(
@@ -1671,6 +1686,18 @@ class Agent:
                 reason="termination",
                 payload={},
                 resume_reason="termination requested",
+            )
+        )
+
+    def request_process_exit(self) -> None:
+        self._preserve_workspace_state_on_exit = bool(self.config.tab_id)
+        self._termination_reason = "process_exit"
+        self._terminate.set()
+        self._wake_queue.put(
+            WakeSignal(
+                reason="termination",
+                payload={},
+                resume_reason="process exit requested",
             )
         )
 
@@ -1708,6 +1735,9 @@ class Agent:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
         return not (self._thread and self._thread.is_alive())
+
+    def _should_preserve_workspace_state_on_exit(self) -> bool:
+        return self._preserve_workspace_state_on_exit and bool(self.config.tab_id)
 
     def _finalize_termination(self, reason: str) -> None:
         from app.registry import registry

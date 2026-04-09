@@ -619,23 +619,27 @@ def test_shutdown_runtime_keeps_persistent_workspace_nodes_unterminated(
     )
     monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
     monkeypatch.setattr(settings_module, "_cached_settings", None)
-    monkeypatch.setattr(Agent, "start", lambda self: None)
-
-    terminated: list[str] = []
-
-    def fake_terminate_and_wait(self: Agent, timeout: float = 10.0) -> None:
-        terminated.append(self.uuid)
-
-    monkeypatch.setattr(Agent, "terminate_and_wait", fake_terminate_and_wait)
 
     bootstrap_runtime()
-    shutdown_runtime()
 
     try:
-        assert len(terminated) == 1
-        assert terminated[0] != "node-1"
+        assistant = registry.get_assistant()
+        persistent = registry.get("node-1")
+        assert assistant is not None
+        assert persistent is not None
+
+        shutdown_runtime()
+
+        assert assistant.wait_for_termination(timeout=1.0) is True
+        assert persistent.wait_for_termination(timeout=1.0) is True
+        assert registry.get_all() == []
+        assert persistent.state == AgentState.IDLE
         persisted = workspace_store.get_node_record("node-1")
         assert persisted is not None
         assert persisted.state == AgentState.IDLE
+        assert not any(
+            isinstance(entry, StateEntry) and entry.state == "terminated"
+            for entry in persistent.history
+        )
     finally:
-        registry.reset()
+        _stop_all_agents()

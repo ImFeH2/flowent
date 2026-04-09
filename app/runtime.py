@@ -140,9 +140,14 @@ def bootstrap_runtime() -> None:
 def shutdown_runtime(timeout: float = SYSTEM_NODE_TIMEOUT) -> None:
     logger.info("Shutting down runtime")
     _stop_telegram_channel()
+    persistent_agents = []
     for agent in registry.get_all():
         if agent.config.tab_id:
+            agent.request_process_exit()
+            persistent_agents.append(agent)
             continue
         agent.terminate_and_wait(timeout=timeout)
+    for agent in persistent_agents:
+        agent.wait_for_termination(timeout=timeout)
     registry.reset()
     logger.info("Runtime shutdown complete")

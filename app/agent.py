@@ -271,6 +271,16 @@ class Agent:
         with self._todos_lock:
             return [TodoItem(text=t.text) for t in self.todos]
 
+    def prime_runtime_state(self, state: AgentState) -> None:
+        self.state = state
+        if state == AgentState.IDLE:
+            self._idle_started_at = _time.perf_counter()
+            self._idle_state_event.set()
+        else:
+            self._idle_started_at = None
+            self._idle_started_by_tool_call_id = None
+            self._idle_state_event.clear()
+
     def set_todos(self, todos: list[TodoItem]) -> None:
         with self._todos_lock:
             self.todos = [TodoItem(text=t.text) for t in todos]
@@ -500,8 +510,14 @@ class Agent:
                     SystemEntry(content=get_system_prompt(self.config))
                 )
 
-            self.set_state(AgentState.IDLE, "initialized, awaiting first message")
-            self._log.info("Agent started, waiting for first message")
+            if self.state == AgentState.INITIALIZING:
+                self.set_state(AgentState.IDLE, "initialized, awaiting first message")
+                self._log.info("Agent started, waiting for first message")
+            else:
+                self._log.info(
+                    "Agent restored in state {}, waiting for input",
+                    self.state.value,
+                )
             self._wait_for_input()
 
             if self._terminate.is_set():

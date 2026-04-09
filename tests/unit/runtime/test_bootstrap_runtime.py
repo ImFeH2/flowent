@@ -4,7 +4,7 @@ from uuid import UUID
 
 import app.settings as settings_module
 from app.agent import Agent
-from app.models import StateEntry
+from app.models import AgentState, StateEntry
 from app.registry import registry
 from app.runtime import bootstrap_runtime
 from app.settings import (
@@ -19,6 +19,7 @@ from app.settings import (
     WORKER_ROLE_SYSTEM_PROMPT,
     RoleConfig,
 )
+from app.workspace_store import workspace_store
 
 
 def test_bootstrap_runtime_creates_only_assistant(
@@ -60,6 +61,14 @@ def test_bootstrap_runtime_creates_only_assistant(
         assert assistant.config.allow_network is True
     finally:
         registry.reset()
+
+
+def _stop_all_agents(timeout: float = 1.0) -> None:
+    for node in list(registry.get_all()):
+        node.request_termination("test cleanup")
+    for node in list(registry.get_all()):
+        node.wait_for_termination(timeout=timeout)
+    registry.reset()
 
 
 def test_bootstrap_runtime_creates_builtin_worker_and_conductor_roles(
@@ -299,9 +308,249 @@ def test_bootstrap_runtime_backfills_state_history_for_restored_nodes(
     try:
         restored = registry.get("node-1")
         assert restored is not None
+        assert restored.state == AgentState.IDLE
         assert any(
             isinstance(entry, StateEntry) and entry.state == "idle"
             for entry in restored.history
         )
     finally:
         registry.reset()
+
+
+def test_bootstrap_runtime_restores_running_nodes_as_idle(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    workspace_file = tmp_path / "workspace.json"
+    registry.reset()
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_file.write_text(
+        json.dumps(
+            {
+                "tabs": [
+                    {
+                        "id": "tab-1",
+                        "title": "Restore",
+                        "goal": "",
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "nodes": [
+                    {
+                        "id": "node-1",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Worker",
+                            "tab_id": "tab-1",
+                            "name": "Restored Worker",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "running",
+                        "todos": [{"text": "resume me"}],
+                        "history": [
+                            {
+                                "type": "StateEntry",
+                                "state": "running",
+                                "reason": "before restart",
+                            }
+                        ],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        restored = registry.get("node-1")
+        assert restored is not None
+        assert restored.wait_until_idle(timeout=1.0) is True
+        assert restored.state == AgentState.IDLE
+        assert restored.uuid == "node-1"
+        assert [todo.text for todo in restored.todos] == ["resume me"]
+        assert any(
+            isinstance(entry, StateEntry)
+            and entry.state == "idle"
+            and entry.reason == "restored"
+            for entry in restored.history
+        )
+        persisted = workspace_store.get_node_record("node-1")
+        assert persisted is not None
+        assert persisted.state == AgentState.IDLE
+    finally:
+        _stop_all_agents()
+
+
+def test_bootstrap_runtime_preserves_error_state_for_restored_nodes(
+    monkeypatch,
+    tmp_path,
+):
+    settings_file = tmp_path / "settings.json"
+    workspace_file = tmp_path / "workspace.json"
+    registry.reset()
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_file.write_text(
+        json.dumps(
+            {
+                "tabs": [
+                    {
+                        "id": "tab-1",
+                        "title": "Restore",
+                        "goal": "",
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "nodes": [
+                    {
+                        "id": "node-1",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Worker",
+                            "tab_id": "tab-1",
+                            "name": "Broken Worker",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "error",
+                        "todos": [],
+                        "history": [
+                            {
+                                "type": "StateEntry",
+                                "state": "error",
+                                "reason": "provider failure",
+                            }
+                        ],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        restored = registry.get("node-1")
+        assert restored is not None
+        assert restored.state == AgentState.ERROR
+        assert restored.wait_until_idle(timeout=0.05) is False
+        assert not any(
+            isinstance(entry, StateEntry)
+            and entry.state == "idle"
+            and entry.reason == "initialized, awaiting first message"
+            for entry in restored.history
+        )
+        persisted = workspace_store.get_node_record("node-1")
+        assert persisted is not None
+        assert persisted.state == AgentState.ERROR
+    finally:
+        _stop_all_agents()
+
+
+def test_bootstrap_runtime_skips_terminated_restored_nodes(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    workspace_file = tmp_path / "workspace.json"
+    registry.reset()
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_file.write_text(
+        json.dumps(
+            {
+                "tabs": [
+                    {
+                        "id": "tab-1",
+                        "title": "Restore",
+                        "goal": "",
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "nodes": [
+                    {
+                        "id": "node-1",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Worker",
+                            "tab_id": "tab-1",
+                            "name": "Finished Worker",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "terminated",
+                        "todos": [],
+                        "history": [
+                            {
+                                "type": "StateEntry",
+                                "state": "terminated",
+                                "reason": "done",
+                            }
+                        ],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        assert registry.get("node-1") is None
+        persisted = workspace_store.get_node_record("node-1")
+        assert persisted is not None
+        assert persisted.state == AgentState.TERMINATED
+    finally:
+        _stop_all_agents()

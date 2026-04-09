@@ -104,7 +104,17 @@ def bootstrap_runtime() -> None:
                 0,
                 StateEntry(state=record.state.value, reason="restored"),
             )
+        if record.state in {
+            AgentState.INITIALIZING,
+            AgentState.RUNNING,
+        }:
+            node.history.append(
+                StateEntry(state=AgentState.IDLE.value, reason="restored")
+            )
         node.todos = list(record.todos)
+        node.prime_runtime_state(
+            AgentState.ERROR if record.state == AgentState.ERROR else AgentState.IDLE
+        )
         registry.register(node)
         node.start()
         restored_node_ids.add(node.uuid)

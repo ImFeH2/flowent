@@ -8,6 +8,7 @@ from loguru import logger
 
 from app.models import LLMResponse, ModelInfo
 from app.providers import LLMProvider
+from app.providers.errors import build_configuration_error
 from app.settings import merge_model_params
 
 ProviderCacheKey = tuple[
@@ -110,6 +111,15 @@ class ProviderGateway:
         cfg = find_provider(settings, provider_id)
         if cfg is None:
             raise RuntimeError(f"Provider '{provider_id}' not found")
+
+        if not model.strip():
+            raise build_configuration_error(
+                provider_name=cfg.name,
+                provider_type=cfg.type,
+                model=model,
+                base_url=cfg.base_url,
+                detail="No active model configured",
+            )
 
         provider_type = cfg.type
         base_url = cfg.base_url

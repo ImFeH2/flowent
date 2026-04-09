@@ -1,5 +1,6 @@
 from app.providers.errors import (
     build_access_blocked_error,
+    build_configuration_error,
     build_network_error,
     build_status_error,
 )
@@ -51,3 +52,17 @@ def test_build_access_blocked_error_hides_html_body():
     assert "Status: 403" in str(error)
     assert "Detail: Challenge or interstitial HTML response from upstream" in str(error)
     assert "<title>" not in str(error)
+
+
+def test_build_configuration_error_formats_local_validation_failure():
+    error = build_configuration_error(
+        provider_name="Test Provider",
+        provider_type="openai_responses",
+        model="",
+        base_url="http://example.invalid",
+        detail="No active model configured",
+    )
+
+    assert "LLM configuration error" in str(error)
+    assert "Detail: No active model configured" in str(error)
+    assert error.transient is False

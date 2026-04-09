@@ -69,6 +69,27 @@ def build_network_error(
     )
 
 
+def build_configuration_error(
+    *,
+    provider_name: str,
+    provider_type: str,
+    model: str,
+    base_url: str,
+    detail: str,
+) -> LLMProviderError:
+    return LLMProviderError(
+        (
+            "LLM configuration error\n"
+            f"Provider: {provider_name}\n"
+            f"Type: {provider_type}\n"
+            f"Model: {model}\n"
+            f"Base URL: {base_url}\n"
+            f"Detail: {_compact_text(detail)}"
+        ),
+        transient=False,
+    )
+
+
 def build_access_blocked_error(
     *,
     provider_name: str,

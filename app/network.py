@@ -45,14 +45,26 @@ def iter_response_text(response: Any) -> Iterator[str]:
 
 def read_response_text(response: Any) -> str:
     text = getattr(response, "text", None)
-    if isinstance(text, str):
+    if isinstance(text, str) and text:
         return text
 
     content = getattr(response, "content", None)
-    if isinstance(content, str):
+    if isinstance(content, str) and content:
         return content
-    if isinstance(content, (bytes, bytearray)):
+    if isinstance(content, (bytes, bytearray)) and content:
         return bytes(content).decode("utf-8", errors="replace")
+
+    iter_text = getattr(response, "iter_text", None)
+    if callable(iter_text):
+        chunks = [_decode_to_text(chunk) for chunk in iter_text()]
+        if chunks:
+            return "".join(chunks)
+
+    iter_content = getattr(response, "iter_content", None)
+    if callable(iter_content):
+        chunks = [_decode_to_text(chunk) for chunk in iter_content()]
+        if chunks:
+            return "".join(chunks)
 
     read = getattr(response, "read", None)
     if callable(read):

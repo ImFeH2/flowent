@@ -21,11 +21,13 @@ class _FakeStreamResponse:
         status_code: int = 200,
         headers: dict[str, str] | None = None,
         text: str = "",
+        content_chunks: list[bytes | str] | None = None,
     ) -> None:
         self._lines = lines
         self.status_code = status_code
         self.headers = headers or {}
         self.text = text
+        self._content_chunks = content_chunks or []
 
     def __enter__(self) -> _FakeStreamResponse:
         return self
@@ -35,6 +37,9 @@ class _FakeStreamResponse:
 
     def iter_lines(self) -> Iterator[str]:
         return iter(self._lines)
+
+    def iter_content(self) -> Iterator[bytes | str]:
+        return iter(self._content_chunks)
 
     def read(self) -> bytes:
         return b""
@@ -64,12 +69,14 @@ class _FakeClient:
         status_code: int = 200,
         headers: dict[str, str] | None = None,
         text: str = "",
+        content_chunks: list[bytes | str] | None = None,
         json_payload: dict[str, Any] | None = None,
     ) -> None:
         self._lines = lines
         self._status_code = status_code
         self._headers = headers or {}
         self._text = text
+        self._content_chunks = content_chunks or []
         self._json_payload = json_payload or {}
         self.last_payload: dict[str, Any] | None = None
         self.last_headers: dict[str, str] | None = None
@@ -88,6 +95,7 @@ class _FakeClient:
             status_code=self._status_code,
             headers=self._headers,
             text=self._text,
+            content_chunks=self._content_chunks,
         )
 
     def get(self, url: str, headers: dict[str, str]) -> _FakeJsonResponse:
@@ -305,6 +313,30 @@ def test_openai_responses_marks_429_as_transient_error():
 
     assert excinfo.value.transient is True
     assert excinfo.value.status_code == 429
+
+
+def test_openai_responses_reads_json_error_body_from_stream_chunks():
+    provider = OpenAIResponsesProvider(
+        provider_name="Test Provider",
+        api_base_url="http://example.invalid",
+        api_key="secret",
+        model="gpt-5.2",
+    )
+    provider._client = _FakeClient(
+        [],
+        status_code=400,
+        headers={"content-type": "application/json; charset=utf-8"},
+        content_chunks=[
+            b'{"error":{"message":"model is required","type":"invalid_request_error"}}'
+        ],
+    )
+
+    with pytest.raises(LLMProviderError) as excinfo:
+        provider.chat(messages=[{"role": "user", "content": "Hello"}])
+
+    assert excinfo.value.transient is False
+    assert excinfo.value.status_code == 400
+    assert "model is required" in str(excinfo.value)
 
 
 def test_openai_responses_rejects_html_challenge_page():

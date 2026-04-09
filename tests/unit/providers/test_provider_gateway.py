@@ -1,5 +1,6 @@
 import pytest
 
+from app.providers.errors import LLMProviderError
 from app.providers.gateway import ProviderGateway
 from app.settings import (
     ModelParams,
@@ -26,6 +27,35 @@ def test_gateway_requires_active_provider(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="No active provider configured"):
+        gateway.chat(messages=[])
+
+
+def test_gateway_requires_active_model(monkeypatch):
+    gateway = ProviderGateway()
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            model=ModelSettings(active_provider_id="provider-1", active_model=""),
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Default Provider",
+                    type="openai_responses",
+                    base_url="https://default.invalid/v1",
+                    api_key="secret",
+                )
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        "app.providers.registry.create_provider",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("create_provider should not be called")
+        ),
+    )
+
+    with pytest.raises(LLMProviderError, match="No active model configured"):
         gateway.chat(messages=[])
 
 

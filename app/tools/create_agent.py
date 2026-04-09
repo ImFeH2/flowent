@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.graph_service import create_agent_node
 from app.models import NodeType
+from app.settings import CONDUCTOR_ROLE_NAME
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -84,6 +85,14 @@ class CreateAgentTool(Tool):
             return json.dumps({"error": "allow_network must be a boolean"})
         if not resolved_tab_id:
             return json.dumps({"error": "tab_id is required"})
+        normalized_role_name = role_name.strip()
+        if (
+            agent.node_type == NodeType.ASSISTANT
+            and normalized_role_name != CONDUCTOR_ROLE_NAME
+        ):
+            return json.dumps(
+                {"error": "Assistant may only create a tab's Conductor owner directly"}
+            )
         if agent.node_type != NodeType.ASSISTANT:
             if not agent.config.tab_id:
                 return json.dumps(
@@ -119,7 +128,7 @@ class CreateAgentTool(Tool):
                 )
 
         record, error = create_agent_node(
-            role_name=role_name,
+            role_name=normalized_role_name,
             tab_id=resolved_tab_id,
             name=name,
             tools=tools,

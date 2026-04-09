@@ -6,7 +6,7 @@ from app.agent import Agent
 from app.graph_service import create_tab
 from app.models import NodeConfig, NodeType
 from app.registry import registry
-from app.settings import RoleConfig, Settings
+from app.settings import CONDUCTOR_ROLE_NAME, RoleConfig, Settings
 from app.tools.create_agent import CreateAgentTool
 from app.workspace_store import workspace_store
 
@@ -97,6 +97,73 @@ def test_create_agent_rejects_cross_tab_creation_for_non_assistant(monkeypatch):
     )
 
     assert result == {"error": "A graph node may only create peers inside its own tab"}
+
+
+def test_create_agent_restricts_assistant_to_conductor_owner(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[RoleConfig(name="Worker", system_prompt="Do work.")],
+        ),
+    )
+    tab = create_tab(title="Task", goal="Do work")
+
+    assistant = Agent(
+        NodeConfig(
+            node_type=NodeType.ASSISTANT,
+            role_name="Steward",
+            tools=["create_agent"],
+        ),
+        uuid="assistant",
+    )
+
+    result = json.loads(
+        CreateAgentTool().execute(
+            assistant,
+            {
+                "tab_id": tab.id,
+                "role_name": "Worker",
+            },
+        )
+    )
+
+    assert result == {
+        "error": "Assistant may only create a tab's Conductor owner directly"
+    }
+
+
+def test_create_agent_allows_assistant_to_create_conductor_owner(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[RoleConfig(name=CONDUCTOR_ROLE_NAME, system_prompt="Orchestrate.")],
+        ),
+    )
+    tab = create_tab(title="Task", goal="Do work")
+
+    assistant = Agent(
+        NodeConfig(
+            node_type=NodeType.ASSISTANT,
+            role_name="Steward",
+            tools=["create_agent"],
+        ),
+        uuid="assistant",
+    )
+
+    result = json.loads(
+        CreateAgentTool().execute(
+            assistant,
+            {
+                "tab_id": tab.id,
+                "role_name": f" {CONDUCTOR_ROLE_NAME} ",
+                "name": "Task Conductor",
+            },
+        )
+    )
+
+    assert result["config"]["role_name"] == CONDUCTOR_ROLE_NAME
+    assert result["config"]["tab_id"] == tab.id
+    assert result["config"]["name"] == "Task Conductor"
 
 
 def test_create_agent_respects_write_dir_and_network_boundaries(monkeypatch, tmp_path):

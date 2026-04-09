@@ -1,6 +1,8 @@
 .vscode/
 .idea/
 .zed/
+.agents/
+.claude/
 
 __pycache__/
 *.pyc

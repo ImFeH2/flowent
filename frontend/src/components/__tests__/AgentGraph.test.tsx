@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -64,6 +65,8 @@ vi.mock("@xyflow/react", async () => {
     nodeTypes,
     onInit,
     onNodeClick,
+    onConnectStart,
+    onConnectEnd,
     onNodeContextMenu,
     onPaneContextMenu,
     minZoom,
@@ -76,6 +79,8 @@ vi.mock("@xyflow/react", async () => {
     nodeTypes: Record<string, React.ComponentType<MockNodeComponentProps>>;
     onInit?: (instance: { fitView: typeof fitViewMock }) => void;
     onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
+    onConnectStart?: () => void;
+    onConnectEnd?: () => void;
     onNodeContextMenu?: (event: React.MouseEvent, node: { id: string }) => void;
     onPaneContextMenu?: (event: React.MouseEvent) => void;
     minZoom?: number;
@@ -100,6 +105,11 @@ vi.mock("@xyflow/react", async () => {
         data-testid="react-flow"
         onContextMenu={(event) => onPaneContextMenu?.(event)}
       >
+        <button
+          data-testid="connect-start"
+          onClick={() => onConnectStart?.()}
+        />
+        <button data-testid="connect-end" onClick={() => onConnectEnd?.()} />
         {nodes.map((node) => {
           const Component = nodeTypes[node.type];
           return (
@@ -137,8 +147,8 @@ vi.mock("@xyflow/react", async () => {
     ReactFlow: ReactFlowMock,
     Background: () => null,
     BaseEdge: ({ id }: { id: string }) => <div data-testid={`edge-${id}`} />,
-    Handle: ({ type }: { type: string }) => (
-      <div data-testid={`handle-${type}`} />
+    Handle: ({ type, className }: { type: string; className?: string }) => (
+      <div data-testid={`handle-${type}`} className={className} />
     ),
     Position: {
       Top: "top",
@@ -177,6 +187,7 @@ function renderGraph(
   nodes: Node[],
   options?: {
     activeTabId?: string | null;
+    selectedAgentId?: string | null;
     tabs?: TaskTab[];
   },
 ) {
@@ -194,7 +205,7 @@ function renderGraph(
   });
   useAgentUIMock.mockReturnValue({
     activeTabId: options?.activeTabId ?? "tab-1",
-    selectedAgentId: null,
+    selectedAgentId: options?.selectedAgentId ?? null,
     selectAgent: vi.fn(),
   });
 
@@ -238,6 +249,105 @@ describe("AgentGraph", () => {
       width: `${getAgentNodeWidth("Worker")}px`,
     });
     expect(workerNode).toHaveClass("h-14");
+  });
+
+  it("shows only the stable handles for existing incoming and outgoing edges", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Planner",
+        connections: ["worker-2"],
+      }),
+      buildNode({
+        id: "worker-2",
+        role_name: "Reviewer",
+        connections: [],
+      }),
+    ]);
+
+    await screen.findByText("Planner");
+
+    const plannerNode = screen.getByTestId("node-worker-1");
+    const reviewerNode = screen.getByTestId("node-worker-2");
+
+    expect(within(plannerNode).getByTestId("handle-source")).not.toHaveClass(
+      "!opacity-0",
+    );
+    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
+      "!opacity-0",
+    );
+    expect(within(reviewerNode).getByTestId("handle-target")).not.toHaveClass(
+      "!opacity-0",
+    );
+    expect(within(reviewerNode).getByTestId("handle-source")).toHaveClass(
+      "!opacity-0",
+    );
+  });
+
+  it("temporarily shows handles for isolated nodes during explicit connect interaction", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Planner",
+        connections: [],
+      }),
+      buildNode({
+        id: "worker-2",
+        role_name: "Reviewer",
+        connections: [],
+      }),
+    ]);
+
+    await screen.findByText("Planner");
+
+    const plannerNode = screen.getByTestId("node-worker-1");
+    expect(within(plannerNode).getByTestId("handle-source")).toHaveClass(
+      "!opacity-0",
+    );
+    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
+      "!opacity-0",
+    );
+
+    fireEvent.click(screen.getByTestId("connect-start"));
+
+    expect(within(plannerNode).getByTestId("handle-source")).not.toHaveClass(
+      "!opacity-0",
+    );
+    expect(within(plannerNode).getByTestId("handle-target")).not.toHaveClass(
+      "!opacity-0",
+    );
+
+    fireEvent.click(screen.getByTestId("connect-end"));
+
+    expect(within(plannerNode).getByTestId("handle-source")).toHaveClass(
+      "!opacity-0",
+    );
+    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
+      "!opacity-0",
+    );
+  });
+
+  it("keeps isolated handles hidden when selection is the only state", async () => {
+    renderGraph(
+      [
+        buildNode({
+          id: "worker-1",
+          role_name: "Planner",
+          connections: [],
+        }),
+      ],
+      { selectedAgentId: "worker-1" },
+    );
+
+    await screen.findByText("Planner");
+
+    const plannerNode = screen.getByTestId("node-worker-1");
+    expect(within(plannerNode).getByTestId("handle-source")).toHaveClass(
+      "!opacity-0",
+    );
+    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
+      "!opacity-0",
+    );
   });
 
   it("renders only nodes from the active task tab", async () => {

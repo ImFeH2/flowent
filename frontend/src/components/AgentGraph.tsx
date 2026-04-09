@@ -229,6 +229,7 @@ export function AgentGraph() {
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(
     null,
   );
+  const [connecting, setConnecting] = useState(false);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lastViewportStructureKey = useRef<string | null>(null);
@@ -271,6 +272,17 @@ export function AgentGraph() {
   );
 
   const transientData = useMemo(() => {
+    const visibleAgentIds = new Set(visibleAgents.map((agent) => agent.id));
+    const incomingAgentIds = new Set<string>();
+    for (const agent of visibleAgents) {
+      for (const targetId of agent.connections) {
+        if (!visibleAgentIds.has(targetId)) {
+          continue;
+        }
+        incomingAgentIds.add(targetId);
+      }
+    }
+
     const data = new Map<string, AgentNodeData>();
 
     for (const agent of visibleAgents) {
@@ -292,11 +304,25 @@ export function AgentGraph() {
         selected: id === selectedAgentId,
         toolCall: activeToolCalls.get(id) ?? null,
         leaving: false,
+        showIncomingHandle:
+          Boolean(activeTabId) && (incomingAgentIds.has(id) || connecting),
+        showOutgoingHandle:
+          Boolean(activeTabId) &&
+          (agent.connections.some((targetId) =>
+            visibleAgentIds.has(targetId),
+          ) ||
+            connecting),
       });
     }
 
     return data;
-  }, [activeToolCalls, selectedAgentId, visibleAgents]);
+  }, [
+    activeTabId,
+    activeToolCalls,
+    connecting,
+    selectedAgentId,
+    visibleAgents,
+  ]);
 
   const graphElements = useMemo(() => {
     const visibleAgentIds = new Set(visibleAgents.map((agent) => agent.id));
@@ -512,6 +538,14 @@ export function AgentGraph() {
     },
     [activeTabId],
   );
+
+  const onConnectStart = useCallback(() => {
+    setConnecting(true);
+  }, []);
+
+  const onConnectEnd = useCallback(() => {
+    setConnecting(false);
+  }, []);
 
   const onNodeDragStop = useCallback(
     (_event: unknown, node: FlowNode) => {
@@ -733,6 +767,8 @@ export function AgentGraph() {
             onNodeContextMenu={onNodeContextMenu}
             onNodeDragStop={onNodeDragStop}
             onConnect={onConnect}
+            onConnectStart={onConnectStart}
+            onConnectEnd={onConnectEnd}
             proOptions={{ hideAttribution: true }}
             nodesDraggable={Boolean(activeTabId)}
             nodesConnectable={Boolean(activeTabId)}

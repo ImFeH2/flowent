@@ -23,12 +23,23 @@ interface AgentNodeData {
   selected: boolean;
   toolCall: string | null;
   leaving: boolean;
+  showIncomingHandle: boolean;
+  showOutgoingHandle: boolean;
   [key: string]: unknown;
 }
 
 export function AgentNode({ data }: NodeProps) {
-  const { label, width, node_type, state, latestTodo, selected, toolCall } =
-    data as unknown as AgentNodeData;
+  const {
+    label,
+    width,
+    node_type,
+    state,
+    latestTodo,
+    selected,
+    toolCall,
+    showIncomingHandle,
+    showOutgoingHandle,
+  } = data as unknown as AgentNodeData;
   const leaving = Boolean((data as AgentNodeData).leaving);
   const Icon = nodeTypeIcon[node_type];
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -117,7 +128,10 @@ export function AgentNode({ data }: NodeProps) {
       <Handle
         type="target"
         position={Position.Top}
-        className="!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className={cn(
+          "!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg transition-opacity duration-150",
+          !showIncomingHandle && "!opacity-0 !pointer-events-none",
+        )}
       />
 
       <div
@@ -175,7 +189,10 @@ export function AgentNode({ data }: NodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg"
+        className={cn(
+          "!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg transition-opacity duration-150",
+          !showOutgoingHandle && "!opacity-0 !pointer-events-none",
+        )}
       />
     </motion.div>
   );

@@ -2,6 +2,7 @@ import json
 import threading
 import time
 
+import pytest
 from loguru import logger
 
 from app.agent import Agent, InterruptRequestedError, extract_routed_content
@@ -20,6 +21,7 @@ from app.models import (
     SentMessage,
     StateEntry,
     SystemEntry,
+    Tab,
     TodoItem,
     ToolCall,
     ToolCallResult,
@@ -27,6 +29,40 @@ from app.models import (
 from app.providers.errors import LLMProviderError
 from app.registry import registry
 from app.settings import ModelSettings, Settings
+from app.workspace_store import workspace_store
+
+
+@pytest.fixture(autouse=True)
+def reset_runtime_state(monkeypatch, tmp_path):
+    import app.settings as settings_module
+
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+    registry.reset()
+    workspace_store.reset_cache()
+    yield
+    registry.reset()
+    workspace_store.reset_cache()
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+
+def _register_tab_leader(*, tab_id: str = "tab-1", leader_id: str = "leader") -> Agent:
+    workspace_store.upsert_tab(
+        Tab(id=tab_id, title="Task", goal="", leader_id=leader_id)
+    )
+    leader = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            name="Leader",
+            tab_id=tab_id,
+        ),
+        uuid=leader_id,
+    )
+    registry.register(leader)
+    return leader
 
 
 def test_agent_keeps_running_after_pure_text_response(monkeypatch):
@@ -828,10 +864,9 @@ def test_route_content_output_delivers_to_single_target_when_header_present(
     monkeypatch,
 ):
     registry.reset()
-    parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
-    child = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
-    registry.register(parent)
+    _register_tab_leader()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
     registry.register(peer)
     child.add_connection(peer.uuid)
@@ -876,6 +911,7 @@ def test_route_content_output_delivers_to_single_target_when_header_present(
 
 def test_route_content_output_delivers_to_contact_from_incoming_edge(monkeypatch):
     registry.reset()
+    _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
     peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
@@ -913,6 +949,7 @@ def test_route_content_output_delivers_to_contact_from_incoming_edge(monkeypatch
 
 def test_route_content_output_reports_error_when_target_is_not_in_contacts():
     registry.reset()
+    _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
     peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
@@ -1042,15 +1079,13 @@ def test_record_content_output_keeps_plain_prefix_and_drops_later_routed_text(
 def test_build_messages_adds_one_shot_notice_for_multiple_routed_headers(monkeypatch):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
     registry.reset()
+    leader = _register_tab_leader()
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
-    worker = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="worker")
     registry.register(assistant)
-    registry.register(worker)
-    assistant.add_connection(worker.uuid)
 
     try:
         assistant._record_content_output(
-            "@worker: first task\n@other: second task",
+            "@leader: first task\n@other: second task",
             emitted_human_content=False,
         )
 
@@ -1070,25 +1105,23 @@ def test_build_messages_adds_one_shot_notice_for_multiple_routed_headers(monkeyp
 
     assert any(msg.get("content") == reminder for msg in first_messages)
     assert not any(msg.get("content") == reminder for msg in second_messages)
-    worker_signal = worker._wake_queue.get_nowait()
+    leader_signal = leader._wake_queue.get_nowait()
     assert (
-        worker_signal.payload["message"]["content"] == "first task\n@other: second task"
+        leader_signal.payload["message"]["content"] == "first task\n@other: second task"
     )
 
 
 def test_multiple_routed_headers_prevent_idle_until_notice_is_seen(monkeypatch):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
     registry.reset()
+    _register_tab_leader()
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
-    worker = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="worker")
     registry.register(assistant)
-    registry.register(worker)
-    assistant.add_connection(worker.uuid)
     assistant.set_state(AgentState.RUNNING, "processing")
 
     try:
         assistant._record_content_output(
-            "@worker: first task\n@other: second task",
+            "@leader: first task\n@other: second task",
             emitted_human_content=False,
         )
         idle_result = assistant.request_idle()
@@ -1160,8 +1193,9 @@ def test_idle_is_blocked_when_first_todo_is_actionable(monkeypatch):
 
 def test_record_content_output_records_sent_message_in_history(monkeypatch):
     registry.reset()
-    child = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
+    _register_tab_leader()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
     registry.register(peer)
     child.add_connection(peer.uuid)
@@ -1196,8 +1230,9 @@ def test_record_content_output_records_sent_message_in_history(monkeypatch):
 
 def test_routed_message_emits_streaming_preview_for_sender_and_receiver(monkeypatch):
     registry.reset()
-    child = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="peer")
+    _register_tab_leader()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
     registry.register(peer)
     child.add_connection(peer.uuid)
@@ -1703,18 +1738,16 @@ def test_build_messages_keeps_error_entries_in_context(monkeypatch):
 
 def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
     registry.reset()
+    _register_tab_leader()
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT),
         uuid="assistant",
     )
-    worker = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="worker")
     registry.register(assistant)
-    registry.register(worker)
-    assistant.add_connection(worker.uuid)
     events = []
     responses = iter(
         [
-            LLMResponse(content="@worker: investigate the error"),
+            LLMResponse(content="@leader: investigate the error"),
             LLMResponse(),
         ]
     )
@@ -1752,12 +1785,12 @@ def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
     assert any(
         isinstance(entry, SentMessage)
         and entry.content == "investigate the error"
-        and entry.to_ids == ["worker"]
+        and entry.to_ids == ["leader"]
         for entry in assistant.get_history_snapshot()
     )
     assert not any(
         isinstance(entry, AssistantText)
-        and entry.content == "@worker: investigate the error"
+        and entry.content == "@leader: investigate the error"
         for entry in assistant.get_history_snapshot()
     )
 

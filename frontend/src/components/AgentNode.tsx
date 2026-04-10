@@ -2,7 +2,13 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
 import { useRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
-import { nodeTypeIcon, nodeTypeIconStyle, stateColor } from "@/lib/constants";
+import {
+  nodeTypeIcon,
+  nodeTypeIconStyle,
+  stateBorder,
+  stateColor,
+  stateRing,
+} from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
 interface AgentNodeData {
@@ -66,12 +72,12 @@ export function AgentNode({ data }: NodeProps) {
   const isRunning = state === "running";
 
   const baseBorder = isToolActive
-    ? "border-emerald-500/30 shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)]"
-    : "border-white/[0.08]";
+    ? "border-graph-attention/70"
+    : stateBorder[state];
 
   const borderClass = selected
-    ? "ring-1 ring-white/30 border-white/40 bg-white/[0.06]"
-    : cn(baseBorder, "hover:border-white/[0.15] hover:bg-white/[0.04]");
+    ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
+    : cn(baseBorder, "hover:border-graph-node-border-hover");
 
   return (
     <motion.div
@@ -92,9 +98,10 @@ export function AgentNode({ data }: NodeProps) {
       onMouseMove={(event) => updateMouseEffect(event.clientX, event.clientY)}
       onMouseLeave={resetMouseEffect}
       className={cn(
-        "relative isolate flex h-14 min-w-0 items-center gap-3 overflow-visible rounded-2xl border px-3.5 py-2.5",
-        "bg-black/60 backdrop-blur-2xl shadow-xl",
-        "transition-all duration-300",
+        "relative isolate flex h-14 min-w-0 items-center gap-2.5 overflow-visible rounded-[10px] border px-3 py-2.5",
+        "shadow-[0_10px_24px_rgba(0,0,0,0.24)]",
+        "bg-graph-node-bg",
+        "transition-[border-color] duration-300",
         leaving && "pointer-events-none",
         borderClass,
       )}
@@ -108,30 +115,37 @@ export function AgentNode({ data }: NodeProps) {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[0.04] to-transparent opacity-50"
+        className={cn("agent-state-ring", stateRing[state])}
+      />
+      <div
+        aria-hidden="true"
+        className={cn(
+          "agent-loading-border",
+          isRunning && "agent-loading-border-active",
+        )}
       />
 
       <Handle
         type="target"
         position={Position.Top}
         className={cn(
-          "!z-10 !size-2 !border-none !bg-white/40 transition-all duration-300 hover:!bg-white hover:!size-3 hover:!-top-1.5",
+          "!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg transition-opacity duration-150",
           !showIncomingHandle && "!opacity-0 !pointer-events-none",
         )}
       />
 
       <div
         className={cn(
-          "relative z-10 flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.02]",
+          "relative z-10 flex size-8 shrink-0 items-center justify-center border",
           nodeTypeIconStyle[node_type],
         )}
       >
-        <Icon className="size-4.5 text-white/80" />
+        <Icon className="size-4.5" />
       </div>
 
       <div className="relative z-10 flex min-w-0 flex-1 items-center justify-between gap-2">
         <span
-          className="truncate text-[13px] font-medium tracking-wide text-white/90"
+          className="truncate text-[13px] font-semibold text-foreground"
           title={latestTodo ?? undefined}
         >
           {label}
@@ -141,19 +155,19 @@ export function AgentNode({ data }: NodeProps) {
           className="relative flex items-center pr-0.5"
           title={isToolActive ? "Active" : state}
         >
-          <span className="relative flex size-2.5 items-center justify-center">
+          <span className="relative flex size-2.5">
             {(isRunning || isToolActive) && (
               <span
                 className={cn(
-                  "absolute inline-flex size-full animate-ping rounded-full opacity-60",
-                  isToolActive ? "bg-emerald-400" : stateColor[state],
+                  "absolute inline-flex size-full animate-ping rounded-full opacity-40",
+                  isToolActive ? "bg-graph-attention" : stateColor[state],
                 )}
               />
             )}
             <span
               className={cn(
-                "relative inline-flex size-2 rounded-full",
-                isToolActive ? "bg-emerald-400" : stateColor[state],
+                "relative inline-flex size-2.5 rounded-full border border-card shadow-sm",
+                isToolActive ? "bg-graph-attention" : stateColor[state],
               )}
             />
           </span>
@@ -164,9 +178,9 @@ export function AgentNode({ data }: NodeProps) {
         <motion.div
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute -bottom-8 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap"
+          className="absolute -bottom-6 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap"
         >
-          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-mono font-medium text-emerald-300 shadow-lg backdrop-blur-md">
+          <span className="rounded-sm border border-graph-attention/24 bg-surface-2/92 px-1.5 py-0.5 text-[9px] font-mono text-graph-attention-text shadow-lg backdrop-blur-sm">
             {toolCall}
           </span>
         </motion.div>
@@ -176,7 +190,7 @@ export function AgentNode({ data }: NodeProps) {
         type="source"
         position={Position.Bottom}
         className={cn(
-          "!z-10 !size-2 !border-none !bg-white/40 transition-all duration-300 hover:!bg-white hover:!size-3 hover:!-bottom-1.5",
+          "!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg transition-opacity duration-150",
           !showOutgoingHandle && "!opacity-0 !pointer-events-none",
         )}
       />

@@ -12,6 +12,7 @@ export function AgentEdge(props: EdgeProps) {
     id,
     data,
   } = props;
+
   const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
@@ -20,38 +21,22 @@ export function AgentEdge(props: EdgeProps) {
     targetY,
     targetPosition,
   });
-  const [reversePath] = getBezierPath({
-    sourceX: targetX,
-    sourceY: targetY,
-    sourcePosition: targetPosition,
-    targetX: sourceX,
-    targetY: sourceY,
-    targetPosition: sourcePosition,
-  });
+
   const edgeData = (data as Record<string, unknown> | undefined) ?? {};
   const hasActiveMessage = !!edgeData.active;
   const leaving = !!edgeData.leaving;
   const flowDirection = edgeData.flowDirection === "reverse" ? -1 : 1;
-  const motionPath = flowDirection === 1 ? edgePath : reversePath;
-  const dashOffsetFrom = flowDirection === 1 ? "18" : "0";
-  const dashOffsetTo = flowDirection === 1 ? "0" : "18";
-  const trailOffsetFrom = flowDirection === 1 ? "32" : "0";
-  const trailOffsetTo = flowDirection === 1 ? "0" : "32";
-  const trailParticles = [
-    { radius: 5.4, opacity: 0.12, begin: "0s", glow: true },
-    { radius: 3.8, opacity: 0.95, begin: "0s", glow: false },
-    { radius: 3.2, opacity: 0.62, begin: "0.06s", glow: false },
-    { radius: 2.7, opacity: 0.42, begin: "0.12s", glow: false },
-    { radius: 2.2, opacity: 0.28, begin: "0.18s", glow: false },
-    { radius: 1.8, opacity: 0.18, begin: "0.24s", glow: false },
-  ] as const;
+
+  // Calculate dash offsets based on direction for the continuous dotted stream
+  const dashOffsetFrom = flowDirection === 1 ? "48" : "0";
+  const dashOffsetTo = flowDirection === 1 ? "0" : "48";
 
   return (
     <motion.g
       className="agent-graph-edge-shell"
       initial={{ opacity: 0 }}
       animate={{ opacity: leaving ? 0 : 1 }}
-      transition={{ duration: leaving ? 0.2 : 0.26, ease: [0.23, 1, 0.32, 1] }}
+      transition={{ duration: leaving ? 0.2 : 0.3, ease: "easeInOut" }}
     >
       <BaseEdge
         id={id}
@@ -60,83 +45,105 @@ export function AgentEdge(props: EdgeProps) {
           stroke: hasActiveMessage
             ? "var(--graph-edge-active)"
             : "var(--graph-edge)",
-          strokeWidth: hasActiveMessage ? 2.2 : 1.2,
+          strokeWidth: hasActiveMessage ? 2.5 : 1.5,
           transition:
-            "stroke 220ms ease, stroke-width 220ms ease, opacity 220ms ease",
+            "stroke 300ms ease, stroke-width 300ms ease, opacity 300ms ease",
         }}
       />
       {hasActiveMessage && (
         <>
+          {/* Ambient Glow - Thick and subtly pulsing */}
           <motion.path
             d={edgePath}
             fill="none"
             stroke="var(--graph-edge-active)"
-            strokeWidth="7"
+            strokeWidth="8"
             strokeLinecap="round"
-            opacity="0.18"
-            filter="url(#agent-edge-glow)"
-            initial={{ opacity: 0, pathLength: 0.68 }}
-            animate={{ opacity: 0.18, pathLength: 1 }}
-            transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+            filter="url(#agent-graph-edge-glow)"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0.1, 0.3, 0.1] }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
           />
+
+          {/* Continuous Flow - Flowing dashed lines to simulate data transfer */}
           <motion.path
             d={edgePath}
             fill="none"
             stroke="url(#agent-graph-edge-flow)"
-            strokeWidth="3.4"
+            strokeWidth="3.5"
             strokeLinecap="round"
-            strokeDasharray="10 8"
-            opacity="0.95"
-            filter="url(#agent-edge-glow)"
-            initial={{ opacity: 0, pathLength: 0.76 }}
-            animate={{ opacity: 0.95, pathLength: 1 }}
-            transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+            strokeDasharray="12 12"
+            opacity="0.8"
+            filter="url(#agent-graph-edge-glow)"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.8 }}
+            transition={{ duration: 0.4 }}
           >
             <animate
               attributeName="stroke-dashoffset"
               from={dashOffsetFrom}
               to={dashOffsetTo}
-              dur="0.7s"
+              dur="0.8s"
               repeatCount="indefinite"
             />
           </motion.path>
+
+          {/* The Data Comet - A bright, fast moving segment that shoots across the line */}
           <motion.path
             d={edgePath}
             fill="none"
             stroke="var(--graph-edge-active)"
-            strokeWidth="5.8"
+            strokeWidth="5"
             strokeLinecap="round"
-            strokeDasharray="22 30"
-            opacity="0.22"
-            filter="url(#agent-edge-glow)"
-            initial={{ opacity: 0, pathLength: 0.72 }}
-            animate={{ opacity: 0.22, pathLength: 1 }}
-            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-          >
-            <animate
-              attributeName="stroke-dashoffset"
-              from={trailOffsetFrom}
-              to={trailOffsetTo}
-              dur="0.72s"
-              repeatCount="indefinite"
-            />
-          </motion.path>
-          {trailParticles.map((particle) => (
-            <circle
-              key={`${id}-${particle.radius}-${particle.begin}`}
-              r={particle.radius}
-              fill="url(#agent-graph-edge-pulse)"
-              opacity={particle.opacity}
-              filter={particle.glow ? "url(#agent-graph-edge-glow)" : undefined}
-            >
-              <animateMotion
-                dur="0.72s"
-                repeatCount="indefinite"
-                path={motionPath}
-                begin={particle.begin}
-              />
-            </circle>
-          ))}
+            filter="url(#agent-graph-edge-glow)"
+            initial={{
+              pathLength: 0.15,
+              pathOffset: flowDirection === 1 ? -0.2 : 1.2,
+              opacity: 0,
+            }}
+            animate={{
+              pathOffset: flowDirection === 1 ? 1.2 : -0.2,
+              opacity: [0, 1, 1, 0],
+            }}
+            transition={{
+              duration: 1.5,
+              ease: "easeInOut",
+              repeat: Infinity,
+              repeatType: "loop",
+              times: [0, 0.1, 0.9, 1], // Quick fade in, hold, quick fade out
+            }}
+          />
+
+          {/* Secondary smaller comet core for a cool white-hot energy effect */}
+          <motion.path
+            d={edgePath}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            filter="url(#agent-graph-edge-glow)"
+            initial={{
+              pathLength: 0.08,
+              pathOffset: flowDirection === 1 ? -0.23 : 1.23,
+              opacity: 0,
+            }}
+            animate={{
+              pathOffset: flowDirection === 1 ? 1.17 : -0.17,
+              opacity: [0, 0.9, 0.9, 0],
+            }}
+            transition={{
+              duration: 1.5,
+              ease: "easeInOut",
+              repeat: Infinity,
+              repeatType: "loop",
+              times: [0, 0.1, 0.9, 1],
+              delay: 0.03, // slightly offset behind the main comet
+            }}
+          />
         </>
       )}
     </motion.g>

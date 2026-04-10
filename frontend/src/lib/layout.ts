@@ -1,7 +1,7 @@
 import dagre from "@dagrejs/dagre";
 import type { Edge, Node } from "@xyflow/react";
 
-export const AGENT_NODE_MIN_WIDTH = 164;
+export const AGENT_NODE_MIN_WIDTH = 100;
 export const AGENT_NODE_MAX_WIDTH = 300;
 export const AGENT_NODE_HEIGHT = 56;
 const LAYOUT_COMPONENT_GAP_X = 120;
@@ -19,7 +19,7 @@ export function getAgentNodeWidth(label: string): number {
 
   return Math.max(
     AGENT_NODE_MIN_WIDTH,
-    Math.min(AGENT_NODE_MAX_WIDTH, textWidth + 98),
+    Math.min(AGENT_NODE_MAX_WIDTH, textWidth + 76),
   );
 }
 

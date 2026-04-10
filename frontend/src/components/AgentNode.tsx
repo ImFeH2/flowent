@@ -98,7 +98,7 @@ export function AgentNode({ data }: NodeProps) {
       onMouseMove={(event) => updateMouseEffect(event.clientX, event.clientY)}
       onMouseLeave={resetMouseEffect}
       className={cn(
-        "relative isolate flex h-14 min-w-0 items-center gap-2.5 overflow-visible rounded-[10px] border px-3 py-2.5",
+        "relative isolate flex h-14 min-w-0 items-center gap-2 overflow-visible rounded-[10px] border px-2.5 py-2.5",
         "shadow-[0_10px_24px_rgba(0,0,0,0.24)]",
         "bg-graph-node-bg",
         "transition-[border-color] duration-300",
@@ -145,7 +145,7 @@ export function AgentNode({ data }: NodeProps) {
 
       <div className="relative z-10 flex min-w-0 flex-1 items-center justify-between gap-2">
         <span
-          className="truncate text-[13px] font-semibold text-foreground"
+          className="truncate text-[13px] font-semibold text-foreground -translate-y-[0.5px]"
           title={latestTodo ?? undefined}
         >
           {label}

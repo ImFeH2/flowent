@@ -38,12 +38,11 @@ export function AgentEdge(props: EdgeProps) {
   const trailOffsetFrom = flowDirection === 1 ? "32" : "0";
   const trailOffsetTo = flowDirection === 1 ? "0" : "32";
   const trailParticles = [
-    { radius: 5.4, opacity: 0.12, begin: "0s", glow: true },
-    { radius: 3.8, opacity: 0.95, begin: "0s", glow: false },
-    { radius: 3.2, opacity: 0.62, begin: "0.06s", glow: false },
-    { radius: 2.7, opacity: 0.42, begin: "0.12s", glow: false },
-    { radius: 2.2, opacity: 0.28, begin: "0.18s", glow: false },
-    { radius: 1.8, opacity: 0.18, begin: "0.24s", glow: false },
+    { radius: 3.5, opacity: 0.15, begin: "0s", glow: true },
+    { radius: 2.5, opacity: 0.8, begin: "0s", glow: false },
+    { radius: 2.0, opacity: 0.5, begin: "0.08s", glow: false },
+    { radius: 1.5, opacity: 0.3, begin: "0.16s", glow: false },
+    { radius: 1.0, opacity: 0.15, begin: "0.24s", glow: false },
   ] as const;
 
   return (
@@ -60,9 +59,9 @@ export function AgentEdge(props: EdgeProps) {
           stroke: hasActiveMessage
             ? "var(--graph-edge-active)"
             : "var(--graph-edge)",
-          strokeWidth: hasActiveMessage ? 2.2 : 1.2,
+          strokeWidth: hasActiveMessage ? 2.0 : 1.5,
           transition:
-            "stroke 220ms ease, stroke-width 220ms ease, opacity 220ms ease",
+            "stroke 300ms ease, stroke-width 300ms ease, opacity 300ms ease",
         }}
       />
       {hasActiveMessage && (
@@ -71,32 +70,32 @@ export function AgentEdge(props: EdgeProps) {
             d={edgePath}
             fill="none"
             stroke="var(--graph-edge-active)"
-            strokeWidth="7"
+            strokeWidth="6"
             strokeLinecap="round"
-            opacity="0.18"
+            opacity="0.3"
             filter="url(#agent-edge-glow)"
             initial={{ opacity: 0, pathLength: 0.68 }}
-            animate={{ opacity: 0.18, pathLength: 1 }}
+            animate={{ opacity: 0.3, pathLength: 1 }}
             transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
           />
           <motion.path
             d={edgePath}
             fill="none"
             stroke="url(#agent-graph-edge-flow)"
-            strokeWidth="3.4"
+            strokeWidth="2.5"
             strokeLinecap="round"
-            strokeDasharray="10 8"
-            opacity="0.95"
+            strokeDasharray="12 12"
+            opacity="1"
             filter="url(#agent-edge-glow)"
             initial={{ opacity: 0, pathLength: 0.76 }}
-            animate={{ opacity: 0.95, pathLength: 1 }}
+            animate={{ opacity: 1, pathLength: 1 }}
             transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
           >
             <animate
               attributeName="stroke-dashoffset"
               from={dashOffsetFrom}
               to={dashOffsetTo}
-              dur="0.7s"
+              dur="0.8s"
               repeatCount="indefinite"
             />
           </motion.path>
@@ -104,20 +103,20 @@ export function AgentEdge(props: EdgeProps) {
             d={edgePath}
             fill="none"
             stroke="var(--graph-edge-active)"
-            strokeWidth="5.8"
+            strokeWidth="4"
             strokeLinecap="round"
-            strokeDasharray="22 30"
-            opacity="0.22"
+            strokeDasharray="30 40"
+            opacity="0.4"
             filter="url(#agent-edge-glow)"
             initial={{ opacity: 0, pathLength: 0.72 }}
-            animate={{ opacity: 0.22, pathLength: 1 }}
+            animate={{ opacity: 0.4, pathLength: 1 }}
             transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
           >
             <animate
               attributeName="stroke-dashoffset"
               from={trailOffsetFrom}
               to={trailOffsetTo}
-              dur="0.72s"
+              dur="0.82s"
               repeatCount="indefinite"
             />
           </motion.path>
@@ -130,7 +129,7 @@ export function AgentEdge(props: EdgeProps) {
               filter={particle.glow ? "url(#agent-graph-edge-glow)" : undefined}
             >
               <animateMotion
-                dur="0.72s"
+                dur="0.82s"
                 repeatCount="indefinite"
                 path={motionPath}
                 begin={particle.begin}

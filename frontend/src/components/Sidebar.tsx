@@ -7,15 +7,25 @@ import {
 import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
+import {
+  LayoutDashboard,
+  Server,
+  Users,
+  MessageSquareQuote,
+  Wrench,
+  Radio,
+  Settings,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const NAV_ITEMS: Array<{ id: PageId; label: string }> = [
-  { id: "workspace", label: "Workspace" },
-  { id: "providers", label: "Providers" },
-  { id: "roles", label: "Roles" },
-  { id: "prompts", label: "Prompts" },
-  { id: "tools", label: "Tools" },
-  { id: "channels", label: "Channels" },
-  { id: "settings", label: "Settings" },
+const NAV_ITEMS: Array<{ id: PageId; label: string; icon: LucideIcon }> = [
+  { id: "workspace", label: "Workspace", icon: LayoutDashboard },
+  { id: "providers", label: "Providers", icon: Server },
+  { id: "roles", label: "Roles", icon: Users },
+  { id: "prompts", label: "Prompts", icon: MessageSquareQuote },
+  { id: "tools", label: "Tools", icon: Wrench },
+  { id: "channels", label: "Channels", icon: Radio },
+  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -38,12 +48,8 @@ export function Sidebar({
 
   const { isDragging, startDrag } = usePanelDrag(width, onWidthChange, "right");
   const widthProgress = Math.max(0, Math.min(1, (width - 180) / 220));
-  const headerPaddingY = 12 + widthProgress * 4;
-  const titleFontSizeRem = 1.02 + widthProgress * 0.14;
-  const subtitleFontSizePx = 10 + widthProgress * 0.8;
-  const subtitleMarginTopPx = 2 + widthProgress * 1.2;
-  const statusFontSizePx = 10 + widthProgress * 0.4;
-  const showDescriptions = width > 214;
+  const headerPaddingY = 16 + widthProgress * 4;
+  const titleFontSizeRem = 1.05 + widthProgress * 0.1;
 
   const navigate = (page: PageId) => {
     setCurrentPage(page);
@@ -54,110 +60,77 @@ export function Sidebar({
     <aside
       style={{ width: `${width}px` }}
       className={cn(
-        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border border-white/6 border-r-white/[0.11] bg-[linear-gradient(180deg,rgba(8,8,9,0.96),rgba(5,5,6,0.95))] shadow-[0_18px_44px_-34px_rgba(0,0,0,0.8)] backdrop-blur-xl [contain:paint]",
+        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border-r border-white/[0.04] bg-black/60 shadow-2xl backdrop-blur-2xl transition-colors",
         autoHide ? "h-full" : "fixed inset-y-0 left-0 h-auto",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.016),transparent_20%,transparent_84%,rgba(255,255,255,0.008))]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent opacity-30" />
       <div className="flex h-full flex-col overflow-hidden">
         <div
-          className="shrink-0 border-b border-white/[0.08] px-4"
+          className="shrink-0 px-5"
           style={{
             paddingTop: `${headerPaddingY}px`,
             paddingBottom: `${headerPaddingY}px`,
           }}
         >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
               <h1
-                className="truncate font-semibold tracking-[-0.03em] text-foreground"
+                className="truncate font-medium tracking-tight text-white/90"
                 style={{ fontSize: `${titleFontSizeRem.toFixed(3)}rem` }}
               >
                 Autopoe
               </h1>
-              <p
-                className="truncate font-medium tracking-[0.02em] text-muted-foreground/84"
-                style={{
-                  marginTop: `${subtitleMarginTopPx.toFixed(2)}px`,
-                  fontSize: `${subtitleFontSizePx.toFixed(2)}px`,
-                }}
-              >
-                Agent Studio
-              </p>
+              <div className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-0.5">
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    connected
+                      ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]"
+                      : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]",
+                  )}
+                />
+                <span className="text-[9px] font-medium uppercase tracking-wider text-white/50">
+                  {connected ? "Live" : "Wait"}
+                </span>
+              </div>
             </div>
-            <div
-              className="flex shrink-0 items-center gap-2 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1"
-              style={{ fontSize: `${statusFontSizePx.toFixed(2)}px` }}
-            >
-              <span
-                className={cn(
-                  "size-2 rounded-full shadow-[0_0_10px_currentColor]",
-                  connected
-                    ? "bg-emerald-400 text-emerald-400"
-                    : "bg-amber-300 text-amber-300",
-                )}
-              />
-              <span className="font-medium text-foreground/88">
-                {connected ? "Connected" : "Reconnecting"}
-              </span>
-            </div>
+            <p className="text-[11px] font-medium text-white/40">
+              Agent Studio
+            </p>
           </div>
         </div>
 
-        <div className="shrink-0 px-4 pb-2 pt-3.5 text-[9px] font-semibold uppercase tracking-[0.24em] text-muted-foreground/52">
-          Navigation
-        </div>
-
-        <nav className="min-h-0 flex-1 space-y-1 px-3 pb-3 overflow-y-auto">
-          {NAV_ITEMS.map(({ id, label }) => (
+        <nav className="min-h-0 flex-1 space-y-0.5 px-3 py-2 overflow-y-auto scrollbar-none">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-start gap-2.5 rounded-md px-3 py-2 text-sm transition-colors duration-150",
+                "group flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-white/20",
                 currentPage === id
-                  ? "bg-white/[0.05] text-foreground"
-                  : "text-muted-foreground hover:bg-white/[0.028] hover:text-foreground",
+                  ? "bg-white/[0.06] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]"
+                  : "text-white/50 hover:bg-white/[0.03] hover:text-white/90",
               )}
             >
-              <span
+              <Icon
                 className={cn(
-                  "mt-0.5 h-5 w-px shrink-0 rounded-full transition-[opacity,background-color] duration-150",
+                  "size-4 shrink-0 transition-colors duration-200",
                   currentPage === id
-                    ? "bg-white/72 opacity-100"
-                    : "bg-white/0 opacity-0 group-hover:bg-white/8 group-hover:opacity-100",
+                    ? "text-white/90"
+                    : "text-white/40 group-hover:text-white/80",
                 )}
               />
-              <div className="min-w-0 text-left">
-                <span className="block truncate text-[13px] font-medium leading-5">
-                  {label}
-                </span>
-                {showDescriptions ? (
-                  <span className="block truncate text-[10px] leading-4 text-muted-foreground/68">
-                    {id === "workspace"
-                      ? "Task tabs, graph canvas, and assistant panels"
-                      : id === "providers"
-                        ? "Model backends and catalogs"
-                        : id === "roles"
-                          ? "Behavior templates and overrides"
-                          : id === "prompts"
-                            ? "Global system guidance"
-                            : id === "tools"
-                              ? "Available runtime capabilities"
-                              : id === "channels"
-                                ? "External messaging integrations"
-                                : "Runtime defaults and event log"}
-                  </span>
-                ) : null}
-              </div>
+              <span className="block truncate text-[13px] font-medium tracking-wide">
+                {label}
+              </span>
             </button>
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-white/[0.08] px-4 py-2.5">
+        <div className="shrink-0 border-t border-white/[0.04] px-4 py-3 bg-black/20">
           <SidebarActivityTicker width={width} />
         </div>
       </div>

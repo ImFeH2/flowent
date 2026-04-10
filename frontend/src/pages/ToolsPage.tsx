@@ -63,16 +63,19 @@ function ToolCard({
       onClick={onToggle}
       title={tool.description}
       className={cn(
-        "group cursor-pointer rounded-xl border border-white/[0.07] bg-white/[0.025] p-4 transition-all duration-150 hover:-translate-y-px hover:border-white/[0.12] hover:bg-white/[0.045]",
-        expanded && "border-white/[0.12] bg-white/[0.04]",
+        "group cursor-pointer rounded-2xl border border-white/[0.04] bg-white/[0.01] p-5 transition-all duration-300 hover:border-white/[0.08] hover:bg-white/[0.03] hover:shadow-lg hover:shadow-black/50",
+        expanded &&
+          "border-white/[0.08] bg-white/[0.03] shadow-lg shadow-black/50",
       )}
     >
-      <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-white/[0.06]">
-        <Icon className="size-4 text-primary" />
+      <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-white/[0.03] border border-white/[0.04] transition-colors group-hover:bg-white/[0.06] group-hover:border-white/[0.08]">
+        <Icon className="size-4.5 text-white/80" />
       </div>
 
-      <code className="block text-sm font-mono font-medium">{tool.name}</code>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground/78">
+      <code className="block text-[13px] font-mono font-medium text-white/90">
+        {tool.name}
+      </code>
+      <p className="mt-2 text-[12px] leading-relaxed text-white/40">
         {tool.description}
       </p>
 
@@ -82,15 +85,15 @@ function ToolCard({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mt-3 border-t border-white/8 pt-3">
-              <p className="mb-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+            <div className="mt-4 border-t border-white/[0.04] pt-4">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
                 Parameters
               </p>
-              <pre className="max-h-48 overflow-auto rounded-lg border border-white/6 bg-black/[0.2] p-3 text-xs font-mono">
+              <pre className="max-h-48 overflow-auto rounded-xl border border-white/[0.04] bg-black/40 p-3.5 text-[11px] font-mono text-white/60 scrollbar-none">
                 {JSON.stringify(tool.parameters ?? {}, null, 2)}
               </pre>
             </div>
@@ -142,48 +145,55 @@ export function ToolsPage() {
       description="Search and inspect the runtime tools currently available to agents."
     >
       <div className="flex h-full flex-col">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="relative max-w-sm flex-1">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="mb-6 flex items-center gap-4">
+          <div className="relative max-w-md flex-1">
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/40" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search tools..."
-              className="w-full rounded-lg border border-white/8 bg-white/[0.03] py-2 pl-10 pr-4 text-sm transition-colors placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+              className="w-full rounded-full border border-white/[0.06] bg-white/[0.02] py-2.5 pl-10 pr-5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
             />
           </div>
-          <span className="shrink-0 text-sm text-muted-foreground">
+          <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1 text-[11px] font-medium text-white/50">
             {filteredTools.length} tools
           </span>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-2 scrollbar-none">
           {loading ? (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="h-32 rounded-xl skeleton-shimmer" />
+                <div
+                  key={i}
+                  className="h-36 animate-pulse rounded-2xl border border-white/[0.04] bg-white/[0.02]"
+                />
               ))}
             </div>
           ) : filteredTools.length === 0 ? (
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               className="flex h-full flex-col items-center justify-center text-center"
             >
-              <Wrench className="size-7 text-muted-foreground/60" />
-              <h3 className="mt-4 text-lg font-semibold">No Tools Found</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <div className="flex size-14 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.02] shadow-sm">
+                <Wrench className="size-6 text-white/40" />
+              </div>
+              <h3 className="mt-5 text-[15px] font-medium text-white/90">
+                No Tools Found
+              </h3>
+              <p className="mt-1.5 text-[13px] text-white/40">
                 Try adjusting your search criteria.
               </p>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 pb-8">
               {filteredTools.map((tool, i) => (
                 <motion.div
                   key={tool.name}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.04 }}
+                  transition={{ delay: i * 0.03 }}
                 >
                   <ToolCard
                     tool={tool}

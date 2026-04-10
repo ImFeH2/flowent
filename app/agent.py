@@ -1270,7 +1270,41 @@ class Agent:
         return settings.model.max_retries
 
     def _get_llm_retry_delay(self, retry_number: int) -> float:
-        return min(0.5 * (2 ** max(retry_number - 1, 0)), 8.0)
+        settings = get_settings()
+        capped_retry_number = min(
+            max(retry_number - 1, 0),
+            settings.model.retry_backoff_cap_retries - 1,
+        )
+        return min(
+            settings.model.retry_max_delay_seconds,
+            settings.model.retry_initial_delay_seconds * (2**capped_retry_number),
+        )
+
+    def _get_llm_retry_429_delay(self, status_code: int | None) -> float:
+        if status_code != 429:
+            return 0.0
+        from app.settings import find_provider, find_role
+
+        settings = get_settings()
+        provider_id = settings.model.active_provider_id
+        role_cfg = (
+            find_role(settings, self.config.role_name)
+            if self.config.role_name
+            else None
+        )
+        if (
+            role_cfg is not None
+            and role_cfg.model is not None
+            and role_cfg.model.provider_id
+            and role_cfg.model.model
+        ):
+            provider_id = role_cfg.model.provider_id
+        if not provider_id:
+            return 0.0
+        provider = find_provider(settings, provider_id)
+        if provider is None:
+            return 0.0
+        return float(provider.retry_429_delay_seconds)
 
     def _wait_for_llm_retry_delay(self, delay_seconds: float) -> None:
         self.set_interrupt_callback(self._interrupt_requested.set)
@@ -1319,7 +1353,9 @@ class Agent:
                 if not should_retry:
                     raise
                 retry_count += 1
-                delay_seconds = self._get_llm_retry_delay(retry_count)
+                delay_seconds = self._get_llm_retry_delay(
+                    retry_count
+                ) + self._get_llm_retry_429_delay(exc.status_code)
                 self._log.warning(
                     "Transient LLM error, retry {} ({}) in {:.2f}s: {}",
                     retry_count,

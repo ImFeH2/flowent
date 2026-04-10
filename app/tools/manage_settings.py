@@ -24,6 +24,9 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
             "timeout_ms": settings.model.timeout_ms,
             "retry_policy": settings.model.retry_policy,
             "max_retries": settings.model.max_retries,
+            "retry_initial_delay_seconds": settings.model.retry_initial_delay_seconds,
+            "retry_max_delay_seconds": settings.model.retry_max_delay_seconds,
+            "retry_backoff_cap_retries": settings.model.retry_backoff_cap_retries,
             "params": {
                 "reasoning_effort": settings.model.params.reasoning_effort,
                 "verbosity": settings.model.params.verbosity,
@@ -73,6 +76,18 @@ class ManageSettingsTool(Tool):
                 "type": "integer",
                 "description": "Maximum retries for transient LLM call failures when retry_policy is limited",
             },
+            "retry_initial_delay_seconds": {
+                "type": "number",
+                "description": "Initial exponential backoff delay in seconds",
+            },
+            "retry_max_delay_seconds": {
+                "type": "number",
+                "description": "Maximum exponential backoff delay in seconds",
+            },
+            "retry_backoff_cap_retries": {
+                "type": "integer",
+                "description": "Retry count where exponential growth stops doubling",
+            },
             "retry_policy": {
                 "type": "string",
                 "enum": ["no_retry", "limited", "unlimited"],
@@ -115,11 +130,15 @@ class ManageSettingsTool(Tool):
             build_default_model_params,
             build_model_max_retries,
             build_model_params_from_mapping,
+            build_model_retry_backoff_cap_retries,
+            build_model_retry_initial_delay_seconds,
+            build_model_retry_max_delay_seconds,
             build_model_retry_policy,
             build_model_timeout_ms,
             find_role,
             get_settings,
             save_settings,
+            validate_model_retry_backoff_settings,
         )
 
         action = args.get("action")
@@ -130,6 +149,9 @@ class ManageSettingsTool(Tool):
         timeout_ms = args.get("timeout_ms")
         retry_policy = args.get("retry_policy")
         max_retries = args.get("max_retries")
+        retry_initial_delay_seconds = args.get("retry_initial_delay_seconds")
+        retry_max_delay_seconds = args.get("retry_max_delay_seconds")
+        retry_backoff_cap_retries = args.get("retry_backoff_cap_retries")
         model_params = args.get("model_params")
         timestamp_format = args.get("timestamp_format")
 
@@ -159,6 +181,30 @@ class ManageSettingsTool(Tool):
                 build_model_max_retries(max_retries, field_name="max_retries")
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
+        if retry_initial_delay_seconds is not None:
+            try:
+                build_model_retry_initial_delay_seconds(
+                    retry_initial_delay_seconds,
+                    field_name="retry_initial_delay_seconds",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+        if retry_max_delay_seconds is not None:
+            try:
+                build_model_retry_max_delay_seconds(
+                    retry_max_delay_seconds,
+                    field_name="retry_max_delay_seconds",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+        if retry_backoff_cap_retries is not None:
+            try:
+                build_model_retry_backoff_cap_retries(
+                    retry_backoff_cap_retries,
+                    field_name="retry_backoff_cap_retries",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
         if model_params is not None and not isinstance(
             model_params, (dict, type(None))
         ):
@@ -174,50 +220,107 @@ class ManageSettingsTool(Tool):
         if action != "update":
             return json.dumps({"error": f"Unsupported action: {action}"})
 
+        next_assistant_role_name = settings.assistant.role_name
         if assistant_role_name is not None:
             next_role_name = assistant_role_name.strip()
             if not next_role_name:
                 return json.dumps({"error": "assistant_role_name must not be empty"})
             if find_role(settings, next_role_name) is None:
                 return json.dumps({"error": f"Role '{next_role_name}' not found"})
-            settings.assistant.role_name = next_role_name
+            next_assistant_role_name = next_role_name
+
+        next_leader_role_name = settings.leader.role_name
         if leader_role_name is not None:
             next_role_name = leader_role_name.strip()
             if not next_role_name:
                 return json.dumps({"error": "leader_role_name must not be empty"})
             if find_role(settings, next_role_name) is None:
                 return json.dumps({"error": f"Role '{next_role_name}' not found"})
-            settings.leader.role_name = next_role_name
+            next_leader_role_name = next_role_name
 
+        next_active_provider_id = settings.model.active_provider_id
         if active_provider_id is not None:
-            settings.model.active_provider_id = active_provider_id
+            next_active_provider_id = active_provider_id
+
+        next_active_model = settings.model.active_model
         if active_model is not None:
-            settings.model.active_model = active_model
+            next_active_model = active_model
+
+        next_retry_policy = settings.model.retry_policy
         if retry_policy is not None:
-            settings.model.retry_policy = build_model_retry_policy(
+            next_retry_policy = build_model_retry_policy(
                 retry_policy,
                 field_name="retry_policy",
             )
+
+        next_timeout_ms = settings.model.timeout_ms
         if timeout_ms is not None:
-            settings.model.timeout_ms = build_model_timeout_ms(
+            next_timeout_ms = build_model_timeout_ms(
                 timeout_ms,
                 field_name="timeout_ms",
             )
+
+        next_max_retries = settings.model.max_retries
         if max_retries is not None:
-            settings.model.max_retries = build_model_max_retries(
+            next_max_retries = build_model_max_retries(
                 max_retries,
                 field_name="max_retries",
             )
+
+        next_retry_initial_delay_seconds = settings.model.retry_initial_delay_seconds
+        if retry_initial_delay_seconds is not None:
+            next_retry_initial_delay_seconds = build_model_retry_initial_delay_seconds(
+                retry_initial_delay_seconds,
+                field_name="retry_initial_delay_seconds",
+            )
+
+        next_retry_max_delay_seconds = settings.model.retry_max_delay_seconds
+        if retry_max_delay_seconds is not None:
+            next_retry_max_delay_seconds = build_model_retry_max_delay_seconds(
+                retry_max_delay_seconds,
+                field_name="retry_max_delay_seconds",
+            )
+
+        next_retry_backoff_cap_retries = settings.model.retry_backoff_cap_retries
+        if retry_backoff_cap_retries is not None:
+            next_retry_backoff_cap_retries = build_model_retry_backoff_cap_retries(
+                retry_backoff_cap_retries,
+                field_name="retry_backoff_cap_retries",
+            )
+        try:
+            validate_model_retry_backoff_settings(
+                retry_initial_delay_seconds=next_retry_initial_delay_seconds,
+                retry_max_delay_seconds=next_retry_max_delay_seconds,
+            )
+        except ValueError as exc:
+            return json.dumps({"error": str(exc)})
+
+        next_model_params = settings.model.params
         if "model_params" in args:
             try:
-                settings.model.params = (
+                next_model_params = (
                     build_model_params_from_mapping(model_params)
                     or build_default_model_params()
                 )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
+
+        next_timestamp_format = settings.event_log.timestamp_format
         if timestamp_format is not None:
-            settings.event_log.timestamp_format = timestamp_format
+            next_timestamp_format = timestamp_format
+
+        settings.assistant.role_name = next_assistant_role_name
+        settings.leader.role_name = next_leader_role_name
+        settings.model.active_provider_id = next_active_provider_id
+        settings.model.active_model = next_active_model
+        settings.model.retry_policy = next_retry_policy
+        settings.model.timeout_ms = next_timeout_ms
+        settings.model.max_retries = next_max_retries
+        settings.model.retry_initial_delay_seconds = next_retry_initial_delay_seconds
+        settings.model.retry_max_delay_seconds = next_retry_max_delay_seconds
+        settings.model.retry_backoff_cap_retries = next_retry_backoff_cap_retries
+        settings.model.params = next_model_params
+        settings.event_log.timestamp_format = next_timestamp_format
 
         save_settings(settings)
         sync_assistant_role(reason="assistant settings updated")

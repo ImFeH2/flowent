@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from app.settings import ProviderConfig
 
 from app.providers.base_url import resolve_provider_base_url
-from app.settings import build_provider_headers
+from app.settings import build_provider_headers, build_provider_retry_429_delay_seconds
 from app.tools import Tool, re_raise_interrupt
 
 
@@ -23,6 +23,7 @@ def _serialize_provider(provider: ProviderConfig) -> dict[str, object]:
         "type": provider.type,
         "base_url": provider.base_url,
         "headers": dict(provider.headers),
+        "retry_429_delay_seconds": provider.retry_429_delay_seconds,
     }
 
 
@@ -65,6 +66,10 @@ class ManageProvidersTool(Tool):
                 "description": "Provider request header overrides",
                 "additionalProperties": {"type": "string"},
             },
+            "retry_429_delay_seconds": {
+                "type": "integer",
+                "description": "Extra wait time in seconds after HTTP 429 before retrying",
+            },
         },
         "required": ["action"],
     }
@@ -86,6 +91,7 @@ class ManageProvidersTool(Tool):
         base_url = args.get("base_url")
         api_key = args.get("api_key")
         raw_headers = args.get("headers")
+        retry_429_delay_seconds = args.get("retry_429_delay_seconds")
 
         if not isinstance(action, str):
             return json.dumps({"error": "action must be a string"})
@@ -102,6 +108,11 @@ class ManageProvidersTool(Tool):
             return json.dumps({"error": "api_key must be a string"})
         if raw_headers is not None and not isinstance(raw_headers, dict):
             return json.dumps({"error": "headers must be a JSON object"})
+        if retry_429_delay_seconds is not None:
+            try:
+                build_provider_retry_429_delay_seconds(retry_429_delay_seconds)
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
 
         try:
             headers = (
@@ -136,6 +147,11 @@ class ManageProvidersTool(Tool):
                 base_url=resolved_base_url,
                 api_key=api_key or "",
                 headers=headers or {},
+                retry_429_delay_seconds=build_provider_retry_429_delay_seconds(
+                    retry_429_delay_seconds
+                    if retry_429_delay_seconds is not None
+                    else 0
+                ),
             )
             settings.providers.append(provider)
             save_settings(settings)
@@ -176,6 +192,10 @@ class ManageProvidersTool(Tool):
                     provider.api_key = api_key
                 if headers is not None:
                     provider.headers = headers
+                if retry_429_delay_seconds is not None:
+                    provider.retry_429_delay_seconds = (
+                        build_provider_retry_429_delay_seconds(retry_429_delay_seconds)
+                    )
                 save_settings(settings)
                 gateway.invalidate_cache()
                 return json.dumps(_serialize_provider(provider))

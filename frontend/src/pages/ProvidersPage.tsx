@@ -60,6 +60,7 @@ const emptyDraft = (): ProviderDraft => ({
   base_url: "",
   api_key: "",
   headers_text: "",
+  retry_429_delay_seconds: 0,
 });
 
 export function ProvidersPage() {
@@ -124,6 +125,7 @@ export function ProvidersPage() {
       base_url: provider.base_url,
       api_key: provider.api_key,
       headers_text: formatProviderHeaders(provider.headers),
+      retry_429_delay_seconds: provider.retry_429_delay_seconds,
     });
     setShowKey(false);
   };
@@ -146,6 +148,7 @@ export function ProvidersPage() {
         base_url: selectedProvider.base_url,
         api_key: selectedProvider.api_key,
         headers_text: formatProviderHeaders(selectedProvider.headers),
+        retry_429_delay_seconds: selectedProvider.retry_429_delay_seconds,
       });
     }
   };
@@ -174,6 +177,7 @@ export function ProvidersPage() {
       base_url: draft.base_url,
       api_key: draft.api_key,
       headers: parsedHeaders.headers,
+      retry_429_delay_seconds: draft.retry_429_delay_seconds,
     };
 
     setSaving(true);
@@ -189,6 +193,7 @@ export function ProvidersPage() {
           base_url: created.base_url,
           api_key: created.api_key,
           headers_text: formatProviderHeaders(created.headers),
+          retry_429_delay_seconds: created.retry_429_delay_seconds,
         });
         toast.success("Provider created");
       } else if (selectedId) {
@@ -202,6 +207,7 @@ export function ProvidersPage() {
           base_url: updated.base_url,
           api_key: updated.api_key,
           headers_text: formatProviderHeaders(updated.headers),
+          retry_429_delay_seconds: updated.retry_429_delay_seconds,
         });
         toast.success("Provider updated");
       }
@@ -235,13 +241,17 @@ export function ProvidersPage() {
     ? draft.name !== "" ||
       draft.base_url !== "" ||
       draft.api_key !== "" ||
-      draft.headers_text !== ""
+      draft.headers_text !== "" ||
+      draft.retry_429_delay_seconds !== 0
     : selectedProvider
       ? draft.name !== selectedProvider.name ||
         draft.type !== selectedProvider.type ||
         draft.base_url !== selectedProvider.base_url ||
         draft.api_key !== selectedProvider.api_key ||
-        draft.headers_text !== formatProviderHeaders(selectedProvider.headers)
+        draft.headers_text !==
+          formatProviderHeaders(selectedProvider.headers) ||
+        draft.retry_429_delay_seconds !==
+          selectedProvider.retry_429_delay_seconds
       : false;
 
   return (
@@ -535,6 +545,44 @@ export function ProvidersPage() {
                             {parsedHeaders.error}
                           </p>
                         )}
+                      </div>
+                    </SettingsRow>
+                    <SettingsRow
+                      label="429 Retry Delay"
+                      description="Extra wait after HTTP 429"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            aria-label="429 Retry Delay"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={String(draft.retry_429_delay_seconds)}
+                            onChange={(e) => {
+                              const nextValue = e.target.value.trim();
+                              if (!/^\d+$/.test(nextValue)) {
+                                return;
+                              }
+                              const parsed = Number.parseInt(nextValue, 10);
+                              if (!Number.isSafeInteger(parsed) || parsed < 0) {
+                                return;
+                              }
+                              setDraft({
+                                ...draft,
+                                retry_429_delay_seconds: parsed,
+                              });
+                            }}
+                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                          />
+                          <span className="text-[13px] font-medium text-white/40">
+                            s
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white/40 leading-relaxed">
+                          Adds extra wait only when this provider returns HTTP
+                          429 and the system will continue retrying.
+                        </p>
                       </div>
                     </SettingsRow>
                   </div>

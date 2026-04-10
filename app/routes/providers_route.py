@@ -11,6 +11,7 @@ from app.providers.base_url import resolve_provider_base_url
 from app.settings import (
     ProviderConfig,
     build_provider_headers,
+    build_provider_retry_429_delay_seconds,
     get_settings,
     save_settings,
     serialize_provider,
@@ -25,6 +26,7 @@ class CreateProviderRequest(BaseModel):
     base_url: str
     api_key: str = ""
     headers: dict[str, object] | None = None
+    retry_429_delay_seconds: int = 0
 
 
 class UpdateProviderRequest(BaseModel):
@@ -33,6 +35,7 @@ class UpdateProviderRequest(BaseModel):
     base_url: str | None = None
     api_key: str | None = None
     headers: dict[str, object] | None = None
+    retry_429_delay_seconds: int | None = None
 
 
 @router.get("/api/providers")
@@ -51,6 +54,9 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
     try:
         resolved_base_url = resolve_provider_base_url(req.type, req.base_url)
         headers = build_provider_headers(req.headers)
+        retry_429_delay_seconds = build_provider_retry_429_delay_seconds(
+            req.retry_429_delay_seconds
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     provider = ProviderConfig(
@@ -60,6 +66,7 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
         base_url=resolved_base_url,
         api_key=req.api_key,
         headers=headers,
+        retry_429_delay_seconds=retry_429_delay_seconds,
     )
     settings.providers.append(provider)
     save_settings(settings)
@@ -87,6 +94,11 @@ async def update_provider(
                 if req.headers is not None
                 else dict(p.headers)
             )
+            next_retry_429_delay_seconds = (
+                build_provider_retry_429_delay_seconds(req.retry_429_delay_seconds)
+                if req.retry_429_delay_seconds is not None
+                else p.retry_429_delay_seconds
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if req.name is not None:
@@ -99,6 +111,8 @@ async def update_provider(
             p.api_key = req.api_key
         if req.headers is not None:
             p.headers = next_headers
+        if req.retry_429_delay_seconds is not None:
+            p.retry_429_delay_seconds = next_retry_429_delay_seconds
         save_settings(settings)
         gateway.invalidate_cache()
         return serialize_provider(p)

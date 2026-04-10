@@ -16,6 +16,9 @@ from app.settings import (
     build_default_model_params,
     build_model_max_retries,
     build_model_params_from_mapping,
+    build_model_retry_backoff_cap_retries,
+    build_model_retry_initial_delay_seconds,
+    build_model_retry_max_delay_seconds,
     build_model_retry_policy,
     build_model_timeout_ms,
     find_role,
@@ -25,6 +28,7 @@ from app.settings import (
     serialize_role,
     serialize_settings,
     serialize_telegram_settings,
+    validate_model_retry_backoff_settings,
 )
 
 router = APIRouter()
@@ -109,6 +113,9 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         timeout_ms = current.model.timeout_ms
         retry_policy = current.model.retry_policy
         max_retries = current.model.max_retries
+        retry_initial_delay_seconds = current.model.retry_initial_delay_seconds
+        retry_max_delay_seconds = current.model.retry_max_delay_seconds
+        retry_backoff_cap_retries = current.model.retry_backoff_cap_retries
         if "params" in req.model:
             try:
                 parsed_params = build_model_params_from_mapping(req.model.get("params"))
@@ -130,6 +137,34 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 max_retries = build_model_max_retries(req.model.get("max_retries"))
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "retry_initial_delay_seconds" in req.model:
+            try:
+                retry_initial_delay_seconds = build_model_retry_initial_delay_seconds(
+                    req.model.get("retry_initial_delay_seconds")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "retry_max_delay_seconds" in req.model:
+            try:
+                retry_max_delay_seconds = build_model_retry_max_delay_seconds(
+                    req.model.get("retry_max_delay_seconds")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "retry_backoff_cap_retries" in req.model:
+            try:
+                retry_backoff_cap_retries = build_model_retry_backoff_cap_retries(
+                    req.model.get("retry_backoff_cap_retries")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        try:
+            validate_model_retry_backoff_settings(
+                retry_initial_delay_seconds=retry_initial_delay_seconds,
+                retry_max_delay_seconds=retry_max_delay_seconds,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         current.model = ModelSettings(
             active_provider_id=active_provider_id
             if isinstance(active_provider_id, str)
@@ -141,6 +176,9 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             timeout_ms=timeout_ms,
             retry_policy=retry_policy,
             max_retries=max_retries,
+            retry_initial_delay_seconds=retry_initial_delay_seconds,
+            retry_max_delay_seconds=retry_max_delay_seconds,
+            retry_backoff_cap_retries=retry_backoff_cap_retries,
         )
 
     save_settings(current)

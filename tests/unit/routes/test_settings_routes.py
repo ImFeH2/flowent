@@ -73,6 +73,9 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "timeout_ms": 10000,
                 "retry_policy": "limited",
                 "max_retries": 5,
+                "retry_initial_delay_seconds": 0.5,
+                "retry_max_delay_seconds": 8.0,
+                "retry_backoff_cap_retries": 5,
                 "params": {
                     "reasoning_effort": None,
                     "verbosity": None,
@@ -91,6 +94,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                     "base_url": "https://api.example.com/v1",
                     "api_key": "secret",
                     "headers": {},
+                    "retry_429_delay_seconds": 0,
                 }
             ],
             "roles": [
@@ -112,6 +116,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "base_url": "https://api.example.com/v1",
                 "api_key": "secret",
                 "headers": {},
+                "retry_429_delay_seconds": 0,
             }
         ],
         "roles": [
@@ -538,6 +543,65 @@ def test_update_settings_accepts_model_timeout_ms(monkeypatch):
     assert settings.model.timeout_ms == 15000
     assert result["settings"]["model"]["timeout_ms"] == 15000
     assert saved == [settings]
+
+
+def test_update_settings_accepts_retry_backoff_fields(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                model={
+                    "retry_initial_delay_seconds": 0.75,
+                    "retry_max_delay_seconds": 12.0,
+                    "retry_backoff_cap_retries": 3,
+                },
+            )
+        )
+    )
+
+    assert settings.model.retry_initial_delay_seconds == 0.75
+    assert settings.model.retry_max_delay_seconds == 12.0
+    assert settings.model.retry_backoff_cap_retries == 3
+    assert result["settings"]["model"]["retry_initial_delay_seconds"] == 0.75
+    assert result["settings"]["model"]["retry_max_delay_seconds"] == 12.0
+    assert result["settings"]["model"]["retry_backoff_cap_retries"] == 3
+    assert saved == [settings]
+
+
+def test_update_settings_rejects_retry_backoff_when_max_below_initial(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(
+                    model={
+                        "retry_initial_delay_seconds": 1.5,
+                        "retry_max_delay_seconds": 1.0,
+                    },
+                )
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert (
+        excinfo.value.detail
+        == "model.retry_max_delay_seconds must be greater than or equal to model.retry_initial_delay_seconds"
+    )
 
 
 def test_update_settings_rejects_non_positive_model_timeout_ms(monkeypatch):

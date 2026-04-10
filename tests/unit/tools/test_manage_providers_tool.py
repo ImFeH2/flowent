@@ -37,6 +37,7 @@ def test_manage_providers_list_omits_api_keys(monkeypatch):
             "type": "openai_compatible",
             "base_url": "https://api.example.com/v1",
             "headers": {},
+            "retry_429_delay_seconds": 0,
         }
     ]
 
@@ -72,6 +73,7 @@ def test_manage_providers_create_persists_provider(monkeypatch):
     assert result["type"] == "openai_compatible"
     assert result["base_url"] == "https://api.example.com/v1"
     assert result["headers"] == {}
+    assert result["retry_429_delay_seconds"] == 0
     assert "api_key" not in result
     assert len(settings.providers) == 1
     assert settings.providers[0].name == "Test Provider"
@@ -139,6 +141,7 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
         "type": "openai_compatible",
         "base_url": "https://new.example.com/v1",
         "headers": {},
+        "retry_429_delay_seconds": 0,
     }
     assert settings.providers[0].name == "Old Name"
     assert settings.providers[0].type == "openai_compatible"
@@ -199,12 +202,15 @@ def test_manage_providers_update_persists_headers(monkeypatch):
                 "action": "update",
                 "id": "provider-1",
                 "headers": {"X-New": "next"},
+                "retry_429_delay_seconds": 4,
             },
         )
     )
 
     assert result["headers"] == {"X-New": "next"}
+    assert result["retry_429_delay_seconds"] == 4
     assert settings.providers[0].headers == {"X-New": "next"}
+    assert settings.providers[0].retry_429_delay_seconds == 4
 
 
 def test_manage_providers_rejects_non_string_header_values(monkeypatch):
@@ -225,6 +231,28 @@ def test_manage_providers_rejects_non_string_header_values(monkeypatch):
     )
 
     assert result == {"error": "headers must be a JSON object of string values"}
+
+
+def test_manage_providers_rejects_negative_retry_429_delay(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
+    monkeypatch.setattr("app.settings.get_settings", lambda: Settings())
+
+    result = json.loads(
+        ManageProvidersTool().execute(
+            agent,
+            {
+                "action": "create",
+                "name": "Test Provider",
+                "type": "openai_compatible",
+                "base_url": "https://api.example.com",
+                "retry_429_delay_seconds": -1,
+            },
+        )
+    )
+
+    assert result == {
+        "error": "retry_429_delay_seconds must be greater than or equal to 0"
+    }
 
 
 def test_manage_providers_update_rejects_unknown_provider(monkeypatch):

@@ -103,6 +103,9 @@ REMOVED_TOOL_NAMES = frozenset({"exit", "list_connections"})
 DEFAULT_LLM_TIMEOUT_MS = 10000
 DEFAULT_LLM_MAX_RETRIES = 5
 DEFAULT_LLM_RETRY_POLICY = "limited"
+DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS = 0.5
+DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS = 8.0
+DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES = 5
 
 
 @dataclass
@@ -118,6 +121,7 @@ class ProviderConfig:
     base_url: str
     api_key: str
     headers: dict[str, str] = field(default_factory=dict)
+    retry_429_delay_seconds: int = 0
 
 
 @dataclass
@@ -157,6 +161,9 @@ class ModelSettings:
     timeout_ms: int = DEFAULT_LLM_TIMEOUT_MS
     retry_policy: str = DEFAULT_LLM_RETRY_POLICY
     max_retries: int = DEFAULT_LLM_MAX_RETRIES
+    retry_initial_delay_seconds: float = DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS
+    retry_max_delay_seconds: float = DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS
+    retry_backoff_cap_retries: int = DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES
 
 
 @dataclass
@@ -382,6 +389,60 @@ def build_model_retry_policy(
     return retry_policy
 
 
+def build_model_retry_initial_delay_seconds(
+    raw_delay_seconds: object,
+    *,
+    field_name: str = "model.retry_initial_delay_seconds",
+) -> float:
+    if isinstance(raw_delay_seconds, bool) or not isinstance(
+        raw_delay_seconds, (int, float)
+    ):
+        raise ValueError(f"{field_name} must be a number")
+    delay_seconds = float(raw_delay_seconds)
+    if not isfinite(delay_seconds) or delay_seconds <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return delay_seconds
+
+
+def build_model_retry_max_delay_seconds(
+    raw_delay_seconds: object,
+    *,
+    field_name: str = "model.retry_max_delay_seconds",
+) -> float:
+    if isinstance(raw_delay_seconds, bool) or not isinstance(
+        raw_delay_seconds, (int, float)
+    ):
+        raise ValueError(f"{field_name} must be a number")
+    delay_seconds = float(raw_delay_seconds)
+    if not isfinite(delay_seconds) or delay_seconds <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return delay_seconds
+
+
+def build_model_retry_backoff_cap_retries(
+    raw_cap_retries: object,
+    *,
+    field_name: str = "model.retry_backoff_cap_retries",
+) -> int:
+    if isinstance(raw_cap_retries, bool) or not isinstance(raw_cap_retries, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if raw_cap_retries <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return raw_cap_retries
+
+
+def validate_model_retry_backoff_settings(
+    *,
+    retry_initial_delay_seconds: float,
+    retry_max_delay_seconds: float,
+) -> None:
+    if retry_max_delay_seconds < retry_initial_delay_seconds:
+        raise ValueError(
+            "model.retry_max_delay_seconds must be greater than or equal to "
+            "model.retry_initial_delay_seconds"
+        )
+
+
 def build_model_timeout_ms(
     raw_timeout_ms: object,
     *,
@@ -412,6 +473,18 @@ def build_provider_headers(
     return headers
 
 
+def build_provider_retry_429_delay_seconds(
+    raw_delay_seconds: object,
+    *,
+    field_name: str = "retry_429_delay_seconds",
+) -> int:
+    if isinstance(raw_delay_seconds, bool) or not isinstance(raw_delay_seconds, int):
+        raise ValueError(f"{field_name} must be an integer")
+    if raw_delay_seconds < 0:
+        raise ValueError(f"{field_name} must be greater than or equal to 0")
+    return raw_delay_seconds
+
+
 def _normalize_provider_headers(raw_headers: object) -> tuple[dict[str, str], bool]:
     if raw_headers is None:
         return {}, False
@@ -436,6 +509,7 @@ def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
         "base_url": provider.base_url,
         "api_key": provider.api_key,
         "headers": dict(provider.headers),
+        "retry_429_delay_seconds": provider.retry_429_delay_seconds,
     }
 
 
@@ -917,6 +991,51 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         except ValueError:
             model_max_retries = DEFAULT_LLM_MAX_RETRIES
             migrated = True
+    raw_retry_initial_delay_seconds = model_data.get("retry_initial_delay_seconds")
+    if raw_retry_initial_delay_seconds is None:
+        retry_initial_delay_seconds = DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS
+        migrated = True
+    else:
+        try:
+            retry_initial_delay_seconds = build_model_retry_initial_delay_seconds(
+                raw_retry_initial_delay_seconds
+            )
+        except ValueError:
+            retry_initial_delay_seconds = DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS
+            migrated = True
+    raw_retry_max_delay_seconds = model_data.get("retry_max_delay_seconds")
+    if raw_retry_max_delay_seconds is None:
+        retry_max_delay_seconds = DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS
+        migrated = True
+    else:
+        try:
+            retry_max_delay_seconds = build_model_retry_max_delay_seconds(
+                raw_retry_max_delay_seconds
+            )
+        except ValueError:
+            retry_max_delay_seconds = DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS
+            migrated = True
+    raw_retry_backoff_cap_retries = model_data.get("retry_backoff_cap_retries")
+    if raw_retry_backoff_cap_retries is None:
+        retry_backoff_cap_retries = DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES
+        migrated = True
+    else:
+        try:
+            retry_backoff_cap_retries = build_model_retry_backoff_cap_retries(
+                raw_retry_backoff_cap_retries
+            )
+        except ValueError:
+            retry_backoff_cap_retries = DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES
+            migrated = True
+    try:
+        validate_model_retry_backoff_settings(
+            retry_initial_delay_seconds=retry_initial_delay_seconds,
+            retry_max_delay_seconds=retry_max_delay_seconds,
+        )
+    except ValueError:
+        retry_initial_delay_seconds = DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS
+        retry_max_delay_seconds = DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS
+        migrated = True
     raw_model_timeout_ms = model_data.get("timeout_ms")
     if raw_model_timeout_ms is None:
         model_timeout_ms = DEFAULT_LLM_TIMEOUT_MS
@@ -934,6 +1053,9 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         timeout_ms=model_timeout_ms,
         retry_policy=model_retry_policy,
         max_retries=model_max_retries,
+        retry_initial_delay_seconds=retry_initial_delay_seconds,
+        retry_max_delay_seconds=retry_max_delay_seconds,
+        retry_backoff_cap_retries=retry_backoff_cap_retries,
     )
     custom_prompt = str(data.get("custom_prompt", ""))
     if "custom_post_prompt" in data:
@@ -952,6 +1074,18 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
             continue
         headers, headers_migrated = _normalize_provider_headers(provider.get("headers"))
         migrated = migrated or headers_migrated
+        raw_retry_429_delay_seconds = provider.get("retry_429_delay_seconds")
+        if raw_retry_429_delay_seconds is None:
+            retry_429_delay_seconds = 0
+            migrated = True
+        else:
+            try:
+                retry_429_delay_seconds = build_provider_retry_429_delay_seconds(
+                    raw_retry_429_delay_seconds
+                )
+            except ValueError:
+                retry_429_delay_seconds = 0
+                migrated = True
         providers.append(
             ProviderConfig(
                 id=str(provider.get("id", "")),
@@ -960,6 +1094,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
                 base_url=str(provider.get("base_url", "")),
                 api_key=str(provider.get("api_key", "")),
                 headers=headers,
+                retry_429_delay_seconds=retry_429_delay_seconds,
             )
         )
 

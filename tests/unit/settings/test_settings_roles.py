@@ -132,6 +132,35 @@ def test_load_settings_defaults_model_retry_policy(monkeypatch, tmp_path):
     assert persisted["model"]["retry_policy"] == "limited"
 
 
+def test_load_settings_defaults_retry_backoff_fields(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+
+    assert loaded.model.retry_initial_delay_seconds == 0.5
+    assert loaded.model.retry_max_delay_seconds == 8.0
+    assert loaded.model.retry_backoff_cap_retries == 5
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["model"]["retry_initial_delay_seconds"] == 0.5
+    assert persisted["model"]["retry_max_delay_seconds"] == 8.0
+    assert persisted["model"]["retry_backoff_cap_retries"] == 5
+
+
 def test_load_settings_defaults_model_timeout_ms(monkeypatch, tmp_path):
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
@@ -201,6 +230,39 @@ def test_load_settings_normalizes_provider_headers(monkeypatch, tmp_path):
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
     assert persisted["providers"][0]["headers"] == {"Authorization": "Bearer test"}
+
+
+def test_load_settings_defaults_provider_retry_429_delay_seconds(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [
+                    {
+                        "id": "provider-1",
+                        "name": "Primary",
+                        "type": "openai_compatible",
+                        "base_url": "https://api.example.com/v1",
+                        "api_key": "secret",
+                    }
+                ],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+
+    assert loaded.providers[0].retry_429_delay_seconds == 0
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["providers"][0]["retry_429_delay_seconds"] == 0
 
 
 def test_load_settings_drops_removed_exit_tool_from_roles(monkeypatch, tmp_path):

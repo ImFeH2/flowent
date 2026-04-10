@@ -44,8 +44,10 @@ def test_create_provider_normalizes_base_url(monkeypatch):
 
     assert result["base_url"] == "https://api.openai.com/v1"
     assert result["headers"] == {"Authorization": "Bearer override"}
+    assert result["retry_429_delay_seconds"] == 0
     assert settings.providers[0].base_url == "https://api.openai.com/v1"
     assert settings.providers[0].headers == {"Authorization": "Bearer override"}
+    assert settings.providers[0].retry_429_delay_seconds == 0
     assert saved == [settings]
     assert invalidations == ["invalidate"]
 
@@ -133,12 +135,17 @@ def test_update_provider_persists_headers(monkeypatch):
     result = asyncio.run(
         update_provider(
             "provider-1",
-            UpdateProviderRequest(headers={"X-New": "next"}),
+            UpdateProviderRequest(
+                headers={"X-New": "next"},
+                retry_429_delay_seconds=4,
+            ),
         )
     )
 
     assert result["headers"] == {"X-New": "next"}
+    assert result["retry_429_delay_seconds"] == 4
     assert settings.providers[0].headers == {"X-New": "next"}
+    assert settings.providers[0].retry_429_delay_seconds == 4
     assert saved == [settings]
     assert invalidations == ["invalidate"]
 
@@ -161,6 +168,28 @@ def test_create_provider_rejects_non_string_header_values(monkeypatch):
 
     assert exc.value.status_code == 400
     assert exc.value.detail == "headers must be a JSON object of string values"
+
+
+def test_create_provider_rejects_negative_retry_429_delay(monkeypatch):
+    monkeypatch.setattr("app.routes.providers_route.get_settings", lambda: Settings())
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            create_provider(
+                CreateProviderRequest(
+                    name="Primary",
+                    type="openai_compatible",
+                    base_url="https://api.example.com",
+                    api_key="secret",
+                    retry_429_delay_seconds=-1,
+                )
+            )
+        )
+
+    assert exc.value.status_code == 400
+    assert (
+        exc.value.detail == "retry_429_delay_seconds must be greater than or equal to 0"
+    )
 
 
 def test_list_provider_models_runs_gateway_in_threadpool(monkeypatch):

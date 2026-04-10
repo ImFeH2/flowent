@@ -183,6 +183,7 @@ export interface Provider {
   base_url: string;
   api_key: string;
   headers: Record<string, string>;
+  retry_429_delay_seconds: number;
 }
 
 export type RetryPolicy = "no_retry" | "limited" | "unlimited";

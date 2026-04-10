@@ -41,6 +41,9 @@ describe("SettingsPage", () => {
           timeout_ms: 10000,
           retry_policy: "limited",
           max_retries: 5,
+          retry_initial_delay_seconds: 0.5,
+          retry_max_delay_seconds: 8,
+          retry_backoff_cap_retries: 5,
           params: {
             reasoning_effort: null,
             verbosity: null,
@@ -59,11 +62,14 @@ describe("SettingsPage", () => {
     render(<SettingsPage />);
 
     const timeoutInput = await screen.findByLabelText("Request Timeout");
+    const initialDelayInput = screen.getByLabelText("Initial Delay");
 
     expect(timeoutInput).toHaveValue("10000");
     expect(screen.getByText("ms")).toBeInTheDocument();
+    expect(initialDelayInput).toHaveValue("0.5");
 
     fireEvent.change(timeoutInput, { target: { value: "15000" } });
+    fireEvent.change(initialDelayInput, { target: { value: "0.75" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
@@ -76,6 +82,9 @@ describe("SettingsPage", () => {
           timeout_ms: 15000,
           retry_policy: "limited",
           max_retries: 5,
+          retry_initial_delay_seconds: 0.75,
+          retry_max_delay_seconds: 8,
+          retry_backoff_cap_retries: 5,
           params: {
             reasoning_effort: null,
             verbosity: null,

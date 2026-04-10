@@ -45,6 +45,9 @@ interface UserSettings {
     timeout_ms: number;
     retry_policy: RetryPolicy;
     max_retries: number;
+    retry_initial_delay_seconds: number;
+    retry_max_delay_seconds: number;
+    retry_backoff_cap_retries: number;
     params: ModelParams;
   };
 }
@@ -138,6 +141,13 @@ export function SettingsPage() {
 
   const handleSave = async () => {
     if (!settings) return;
+    if (
+      settings.model.retry_max_delay_seconds <
+      settings.model.retry_initial_delay_seconds
+    ) {
+      toast.error("Max Delay must be greater than or equal to Initial Delay");
+      return;
+    }
     setSaving(true);
     try {
       await saveSettings({
@@ -494,6 +504,135 @@ export function SettingsPage() {
                     retries automatically up to the configured attempt count.
                     Unlimited keeps retrying transient failures until success,
                     interruption, or a non-transient error.
+                  </p>
+                </div>
+              </SettingsRow>
+
+              <SettingsRow
+                label="Retry Backoff"
+                description="Global exponential backoff"
+              >
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="retry-initial-delay"
+                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                      >
+                        Initial Delay
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="retry-initial-delay"
+                          aria-label="Initial Delay"
+                          type="text"
+                          inputMode="decimal"
+                          value={String(
+                            settings.model.retry_initial_delay_seconds,
+                          )}
+                          onChange={(e) => {
+                            const nextValue = e.target.value.trim();
+                            if (!/^\d+(\.\d+)?$/.test(nextValue)) {
+                              return;
+                            }
+                            const parsed = Number.parseFloat(nextValue);
+                            if (!Number.isFinite(parsed) || parsed <= 0) {
+                              return;
+                            }
+                            setSettings({
+                              ...settings,
+                              model: {
+                                ...settings.model,
+                                retry_initial_delay_seconds: parsed,
+                              },
+                            });
+                          }}
+                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        />
+                        <span className="text-[13px] font-medium text-white/40">
+                          s
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="retry-max-delay"
+                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                      >
+                        Max Delay
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="retry-max-delay"
+                          aria-label="Max Delay"
+                          type="text"
+                          inputMode="decimal"
+                          value={String(settings.model.retry_max_delay_seconds)}
+                          onChange={(e) => {
+                            const nextValue = e.target.value.trim();
+                            if (!/^\d+(\.\d+)?$/.test(nextValue)) {
+                              return;
+                            }
+                            const parsed = Number.parseFloat(nextValue);
+                            if (!Number.isFinite(parsed) || parsed <= 0) {
+                              return;
+                            }
+                            setSettings({
+                              ...settings,
+                              model: {
+                                ...settings.model,
+                                retry_max_delay_seconds: parsed,
+                              },
+                            });
+                          }}
+                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        />
+                        <span className="text-[13px] font-medium text-white/40">
+                          s
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="retry-backoff-cap-retries"
+                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                      >
+                        Cap Retries
+                      </label>
+                      <input
+                        id="retry-backoff-cap-retries"
+                        aria-label="Cap Retries"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={String(settings.model.retry_backoff_cap_retries)}
+                        onChange={(e) => {
+                          const nextValue = e.target.value.trim();
+                          if (!/^\d+$/.test(nextValue)) {
+                            return;
+                          }
+                          const parsed = Number.parseInt(nextValue, 10);
+                          if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+                            return;
+                          }
+                          setSettings({
+                            ...settings,
+                            model: {
+                              ...settings.model,
+                              retry_backoff_cap_retries: parsed,
+                            },
+                          });
+                        }}
+                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    Retries use exponential backoff from Initial Delay, stop
+                    doubling after Cap Retries, and never exceed Max Delay.
                   </p>
                 </div>
               </SettingsRow>

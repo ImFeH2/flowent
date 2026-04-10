@@ -28,7 +28,7 @@ from app.models import (
 )
 from app.providers.errors import LLMProviderError
 from app.registry import registry
-from app.settings import ModelSettings, Settings
+from app.settings import ModelSettings, ProviderConfig, Settings
 from app.workspace_store import workspace_store
 
 
@@ -416,6 +416,53 @@ def test_agent_retries_transient_errors_when_retry_policy_is_unlimited(monkeypat
         and entry.content == "Recovered after unlimited retries"
         for entry in agent.get_history_snapshot()
     )
+
+
+def test_get_llm_retry_delay_uses_configured_backoff_settings(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT))
+
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(
+            model=ModelSettings(
+                retry_initial_delay_seconds=0.75,
+                retry_max_delay_seconds=5.0,
+                retry_backoff_cap_retries=3,
+            )
+        ),
+    )
+
+    assert agent._get_llm_retry_delay(1) == 0.75
+    assert agent._get_llm_retry_delay(2) == 1.5
+    assert agent._get_llm_retry_delay(3) == 3.0
+    assert agent._get_llm_retry_delay(4) == 3.0
+
+
+def test_get_llm_retry_429_delay_uses_active_provider_only_for_429(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT, role_name="Worker"))
+
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-test",
+            ),
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Primary",
+                    type="openai_compatible",
+                    base_url="https://api.example.com/v1",
+                    api_key="secret",
+                    retry_429_delay_seconds=4,
+                )
+            ],
+        ),
+    )
+
+    assert agent._get_llm_retry_429_delay(429) == 4.0
+    assert agent._get_llm_retry_429_delay(500) == 0.0
 
 
 def test_clear_assistant_chat_history_drops_conversation_entries():

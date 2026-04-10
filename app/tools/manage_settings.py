@@ -15,6 +15,9 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
         "assistant": {
             "role_name": settings.assistant.role_name,
         },
+        "leader": {
+            "role_name": settings.leader.role_name,
+        },
         "model": {
             "active_provider_id": settings.model.active_provider_id,
             "active_model": settings.model.active_model,
@@ -37,9 +40,9 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
 class ManageSettingsTool(Tool):
     name = "manage_settings"
     description = (
-        "Read and update system settings, including the Assistant role, active "
-        "provider and model, default model params, event log timestamp format, "
-        "and other runtime defaults."
+        "Read and update system settings, including the Assistant role, Leader "
+        "role, active provider and model, default model params, event log "
+        "timestamp format, and other runtime defaults."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
@@ -56,6 +59,10 @@ class ManageSettingsTool(Tool):
             "assistant_role_name": {
                 "type": "string",
                 "description": "Role name used by the Assistant",
+            },
+            "leader_role_name": {
+                "type": "string",
+                "description": "Role name used by tab Leaders",
             },
             "active_model": {
                 "type": "string",
@@ -96,8 +103,8 @@ class ManageSettingsTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+        from app.graph_service import sync_assistant_role, sync_tab_leaders
         from app.providers.gateway import gateway
-        from app.registry import registry
         from app.settings import (
             build_default_model_params,
             build_model_max_retries,
@@ -110,6 +117,7 @@ class ManageSettingsTool(Tool):
 
         action = args.get("action")
         assistant_role_name = args.get("assistant_role_name")
+        leader_role_name = args.get("leader_role_name")
         active_provider_id = args.get("active_provider_id")
         active_model = args.get("active_model")
         timeout_ms = args.get("timeout_ms")
@@ -122,6 +130,8 @@ class ManageSettingsTool(Tool):
 
         if assistant_role_name is not None and not isinstance(assistant_role_name, str):
             return json.dumps({"error": "assistant_role_name must be a string"})
+        if leader_role_name is not None and not isinstance(leader_role_name, str):
+            return json.dumps({"error": "leader_role_name must be a string"})
         if active_provider_id is not None and not isinstance(active_provider_id, str):
             return json.dumps({"error": "active_provider_id must be a string"})
         if active_model is not None and not isinstance(active_model, str):
@@ -158,6 +168,13 @@ class ManageSettingsTool(Tool):
             if find_role(settings, next_role_name) is None:
                 return json.dumps({"error": f"Role '{next_role_name}' not found"})
             settings.assistant.role_name = next_role_name
+        if leader_role_name is not None:
+            next_role_name = leader_role_name.strip()
+            if not next_role_name:
+                return json.dumps({"error": "leader_role_name must not be empty"})
+            if find_role(settings, next_role_name) is None:
+                return json.dumps({"error": f"Role '{next_role_name}' not found"})
+            settings.leader.role_name = next_role_name
 
         if active_provider_id is not None:
             settings.model.active_provider_id = active_provider_id
@@ -185,14 +202,7 @@ class ManageSettingsTool(Tool):
             settings.event_log.timestamp_format = timestamp_format
 
         save_settings(settings)
-        assistant = registry.get_assistant()
-        if assistant is not None:
-            assistant.config.role_name = settings.assistant.role_name
-            assistant._sync_system_prompt_entry()
-            assistant.set_state(
-                assistant.state,
-                "assistant settings updated",
-                force_emit=True,
-            )
+        sync_assistant_role(reason="assistant settings updated")
+        sync_tab_leaders(reason="leader settings updated")
         gateway.invalidate_cache()
         return json.dumps(_serialize_settings(settings))

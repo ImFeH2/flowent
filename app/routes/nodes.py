@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.graph_service import is_tab_leader
 from app.registry import registry
 from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
@@ -29,6 +30,7 @@ async def list_nodes() -> dict:
             "state": assistant.state.value,
             "connections": assistant.get_connections_snapshot(),
             "name": assistant.config.name,
+            "is_leader": False,
             "todos": [t.serialize() for t in assistant.todos],
             "position": None,
         }
@@ -45,6 +47,7 @@ async def list_nodes() -> dict:
             "node_type": record.config.node_type.value,
             "tab_id": record.config.tab_id,
             "role_name": record.config.role_name,
+            "is_leader": is_tab_leader(node_id=record.id, tab_id=record.config.tab_id),
             "state": (live.state if live is not None else record.state).value,
             "connections": [
                 edge.to_node_id for edge in edges if edge.from_node_id == record.id
@@ -69,6 +72,7 @@ async def list_nodes() -> dict:
             "node_type": node.config.node_type.value,
             "tab_id": node.config.tab_id,
             "role_name": node.config.role_name,
+            "is_leader": is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id),
             "state": node.state.value,
             "connections": node.get_connections_snapshot(),
             "name": node.config.name,
@@ -117,6 +121,7 @@ async def get_node(node_id: str) -> dict:
         "node_type": target_config.node_type.value,
         "tab_id": target_config.tab_id,
         "role_name": target_config.role_name,
+        "is_leader": is_tab_leader(node_id=record_id, tab_id=target_config.tab_id),
         "state": record_state.value,
         "contacts": node.get_contact_ids_snapshot() if node is not None else [],
         "connections": (
@@ -146,6 +151,11 @@ async def terminate_node(node_id: str) -> dict:
 
     if node.config.node_type == NodeType.ASSISTANT:
         raise HTTPException(status_code=400, detail="Cannot terminate assistant")
+    if is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot terminate a tab Leader directly",
+        )
 
     node.request_termination("user_requested")
     return {"status": "terminating"}

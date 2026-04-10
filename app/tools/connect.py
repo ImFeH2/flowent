@@ -39,6 +39,8 @@ class ConnectTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
+        from app.graph_service import is_tab_leader
+
         from_ref = args.get("from")
         to_ref = args.get("to")
         bidirectional = args.get("bidirectional", False)
@@ -59,12 +61,16 @@ class ConnectTool(Tool):
 
         if not source.config.tab_id or source.config.tab_id != target.config.tab_id:
             return json.dumps({"error": "Both nodes must belong to the same tab"})
-        if agent.node_type != NodeType.ASSISTANT and (
-            not agent.config.tab_id or agent.config.tab_id != source.config.tab_id
-        ):
+        if agent.node_type == NodeType.ASSISTANT:
             return json.dumps(
-                {"error": "A graph node may only connect peers inside its own tab"}
+                {"error": "Assistant may not rewire a tab graph directly"}
             )
+        if not agent.config.tab_id or agent.config.tab_id != source.config.tab_id:
+            return json.dumps(
+                {"error": "A tab Leader may only connect peers inside its own tab"}
+            )
+        if not is_tab_leader(node_id=agent.uuid, tab_id=agent.config.tab_id):
+            return json.dumps({"error": "Only a tab Leader may connect task nodes"})
 
         connected = [[source.uuid, target.uuid]]
         connect_nodes(source.uuid, target.uuid)

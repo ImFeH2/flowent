@@ -15,6 +15,7 @@ describe("AssistantChatMessages", () => {
         {
           id: "worker-1",
           node_type: "agent",
+          is_leader: false,
           state: "running",
           connections: [],
           name: "Project Analyst",

@@ -20,6 +20,7 @@ function buildDetail(history: HistoryEntry[] = []): NodeDetail {
   return {
     id: "assistant",
     node_type: "assistant",
+    is_leader: false,
     state: "idle",
     name: null,
     contacts: [],
@@ -37,6 +38,7 @@ function buildNode(): Node {
   return {
     id: "assistant",
     node_type: "assistant",
+    is_leader: false,
     state: "idle",
     connections: [],
     name: null,

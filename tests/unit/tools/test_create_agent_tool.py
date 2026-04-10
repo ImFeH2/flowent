@@ -51,7 +51,7 @@ def test_create_agent_defaults_to_current_tab(monkeypatch):
             write_dirs=["/tmp/workspace"],
             allow_network=False,
         ),
-        uuid="owner",
+        uuid=tab.leader_id,
     )
     registry.register(owner)
 
@@ -83,7 +83,7 @@ def test_create_agent_rejects_cross_tab_creation_for_non_assistant(monkeypatch):
             tab_id=tab.id,
             tools=["create_agent"],
         ),
-        uuid="owner",
+        uuid=tab.leader_id,
     )
 
     result = json.loads(
@@ -96,10 +96,10 @@ def test_create_agent_rejects_cross_tab_creation_for_non_assistant(monkeypatch):
         )
     )
 
-    assert result == {"error": "A graph node may only create peers inside its own tab"}
+    assert result == {"error": "A tab Leader may only create peers inside its own tab"}
 
 
-def test_create_agent_restricts_assistant_to_conductor_owner(monkeypatch):
+def test_create_agent_rejects_assistant_for_ordinary_nodes(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
@@ -127,12 +127,39 @@ def test_create_agent_restricts_assistant_to_conductor_owner(monkeypatch):
         )
     )
 
-    assert result == {
-        "error": "Assistant may only create a tab's Conductor owner directly"
-    }
+    assert result == {"error": "Assistant may not create ordinary task nodes directly"}
 
 
-def test_create_agent_allows_assistant_to_create_conductor_owner(monkeypatch):
+def test_create_agent_rejects_non_leader_task_node(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
+    )
+    tab = create_tab(title="Task", goal="Do work")
+
+    worker = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Worker",
+            tab_id=tab.id,
+            tools=["create_agent"],
+        ),
+        uuid="worker",
+    )
+
+    result = json.loads(
+        CreateAgentTool().execute(
+            worker,
+            {
+                "role_name": "Worker",
+            },
+        )
+    )
+
+    assert result == {"error": "Only a tab Leader may create ordinary task nodes"}
+
+
+def test_create_agent_rejects_reserved_conductor_role(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
@@ -141,29 +168,30 @@ def test_create_agent_allows_assistant_to_create_conductor_owner(monkeypatch):
     )
     tab = create_tab(title="Task", goal="Do work")
 
-    assistant = Agent(
+    leader = Agent(
         NodeConfig(
-            node_type=NodeType.ASSISTANT,
-            role_name="Steward",
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            tab_id=tab.id,
             tools=["create_agent"],
         ),
-        uuid="assistant",
+        uuid=tab.leader_id,
     )
+    registry.register(leader)
 
     result = json.loads(
         CreateAgentTool().execute(
-            assistant,
+            leader,
             {
-                "tab_id": tab.id,
                 "role_name": f" {CONDUCTOR_ROLE_NAME} ",
                 "name": "Task Conductor",
             },
         )
     )
 
-    assert result["config"]["role_name"] == CONDUCTOR_ROLE_NAME
-    assert result["config"]["tab_id"] == tab.id
-    assert result["config"]["name"] == "Task Conductor"
+    assert result == {
+        "error": f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a tab Leader"
+    }
 
 
 def test_create_agent_respects_write_dir_and_network_boundaries(monkeypatch, tmp_path):
@@ -176,17 +204,18 @@ def test_create_agent_respects_write_dir_and_network_boundaries(monkeypatch, tmp
     allowed_dir.mkdir()
     disallowed_dir = tmp_path / "disallowed"
     disallowed_dir.mkdir()
+    tab = create_tab(title="Task", goal="Do work")
 
     owner = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
             role_name="Conductor",
-            tab_id=create_tab(title="Task", goal="Do work").id,
+            tab_id=tab.id,
             tools=["create_agent"],
             write_dirs=[str(allowed_dir)],
             allow_network=False,
         ),
-        uuid="owner",
+        uuid=tab.leader_id,
     )
 
     write_dir_result = json.loads(

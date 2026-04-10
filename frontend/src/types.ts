@@ -38,6 +38,7 @@ export interface Node {
   id: string;
   node_type: NodeType;
   tab_id?: string | null;
+  is_leader: boolean;
   state: AgentState;
   connections: string[];
   name: string | null;
@@ -99,6 +100,7 @@ export interface NodeDetail {
   id: string;
   node_type: NodeType;
   tab_id?: string | null;
+  is_leader: boolean;
   state: AgentState;
   name: string | null;
   contacts: string[];
@@ -119,6 +121,7 @@ export interface TaskTab {
   id: string;
   title: string;
   goal: string;
+  leader_id?: string | null;
   created_at: number;
   updated_at: number;
   node_count?: number;

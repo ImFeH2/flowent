@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.settings import (
     AssistantSettings,
     EventLogSettings,
+    LeaderSettings,
     ModelSettings,
     TelegramApprovedChat,
     TelegramSettings,
@@ -50,6 +51,7 @@ async def get_settings_api() -> dict[str, object]:
 class UpdateSettingsRequest(BaseModel):
     assistant: dict[str, object] | None = None
     event_log: dict[str, object] | None = None
+    leader: dict[str, object] | None = None
     model: dict[str, object] | None = None
 
 
@@ -59,8 +61,8 @@ class UpdateTelegramSettingsRequest(BaseModel):
 
 @router.post("/api/settings")
 async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
+    from app.graph_service import sync_assistant_role, sync_tab_leaders
     from app.providers.gateway import gateway
-    from app.registry import registry
 
     current = get_settings()
 
@@ -77,6 +79,20 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 detail=f"Role '{next_role_name}' not found",
             )
         current.assistant = AssistantSettings(role_name=next_role_name)
+
+    if req.leader is not None:
+        role_name = req.leader.get("role_name", current.leader.role_name)
+        next_role_name = (
+            role_name if isinstance(role_name, str) else current.leader.role_name
+        ).strip()
+        if not next_role_name:
+            next_role_name = current.leader.role_name
+        if find_role(current, next_role_name) is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Role '{next_role_name}' not found",
+            )
+        current.leader = LeaderSettings(role_name=next_role_name)
 
     if req.event_log is not None:
         timestamp_format = req.event_log.get("timestamp_format")
@@ -120,15 +136,8 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         )
 
     save_settings(current)
-    assistant = registry.get_assistant()
-    if assistant is not None:
-        assistant.config.role_name = current.assistant.role_name
-        assistant._sync_system_prompt_entry()
-        assistant.set_state(
-            assistant.state,
-            "assistant settings updated",
-            force_emit=True,
-        )
+    sync_assistant_role(reason="assistant settings updated")
+    sync_tab_leaders(reason="leader settings updated")
     gateway.invalidate_cache()
     logger.info("Settings updated")
     return {"status": "saved", "settings": serialize_settings(current)}

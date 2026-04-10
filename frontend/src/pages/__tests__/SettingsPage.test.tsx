@@ -34,6 +34,7 @@ describe("SettingsPage", () => {
     fetchSettingsBootstrap.mockResolvedValue({
       settings: {
         assistant: { role_name: "Steward" },
+        leader: { role_name: "Conductor" },
         model: {
           active_provider_id: "",
           active_model: "",
@@ -66,6 +67,7 @@ describe("SettingsPage", () => {
     await waitFor(() =>
       expect(saveSettings).toHaveBeenCalledWith({
         assistant: { role_name: "Steward" },
+        leader: { role_name: "Conductor" },
         model: {
           active_provider_id: "",
           active_model: "",

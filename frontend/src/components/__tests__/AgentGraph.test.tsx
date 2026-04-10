@@ -11,7 +11,6 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentGraph } from "@/components/AgentGraph";
-import { getAgentNodeWidth } from "@/lib/layout";
 import type { Node, TaskTab } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
@@ -184,6 +183,7 @@ function buildNode(overrides: Partial<Node>): Node {
     id: "node",
     node_type: "agent",
     tab_id: "tab-1",
+    is_leader: false,
     state: "idle",
     connections: [],
     name: null,
@@ -198,6 +198,7 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     id: "tab-1",
     title: "Research Task",
     goal: "Inspect the repository",
+    leader_id: "leader-1",
     created_at: 1,
     updated_at: 1,
     ...overrides,
@@ -247,7 +248,7 @@ afterEach(() => {
 });
 
 describe("AgentGraph", () => {
-  it("renders active tab agent nodes using role_name and sizes width to fit the label", async () => {
+  it("renders active tab agent nodes using role_name", async () => {
     renderGraph([
       buildNode({
         id: "assistant",
@@ -266,9 +267,7 @@ describe("AgentGraph", () => {
     expect(screen.queryByText("Assistant")).not.toBeInTheDocument();
 
     const workerNode = screen.getByTestId("node-worker-1").firstElementChild;
-    expect(workerNode).toHaveStyle({
-      width: `${getAgentNodeWidth("Worker")}px`,
-    });
+    expect(workerNode).toHaveClass("w-max");
     expect(workerNode).toHaveClass("h-14");
   });
 

@@ -28,6 +28,10 @@ export function getNodeLabel(
     return clampLabel(name, maxLength);
   }
 
+  if (node?.is_leader) {
+    return clampLabel("Leader", maxLength);
+  }
+
   const roleName = node?.role_name?.trim();
   if (roleName) {
     return clampLabel(roleName, maxLength);

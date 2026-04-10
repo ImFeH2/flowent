@@ -5,6 +5,7 @@ from app.models import NodeConfig, NodeType
 from app.settings import (
     AssistantSettings,
     EventLogSettings,
+    LeaderSettings,
     ModelSettings,
     RoleConfig,
     Settings,
@@ -16,6 +17,7 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(
         assistant=AssistantSettings(role_name="Steward"),
+        leader=LeaderSettings(role_name="Conductor"),
         event_log=EventLogSettings(timestamp_format="relative"),
         model=ModelSettings(active_provider_id="provider-1", active_model="gpt-4o"),
     )
@@ -27,6 +29,9 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
     assert result == {
         "assistant": {
             "role_name": "Steward",
+        },
+        "leader": {
+            "role_name": "Conductor",
         },
         "model": {
             "active_provider_id": "provider-1",
@@ -123,6 +128,37 @@ def test_manage_settings_update_changes_assistant_role(monkeypatch):
     assert saved == [settings]
 
 
+def test_manage_settings_update_changes_leader_role(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings(
+        roles=[
+            RoleConfig(name="Conductor", system_prompt="Default leader role."),
+            RoleConfig(name="Reviewer", system_prompt="Review carefully."),
+        ]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "leader_role_name": "Reviewer",
+            },
+        )
+    )
+
+    assert result["leader"] == {"role_name": "Reviewer"}
+    assert settings.leader.role_name == "Reviewer"
+    assert saved == [settings]
+
+
 def test_manage_settings_update_changes_max_retries(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
@@ -198,6 +234,25 @@ def test_manage_settings_update_rejects_unknown_assistant_role(monkeypatch):
             {
                 "action": "update",
                 "assistant_role_name": "Ghost",
+            },
+        )
+    )
+
+    assert result == {"error": "Role 'Ghost' not found"}
+
+
+def test_manage_settings_update_rejects_unknown_leader_role(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings(roles=[RoleConfig(name="Conductor", system_prompt="Default.")])
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "leader_role_name": "Ghost",
             },
         )
     )

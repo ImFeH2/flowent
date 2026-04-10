@@ -50,6 +50,7 @@ function buildAssistantNode(state: Node["state"] = "running"): Node {
   return {
     id: "assistant",
     node_type: "assistant",
+    is_leader: false,
     state,
     connections: [],
     name: null,
@@ -62,6 +63,7 @@ function buildDetail(history: HistoryEntry[]): NodeDetail {
   return {
     id: "assistant",
     node_type: "assistant",
+    is_leader: false,
     state: "running",
     name: null,
     contacts: [],

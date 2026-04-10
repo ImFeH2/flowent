@@ -8,8 +8,10 @@ from app.graph_service import (
     create_edge,
     create_tab,
     delete_tab,
+    is_tab_leader,
     list_tab_edges,
     list_tab_nodes,
+    serialize_tab_summary,
 )
 from app.workspace_store import workspace_store
 
@@ -37,16 +39,7 @@ class CreateTabEdgeRequest(BaseModel):
 @router.get("/api/tabs")
 async def list_tabs() -> dict[str, object]:
     tabs = workspace_store.list_tabs()
-    return {
-        "tabs": [
-            {
-                **tab.serialize(),
-                "node_count": len(list_tab_nodes(tab.id)),
-                "edge_count": len(list_tab_edges(tab.id)),
-            }
-            for tab in tabs
-        ]
-    }
+    return {"tabs": [serialize_tab_summary(tab) for tab in tabs]}
 
 
 @router.post("/api/tabs")
@@ -55,7 +48,7 @@ async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
     if not title:
         raise HTTPException(status_code=400, detail="title must not be empty")
     tab = create_tab(title=title, goal=req.goal)
-    return tab.serialize()
+    return serialize_tab_summary(tab)
 
 
 @router.get("/api/tabs/{tab_id}")
@@ -73,6 +66,7 @@ async def get_tab(tab_id: str) -> dict[str, object]:
                 "node_type": node.config.node_type.value,
                 "tab_id": node.config.tab_id,
                 "role_name": node.config.role_name,
+                "is_leader": is_tab_leader(node_id=node.id, tab_id=tab_id),
                 "state": node.state.value,
                 "connections": [
                     edge.to_node_id for edge in edges if edge.from_node_id == node.id

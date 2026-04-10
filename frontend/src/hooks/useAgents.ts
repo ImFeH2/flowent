@@ -22,6 +22,7 @@ export function useAgents() {
       const data = event.data as unknown as {
         node_type: Node["node_type"];
         tab_id?: string | null;
+        is_leader?: boolean;
         role_name?: string | null;
         name?: string | null;
       };
@@ -31,6 +32,7 @@ export function useAgents() {
           id: event.agent_id,
           node_type: data.node_type,
           tab_id: data.tab_id ?? null,
+          is_leader: data.is_leader ?? false,
           role_name: data.role_name ?? null,
           state: "initializing",
           connections: [],
@@ -50,6 +52,7 @@ export function useAgents() {
         const todos = event.data.todos as Node["todos"] | undefined;
         const roleName = event.data.role_name as Node["role_name"] | undefined;
         const tabId = event.data.tab_id as Node["tab_id"] | undefined;
+        const isLeader = event.data.is_leader as Node["is_leader"] | undefined;
         const name = event.data.name as Node["name"] | undefined;
         next.set(event.agent_id, {
           ...node,
@@ -58,6 +61,7 @@ export function useAgents() {
               ? (event.data.new_state as Node["state"])
               : node.state,
           tab_id: tabId ?? node.tab_id,
+          is_leader: isLeader ?? node.is_leader,
           role_name: roleName ?? node.role_name,
           name: name ?? node.name,
           todos: todos ?? node.todos,

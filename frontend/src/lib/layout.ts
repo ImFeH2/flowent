@@ -9,12 +9,25 @@ const LAYOUT_COMPONENT_GAP_Y = 140;
 const LAYOUT_GRID_GAP_X = 40;
 const LAYOUT_GRID_GAP_Y = 40;
 
+const NARROW_CHARS = /^[il1.,!|:;]$/;
+const SEMI_NARROW_CHARS = /^[fjrt\-[\]()]$/;
+const WIDE_CHARS = /^[wmMWOQ@]$/;
+const UPPERCASE_CHARS = /^[A-Z]$/;
+
 export function getAgentNodeWidth(label: string): number {
   const textWidth = Array.from(label).reduce((total, char) => {
     if (char === " ") {
       return total + 4;
     }
-    return total + (char.charCodeAt(0) > 255 ? 14 : 8);
+    const code = char.charCodeAt(0);
+    if (code > 255) {
+      return total + 13;
+    }
+    if (NARROW_CHARS.test(char)) return total + 4;
+    if (SEMI_NARROW_CHARS.test(char)) return total + 5.5;
+    if (WIDE_CHARS.test(char)) return total + 10.5;
+    if (UPPERCASE_CHARS.test(char)) return total + 8.5;
+    return total + 7;
   }, 0);
 
   return Math.max(

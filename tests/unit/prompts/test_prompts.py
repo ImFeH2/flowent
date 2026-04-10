@@ -297,22 +297,15 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert "## Tools Available" not in prompt
     assert "create_tab" in STEWARD_ROLE_SYSTEM_PROMPT
     assert "delete_tab" in STEWARD_ROLE_SYSTEM_PROMPT
-    assert "create_agent" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "Creating a tab also creates its bound Leader" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "If the target tab does not yet have a Conductor owner"
-        in STEWARD_ROLE_SYSTEM_PROMPT
-    )
-    assert (
-        "Do not directly assign execution work to a Worker as the default path."
+        "Do not directly assign execution work to a Worker or other ordinary task node as the default path."
         in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert (
         "task brief, not a raw copy of the Human's text" in STEWARD_ROLE_SYSTEM_PROMPT
     )
-    assert (
-        "ensure it has a Conductor owner, and hand the execution brief to that Conductor"
-        in STEWARD_ROLE_SYSTEM_PROMPT
-    )
+    assert "hand the execution brief to that tab's Leader" in STEWARD_ROLE_SYSTEM_PROMPT
     assert "call `idle` in the same response" in prompt
     assert "Do not repeat or restate a Human-facing reply" in prompt
 
@@ -345,7 +338,7 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     assert LIST_TOOLS_TOOL_GUIDANCE in prompt
     assert "## Tools Available" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert (
-        "You are the only owner-level Conductor for this tab"
+        "This role is the default behavior template for a tab's Leader"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (

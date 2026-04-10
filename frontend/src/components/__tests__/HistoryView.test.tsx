@@ -28,6 +28,7 @@ describe("HistoryView", () => {
         {
           id: "agent-12345678",
           node_type: "agent",
+          is_leader: false,
           state: "idle",
           connections: [],
           name: "Directory Analyzer",

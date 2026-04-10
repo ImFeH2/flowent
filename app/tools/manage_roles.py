@@ -17,19 +17,11 @@ def _find_role_by_name(roles: list[RoleConfig], role_name: str) -> RoleConfig | 
     return None
 
 
-def _sync_running_assistant_role(role_name: str) -> None:
-    from app.registry import registry
+def _sync_running_system_roles() -> None:
+    from app.graph_service import sync_assistant_role, sync_tab_leaders
 
-    assistant = registry.get_assistant()
-    if assistant is None:
-        return
-    assistant.config.role_name = role_name
-    assistant._sync_system_prompt_entry()
-    assistant.set_state(
-        assistant.state,
-        "assistant role updated",
-        force_emit=True,
-    )
+    sync_assistant_role(reason="assistant role updated")
+    sync_tab_leaders(reason="leader role updated")
 
 
 def _resolve_role_model(
@@ -349,7 +341,7 @@ class ManageRolesTool(Tool):
             target_role.included_tools = next_included
             target_role.excluded_tools = next_excluded
             save_settings(settings)
-            _sync_running_assistant_role(settings.assistant.role_name)
+            _sync_running_system_roles()
             gateway.invalidate_cache()
             return json.dumps(serialize_role(target_role))
 
@@ -370,7 +362,7 @@ class ManageRolesTool(Tool):
             ]
             clear_role_references(settings, role_name)
             save_settings(settings)
-            _sync_running_assistant_role(settings.assistant.role_name)
+            _sync_running_system_roles()
             gateway.invalidate_cache()
             return json.dumps({"status": "deleted"})
 

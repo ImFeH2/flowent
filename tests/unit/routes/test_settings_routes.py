@@ -35,6 +35,7 @@ def test_get_settings_returns_assistant_configuration(monkeypatch):
     result = asyncio.run(get_settings_api())
 
     assert result["assistant"] == {"role_name": "Steward"}
+    assert result["leader"] == {"role_name": "Conductor"}
 
 
 def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
@@ -60,6 +61,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
         "settings": {
             "event_log": {"timestamp_format": "absolute"},
             "assistant": {"role_name": "Steward"},
+            "leader": {"role_name": "Conductor"},
             "telegram": {
                 "bot_token": "",
                 "pending_chats": [],
@@ -535,6 +537,32 @@ def test_update_settings_persists_assistant_role(monkeypatch):
     assert saved == [settings]
 
 
+def test_update_settings_persists_leader_role(monkeypatch):
+    settings = Settings(
+        roles=[
+            RoleConfig(name="Conductor", system_prompt="Default leader role."),
+            RoleConfig(name="Reviewer", system_prompt="Review carefully."),
+        ]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(leader={"role_name": "Reviewer"}),
+        )
+    )
+
+    assert settings.leader.role_name == "Reviewer"
+    assert result["settings"]["leader"] == {"role_name": "Reviewer"}
+    assert saved == [settings]
+
+
 def test_update_settings_rejects_unknown_assistant_role(monkeypatch):
     settings = Settings(
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
@@ -546,6 +574,22 @@ def test_update_settings_rejects_unknown_assistant_role(monkeypatch):
         asyncio.run(
             update_settings(
                 UpdateSettingsRequest(assistant={"role_name": "Ghost"}),
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Role 'Ghost' not found"
+
+
+def test_update_settings_rejects_unknown_leader_role(monkeypatch):
+    settings = Settings(roles=[RoleConfig(name="Conductor", system_prompt="Default.")])
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(leader={"role_name": "Ghost"}),
             )
         )
 

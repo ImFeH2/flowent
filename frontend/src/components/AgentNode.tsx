@@ -3,8 +3,8 @@ import { motion } from "motion/react";
 import { useRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import {
+  getNodeIconStyle,
   nodeTypeIcon,
-  nodeTypeIconStyle,
   stateBorder,
   stateColor,
   stateRing,
@@ -15,6 +15,7 @@ interface AgentNodeData {
   label: string;
   width: number;
   node_type: NodeType;
+  is_leader: boolean;
   state: AgentState;
   shortId: string;
   name: string | null;
@@ -31,8 +32,8 @@ interface AgentNodeData {
 export function AgentNode({ data }: NodeProps) {
   const {
     label,
-    width,
     node_type,
+    is_leader,
     state,
     latestTodo,
     selected,
@@ -98,7 +99,7 @@ export function AgentNode({ data }: NodeProps) {
       onMouseMove={(event) => updateMouseEffect(event.clientX, event.clientY)}
       onMouseLeave={resetMouseEffect}
       className={cn(
-        "relative isolate flex h-14 min-w-0 items-center gap-2 overflow-visible rounded-[10px] border px-2.5 py-2.5",
+        "relative isolate flex h-14 w-max min-w-[100px] max-w-[300px] items-center gap-2 overflow-visible rounded-[10px] border px-2.5 py-2.5",
         "shadow-[0_10px_24px_rgba(0,0,0,0.24)]",
         "bg-graph-node-bg",
         "transition-[border-color] duration-300",
@@ -107,7 +108,6 @@ export function AgentNode({ data }: NodeProps) {
       )}
       style={
         {
-          width: `${width}px`,
           "--mouse-angle": "135deg",
           "--mouse-intensity": "0",
         } as CSSProperties
@@ -137,7 +137,7 @@ export function AgentNode({ data }: NodeProps) {
       <div
         className={cn(
           "relative z-10 flex size-8 shrink-0 items-center justify-center border",
-          nodeTypeIconStyle[node_type],
+          getNodeIconStyle(node_type, is_leader),
         )}
       >
         <Icon className="size-4.5" />
@@ -145,7 +145,7 @@ export function AgentNode({ data }: NodeProps) {
 
       <div className="relative z-10 flex min-w-0 flex-1 items-center justify-between gap-2">
         <span
-          className="truncate text-[13px] font-semibold text-foreground -translate-y-[0.5px]"
+          className="truncate text-[13px] font-semibold text-foreground -translate-y-[0.7px]"
           title={latestTodo ?? undefined}
         >
           {label}

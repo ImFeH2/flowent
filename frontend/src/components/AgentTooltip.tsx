@@ -25,6 +25,7 @@ export function AgentTooltip({
         name: agent.name,
         roleName: agent.role_name,
         nodeType: agent.node_type,
+        isLeader: agent.is_leader,
       })
     : null;
 
@@ -52,6 +53,14 @@ export function AgentTooltip({
               {agent.role_name ? (
                 <Badge variant="outline" className="text-[10px]">
                   {agent.role_name}
+                </Badge>
+              ) : null}
+              {agent.is_leader ? (
+                <Badge
+                  variant="outline"
+                  className="border-amber-300/24 bg-amber-300/[0.08] text-[10px] text-amber-100"
+                >
+                  Leader
                 </Badge>
               ) : null}
             </div>

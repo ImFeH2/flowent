@@ -9,6 +9,38 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "../app/static"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+          if (
+            id.includes("/@xyflow/") ||
+            id.includes("/@dagrejs/") ||
+            id.includes("/react-rnd/")
+          ) {
+            return "graph-vendor";
+          }
+          if (id.includes("/react-markdown/") || id.includes("/remark-gfm/")) {
+            return "markdown-vendor";
+          }
+          if (
+            id.includes("/motion/") ||
+            id.includes("/lucide-react/") ||
+            id.includes("/sonner/") ||
+            id.includes("/@radix-ui/") ||
+            id.includes("/react-resizable-panels/")
+          ) {
+            return "ui-vendor";
+          }
+          if (id.includes("/react/") || id.includes("/react-dom/")) {
+            return "react-vendor";
+          }
+          return undefined;
+        },
+      },
+    },
   },
   resolve: {
     alias: {

@@ -30,6 +30,9 @@ interface UserSettings {
   assistant: {
     role_name: string;
   };
+  leader: {
+    role_name: string;
+  };
   model: {
     active_provider_id: string;
     active_model: string;
@@ -131,6 +134,7 @@ export function SettingsPage() {
     try {
       await saveSettings({
         assistant: settings.assistant,
+        leader: settings.leader,
         model: settings.model,
       });
       toast.success("Settings saved");
@@ -180,6 +184,42 @@ export function SettingsPage() {
                     setSettings({
                       ...settings,
                       assistant: {
+                        role_name: value,
+                      },
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.name} value={role.name}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </SettingsRow>
+            </div>
+          </section>
+
+          <section className="mt-8 border-t border-white/6 pt-8">
+            <SectionHeader
+              title="Leader Configuration"
+              description="Choose the default role used by each task tab's bound leader."
+            />
+            <div>
+              <SettingsRow
+                label="Leader Role"
+                description="Default tab owner role"
+              >
+                <Select
+                  value={settings.leader.role_name}
+                  onValueChange={(value) =>
+                    setSettings({
+                      ...settings,
+                      leader: {
                         role_name: value,
                       },
                     })

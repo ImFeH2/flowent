@@ -19,6 +19,9 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     tab_id = tab["id"]
     assert tab["title"] == "Review Task"
     assert tab["goal"] == "Inspect changed files"
+    assert tab["node_count"] == 1
+    assert tab["edge_count"] == 0
+    assert isinstance(tab["leader_id"], str)
 
     reader_response = client.post(
         f"/api/tabs/{tab_id}/nodes",
@@ -54,7 +57,11 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     assert tab_detail_response.status_code == 200
     tab_detail = tab_detail_response.json()
     assert tab_detail["tab"]["id"] == tab_id
-    assert {node["name"] for node in tab_detail["nodes"]} == {"Reader", "Writer"}
+    assert {node["name"] for node in tab_detail["nodes"]} == {
+        "Leader",
+        "Reader",
+        "Writer",
+    }
     assert tab_detail["edges"] == [edge]
 
     nodes_response = client.get("/api/nodes")
@@ -74,7 +81,9 @@ def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     )
 
     assert create_tab_response.status_code == 200
-    tab_id = create_tab_response.json()["id"]
+    created_tab = create_tab_response.json()
+    tab_id = created_tab["id"]
+    leader_id = created_tab["leader_id"]
 
     left_response = client.post(
         f"/api/tabs/{tab_id}/nodes",
@@ -100,7 +109,11 @@ def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
 
     assert delete_response.status_code == 200
     assert delete_response.json()["id"] == tab_id
-    assert set(delete_response.json()["removed_node_ids"]) == {left_id, right_id}
+    assert set(delete_response.json()["removed_node_ids"]) == {
+        leader_id,
+        left_id,
+        right_id,
+    }
     assert delete_response.json()["removed_edge_ids"] == [edge_id]
 
     tab_detail_response = client.get(f"/api/tabs/{tab_id}")
@@ -113,7 +126,9 @@ def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     assert right_id not in node_ids
 
 
-def test_create_tab_rejects_second_conductor_owner(client: TestClient):
+def test_create_tab_rejects_reserved_conductor_role_for_regular_nodes(
+    client: TestClient,
+):
     create_tab_response = client.post(
         "/api/tabs",
         json={"title": "Execution", "goal": "Coordinate work"},
@@ -122,18 +137,12 @@ def test_create_tab_rejects_second_conductor_owner(client: TestClient):
     assert create_tab_response.status_code == 200
     tab_id = create_tab_response.json()["id"]
 
-    first_conductor = client.post(
+    reserved_role_response = client.post(
         f"/api/tabs/{tab_id}/nodes",
         json={"role_name": "Conductor", "name": "Main Conductor"},
     )
-    duplicate_conductor = client.post(
-        f"/api/tabs/{tab_id}/nodes",
-        json={"role_name": "Conductor", "name": "Backup Conductor"},
-    )
 
-    assert first_conductor.status_code == 200
-    assert duplicate_conductor.status_code == 400
-    assert (
-        duplicate_conductor.json()["detail"]
-        == f"Tab '{tab_id}' already has a Conductor owner"
+    assert reserved_role_response.status_code == 400
+    assert reserved_role_response.json()["detail"] == (
+        "Role 'Conductor' is reserved for a tab Leader"
     )

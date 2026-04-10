@@ -9,6 +9,7 @@ class Tab:
     id: str
     title: str
     goal: str = ""
+    leader_id: str | None = None
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -17,6 +18,7 @@ class Tab:
             "id": self.id,
             "title": self.title,
             "goal": self.goal,
+            "leader_id": self.leader_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -29,6 +31,9 @@ class Tab:
             id=str(data.get("id", "")),
             title=str(data.get("title", "")),
             goal=str(data.get("goal", "")),
+            leader_id=str(data["leader_id"])
+            if isinstance(data.get("leader_id"), str)
+            else None,
             created_at=created_at
             if isinstance(created_at, (int, float))
             else time.time(),

@@ -15,7 +15,6 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Radio,
-  SendHorizontal,
   Shield,
   Trash2,
   X,
@@ -54,7 +53,6 @@ import {
   createTabNodeRequest,
   createTabRequest,
   deleteTabRequest,
-  dispatchNodeMessageRequest,
   interruptNode,
 } from "@/lib/api";
 import { toast } from "sonner";
@@ -96,7 +94,6 @@ type WorkspaceDialogKind =
   | "create-tab"
   | "create-agent"
   | "connect-agents"
-  | "send-task"
   | "delete-tab"
   | null;
 
@@ -128,7 +125,6 @@ export function HomePage() {
   const [createAgentName, setCreateAgentName] = useState("");
   const [connectSourceId, setConnectSourceId] = useState("");
   const [connectTargetId, setConnectTargetId] = useState("");
-  const [taskMessageDraft, setTaskMessageDraft] = useState("");
   const [deleteTabTarget, setDeleteTabTarget] = useState<{
     id: string;
     title: string;
@@ -211,17 +207,11 @@ export function HomePage() {
           name: agent.name,
           roleName: agent.role_name,
           nodeType: agent.node_type,
+          isLeader: agent.is_leader,
         }),
       })),
     [tabAgents],
   );
-  const selectedAgentLabel = selectedAgent
-    ? getNodeLabel({
-        name: selectedAgent.name,
-        roleName: selectedAgent.role_name,
-        nodeType: selectedAgent.node_type,
-      })
-    : null;
   const panelVisible = panelOpen || !!selectedAgent;
   const resolvedPanelWidth = useMemo(() => {
     if (!isCompactWorkspace) {
@@ -254,6 +244,7 @@ export function HomePage() {
     );
   }, [
     activeToolCalls,
+    assistantId,
     assistantNode,
     connected,
     pendingAssistantMessages.length,
@@ -442,38 +433,6 @@ export function HomePage() {
     }
   };
 
-  const openTaskDialog = () => {
-    if (
-      !selectedAgentId ||
-      !selectedAgent ||
-      selectedAgent.node_type === "assistant"
-    ) {
-      toast.error("Select an agent first");
-      return;
-    }
-    setTaskMessageDraft("");
-    setActiveDialog("send-task");
-  };
-
-  const handleDispatchTask = async () => {
-    const content = taskMessageDraft.trim();
-    if (!selectedAgentId || !content) {
-      return;
-    }
-    setPendingAction("send-task");
-    try {
-      await dispatchNodeMessageRequest(selectedAgentId, content, "human");
-      setTaskMessageDraft("");
-      setActiveDialog(null);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to send task",
-      );
-    } finally {
-      setPendingAction(null);
-    }
-  };
-
   return (
     <div
       ref={workspaceRef}
@@ -583,16 +542,6 @@ export function HomePage() {
             >
               <Link2 className="size-4 opacity-70" />
               Connect
-            </ToolbarButton>
-            <ToolbarDivider />
-            <ToolbarButton
-              disabled={
-                !selectedAgent || selectedAgent.node_type === "assistant"
-              }
-              onClick={openTaskDialog}
-            >
-              <SendHorizontal className="size-4 opacity-70" />
-              Send Task
             </ToolbarButton>
           </div>
         </div>
@@ -826,12 +775,15 @@ export function HomePage() {
         }
       >
         <WorkspaceDialogMeta>
-          Adding to{" "}
+          Adding a regular node to{" "}
           <span className="font-semibold text-white">
             {activeTab?.title ?? "No active tab"}
           </span>
         </WorkspaceDialogMeta>
-        <WorkspaceDialogField label="Role" hint="Required">
+        <WorkspaceDialogField
+          label="Role"
+          hint="Required · Leader is managed by the tab"
+        >
           <Input
             autoFocus
             aria-label="Agent role"
@@ -892,7 +844,7 @@ export function HomePage() {
               <span className="font-semibold text-white">
                 {activeTab.title}
               </span>{" "}
-              · {tabAgentOptions.length} agents available
+              · {tabAgentOptions.length} nodes available
             </>
           ) : (
             "No active tab"
@@ -914,7 +866,7 @@ export function HomePage() {
               aria-label="Source agent"
               className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
             >
-              <SelectValue placeholder="Choose source agent" />
+              <SelectValue placeholder="Choose source node" />
             </SelectTrigger>
             <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
               {tabAgentOptions.map((agent) => (
@@ -931,7 +883,7 @@ export function HomePage() {
               aria-label="Target agent"
               className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
             >
-              <SelectValue placeholder="Choose target agent" />
+              <SelectValue placeholder="Choose target node" />
             </SelectTrigger>
             <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
               {tabAgentOptions
@@ -943,58 +895,6 @@ export function HomePage() {
                 ))}
             </SelectContent>
           </Select>
-        </WorkspaceDialogField>
-      </WorkspaceCommandDialog>
-
-      <WorkspaceCommandDialog
-        open={activeDialog === "send-task"}
-        onOpenChange={(open) => {
-          if (!open) {
-            setActiveDialog(null);
-          }
-        }}
-        title="Send Task"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setActiveDialog(null)}
-              disabled={pendingAction === "send-task"}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleDispatchTask()}
-              disabled={
-                !taskMessageDraft.trim() || pendingAction === "send-task"
-              }
-            >
-              {pendingAction === "send-task" ? "Sending..." : "Send Message"}
-            </Button>
-          </>
-        }
-      >
-        <WorkspaceDialogMeta>
-          {selectedAgentLabel ? (
-            <>
-              Delivering to{" "}
-              <span className="font-semibold text-white">
-                {selectedAgentLabel}
-              </span>
-            </>
-          ) : (
-            "No selected agent"
-          )}
-        </WorkspaceDialogMeta>
-        <WorkspaceDialogField label="Message" hint="Plain task content">
-          <Textarea
-            autoFocus
-            aria-label="Task message"
-            value={taskMessageDraft}
-            onChange={(event) => setTaskMessageDraft(event.target.value)}
-            placeholder="Inspect the current directory and report back the file list."
-            className="min-h-[140px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
-          />
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>
 
@@ -1119,6 +1019,7 @@ function AgentDetailPanel({
     agent.node_type === "assistant",
   );
   const detailState = detail?.state ?? agent.state;
+  const detailIsLeader = detail?.is_leader ?? agent.is_leader;
   const detailContacts = detail?.contacts ?? [];
   const detailConnections = detail?.connections ?? agent.connections;
   const detailTodos = detail?.todos ?? agent.todos;
@@ -1140,6 +1041,7 @@ function AgentDetailPanel({
     name: agent.name,
     roleName: agent.role_name,
     nodeType: agent.node_type,
+    isLeader: agent.is_leader,
   });
   const connectionItems = detailConnections.map((connectionId) => {
     const connectedAgent = agents.get(connectionId);
@@ -1150,6 +1052,7 @@ function AgentDetailPanel({
             name: connectedAgent.name,
             roleName: connectedAgent.role_name,
             nodeType: connectedAgent.node_type,
+            isLeader: connectedAgent.is_leader,
           })
         : connectionId.slice(0, 8),
     };
@@ -1163,6 +1066,7 @@ function AgentDetailPanel({
             name: contactAgent.name,
             roleName: contactAgent.role_name,
             nodeType: contactAgent.node_type,
+            isLeader: contactAgent.is_leader,
           })
         : contactId.slice(0, 8),
     };
@@ -1181,6 +1085,11 @@ function AgentDetailPanel({
           </div>
           <div className="min-w-0 flex flex-wrap items-center gap-2">
             <p className="text-[13px] font-semibold">{label}</p>
+            {detailIsLeader ? (
+              <span className="rounded-full border border-amber-300/24 bg-amber-300/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-100">
+                Leader
+              </span>
+            ) : null}
             <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] text-muted-foreground/78">
               {agent.id.slice(0, 8)}
             </span>

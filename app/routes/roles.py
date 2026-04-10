@@ -117,19 +117,11 @@ def _resolve_role_model_params(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def _sync_running_assistant_role(role_name: str) -> None:
-    from app.registry import registry
+def _sync_running_system_roles() -> None:
+    from app.graph_service import sync_assistant_role, sync_tab_leaders
 
-    assistant = registry.get_assistant()
-    if assistant is None:
-        return
-    assistant.config.role_name = role_name
-    assistant._sync_system_prompt_entry()
-    assistant.set_state(
-        assistant.state,
-        "assistant role updated",
-        force_emit=True,
-    )
+    sync_assistant_role(reason="assistant role updated")
+    sync_tab_leaders(reason="leader role updated")
 
 
 def _enforce_builtin_role_guards(
@@ -282,7 +274,7 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
         role.included_tools = included_tools
         role.excluded_tools = excluded_tools
         save_settings(settings)
-        _sync_running_assistant_role(settings.assistant.role_name)
+        _sync_running_system_roles()
         gateway.invalidate_cache()
         return serialize_role(role)
 
@@ -306,6 +298,6 @@ async def delete_role(role_name: str) -> dict:
         raise HTTPException(status_code=404, detail="Role not found")
     clear_role_references(settings, role_name)
     save_settings(settings)
-    _sync_running_assistant_role(settings.assistant.role_name)
+    _sync_running_system_roles()
     gateway.invalidate_cache()
     return {"status": "deleted"}

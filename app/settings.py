@@ -20,7 +20,6 @@ CONDUCTOR_ROLE_NAME = "Conductor"
 STEWARD_ROLE_INCLUDED_TOOLS = [
     "create_tab",
     "delete_tab",
-    "create_agent",
     "list_tabs",
     "list_roles",
     "list_tools",
@@ -36,19 +35,20 @@ WORKER_ROLE_SYSTEM_PROMPT = (
     "and you are not the tab-level orchestrator."
 )
 CONDUCTOR_ROLE_SYSTEM_PROMPT = """\
-You are the Conductor - the owner and orchestrator of a task tab's execution graph.
+You are the Conductor role currently used by a task tab's Leader.
 
 Your responsibilities:
-- Receive execution briefs from the Assistant for this tab
+- Receive execution briefs from the Assistant for this tab through the tab's Leader identity
 - Decide how the task should be decomposed inside the current tab
 - Design, expand, adjust, and simplify this tab's Agent Graph as the work evolves
 - Coordinate agents, aggregate their results, and return a coherent result upstream to the Assistant
 
 ## Ownership
 
-- You are the only owner-level Conductor for this tab
+- This role is the default behavior template for a tab's Leader, not a separate product identity outside the Leader
+- The tab's Leader is the only owner-level entrypoint for this tab
 - You are not a global orchestrator shared across tabs
-- The Assistant owns Human-facing intake and task-boundary management; you own this tab's internal execution structure
+- The Assistant owns Human-facing intake and task-boundary management; the Leader owns this tab's internal execution structure
 - Regular task-node results should usually come back to you first, then you summarize and escalate upstream when appropriate
 
 ## Decision Framework
@@ -63,7 +63,7 @@ Your responsibilities:
 
 ## Workflow
 
-1. **Receive** the brief from the Assistant
+1. **Receive** the brief from the Assistant as the current tab's Leader
 2. **Plan** using `todo` - break into subtasks, decide what to delegate, and design the graph structure that best fits the work
 3. **Inspect roles** with `list_roles`; use `list_tools` for a full tool inventory
 4. **Create the graph structure** with `create_agent` and `connect`
@@ -162,6 +162,11 @@ class AssistantSettings:
 
 
 @dataclass
+class LeaderSettings:
+    role_name: str = CONDUCTOR_ROLE_NAME
+
+
+@dataclass
 class TelegramPendingChat:
     chat_id: int
     username: str | None = None
@@ -189,6 +194,7 @@ class TelegramSettings:
 class Settings:
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
     assistant: AssistantSettings = field(default_factory=AssistantSettings)
+    leader: LeaderSettings = field(default_factory=LeaderSettings)
     telegram: TelegramSettings = field(default_factory=TelegramSettings)
     model: ModelSettings = field(default_factory=ModelSettings)
     custom_prompt: str = ""
@@ -809,6 +815,23 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     ):
         migrated = True
 
+    leader_data = data.get("leader", {})
+    if not isinstance(leader_data, dict):
+        leader_data = {}
+        migrated = True
+    if "leader" not in data:
+        migrated = True
+    leader_role_name = leader_data.get("role_name")
+    leader = LeaderSettings(
+        role_name=leader_role_name.strip()
+        if isinstance(leader_role_name, str) and leader_role_name.strip()
+        else CONDUCTOR_ROLE_NAME
+    )
+    if leader.role_name == CONDUCTOR_ROLE_NAME and (
+        not isinstance(leader_role_name, str) or not leader_role_name.strip()
+    ):
+        migrated = True
+
     telegram_data = data.get("telegram", {})
     if not isinstance(telegram_data, dict):
         telegram_data = {}
@@ -973,6 +996,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         Settings(
             event_log=event_log,
             assistant=assistant,
+            leader=leader,
             telegram=telegram,
             model=model_settings,
             custom_prompt=custom_prompt,
@@ -1127,23 +1151,38 @@ def rename_role_references(
     old_role_name: str,
     new_role_name: str,
 ) -> bool:
-    if settings.assistant.role_name != old_role_name:
-        return False
-    settings.assistant.role_name = new_role_name
-    return True
+    changed = False
+    if settings.assistant.role_name == old_role_name:
+        settings.assistant.role_name = new_role_name
+        changed = True
+    if settings.leader.role_name == old_role_name:
+        settings.leader.role_name = new_role_name
+        changed = True
+    return changed
 
 
 def clear_role_references(settings: Settings, role_name: str) -> bool:
-    if settings.assistant.role_name != role_name:
-        return False
-    settings.assistant.role_name = STEWARD_ROLE_NAME
-    return True
+    changed = False
+    if settings.assistant.role_name == role_name:
+        settings.assistant.role_name = STEWARD_ROLE_NAME
+        changed = True
+    if settings.leader.role_name == role_name:
+        settings.leader.role_name = CONDUCTOR_ROLE_NAME
+        changed = True
+    return changed
 
 
 def ensure_assistant_role(settings: Settings) -> bool:
     if find_role(settings, settings.assistant.role_name) is not None:
         return False
     settings.assistant.role_name = STEWARD_ROLE_NAME
+    return True
+
+
+def ensure_leader_role(settings: Settings) -> bool:
+    if find_role(settings, settings.leader.role_name) is not None:
+        return False
+    settings.leader.role_name = CONDUCTOR_ROLE_NAME
     return True
 
 
@@ -1174,6 +1213,7 @@ def ensure_builtin_roles(settings: Settings) -> bool:
     for standard_role in builtin_role_order:
         changed = _ensure_builtin_role(settings, standard_role) or changed
     changed = ensure_assistant_role(settings) or changed
+    changed = ensure_leader_role(settings) or changed
 
     ordered_roles: list[RoleConfig] = []
     builtin_role_names = {role.name for role in builtin_role_order}

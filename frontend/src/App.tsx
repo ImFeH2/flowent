@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Sidebar } from "@/components/Sidebar";
-import { HomePage } from "@/pages/HomePage";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { usePanelWidth } from "@/hooks/usePanelDrag";
@@ -24,6 +23,7 @@ function lazyPage<TModule, TKey extends keyof TModule & string>(
   });
 }
 
+const HomePage = lazyPage(() => import("@/pages/HomePage"), "HomePage");
 const ProvidersPage = lazyPage(
   () => import("@/pages/ProvidersPage"),
   "ProvidersPage",
@@ -43,7 +43,8 @@ const SettingsPage = lazyPage(
   "SettingsPage",
 );
 
-const lazyPageMap: Partial<Record<PageId, ComponentType>> = {
+const lazyPageMap: Record<PageId, ComponentType> = {
+  workspace: HomePage,
   providers: ProvidersPage,
   roles: RolesPage,
   prompts: PromptsPage,
@@ -79,10 +80,6 @@ function AppContent() {
   const sidebarOpen = isCompactLayout && sidebarDrawerOpen;
 
   const renderPage = () => {
-    if (!LazyPage) {
-      return <HomePage />;
-    }
-
     return (
       <Suspense fallback={<PageLoadingFallback />}>
         <LazyPage />

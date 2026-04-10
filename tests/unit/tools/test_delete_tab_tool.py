@@ -58,11 +58,12 @@ def test_delete_tab_tool_deletes_tab_and_graph(monkeypatch):
     result = json.loads(DeleteTabTool().execute(assistant, {"tab_id": tab.id}))
 
     assert result["id"] == tab.id
-    assert set(result["removed_node_ids"]) == {left.id, right.id}
+    assert set(result["removed_node_ids"]) == {tab.leader_id, left.id, right.id}
     assert result["removed_edge_ids"] == [edge.id]
     assert workspace_store.get_tab(tab.id) is None
     assert workspace_store.list_node_records(tab.id) == []
     assert workspace_store.list_edges(tab.id) == []
+    assert registry.get(tab.leader_id) is None
     assert registry.get(left.id) is None
     assert registry.get(right.id) is None
 

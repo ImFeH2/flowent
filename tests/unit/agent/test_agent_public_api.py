@@ -9,6 +9,7 @@ from app.models import (
     NodeType,
     ReceivedMessage,
     StateEntry,
+    Tab,
     TodoItem,
 )
 from app.registry import registry
@@ -20,6 +21,7 @@ from app.tools.list_tabs import ListTabsTool
 from app.tools.list_tools import ListToolsTool
 from app.tools.sleep import SleepTool
 from app.tools.todo import TodoTool
+from app.workspace_store import workspace_store
 
 
 def test_idle_tool_uses_request_idle(monkeypatch):
@@ -208,6 +210,19 @@ def test_contacts_tool_uses_agent_public_api(monkeypatch):
 
 def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
     registry.reset()
+    workspace_store.reset_cache()
+    workspace_store.upsert_tab(
+        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
+    )
+    leader = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            name="Leader",
+            tab_id="tab-1",
+        ),
+        uuid="leader-a",
+    )
     agent = Agent(
         NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"),
         uuid="agent-a",
@@ -225,6 +240,7 @@ def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
         ),
         uuid="agent-b",
     )
+    registry.register(leader)
     registry.register(agent)
     registry.register(assistant)
     registry.register(peer)
@@ -233,11 +249,12 @@ def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
     try:
         assert agent.get_contacts_info() == [
             {
-                "id": "assistant-a",
-                "node_type": "assistant",
-                "role_name": "Steward",
-                "name": "Assistant",
+                "id": "leader-a",
+                "node_type": "agent",
+                "role_name": "Conductor",
+                "name": "Leader",
                 "state": "initializing",
+                "is_leader": True,
             },
             {
                 "id": "agent-b",
@@ -245,14 +262,29 @@ def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
                 "role_name": "Worker",
                 "name": "Worker",
                 "state": "initializing",
+                "is_leader": False,
             },
         ]
     finally:
         registry.reset()
+        workspace_store.reset_cache()
 
 
 def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
     registry.reset()
+    workspace_store.reset_cache()
+    workspace_store.upsert_tab(
+        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
+    )
+    leader = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            name="Leader",
+            tab_id="tab-1",
+        ),
+        uuid="leader-a",
+    )
     agent = Agent(
         NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"),
         uuid="agent-a",
@@ -270,6 +302,7 @@ def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
         ),
         uuid="agent-b",
     )
+    registry.register(leader)
     registry.register(agent)
     registry.register(assistant)
     registry.register(peer)
@@ -278,11 +311,12 @@ def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
     try:
         assert agent.get_contacts_info() == [
             {
-                "id": "assistant-a",
-                "node_type": "assistant",
-                "role_name": "Steward",
-                "name": "Assistant",
+                "id": "leader-a",
+                "node_type": "agent",
+                "role_name": "Conductor",
+                "name": "Leader",
                 "state": "initializing",
+                "is_leader": True,
             },
             {
                 "id": "agent-b",
@@ -290,37 +324,60 @@ def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
                 "role_name": "Reviewer",
                 "name": "Reviewer",
                 "state": "initializing",
+                "is_leader": False,
             },
         ]
     finally:
         registry.reset()
+        workspace_store.reset_cache()
 
 
-def test_assistant_get_contacts_info_lists_registered_task_nodes():
+def test_assistant_get_contacts_info_lists_registered_tab_leaders():
     registry.reset()
+    workspace_store.reset_cache()
+    workspace_store.upsert_tab(
+        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
+    )
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
         uuid="assistant-a",
     )
+    leader = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            name="Leader",
+            tab_id="tab-1",
+        ),
+        uuid="leader-a",
+    )
     worker = Agent(
-        NodeConfig(node_type=NodeType.AGENT, role_name="Worker", name="Worker"),
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Worker",
+            name="Worker",
+            tab_id="tab-1",
+        ),
         uuid="agent-b",
     )
     registry.register(assistant)
+    registry.register(leader)
     registry.register(worker)
 
     try:
         assert assistant.get_contacts_info() == [
             {
-                "id": "agent-b",
+                "id": "leader-a",
                 "node_type": "agent",
-                "role_name": "Worker",
-                "name": "Worker",
+                "role_name": "Conductor",
+                "name": "Leader",
                 "state": "initializing",
+                "is_leader": True,
             }
         ]
     finally:
         registry.reset()
+        workspace_store.reset_cache()
 
 
 def test_list_roles_tool_returns_registered_roles(monkeypatch):
@@ -506,12 +563,12 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
         assert summaries[0]["goal"] == tab.goal
         assert summaries[0]["created_at"] == tab.created_at
         assert isinstance(summaries[0]["updated_at"], float)
-        assert summaries[0]["node_count"] == 2
+        assert summaries[0]["node_count"] == 3
         assert summaries[0]["edge_count"] == 1
 
         detail = json.loads(ListTabsTool().execute(agent, {"tab_id": tab.id}))
         assert detail["tab"]["id"] == tab.id
-        assert {node["name"] for node in detail["nodes"]} == {"Left", "Right"}
+        assert {node["name"] for node in detail["nodes"]} == {"Leader", "Left", "Right"}
         assert detail["edges"] == [edge.serialize()]
     finally:
         registry.reset()

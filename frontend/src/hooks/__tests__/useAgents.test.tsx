@@ -14,6 +14,7 @@ function buildNode(overrides: Partial<Node> & Pick<Node, "id">): Node {
     id: overrides.id,
     node_type: overrides.node_type ?? "agent",
     tab_id: overrides.tab_id ?? null,
+    is_leader: overrides.is_leader ?? false,
     state: overrides.state ?? "idle",
     connections: overrides.connections ?? [],
     name: overrides.name ?? null,

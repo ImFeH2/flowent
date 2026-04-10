@@ -337,13 +337,17 @@ class Agent:
         return max(0.0, _time.perf_counter() - started_at)
 
     def get_contact_ids_snapshot(self) -> list[str]:
+        from app.graph_service import get_tab_leader_id
         from app.registry import registry
+        from app.workspace_store import workspace_store
 
         if self.node_type == NodeType.ASSISTANT:
             return [
-                node.uuid
-                for node in registry.get_all()
-                if node.uuid != self.uuid and node.node_type != NodeType.ASSISTANT
+                leader_id
+                for leader_id in (
+                    get_tab_leader_id(tab.id) for tab in workspace_store.list_tabs()
+                )
+                if leader_id and registry.get(leader_id) is not None
             ]
 
         seen_ids: set[str] = set()
@@ -357,21 +361,39 @@ class Agent:
             seen_ids.add(node_id)
             contact_ids.append(node_id)
 
+        if self.config.tab_id is None:
+            return contact_ids
+
+        leader_id = get_tab_leader_id(self.config.tab_id)
+        is_leader = leader_id == self.uuid
         assistant = registry.get_assistant()
-        if assistant is not None:
-            append_contact(assistant.uuid)
+        if is_leader:
+            if assistant is not None:
+                append_contact(assistant.uuid)
+            for node in registry.get_all():
+                if (
+                    node.uuid == self.uuid
+                    or node.node_type != NodeType.AGENT
+                    or node.config.tab_id != self.config.tab_id
+                    or node.uuid == leader_id
+                ):
+                    continue
+                append_contact(node.uuid)
+            return contact_ids
+
+        if leader_id is not None:
+            append_contact(leader_id)
 
         with self._connections_lock:
             for node_id in self.connections:
                 append_contact(node_id)
 
-        if self.config.tab_id is None:
-            return contact_ids
-
         for node in registry.get_all():
             if node.uuid == self.uuid or node.node_type != NodeType.AGENT:
                 continue
             if node.config.tab_id != self.config.tab_id:
+                continue
+            if node.uuid == leader_id:
                 continue
             if node.is_connected_to(self.uuid):
                 append_contact(node.uuid)
@@ -379,6 +401,7 @@ class Agent:
         return contact_ids
 
     def get_contacts_info(self) -> list[dict[str, Any]]:
+        from app.graph_service import is_tab_leader
         from app.registry import registry
 
         result: list[dict[str, Any]] = []
@@ -393,6 +416,10 @@ class Agent:
                     "role_name": node.config.role_name,
                     "name": node.config.name,
                     "state": node.state.value,
+                    "is_leader": (
+                        node.config.tab_id is not None
+                        and is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id)
+                    ),
                 }
             )
         return result
@@ -406,6 +433,8 @@ class Agent:
         return self._idle_state_event.wait(timeout=timeout)
 
     def start(self) -> None:
+        from app.graph_service import is_tab_leader
+
         self._thread = threading.Thread(
             target=self._run,
             name=f"agent-{self.uuid[:8]}",
@@ -421,6 +450,10 @@ class Agent:
                     "role_name": self.config.role_name,
                     "name": self.config.name,
                     "tab_id": self.config.tab_id,
+                    "is_leader": is_tab_leader(
+                        node_id=self.uuid,
+                        tab_id=self.config.tab_id,
+                    ),
                 },
             ),
         )
@@ -1640,6 +1673,8 @@ class Agent:
         *,
         force_emit: bool = False,
     ) -> None:
+        from app.graph_service import is_tab_leader
+
         old = self.state
         self.state = state
         if state == AgentState.IDLE:
@@ -1669,8 +1704,13 @@ class Agent:
                     data={
                         "old_state": old.value,
                         "new_state": state.value,
+                        "tab_id": self.config.tab_id,
                         "role_name": self.config.role_name,
                         "name": self.config.name,
+                        "is_leader": is_tab_leader(
+                            node_id=self.uuid,
+                            tab_id=self.config.tab_id,
+                        ),
                         "todos": [t.serialize() for t in self.get_todos_snapshot()],
                     },
                 ),

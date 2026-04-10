@@ -31,6 +31,7 @@ describe("SidebarActivityTicker", () => {
         {
           id: "agent-1",
           node_type: "agent",
+          is_leader: false,
           state: "idle",
           connections: [],
           name: "Project Analyst",
@@ -70,6 +71,7 @@ describe("SidebarActivityTicker", () => {
         {
           id: "agent-1",
           node_type: "agent",
+          is_leader: false,
           state: "running",
           connections: [],
           name: "Project Analyst",

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.graph_service import create_agent_node
 from app.models import NodeType
-from app.settings import CONDUCTOR_ROLE_NAME
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -86,46 +85,46 @@ class CreateAgentTool(Tool):
         if not resolved_tab_id:
             return json.dumps({"error": "tab_id is required"})
         normalized_role_name = role_name.strip()
-        if (
-            agent.node_type == NodeType.ASSISTANT
-            and normalized_role_name != CONDUCTOR_ROLE_NAME
-        ):
+        if agent.node_type == NodeType.ASSISTANT:
             return json.dumps(
-                {"error": "Assistant may only create a tab's Conductor owner directly"}
+                {"error": "Assistant may not create ordinary task nodes directly"}
             )
-        if agent.node_type != NodeType.ASSISTANT:
-            if not agent.config.tab_id:
-                return json.dumps(
-                    {"error": "Only the Assistant may create agents outside a tab"}
-                )
-            if resolved_tab_id != agent.config.tab_id:
-                return json.dumps(
-                    {"error": "A graph node may only create peers inside its own tab"}
-                )
-            parent_write_dirs = [
-                Path(path).resolve() for path in agent.config.write_dirs
-            ]
-            invalid_write_dirs = sorted(
-                path
-                for path in write_dirs
-                if not any(
-                    Path(path).resolve().is_relative_to(parent_path)
-                    for parent_path in parent_write_dirs
-                )
+        if not agent.config.tab_id:
+            return json.dumps(
+                {"error": "Only a tab Leader may create ordinary task nodes"}
             )
-            if invalid_write_dirs:
-                return json.dumps(
-                    {
-                        "error": "write_dirs boundary exceeded: "
-                        + ", ".join(invalid_write_dirs)
-                    }
-                )
-            if allow_network and not agent.config.allow_network:
-                return json.dumps(
-                    {
-                        "error": "allow_network boundary exceeded: parent disallows network access"
-                    }
-                )
+        if resolved_tab_id != agent.config.tab_id:
+            return json.dumps(
+                {"error": "A tab Leader may only create peers inside its own tab"}
+            )
+        from app.graph_service import is_tab_leader
+
+        if not is_tab_leader(node_id=agent.uuid, tab_id=agent.config.tab_id):
+            return json.dumps(
+                {"error": "Only a tab Leader may create ordinary task nodes"}
+            )
+        parent_write_dirs = [Path(path).resolve() for path in agent.config.write_dirs]
+        invalid_write_dirs = sorted(
+            path
+            for path in write_dirs
+            if not any(
+                Path(path).resolve().is_relative_to(parent_path)
+                for parent_path in parent_write_dirs
+            )
+        )
+        if invalid_write_dirs:
+            return json.dumps(
+                {
+                    "error": "write_dirs boundary exceeded: "
+                    + ", ".join(invalid_write_dirs)
+                }
+            )
+        if allow_network and not agent.config.allow_network:
+            return json.dumps(
+                {
+                    "error": "allow_network boundary exceeded: parent disallows network access"
+                }
+            )
 
         record, error = create_agent_node(
             role_name=normalized_role_name,

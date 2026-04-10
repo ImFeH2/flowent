@@ -46,6 +46,7 @@ def restart_telegram_channel() -> None:
 def bootstrap_runtime() -> None:
     from app.agent import Agent
     from app.graph_runtime import connect_nodes
+    from app.graph_service import ensure_tab_leaders
     from app.models import AgentState, NodeConfig, NodeType, StateEntry
     from app.settings import (
         STEWARD_ROLE_INCLUDED_TOOLS,
@@ -81,6 +82,8 @@ def bootstrap_runtime() -> None:
     registry.register(assistant)
     assistant.start()
     logger.info("Assistant started with role {}", settings.assistant.role_name)
+
+    ensure_tab_leaders()
 
     restored_node_ids: set[str] = set()
     for record in workspace_store.list_node_records():

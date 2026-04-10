@@ -111,6 +111,18 @@ def test_assistant_cannot_be_terminated_via_nodes_api(client: TestClient):
     assert response.json() == {"detail": "Cannot terminate assistant"}
 
 
+def test_tab_leader_cannot_be_terminated_directly(client: TestClient):
+    created_tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+
+    response = client.post(f"/api/nodes/{created_tab['leader_id']}/terminate")
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Cannot terminate a tab Leader directly"}
+
+
 def test_assistant_can_be_interrupted_via_nodes_api_when_running(client: TestClient):
     assistant_id = _get_assistant_id(client)
     assistant = registry.get(assistant_id)

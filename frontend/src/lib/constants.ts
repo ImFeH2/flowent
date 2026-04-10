@@ -10,12 +10,18 @@ export function getNodeLabel({
   name,
   roleName,
   nodeType,
+  isLeader = false,
 }: {
   name: string | null;
   roleName: string | null;
   nodeType: NodeType;
+  isLeader?: boolean;
 }): string {
-  return name ?? roleName ?? (nodeType === "assistant" ? "Assistant" : "Agent");
+  return (
+    name ??
+    roleName ??
+    (nodeType === "assistant" ? "Assistant" : isLeader ? "Leader" : "Agent")
+  );
 }
 
 export const stateColor: Record<AgentState, string> = {
@@ -45,10 +51,14 @@ export const stateRing: Record<AgentState, string> = {
   terminated: "agent-state-ring-terminated",
 };
 
-export const nodeTypeIconStyle: Record<NodeType, string> = {
-  assistant: "rounded-sm border-white/18 bg-white/[0.08] text-white",
-  agent: "rounded-sm border-graph-node-border bg-surface-3 text-foreground/80",
-};
+export function getNodeIconStyle(nodeType: NodeType, isLeader = false): string {
+  if (nodeType === "assistant") {
+    return "rounded-sm border-white/18 bg-white/[0.08] text-white";
+  }
+  return `rounded-sm border-graph-node-border bg-surface-3 ${
+    isLeader ? "text-amber-100" : "text-foreground/80"
+  }`;
+}
 
 export const stateBorder: Record<AgentState, string> = {
   running: "border-white/18",

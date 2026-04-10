@@ -12,6 +12,7 @@ from app.settings import (
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
     AssistantSettings,
+    LeaderSettings,
     ProviderConfig,
     RoleConfig,
     RoleModelConfig,
@@ -58,10 +59,12 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
         )
     ]
     assert loaded.assistant == AssistantSettings()
+    assert loaded.leader == LeaderSettings()
     assert loaded.telegram == TelegramSettings()
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
     assert persisted["assistant"] == {"role_name": STEWARD_ROLE_NAME}
+    assert persisted["leader"] == {"role_name": CONDUCTOR_ROLE_NAME}
     assert persisted["telegram"] == {
         "bot_token": "",
         "pending_chats": [],
@@ -249,6 +252,7 @@ def test_load_settings_migrates_legacy_post_prompt_to_custom_post_prompt(
     assert loaded.custom_prompt == "Apply extra guardrails."
     assert loaded.custom_post_prompt == "Append runtime guidance."
     assert loaded.assistant == AssistantSettings()
+    assert loaded.leader == LeaderSettings()
     assert loaded.telegram == TelegramSettings()
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
@@ -448,3 +452,4 @@ def test_ensure_builtin_roles_repairs_and_creates_builtin_roles():
         ),
     ]
     assert settings.assistant.role_name == STEWARD_ROLE_NAME
+    assert settings.leader.role_name == CONDUCTOR_ROLE_NAME

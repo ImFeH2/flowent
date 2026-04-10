@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from app.graph_service import list_tab_edges, list_tab_nodes
+from app.graph_service import (
+    is_tab_leader,
+    list_tab_edges,
+    list_tab_nodes,
+    serialize_tab_summary,
+)
 from app.tools import Tool
 from app.workspace_store import workspace_store
 
@@ -46,6 +51,10 @@ class ListTabsTool(Tool):
                             "id": node.id,
                             "name": node.config.name,
                             "role_name": node.config.role_name,
+                            "is_leader": is_tab_leader(
+                                node_id=node.id,
+                                tab_id=tab.id,
+                            ),
                             "state": node.state.value,
                             "position": (
                                 node.position.serialize()
@@ -60,12 +69,5 @@ class ListTabsTool(Tool):
             )
 
         return json.dumps(
-            [
-                {
-                    **tab.serialize(),
-                    "node_count": len(list_tab_nodes(tab.id)),
-                    "edge_count": len(list_tab_edges(tab.id)),
-                }
-                for tab in workspace_store.list_tabs()
-            ]
+            [serialize_tab_summary(tab) for tab in workspace_store.list_tabs()]
         )

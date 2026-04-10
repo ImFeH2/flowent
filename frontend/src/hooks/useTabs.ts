@@ -31,6 +31,7 @@ export function useTabs() {
           id,
           title,
           goal: typeof data.goal === "string" ? data.goal : "",
+          leader_id: typeof data.leader_id === "string" ? data.leader_id : null,
           created_at:
             typeof data.created_at === "number" ? data.created_at : Date.now(),
           updated_at:

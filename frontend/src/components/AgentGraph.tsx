@@ -71,6 +71,7 @@ interface AgentNodeData extends Record<string, unknown> {
   label: string;
   width: number;
   node_type: NodeType;
+  is_leader: boolean;
   state: AgentState;
   shortId: string;
   name: string | null;
@@ -280,11 +281,13 @@ export function AgentGraph() {
         name: agent.name,
         roleName: agent.role_name,
         nodeType: agent.node_type,
+        isLeader: agent.is_leader,
       });
       data.set(id, {
         label,
         width: getAgentNodeWidth(label),
         node_type: agent.node_type,
+        is_leader: agent.is_leader,
         state: agent.state,
         shortId: id.slice(0, 8),
         name: agent.name,
@@ -343,10 +346,24 @@ export function AgentGraph() {
         } satisfies FlowNode,
       ];
     });
+    const leaderId = visibleAgents.find((agent) => agent.is_leader)?.id ?? null;
+    const layoutEdges =
+      leaderId && rawNodes.length > 1
+        ? [
+            ...baseEdges,
+            ...visibleAgents
+              .filter((agent) => agent.id !== leaderId)
+              .map((agent) => ({
+                id: `layout:${leaderId}->${agent.id}`,
+                source: leaderId,
+                target: agent.id,
+              })),
+          ]
+        : baseEdges;
 
     const layouted =
       rawNodes.length > 0
-        ? getLayoutedElements(rawNodes, baseEdges)
+        ? getLayoutedElements(rawNodes, layoutEdges)
         : { nodes: [] as FlowNode[], edges: baseEdges };
     const positions = new Map(
       layouted.nodes.map((node) => [node.id, node.position] as const),
@@ -497,9 +514,13 @@ export function AgentGraph() {
     const items: ContextMenuEntry[] = [];
     if (contextMenu.agentId) {
       const agentId = contextMenu.agentId;
+      const contextAgent = agents.get(agentId) ?? null;
       items.push({
-        label: "Stop Agent",
-        danger: true,
+        label: contextAgent?.is_leader
+          ? "Leader Follows Tab Lifecycle"
+          : "Stop Agent",
+        danger: !contextAgent?.is_leader,
+        disabled: contextAgent?.is_leader,
         onClick: () => {
           terminateNode(agentId).catch(() =>
             toast.error("Failed to terminate agent"),
@@ -526,7 +547,7 @@ export function AgentGraph() {
       });
     }
     return items;
-  }, [contextMenu, flowInstance, selectAgent]);
+  }, [agents, contextMenu, flowInstance, selectAgent]);
 
   const tooltipAgent = tooltip ? (agents.get(tooltip.agentId) ?? null) : null;
   const tooltipToolCall =
@@ -642,7 +663,7 @@ export function AgentGraph() {
       title: "This task tab is ready for its first agent",
       description:
         "Add agents, connect them, or ask Assistant to scaffold the graph.",
-      hint: "Start with a worker, a reviewer, or a conductor.",
+      hint: "Start with a worker, a reviewer, or another helper node.",
     };
   }, [activeTabId, tabs.size]);
 

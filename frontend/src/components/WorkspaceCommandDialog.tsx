@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react";
 import { X } from "lucide-react";
 import {
   Dialog,
@@ -15,10 +14,7 @@ import type { ReactNode } from "react";
 interface WorkspaceCommandDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  icon: LucideIcon;
-  eyebrow?: string;
   title: string;
-  description?: string;
   children: ReactNode;
   footer: ReactNode;
   className?: string;
@@ -27,10 +23,7 @@ interface WorkspaceCommandDialogProps {
 export function WorkspaceCommandDialog({
   open,
   onOpenChange,
-  icon: Icon,
-  eyebrow,
   title,
-  description,
   children,
   footer,
   className,
@@ -38,46 +31,28 @@ export function WorkspaceCommandDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={cn("p-0", className)}>
-        <div className="relative overflow-hidden px-5 pb-5 pt-4.5">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.1),transparent_58%),radial-gradient(circle_at_top_right,rgba(255,255,255,0.06),transparent_48%)]" />
+        <div className="relative overflow-hidden p-6">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent opacity-50" />
           <DialogClose asChild>
             <button
               type="button"
               aria-label="Close dialog"
-              className="absolute right-3.5 top-3.5 z-20 flex size-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-white/55 transition-colors hover:bg-white/[0.08] hover:text-white"
+              className="absolute right-4 top-4 z-20 flex size-7 items-center justify-center rounded-full bg-white/[0.04] text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
             >
               <X className="size-3.5" />
             </button>
           </DialogClose>
 
-          <DialogHeader className="relative z-10 gap-2 pr-9">
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-[12px] border border-white/12 bg-white/[0.05] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_14px_28px_-22px_rgba(255,255,255,0.14)]">
-                <Icon className="size-4.5" />
-              </div>
-              <div className="min-w-0">
-                {eyebrow ? (
-                  <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-white/42">
-                    {eyebrow}
-                  </p>
-                ) : null}
-                <DialogTitle className="mt-1 text-[1.02rem] text-white">
-                  {title}
-                </DialogTitle>
-              </div>
-            </div>
-            {description ? (
-              <DialogDescription className="pl-[2.9rem] text-[12px] leading-5 text-white/60">
-                {description}
-              </DialogDescription>
-            ) : (
-              <DialogDescription className="sr-only">{title}</DialogDescription>
-            )}
+          <DialogHeader className="relative z-10 pr-8">
+            <DialogTitle className="text-[1.1rem] font-medium text-white/90">
+              {title}
+            </DialogTitle>
+            <DialogDescription className="sr-only">{title}</DialogDescription>
           </DialogHeader>
 
-          <div className="relative z-10 mt-4 space-y-3">{children}</div>
+          <div className="relative z-10 mt-6 space-y-4">{children}</div>
 
-          <DialogFooter className="relative z-10 mt-4 border-t border-white/8 pt-3.5">
+          <DialogFooter className="relative z-10 mt-6 border-t border-white/[0.06] pt-4">
             {footer}
           </DialogFooter>
         </div>
@@ -96,14 +71,10 @@ export function WorkspaceDialogField({
   children: ReactNode;
 }) {
   return (
-    <label className="block space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/52">
-          {label}
-        </span>
-        {hint ? (
-          <span className="text-[10px] font-medium text-white/34">{hint}</span>
-        ) : null}
+    <label className="block space-y-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-sm font-medium text-white/80">{label}</span>
+        {hint ? <span className="text-xs text-white/40">{hint}</span> : null}
       </div>
       {children}
     </label>
@@ -112,7 +83,7 @@ export function WorkspaceDialogField({
 
 export function WorkspaceDialogMeta({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[0.85rem] border border-white/8 bg-white/[0.03] px-3 py-2 text-[12px] text-white/68 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]">
+    <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-xs text-white/60">
       {children}
     </div>
   );

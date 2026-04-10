@@ -34,7 +34,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_22%),rgba(3,3,4,0.78)] backdrop-blur-md",
+        "fixed inset-0 z-50 bg-black/40 backdrop-blur-[6px]",
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className,
@@ -55,7 +55,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-[34rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,21,0.98),rgba(13,13,14,0.96))] shadow-[0_30px_90px_-42px_rgba(0,0,0,0.95),0_16px_38px_-28px_rgba(255,255,255,0.08)] backdrop-blur-2xl",
+          "fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-[34rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[20px] border border-white/[0.08] bg-black/60 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_30px_60px_-16px_rgba(0,0,0,0.8)] backdrop-blur-3xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -65,8 +65,6 @@ function DialogContent({
         )}
         {...props}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.055),transparent_18%,transparent_84%,rgba(255,255,255,0.025))]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/14" />
         {children}
       </DialogPrimitive.Content>
     </DialogPortal>

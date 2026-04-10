@@ -10,8 +10,6 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bot,
-  CircuitBoard,
-  FilePlus2,
   Link2,
   Plus,
   PanelRightClose,
@@ -19,7 +17,6 @@ import {
   Radio,
   SendHorizontal,
   Shield,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -485,31 +482,30 @@ export function HomePage() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),transparent_14%,transparent_84%,rgba(255,255,255,0.01))]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="relative z-30 border-b border-white/8 bg-[rgba(12,12,13,0.84)]">
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-white/8" />
-          <div className="pointer-events-auto relative z-10 flex items-end gap-1 overflow-x-auto px-2.5 pb-0 pr-14 pt-2 scrollbar-none">
+        <div className="relative z-30 border-b border-white/[0.06] bg-black/40 backdrop-blur-md">
+          <div className="pointer-events-auto relative z-10 flex items-center gap-1.5 overflow-x-auto px-3 py-2 pr-14 scrollbar-none">
             {Array.from(tabs.values()).map((tab) => (
               <div
                 key={tab.id}
-                className="group relative min-w-[116px] max-w-[190px] shrink-0"
+                className="group relative min-w-[120px] max-w-[200px] shrink-0"
               >
                 <button
                   type="button"
                   onClick={() => setActiveTabId(tab.id)}
                   className={cn(
-                    "relative -mb-px flex h-9 w-full items-center rounded-t-[9px] border px-3 pr-9 text-left text-[12px] font-medium transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                    "relative flex h-8 w-full items-center rounded-md px-3 pr-8 text-left text-[13px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
                     activeTabId === tab.id
-                      ? "border-white/8 border-b-[rgba(12,12,13,0.84)] bg-white/[0.035] text-white"
-                      : "border-transparent bg-transparent text-white/52 hover:border-white/6 hover:bg-white/[0.022] hover:text-white/82",
+                      ? "bg-white/[0.06] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]"
+                      : "bg-transparent text-white/50 hover:bg-white/[0.03] hover:text-white/80",
                   )}
                 >
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "absolute inset-x-3 bottom-0 h-px rounded-full transition-opacity duration-150",
+                      "absolute inset-x-3 -bottom-2 h-[2px] transition-all duration-200",
                       activeTabId === tab.id
-                        ? "bg-white/80 opacity-100"
-                        : "bg-white/18 opacity-0 group-hover:opacity-100",
+                        ? "bg-white opacity-100 shadow-[0_-1px_6px_0_rgba(255,255,255,0.4)] rounded-t-sm"
+                        : "bg-white/20 opacity-0 group-hover:opacity-100 rounded-t-sm",
                     )}
                   />
                   <div className="truncate leading-tight">{tab.title}</div>
@@ -523,13 +519,13 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-md p-1 text-white/34 transition-[opacity,color,background-color] duration-150 hover:bg-white/[0.04] hover:text-white/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                    "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 transition-all duration-200 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
                     activeTabId === tab.id
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100",
+                      ? "text-white/50 opacity-100"
+                      : "text-white/30 opacity-0 group-hover:opacity-100",
                   )}
                 >
-                  <X className="size-3.5" />
+                  <X className="size-3" />
                 </button>
               </div>
             ))}
@@ -539,9 +535,9 @@ export function HomePage() {
               onClick={() => {
                 openCreateTabDialog();
               }}
-              className="mb-1 flex size-8 shrink-0 items-center justify-center rounded-md border border-white/8 bg-transparent text-white/58 transition-[background-color,border-color,color] duration-150 hover:border-white/12 hover:bg-white/[0.035] hover:text-white/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-white/40 transition-all duration-200 hover:bg-white/[0.04] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
             >
-              <Plus className="size-3.5" />
+              <Plus className="size-4" />
             </button>
           </div>
         </div>
@@ -755,10 +751,7 @@ export function HomePage() {
             setActiveDialog(null);
           }
         }}
-        icon={FilePlus2}
-        eyebrow="Workspace"
         title="Create Task Tab"
-        description="Open a persistent task workspace with a clear title and an optional goal so both you and the Assistant can revisit it later."
         footer={
           <>
             <Button
@@ -809,10 +802,7 @@ export function HomePage() {
             setActiveDialog(null);
           }
         }}
-        icon={Bot}
-        eyebrow="Agent Graph"
         title="Add Agent"
-        description="Add a peer node to the current tab. Start with the role and optional display name, then wire it into the graph."
         footer={
           <>
             <Button
@@ -869,10 +859,7 @@ export function HomePage() {
             setActiveDialog(null);
           }
         }}
-        icon={CircuitBoard}
-        eyebrow="Topology"
         title="Connect Agents"
-        description="Create a directed edge between two peers in the current tab so they can message each other directly."
         footer={
           <>
             <Button
@@ -966,10 +953,7 @@ export function HomePage() {
             setActiveDialog(null);
           }
         }}
-        icon={Sparkles}
-        eyebrow="Dispatch"
         title="Send Task"
-        description="Write the first concrete instruction for the selected agent. This goes straight into that node's queue."
         footer={
           <>
             <Button

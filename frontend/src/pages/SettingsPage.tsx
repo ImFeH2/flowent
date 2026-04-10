@@ -145,8 +145,8 @@ export function SettingsPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
-          <p className="text-sm text-muted-foreground">Loading settings...</p>
+          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-white/[0.05]" />
+          <p className="text-[13px] text-white/40">Loading settings...</p>
         </div>
       </div>
     );
@@ -157,14 +157,19 @@ export function SettingsPage() {
       title="Settings"
       description="Configure the default Assistant role, provider, model, canonical model parameters, and request timeout."
       actions={
-        <Button onClick={() => void handleSave()} disabled={saving}>
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saving}
+          className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
           <Save className="size-4" />
           {saving ? "Saving..." : "Save Changes"}
-        </Button>
+        </button>
       }
     >
-      <div className="h-full min-h-0 overflow-y-auto pr-2">
-        <div className="mx-auto max-w-3xl pb-6">
+      <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none">
+        <div className="mx-auto max-w-[680px] pb-10">
           <section>
             <SectionHeader
               title="Assistant Configuration"
@@ -306,25 +311,27 @@ export function SettingsPage() {
 
               <SettingsRow
                 label="Default Model Parameters"
-                valueClassName="w-72"
+                valueClassName="w-full md:w-80"
               >
-                <ModelParamsFields
-                  className="w-full"
-                  value={cloneModelParams(settings.model.params)}
-                  onChange={(params) =>
-                    setSettings({
-                      ...settings,
-                      model: {
-                        ...settings.model,
-                        params,
-                      },
-                    })
-                  }
-                  emptyLabel="Not set"
-                  numberPlaceholder="Not set"
-                  reasoningDisableLabel={null}
-                  helperText="Empty fields are omitted from outgoing provider requests. Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
-                />
+                <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5">
+                  <ModelParamsFields
+                    className="w-full"
+                    value={cloneModelParams(settings.model.params)}
+                    onChange={(params) =>
+                      setSettings({
+                        ...settings,
+                        model: {
+                          ...settings.model,
+                          params,
+                        },
+                      })
+                    }
+                    emptyLabel="Not set"
+                    numberPlaceholder="Not set"
+                    reasoningDisableLabel={null}
+                    helperText="Empty fields are omitted from outgoing provider requests. Reasoning effort and verbosity are mainly effective on reasoning-capable providers such as OpenAI Responses with GPT-5 family models."
+                  />
+                </div>
               </SettingsRow>
 
               <SettingsRow
@@ -356,11 +363,13 @@ export function SettingsPage() {
                           },
                         });
                       }}
-                      className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
                     />
-                    <span className="text-xs text-muted-foreground">ms</span>
+                    <span className="text-[13px] font-medium text-white/40">
+                      ms
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[11px] text-white/40 leading-relaxed">
                     Applies to a single LLM request attempt. Default is 10000ms.
                     Automatic retries can still make the full call take longer.
                   </p>
@@ -369,9 +378,11 @@ export function SettingsPage() {
             </div>
           </section>
 
-          <div className="mt-8 border-t border-white/6 pt-4 text-sm text-muted-foreground">
-            <p>Autopoe Agent Studio v{appVersion ?? "—"}</p>
-            <p className="mt-1 text-xs">
+          <div className="mt-10 border-t border-white/[0.04] pt-6 flex flex-col items-center text-center">
+            <p className="text-[11px] font-medium text-white/40 tracking-wide uppercase">
+              Autopoe Agent Studio v{appVersion ?? "—"}
+            </p>
+            <p className="mt-1.5 text-[10px] text-white/30">
               A multi-agent collaboration framework.
             </p>
           </div>

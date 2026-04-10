@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageScaffold } from "@/components/layout/PageScaffold";
-import { Button } from "@/components/ui/button";
 import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
 
 export function PromptsPage() {
@@ -53,8 +52,8 @@ export function PromptsPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
-          <p className="text-sm text-muted-foreground">Loading prompts...</p>
+          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-white/[0.05]" />
+          <p className="text-[13px] text-white/40">Loading prompts...</p>
         </div>
       </div>
     );
@@ -64,58 +63,65 @@ export function PromptsPage() {
     <PageScaffold
       title="Prompts"
       description="Edit the global custom prompt layer and the runtime post prompt layer."
+      actions={
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={saving}
+          className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          <Save className="size-4" />
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      }
     >
-      <div className="mx-auto flex h-full max-w-3xl flex-col">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs text-muted-foreground/60">
-            <span>Custom Prompt {customPrompt.length}</span>
-            <span>Custom Post Prompt {customPostPrompt.length}</span>
-          </div>
-          <Button onClick={() => void handleSave()} disabled={saving}>
-            <Save className="size-4" />
-            {saving ? "Saving..." : "Save"}
-          </Button>
-        </div>
-        <div className="grid min-h-0 flex-1 gap-4">
+      <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-4 pb-10">
+        <div className="grid min-h-0 flex-1 gap-8">
           <div className="flex min-h-0 flex-col">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">
-                Custom Prompt
-              </p>
-              <p className="text-[11px] text-muted-foreground/72">
-                Appended to every node&apos;s system prompt
+            <div className="mb-3 flex items-center justify-between px-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-[15px] font-medium text-white/90">
+                  Custom Prompt
+                </h2>
+                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/40">
+                  {customPrompt.length} chars
+                </span>
+              </div>
+              <p className="text-[12px] text-white/40">
+                Appended to every node's system prompt
               </p>
             </div>
-            <div className="relative flex min-h-0 flex-1">
-              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px] rounded-full bg-white/8" />
+            <div className="relative flex min-h-0 flex-1 rounded-xl border border-white/[0.04] bg-white/[0.01] p-1">
               <textarea
                 aria-label="Custom Prompt"
                 value={customPrompt}
                 onChange={(event) => setCustomPrompt(event.target.value)}
                 placeholder="Add a custom prompt appended to every agent's system prompt..."
-                rows={10}
-                className="min-h-0 w-full flex-1 resize-none rounded-r-lg bg-surface-1 pb-4 pl-5 pr-4 pt-4 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+                className="min-h-0 w-full flex-1 resize-none rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
               />
             </div>
           </div>
           <div className="flex min-h-0 flex-col">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">
-                Custom Post Prompt
-              </p>
-              <p className="text-[11px] text-muted-foreground/72">
+            <div className="mb-3 flex items-center justify-between px-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-[15px] font-medium text-white/90">
+                  Runtime Post Prompt
+                </h2>
+                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/40">
+                  {customPostPrompt.length} chars
+                </span>
+              </div>
+              <p className="text-[12px] text-white/40">
                 Added after the built-in runtime post prompt
               </p>
             </div>
-            <div className="relative flex min-h-0 flex-1">
-              <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[2px] rounded-full bg-white/8" />
+            <div className="relative flex min-h-0 flex-1 rounded-xl border border-white/[0.04] bg-white/[0.01] p-1">
               <textarea
                 aria-label="Custom Post Prompt"
                 value={customPostPrompt}
                 onChange={(event) => setCustomPostPrompt(event.target.value)}
                 placeholder="Add custom runtime instructions appended after the built-in post prompt..."
-                rows={10}
-                className="min-h-0 w-full flex-1 resize-none rounded-r-lg bg-surface-1 pb-4 pl-5 pr-4 pt-4 font-mono text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+                className="min-h-0 w-full flex-1 resize-none rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
               />
             </div>
           </div>

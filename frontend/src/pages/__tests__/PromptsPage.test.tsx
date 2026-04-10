@@ -45,7 +45,7 @@ describe("PromptsPage", () => {
     fireEvent.change(customPostPrompt, {
       target: { value: "Call idle when done." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
       expect(savePromptSettings).toHaveBeenCalledWith({

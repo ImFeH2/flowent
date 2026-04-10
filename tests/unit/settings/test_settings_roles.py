@@ -19,6 +19,7 @@ from app.settings import (
     Settings,
     TelegramApprovedChat,
     TelegramSettings,
+    build_default_assistant_write_dirs,
 )
 
 
@@ -63,7 +64,11 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
     assert loaded.telegram == TelegramSettings()
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
-    assert persisted["assistant"] == {"role_name": STEWARD_ROLE_NAME}
+    assert persisted["assistant"] == {
+        "role_name": STEWARD_ROLE_NAME,
+        "allow_network": True,
+        "write_dirs": build_default_assistant_write_dirs(),
+    }
     assert persisted["leader"] == {"role_name": CONDUCTOR_ROLE_NAME}
     assert persisted["telegram"] == {
         "bot_token": "",
@@ -105,6 +110,75 @@ def test_load_settings_defaults_model_max_retries(monkeypatch, tmp_path):
 
     persisted = json.loads(settings_file.read_text(encoding="utf-8"))
     assert persisted["model"]["max_retries"] == 5
+
+
+def test_load_settings_defaults_assistant_permissions(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+
+    assert loaded.assistant.allow_network is True
+    assert loaded.assistant.write_dirs == build_default_assistant_write_dirs()
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["assistant"] == {
+        "role_name": STEWARD_ROLE_NAME,
+        "allow_network": True,
+        "write_dirs": build_default_assistant_write_dirs(),
+    }
+
+
+def test_load_settings_normalizes_assistant_write_dirs(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "assistant": {
+                    "role_name": STEWARD_ROLE_NAME,
+                    "allow_network": False,
+                    "write_dirs": [" ./workspace ", "./workspace/", ""],
+                },
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    loaded = settings_module.load_settings()
+    expected_write_dirs = [str((settings_module.WORKING_DIR / "workspace").resolve())]
+
+    assert loaded.assistant == AssistantSettings(
+        role_name=STEWARD_ROLE_NAME,
+        allow_network=False,
+        write_dirs=expected_write_dirs,
+    )
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    assert persisted["assistant"] == {
+        "role_name": STEWARD_ROLE_NAME,
+        "allow_network": False,
+        "write_dirs": expected_write_dirs,
+    }
 
 
 def test_load_settings_defaults_model_retry_policy(monkeypatch, tmp_path):
@@ -455,7 +529,11 @@ def test_load_settings_parses_telegram_settings(monkeypatch, tmp_path):
         json.dumps(
             {
                 "event_log": {"timestamp_format": "absolute"},
-                "assistant": {"role_name": STEWARD_ROLE_NAME},
+                "assistant": {
+                    "role_name": STEWARD_ROLE_NAME,
+                    "allow_network": True,
+                    "write_dirs": build_default_assistant_write_dirs(),
+                },
                 "telegram": {
                     "bot_token": "123456:ABCDE",
                     "registered_chat_ids": ["-1001", 2002],

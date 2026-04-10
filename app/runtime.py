@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import threading
 from typing import TYPE_CHECKING
 
@@ -57,7 +56,6 @@ def bootstrap_runtime() -> None:
     )
     from app.workspace_store import workspace_store
 
-    working_dir = os.getcwd()
     workspace_store.reset_cache()
     settings = get_settings()
     if ensure_builtin_roles(settings):
@@ -75,8 +73,8 @@ def bootstrap_runtime() -> None:
             role_name=settings.assistant.role_name,
             name="Assistant",
             tools=assistant_tools,
-            write_dirs=[working_dir],
-            allow_network=True,
+            write_dirs=list(settings.assistant.write_dirs),
+            allow_network=settings.assistant.allow_network,
         ),
     )
     registry.register(assistant)

@@ -13,6 +13,8 @@ from app.settings import (
     ModelSettings,
     TelegramApprovedChat,
     TelegramSettings,
+    build_assistant_allow_network,
+    build_assistant_write_dirs,
     build_default_model_params,
     build_model_max_retries,
     build_model_params_from_mapping,
@@ -83,7 +85,27 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 status_code=400,
                 detail=f"Role '{next_role_name}' not found",
             )
-        current.assistant = AssistantSettings(role_name=next_role_name)
+        next_allow_network = current.assistant.allow_network
+        if "allow_network" in req.assistant:
+            try:
+                next_allow_network = build_assistant_allow_network(
+                    req.assistant.get("allow_network")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        next_write_dirs = list(current.assistant.write_dirs)
+        if "write_dirs" in req.assistant:
+            try:
+                next_write_dirs = build_assistant_write_dirs(
+                    req.assistant.get("write_dirs")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        current.assistant = AssistantSettings(
+            role_name=next_role_name,
+            allow_network=next_allow_network,
+            write_dirs=next_write_dirs,
+        )
 
     if req.leader is not None:
         role_name = req.leader.get("role_name", current.leader.role_name)

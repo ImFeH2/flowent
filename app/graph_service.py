@@ -238,6 +238,8 @@ def sync_assistant_role(*, reason: str) -> None:
         settings.assistant.role_name,
         settings=settings,
     )
+    assistant.config.write_dirs = list(settings.assistant.write_dirs)
+    assistant.config.allow_network = settings.assistant.allow_network
     assistant._sync_system_prompt_entry()
     assistant.set_state(
         assistant.state,

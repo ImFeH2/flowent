@@ -33,7 +33,11 @@ describe("SettingsPage", () => {
   it("loads and saves request timeout", async () => {
     fetchSettingsBootstrap.mockResolvedValue({
       settings: {
-        assistant: { role_name: "Steward" },
+        assistant: {
+          role_name: "Steward",
+          allow_network: true,
+          write_dirs: ["/project/autopoe"],
+        },
         leader: { role_name: "Conductor" },
         model: {
           active_provider_id: "",
@@ -57,24 +61,61 @@ describe("SettingsPage", () => {
       roles: [{ name: "Steward", system_prompt: "Default.", is_builtin: true }],
       version: "1.2.3",
     });
-    saveSettings.mockResolvedValue(undefined);
+    saveSettings.mockResolvedValue({
+      assistant: {
+        role_name: "Steward",
+        allow_network: false,
+        write_dirs: ["/project/autopoe/tmp"],
+      },
+      leader: { role_name: "Conductor" },
+      model: {
+        active_provider_id: "",
+        active_model: "",
+        timeout_ms: 15000,
+        retry_policy: "limited",
+        max_retries: 5,
+        retry_initial_delay_seconds: 0.75,
+        retry_max_delay_seconds: 8,
+        retry_backoff_cap_retries: 5,
+        params: {
+          reasoning_effort: null,
+          verbosity: null,
+          max_output_tokens: null,
+          temperature: null,
+          top_p: null,
+        },
+      },
+    });
 
     render(<SettingsPage />);
 
     const timeoutInput = await screen.findByLabelText("Request Timeout");
     const initialDelayInput = screen.getByLabelText("Initial Delay");
+    const networkAccessSwitch = screen.getByRole("switch", {
+      name: "Network Access",
+    });
+    const writeDirsTextarea = screen.getByLabelText("Write Dirs");
 
     expect(timeoutInput).toHaveValue("10000");
     expect(screen.getByText("ms")).toBeInTheDocument();
     expect(initialDelayInput).toHaveValue("0.5");
+    expect(writeDirsTextarea).toHaveValue("/project/autopoe");
 
     fireEvent.change(timeoutInput, { target: { value: "15000" } });
     fireEvent.change(initialDelayInput, { target: { value: "0.75" } });
+    fireEvent.click(networkAccessSwitch);
+    fireEvent.change(writeDirsTextarea, {
+      target: { value: " ./tmp \n./tmp/\n" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
       expect(saveSettings).toHaveBeenCalledWith({
-        assistant: { role_name: "Steward" },
+        assistant: {
+          role_name: "Steward",
+          allow_network: false,
+          write_dirs: ["./tmp"],
+        },
         leader: { role_name: "Conductor" },
         model: {
           active_provider_id: "",

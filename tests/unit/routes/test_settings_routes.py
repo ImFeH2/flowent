@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
@@ -22,6 +23,7 @@ from app.settings import (
     TelegramApprovedChat,
     TelegramPendingChat,
     TelegramSettings,
+    build_default_assistant_write_dirs,
 )
 
 
@@ -34,7 +36,11 @@ def test_get_settings_returns_assistant_configuration(monkeypatch):
 
     result = asyncio.run(get_settings_api())
 
-    assert result["assistant"] == {"role_name": "Steward"}
+    assert result["assistant"] == {
+        "role_name": "Steward",
+        "allow_network": True,
+        "write_dirs": build_default_assistant_write_dirs(),
+    }
     assert result["leader"] == {"role_name": "Conductor"}
 
 
@@ -60,7 +66,11 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
     assert result == {
         "settings": {
             "event_log": {"timestamp_format": "absolute"},
-            "assistant": {"role_name": "Steward"},
+            "assistant": {
+                "role_name": "Steward",
+                "allow_network": True,
+                "write_dirs": build_default_assistant_write_dirs(),
+            },
             "leader": {"role_name": "Conductor"},
             "telegram": {
                 "bot_token": "",
@@ -646,7 +656,45 @@ def test_update_settings_persists_assistant_role(monkeypatch):
     )
 
     assert settings.assistant.role_name == "Reviewer"
-    assert result["settings"]["assistant"] == {"role_name": "Reviewer"}
+    assert result["settings"]["assistant"] == {
+        "role_name": "Reviewer",
+        "allow_network": True,
+        "write_dirs": build_default_assistant_write_dirs(),
+    }
+    assert saved == [settings]
+
+
+def test_update_settings_persists_assistant_permissions(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                assistant={
+                    "allow_network": False,
+                    "write_dirs": [" ./tmp ", "./tmp/", ""],
+                }
+            ),
+        )
+    )
+
+    expected_write_dirs = [str((Path.cwd() / "tmp").resolve())]
+    assert settings.assistant.allow_network is False
+    assert settings.assistant.write_dirs == expected_write_dirs
+    assert result["settings"]["assistant"] == {
+        "role_name": "Steward",
+        "allow_network": False,
+        "write_dirs": expected_write_dirs,
+    }
     assert saved == [settings]
 
 
@@ -692,6 +740,24 @@ def test_update_settings_rejects_unknown_assistant_role(monkeypatch):
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "Role 'Ghost' not found"
+
+
+def test_update_settings_rejects_invalid_assistant_allow_network(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(assistant={"allow_network": "yes"}),
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "assistant.allow_network must be a boolean"
 
 
 def test_update_settings_rejects_unknown_leader_role(monkeypatch):

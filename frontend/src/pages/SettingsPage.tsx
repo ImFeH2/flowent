@@ -35,6 +35,8 @@ const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
 interface UserSettings {
   assistant: {
     role_name: string;
+    allow_network: boolean;
+    write_dirs: string[];
   };
   leader: {
     role_name: string;
@@ -50,6 +52,24 @@ interface UserSettings {
     retry_backoff_cap_retries: number;
     params: ModelParams;
   };
+}
+
+function normalizeWriteDirs(writeDirs: string[]): string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  for (const rawDir of writeDirs) {
+    const trimmed = rawDir.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const normalizedDir = trimmed.replace(/\/+$/u, "") || "/";
+    if (seen.has(normalizedDir)) {
+      continue;
+    }
+    seen.add(normalizedDir);
+    normalized.push(normalizedDir);
+  }
+  return normalized;
 }
 
 export function SettingsPage() {
@@ -150,11 +170,12 @@ export function SettingsPage() {
     }
     setSaving(true);
     try {
-      await saveSettings({
+      const savedSettings = await saveSettings<UserSettings>({
         assistant: settings.assistant,
         leader: settings.leader,
         model: settings.model,
       });
+      setSettings(savedSettings);
       toast.success("Settings saved");
     } catch {
       toast.error("Failed to save settings");
@@ -202,6 +223,7 @@ export function SettingsPage() {
                     setSettings({
                       ...settings,
                       assistant: {
+                        ...settings.assistant,
                         role_name: value,
                       },
                     })
@@ -218,6 +240,82 @@ export function SettingsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </SettingsRow>
+
+              <SettingsRow
+                label="Network Access"
+                description="Hard network permission boundary"
+              >
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.assistant.allow_network}
+                    aria-label="Network Access"
+                    onClick={() =>
+                      setSettings({
+                        ...settings,
+                        assistant: {
+                          ...settings.assistant,
+                          allow_network: !settings.assistant.allow_network,
+                        },
+                      })
+                    }
+                    className={cn(
+                      "inline-flex h-8 w-[72px] items-center rounded-full border px-1 transition-colors",
+                      settings.assistant.allow_network
+                        ? "border-emerald-400/30 bg-emerald-400/15"
+                        : "border-white/[0.08] bg-white/[0.04]",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold transition-all",
+                        settings.assistant.allow_network
+                          ? "translate-x-[40px] bg-emerald-300 text-black"
+                          : "translate-x-0 bg-white/90 text-black",
+                      )}
+                    >
+                      {settings.assistant.allow_network ? "ON" : "OFF"}
+                    </span>
+                  </button>
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    When disabled, the Assistant cannot make networked tool
+                    calls even if its role still includes network-capable tools.
+                  </p>
+                </div>
+              </SettingsRow>
+
+              <SettingsRow
+                label="Write Dirs"
+                description="Writable directory boundaries"
+              >
+                <div className="space-y-2">
+                  <textarea
+                    aria-label="Write Dirs"
+                    value={settings.assistant.write_dirs.join("\n")}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        assistant: {
+                          ...settings.assistant,
+                          write_dirs: normalizeWriteDirs(
+                            e.target.value.split("\n"),
+                          ),
+                        },
+                      })
+                    }
+                    rows={4}
+                    spellCheck={false}
+                    placeholder="/project/autopoe"
+                    className="min-h-[108px] w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                  />
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    One directory per line. Empty lines are ignored. These paths
+                    bound both the Assistant&apos;s own writes and the maximum
+                    write access it can delegate to execution chains.
+                  </p>
+                </div>
               </SettingsRow>
             </div>
           </section>

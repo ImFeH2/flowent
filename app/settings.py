@@ -106,6 +106,11 @@ DEFAULT_LLM_RETRY_POLICY = "limited"
 DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS = 0.5
 DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS = 8.0
 DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES = 5
+DEFAULT_ASSISTANT_ALLOW_NETWORK = True
+
+
+def build_default_assistant_write_dirs() -> list[str]:
+    return [str(WORKING_DIR.resolve())]
 
 
 @dataclass
@@ -143,6 +148,10 @@ def build_default_model_params() -> ModelParams:
     return ModelParams()
 
 
+def _normalize_assistant_write_dir(raw_write_dir: str) -> str:
+    return str(Path(raw_write_dir).expanduser().resolve(strict=False))
+
+
 @dataclass
 class RoleConfig:
     name: str
@@ -169,6 +178,8 @@ class ModelSettings:
 @dataclass
 class AssistantSettings:
     role_name: str = STEWARD_ROLE_NAME
+    allow_network: bool = DEFAULT_ASSISTANT_ALLOW_NETWORK
+    write_dirs: list[str] = field(default_factory=build_default_assistant_write_dirs)
 
 
 @dataclass
@@ -371,6 +382,40 @@ def build_model_max_retries(
     if raw_max_retries <= 0:
         raise ValueError(f"{field_name} must be greater than 0")
     return raw_max_retries
+
+
+def build_assistant_allow_network(
+    raw_allow_network: object,
+    *,
+    field_name: str = "assistant.allow_network",
+) -> bool:
+    if not isinstance(raw_allow_network, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return raw_allow_network
+
+
+def build_assistant_write_dirs(
+    raw_write_dirs: object,
+    *,
+    field_name: str = "assistant.write_dirs",
+) -> list[str]:
+    if not isinstance(raw_write_dirs, list):
+        raise ValueError(f"{field_name} must be an array of strings")
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_item in raw_write_dirs:
+        if not isinstance(raw_item, str):
+            raise ValueError(f"{field_name} must be an array of strings")
+        stripped = raw_item.strip()
+        if not stripped:
+            continue
+        normalized_item = _normalize_assistant_write_dir(stripped)
+        if normalized_item in seen:
+            continue
+        seen.add(normalized_item)
+        normalized.append(normalized_item)
+    return normalized
 
 
 def build_model_retry_policy(
@@ -898,10 +943,49 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     if "assistant" not in data:
         migrated = True
     assistant_role_name = assistant_data.get("role_name")
+    raw_assistant_allow_network = assistant_data.get("allow_network")
+    if raw_assistant_allow_network is None:
+        assistant_allow_network = DEFAULT_ASSISTANT_ALLOW_NETWORK
+        migrated = True
+    else:
+        try:
+            assistant_allow_network = build_assistant_allow_network(
+                raw_assistant_allow_network
+            )
+        except ValueError:
+            assistant_allow_network = DEFAULT_ASSISTANT_ALLOW_NETWORK
+            migrated = True
+    raw_assistant_write_dirs = assistant_data.get("write_dirs")
+    if raw_assistant_write_dirs is None or not isinstance(
+        raw_assistant_write_dirs, list
+    ):
+        assistant_write_dirs = build_default_assistant_write_dirs()
+        migrated = True
+    else:
+        assistant_write_dirs = []
+        seen_assistant_write_dirs: set[str] = set()
+        for raw_item in raw_assistant_write_dirs:
+            if not isinstance(raw_item, str):
+                migrated = True
+                continue
+            stripped = raw_item.strip()
+            if not stripped:
+                migrated = True
+                continue
+            normalized_item = _normalize_assistant_write_dir(stripped)
+            if normalized_item != raw_item:
+                migrated = True
+            if normalized_item in seen_assistant_write_dirs:
+                migrated = True
+                continue
+            seen_assistant_write_dirs.add(normalized_item)
+            assistant_write_dirs.append(normalized_item)
     assistant = AssistantSettings(
         role_name=assistant_role_name.strip()
         if isinstance(assistant_role_name, str) and assistant_role_name.strip()
-        else STEWARD_ROLE_NAME
+        else STEWARD_ROLE_NAME,
+        allow_network=assistant_allow_network,
+        write_dirs=assistant_write_dirs,
     )
     if assistant.role_name == STEWARD_ROLE_NAME and (
         not isinstance(assistant_role_name, str) or not assistant_role_name.strip()

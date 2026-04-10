@@ -1,5 +1,5 @@
 import type { Provider, Role } from "@/types";
-import { requestJson, requestVoid } from "./shared";
+import { requestJson } from "./shared";
 
 export interface SettingsBootstrap<TSettings> {
   settings: TSettings;
@@ -22,10 +22,16 @@ export async function fetchSettingsBootstrap<T>(): Promise<
   });
 }
 
-export async function saveSettings(settings: unknown): Promise<void> {
-  await requestVoid("/api/settings", {
+export async function saveSettings<T>(settings: unknown): Promise<T> {
+  return requestJson<{ status: string; settings: T }, T>("/api/settings", {
     method: "POST",
     body: settings,
     errorMessage: "Failed to save settings",
+    map: (data) => {
+      if (!data) {
+        throw new Error("Failed to save settings");
+      }
+      return data.settings;
+    },
   });
 }

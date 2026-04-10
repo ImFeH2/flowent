@@ -16,7 +16,11 @@ from app.tools.manage_settings import ManageSettingsTool
 def test_manage_settings_get_returns_current_settings(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(
-        assistant=AssistantSettings(role_name="Steward"),
+        assistant=AssistantSettings(
+            role_name="Steward",
+            allow_network=False,
+            write_dirs=["/tmp/workspace", "/tmp/output"],
+        ),
         leader=LeaderSettings(role_name="Conductor"),
         event_log=EventLogSettings(timestamp_format="relative"),
         model=ModelSettings(active_provider_id="provider-1", active_model="gpt-4o"),
@@ -29,6 +33,8 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
     assert result == {
         "assistant": {
             "role_name": "Steward",
+            "allow_network": False,
+            "write_dirs": ["/tmp/workspace", "/tmp/output"],
         },
         "leader": {
             "role_name": "Conductor",
@@ -131,9 +137,41 @@ def test_manage_settings_update_changes_assistant_role(monkeypatch):
         )
     )
 
-    assert result["assistant"] == {"role_name": "Reviewer"}
+    assert result["assistant"] == {
+        "role_name": "Reviewer",
+        "allow_network": True,
+        "write_dirs": ["/project/autopoe"],
+    }
     assert settings.assistant.role_name == "Reviewer"
     assert saved == [settings]
+
+
+def test_manage_settings_update_changes_assistant_permissions(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "assistant_allow_network": False,
+                "assistant_write_dirs": [" ./tmp ", "./tmp/", ""],
+            },
+        )
+    )
+
+    assert result["assistant"] == {
+        "role_name": "Steward",
+        "allow_network": False,
+        "write_dirs": ["/project/autopoe/tmp"],
+    }
+    assert settings.assistant.allow_network is False
+    assert settings.assistant.write_dirs == ["/project/autopoe/tmp"]
 
 
 def test_manage_settings_update_changes_leader_role(monkeypatch):
@@ -349,6 +387,25 @@ def test_manage_settings_update_rejects_unknown_assistant_role(monkeypatch):
     )
 
     assert result == {"error": "Role 'Ghost' not found"}
+
+
+def test_manage_settings_update_rejects_invalid_assistant_allow_network(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "assistant_allow_network": "yes",
+            },
+        )
+    )
+
+    assert result == {"error": "assistant_allow_network must be a boolean"}
 
 
 def test_manage_settings_update_rejects_unknown_leader_role(monkeypatch):

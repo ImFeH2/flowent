@@ -14,6 +14,8 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
     return {
         "assistant": {
             "role_name": settings.assistant.role_name,
+            "allow_network": settings.assistant.allow_network,
+            "write_dirs": list(settings.assistant.write_dirs),
         },
         "leader": {
             "role_name": settings.leader.role_name,
@@ -63,6 +65,15 @@ class ManageSettingsTool(Tool):
             "assistant_role_name": {
                 "type": "string",
                 "description": "Role name used by the Assistant",
+            },
+            "assistant_allow_network": {
+                "type": "boolean",
+                "description": "Whether the Assistant may use networked tools or paths",
+            },
+            "assistant_write_dirs": {
+                "type": "array",
+                "description": "Writable directory boundaries for the Assistant",
+                "items": {"type": "string"},
             },
             "leader_role_name": {
                 "type": "string",
@@ -127,6 +138,8 @@ class ManageSettingsTool(Tool):
         from app.graph_service import sync_assistant_role, sync_tab_leaders
         from app.providers.gateway import gateway
         from app.settings import (
+            build_assistant_allow_network,
+            build_assistant_write_dirs,
             build_default_model_params,
             build_model_max_retries,
             build_model_params_from_mapping,
@@ -143,6 +156,8 @@ class ManageSettingsTool(Tool):
 
         action = args.get("action")
         assistant_role_name = args.get("assistant_role_name")
+        assistant_allow_network = args.get("assistant_allow_network")
+        assistant_write_dirs = args.get("assistant_write_dirs")
         leader_role_name = args.get("leader_role_name")
         active_provider_id = args.get("active_provider_id")
         active_model = args.get("active_model")
@@ -160,6 +175,16 @@ class ManageSettingsTool(Tool):
 
         if assistant_role_name is not None and not isinstance(assistant_role_name, str):
             return json.dumps({"error": "assistant_role_name must be a string"})
+        if assistant_allow_network is not None and not isinstance(
+            assistant_allow_network, bool
+        ):
+            return json.dumps({"error": "assistant_allow_network must be a boolean"})
+        if assistant_write_dirs is not None and not isinstance(
+            assistant_write_dirs, list
+        ):
+            return json.dumps(
+                {"error": "assistant_write_dirs must be an array of strings"}
+            )
         if leader_role_name is not None and not isinstance(leader_role_name, str):
             return json.dumps({"error": "leader_role_name must be a string"})
         if active_provider_id is not None and not isinstance(active_provider_id, str):
@@ -228,6 +253,24 @@ class ManageSettingsTool(Tool):
             if find_role(settings, next_role_name) is None:
                 return json.dumps({"error": f"Role '{next_role_name}' not found"})
             next_assistant_role_name = next_role_name
+        next_assistant_allow_network = settings.assistant.allow_network
+        if assistant_allow_network is not None:
+            try:
+                next_assistant_allow_network = build_assistant_allow_network(
+                    assistant_allow_network,
+                    field_name="assistant_allow_network",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+        next_assistant_write_dirs = list(settings.assistant.write_dirs)
+        if assistant_write_dirs is not None:
+            try:
+                next_assistant_write_dirs = build_assistant_write_dirs(
+                    assistant_write_dirs,
+                    field_name="assistant_write_dirs",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
 
         next_leader_role_name = settings.leader.role_name
         if leader_role_name is not None:
@@ -310,6 +353,8 @@ class ManageSettingsTool(Tool):
             next_timestamp_format = timestamp_format
 
         settings.assistant.role_name = next_assistant_role_name
+        settings.assistant.allow_network = next_assistant_allow_network
+        settings.assistant.write_dirs = next_assistant_write_dirs
         settings.leader.role_name = next_leader_role_name
         settings.model.active_provider_id = next_active_provider_id
         settings.model.active_model = next_active_model

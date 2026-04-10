@@ -1,5 +1,4 @@
 import json
-import os
 from uuid import UUID
 
 import app.settings as settings_module
@@ -18,6 +17,7 @@ from app.settings import (
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
     RoleConfig,
+    build_default_assistant_write_dirs,
 )
 from app.workspace_store import workspace_store
 
@@ -57,7 +57,7 @@ def test_bootstrap_runtime_creates_only_assistant(
         assert assistant.config.name == "Assistant"
         assert assistant.config.role_name == STEWARD_ROLE_NAME
         assert assistant.config.tools == list(STEWARD_ROLE_INCLUDED_TOOLS)
-        assert assistant.config.write_dirs == [os.getcwd()]
+        assert assistant.config.write_dirs == build_default_assistant_write_dirs()
         assert assistant.config.allow_network is True
     finally:
         registry.reset()
@@ -205,6 +205,52 @@ def test_bootstrap_runtime_uses_configured_assistant_role(monkeypatch, tmp_path)
         assert assistant is not None
         assert assistant.config.role_name == "Reviewer"
         assert settings_module.get_settings().assistant.role_name == "Reviewer"
+    finally:
+        registry.reset()
+
+
+def test_bootstrap_runtime_uses_configured_assistant_permissions(
+    monkeypatch,
+    tmp_path,
+):
+    registry.reset()
+    allowed_dir = tmp_path / "assistant-write"
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "assistant": {
+                    "role_name": "Reviewer",
+                    "allow_network": False,
+                    "write_dirs": [str(allowed_dir)],
+                },
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [
+                    {
+                        "name": "Reviewer",
+                        "system_prompt": "Review everything.",
+                        "included_tools": [],
+                        "excluded_tools": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        assistant = registry.get_assistant()
+        assert assistant is not None
+        assert assistant.config.allow_network is False
+        assert assistant.config.write_dirs == [str(allowed_dir.resolve())]
     finally:
         registry.reset()
 

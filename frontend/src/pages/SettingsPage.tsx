@@ -153,23 +153,20 @@ export function SettingsPage() {
   }
 
   return (
-    <PageScaffold
-      title="Settings"
-      description="Configure the default Assistant role, provider, model, canonical model parameters, and request timeout."
-      actions={
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          <Save className="size-4" />
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-      }
-    >
+    <PageScaffold>
       <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none">
-        <div className="mx-auto max-w-[680px] pb-10">
+        <div className="mx-auto max-w-[680px] pb-10 pt-8">
+          <div className="mb-8 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              <Save className="size-4" />
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
           <section>
             <SectionHeader
               title="Assistant Configuration"

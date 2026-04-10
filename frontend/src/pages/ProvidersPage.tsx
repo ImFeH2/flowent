@@ -245,16 +245,12 @@ export function ProvidersPage() {
       : false;
 
   return (
-    <PageScaffold
-      title="Providers"
-      description="Manage LLM backends and connection endpoints."
-      className="overflow-hidden p-0 md:p-0"
-    >
+    <PageScaffold className="overflow-hidden p-0 md:p-0">
       <div className="flex h-full w-full">
         {/* Left Sidebar List */}
         <div
           style={{ width: `${panelWidth}px` }}
-          className="relative flex shrink-0 flex-col border-r border-white/[0.04] bg-white/[0.01]"
+          className="relative flex shrink-0 flex-col border-r border-white/[0.04] bg-white/[0.01] pt-8 pl-8"
         >
           <div className="flex shrink-0 items-center justify-between px-5 py-4">
             <div className="flex items-center gap-2">

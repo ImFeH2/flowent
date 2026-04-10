@@ -140,11 +140,8 @@ export function ToolsPage() {
   };
 
   return (
-    <PageScaffold
-      title="Tools"
-      description="Search and inspect the runtime tools currently available to agents."
-    >
-      <div className="flex h-full flex-col">
+    <PageScaffold>
+      <div className="flex h-full flex-col pt-8 px-8">
         <div className="mb-6 flex items-center gap-4">
           <div className="relative max-w-md flex-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/40" />

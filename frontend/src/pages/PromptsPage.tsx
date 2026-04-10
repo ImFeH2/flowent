@@ -60,22 +60,19 @@ export function PromptsPage() {
   }
 
   return (
-    <PageScaffold
-      title="Prompts"
-      description="Edit the global custom prompt layer and the runtime post prompt layer."
-      actions={
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving}
-          className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          <Save className="size-4" />
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-      }
-    >
-      <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-4 pb-10">
+    <PageScaffold>
+      <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-4 pb-10 pt-8">
+        <div className="mb-6 flex justify-end">
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            <Save className="size-4" />
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
         <div className="grid min-h-0 flex-1 gap-8">
           <div className="flex min-h-0 flex-col">
             <div className="mb-3 flex items-center justify-between px-1">

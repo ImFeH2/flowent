@@ -5,7 +5,7 @@ import { PageScaffold } from "@/components/layout/PageScaffold";
 describe("PageScaffold", () => {
   it("passes the remaining page height to the child page root container", () => {
     render(
-      <PageScaffold title="Providers" description="Manage providers">
+      <PageScaffold>
         <div data-testid="page-root" className="flex min-h-0 flex-1" />
       </PageScaffold>,
     );
@@ -14,9 +14,9 @@ describe("PageScaffold", () => {
     expect(pageRoot).toHaveClass("flex-1");
     expect(pageRoot.parentElement).toHaveClass(
       "flex",
-      "min-h-0",
-      "flex-1",
+      "h-full",
       "flex-col",
+      "min-h-0",
       "overflow-hidden",
     );
   });

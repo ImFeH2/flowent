@@ -2,9 +2,6 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface PageScaffoldProps {
-  title: string;
-  description?: string;
-  actions?: ReactNode;
   children: ReactNode;
   className?: string;
 }
@@ -14,31 +11,12 @@ interface SoftPanelProps {
   className?: string;
 }
 
-export function PageScaffold({
-  title,
-  description,
-  actions,
-  children,
-  className,
-}: PageScaffoldProps) {
+export function PageScaffold({ children, className }: PageScaffoldProps) {
   return (
-    <div className={cn("flex h-full flex-col px-8 py-8", className)}>
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-medium tracking-tight text-white/90">
-            {title}
-          </h1>
-          {description ? (
-            <p className="mt-1.5 text-[13px] text-white/40">{description}</p>
-          ) : null}
-        </div>
-        {actions ? (
-          <div className="flex items-center gap-2">{actions}</div>
-        ) : null}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {children}
-      </div>
+    <div
+      className={cn("flex h-full flex-col min-h-0 overflow-hidden", className)}
+    >
+      {children}
     </div>
   );
 }

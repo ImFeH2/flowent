@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { Edit2, Eye, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Edit2, Eye, Plus, RefreshCw, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   createRole,
@@ -413,256 +413,248 @@ export function RolesPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
-          <p className="text-sm text-muted-foreground">Loading roles...</p>
+          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-white/[0.05]" />
+          <p className="text-sm text-white/40">Loading roles...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <PageScaffold
-      title="Roles"
-      description="Define reusable agent behaviors, model overrides, parameter overrides, and tool boundaries."
-      actions={
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => void refreshRoles()}
-            disabled={loading}
-            variant="ghost"
-            size="icon"
-            className="border border-white/8 bg-white/[0.024] text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
-          >
-            <RefreshCw className={cn("size-4", loading && "animate-spin")} />
-          </Button>
-          <Button onClick={handleCreate} disabled={isPanelOpen}>
-            <Plus className="size-4" />
-            New Role
-          </Button>
-        </div>
-      }
-    >
+    <PageScaffold>
       {isPanelOpen ? (
-        <div className="h-full min-h-0 overflow-y-auto pr-2">
-          <div className="mx-auto max-w-3xl pb-6">
-            <div className="mb-6 flex items-center justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base font-semibold">{panelTitle}</h2>
-                <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+        <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none">
+          <div className="mx-auto max-w-3xl pb-10">
+            <div className="mb-8 flex items-center justify-between rounded-xl border border-white/[0.04] bg-white/[0.01] px-5 py-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-[15px] font-medium text-white/90">
+                  {panelTitle}
+                </h2>
+                <span className="rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-0.5 text-[10px] font-medium tracking-wide text-white/50">
                   {panelEyebrow}
                 </span>
               </div>
-              <Button
+              <button
+                type="button"
                 onClick={handleCancel}
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
+                className="flex size-7 items-center justify-center rounded-full bg-white/[0.04] text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
               >
-                <X className="size-4" />
-              </Button>
+                <X className="size-3.5" />
+              </button>
             </div>
 
-            <section>
+            <section className="mb-10">
               <SectionHeader
-                title="Role Identity"
+                title="Identity"
                 description="Define the role name and baseline prompt used by agents created with this role."
               />
 
-              <SettingsRow label="Role Name" description="Unique ID">
-                <input
-                  type="text"
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  readOnly={isReadOnly || lockBuiltinFields}
-                  placeholder="e.g., Code Reviewer"
-                  className={cn(
-                    "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground",
-                    isReadOnly || lockBuiltinFields
-                      ? "cursor-default text-muted-foreground focus:outline-none"
-                      : "focus:border-white/16 focus:outline-none",
-                  )}
-                />
-              </SettingsRow>
+              <div className="space-y-4">
+                <SettingsRow label="Role Name" description="Unique identifier">
+                  <input
+                    type="text"
+                    value={draft.name}
+                    onChange={(e) =>
+                      setDraft({ ...draft, name: e.target.value })
+                    }
+                    readOnly={isReadOnly || lockBuiltinFields}
+                    placeholder="e.g., Code Reviewer"
+                    className={cn(
+                      "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30",
+                      isReadOnly || lockBuiltinFields
+                        ? "cursor-default opacity-60 focus:outline-none"
+                        : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                    )}
+                  />
+                </SettingsRow>
 
-              <div className="mt-5 space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-sm font-medium">System Prompt</label>
-                  <span className="text-[11px] text-muted-foreground/72">
-                    Appended after the built-in collaboration prompt
-                  </span>
-                </div>
-                <textarea
-                  value={draft.system_prompt}
-                  onChange={(e) =>
-                    setDraft({ ...draft, system_prompt: e.target.value })
-                  }
-                  readOnly={isReadOnly || lockBuiltinFields}
-                  placeholder="You are a helpful assistant that..."
-                  rows={12}
-                  className={cn(
-                    "w-full resize-y rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
-                    isReadOnly || lockBuiltinFields
-                      ? "cursor-default text-muted-foreground focus:outline-none"
-                      : "focus:border-white/16 focus:outline-none",
-                  )}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {isReadOnly
-                    ? activeRole?.is_builtin
-                      ? "This built-in role can be inspected. Use Edit to adjust only its model configuration."
-                      : "This role is in read-only view. Use Edit to modify it."
-                    : lockBuiltinFields
-                      ? "Built-in role prompt and tool configuration are fixed. Only model configuration can be changed."
-                      : "This prompt defines how agents with this role will behave."}
-                </p>
+                <SettingsRow
+                  label="System Prompt"
+                  description="Appended after the built-in collaboration prompt"
+                >
+                  <div className="space-y-2">
+                    <textarea
+                      value={draft.system_prompt}
+                      onChange={(e) =>
+                        setDraft({ ...draft, system_prompt: e.target.value })
+                      }
+                      readOnly={isReadOnly || lockBuiltinFields}
+                      placeholder="You are a helpful assistant that..."
+                      rows={12}
+                      className={cn(
+                        "w-full resize-y rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 font-mono text-[13px] text-white transition-colors placeholder:text-white/30",
+                        isReadOnly || lockBuiltinFields
+                          ? "cursor-default opacity-60 focus:outline-none"
+                          : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                      )}
+                    />
+                    <p className="text-[11px] text-white/40">
+                      {isReadOnly
+                        ? activeRole?.is_builtin
+                          ? "This built-in role can be inspected. Use Edit to adjust only its model configuration."
+                          : "This role is in read-only view. Use Edit to modify it."
+                        : lockBuiltinFields
+                          ? "Built-in role prompt and tool configuration are fixed. Only model configuration can be changed."
+                          : "This prompt defines how agents with this role will behave."}
+                    </p>
+                  </div>
+                </SettingsRow>
               </div>
             </section>
 
-            <section className="mt-6 border-t border-white/6 pt-6">
+            <section className="mb-10 border-t border-white/[0.04] pt-8">
               <SectionHeader
                 title="Model Configuration"
                 description="Choose whether this role follows Settings or uses its own provider and model override."
               />
 
-              <div className="space-y-4">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button
+              <div className="space-y-6">
+                <div className="flex flex-wrap gap-3">
+                  <button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(false)}
-                    variant="outline"
                     className={cn(
-                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
+                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       draft.model === null
-                        ? "border-white/10 bg-white/[0.075] text-foreground"
-                        : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
-                      isReadOnly && "cursor-default hover:bg-black/[0.18]",
+                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
+                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                      isReadOnly && "cursor-default",
                     )}
                   >
                     Use Settings Default
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(true)}
-                    variant="outline"
                     className={cn(
-                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
+                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       draft.model !== null
-                        ? "border-white/10 bg-white/[0.075] text-foreground"
-                        : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
-                      isReadOnly && "cursor-default hover:bg-black/[0.18]",
+                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
+                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                      isReadOnly && "cursor-default",
                     )}
                   >
                     Set Role Override
-                  </Button>
+                  </button>
                 </div>
 
                 {draft.model ? (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Provider</label>
-                      <Select
-                        value={draft.model.provider_id || undefined}
-                        onValueChange={handleProviderChange}
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
-                          <SelectValue placeholder="Select a provider" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {providers.map((provider) => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5">
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-[13px] font-medium text-white/80">
+                          Provider
+                        </label>
+                        <Select
+                          value={draft.model.provider_id || undefined}
+                          onValueChange={handleProviderChange}
+                          disabled={isReadOnly}
+                        >
+                          <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                            <SelectValue placeholder="Select a provider" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                            {providers.map((provider) => (
+                              <SelectItem
+                                key={provider.id}
+                                value={provider.id}
+                                className="text-[13px]"
+                              >
+                                {provider.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Provider Models
-                      </label>
-                      <Select
-                        value={
-                          activeProviderModelOptions.some(
-                            (option) => option.id === draft.model?.model,
-                          )
-                            ? draft.model?.model
-                            : undefined
-                        }
-                        onValueChange={(value) =>
-                          setDraft((current) => ({
-                            ...current,
-                            model: current.model
-                              ? {
-                                  ...current.model,
-                                  model: value,
-                                }
-                              : null,
-                          }))
-                        }
-                        disabled={
-                          isReadOnly ||
-                          !draft.model.provider_id ||
-                          loadingModelProviderId === draft.model.provider_id ||
-                          activeProviderModelOptions.length === 0
-                        }
-                      >
-                        <SelectTrigger className="rounded-md border-white/8 bg-black/[0.22]">
-                          <SelectValue
-                            placeholder={
-                              loadingModelProviderId === draft.model.provider_id
-                                ? "Loading models..."
-                                : activeProviderModelOptions.length > 0
-                                  ? "Pick a discovered model"
-                                  : "No discovered models"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {activeProviderModelOptions.map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.id}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                      <div className="space-y-2">
+                        <label className="text-[13px] font-medium text-white/80">
+                          Provider Models
+                        </label>
+                        <Select
+                          value={
+                            activeProviderModelOptions.some(
+                              (option) => option.id === draft.model?.model,
+                            )
+                              ? draft.model?.model
+                              : undefined
+                          }
+                          onValueChange={(value) =>
+                            setDraft((current) => ({
+                              ...current,
+                              model: current.model
+                                ? { ...current.model, model: value }
+                                : null,
+                            }))
+                          }
+                          disabled={
+                            isReadOnly ||
+                            !draft.model.provider_id ||
+                            loadingModelProviderId ===
+                              draft.model.provider_id ||
+                            activeProviderModelOptions.length === 0
+                          }
+                        >
+                          <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                            <SelectValue
+                              placeholder={
+                                loadingModelProviderId ===
+                                draft.model.provider_id
+                                  ? "Loading models..."
+                                  : activeProviderModelOptions.length > 0
+                                    ? "Pick a discovered model"
+                                    : "No discovered models"
+                              }
+                            />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px] rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                            {activeProviderModelOptions.map((option) => (
+                              <SelectItem
+                                key={option.id}
+                                value={option.id}
+                                className="text-[13px]"
+                              >
+                                {option.id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-sm font-medium">Model</label>
-                      <input
-                        type="text"
-                        value={draft.model.model}
-                        onChange={(e) =>
-                          setDraft((current) => ({
-                            ...current,
-                            model: current.model
-                              ? {
-                                  ...current.model,
-                                  model: e.target.value,
-                                }
-                              : null,
-                          }))
-                        }
-                        readOnly={isReadOnly}
-                        placeholder="e.g., gpt-4.1-mini"
-                        className={cn(
-                          "w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 font-mono text-sm transition-all duration-200 placeholder:text-muted-foreground",
-                          isReadOnly
-                            ? "cursor-default text-muted-foreground focus:outline-none"
-                            : "focus:border-white/16 focus:outline-none",
-                        )}
-                      />
-                      <p className="text-[11px] text-muted-foreground/72">
-                        Catalog or manual ID
-                      </p>
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-[13px] font-medium text-white/80">
+                          Model ID
+                        </label>
+                        <input
+                          type="text"
+                          value={draft.model.model}
+                          onChange={(e) =>
+                            setDraft((current) => ({
+                              ...current,
+                              model: current.model
+                                ? { ...current.model, model: e.target.value }
+                                : null,
+                            }))
+                          }
+                          readOnly={isReadOnly}
+                          placeholder="e.g., gpt-4o-mini"
+                          className={cn(
+                            "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30",
+                            isReadOnly
+                              ? "cursor-default opacity-60 focus:outline-none"
+                              : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                          )}
+                        />
+                        <p className="text-[11px] text-white/40">
+                          Catalog or manual ID
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[13px] text-white/40">
                     This role follows the default provider and model from
                     Settings.
                   </p>
@@ -670,63 +662,63 @@ export function RolesPage() {
               </div>
             </section>
 
-            <section className="mt-6 border-t border-white/6 pt-6">
+            <section className="mb-10 border-t border-white/[0.04] pt-8">
               <SectionHeader
                 title="Model Parameters"
                 description="Optionally override the canonical model parameters for this role."
               />
 
-              <div className="space-y-4">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Button
+              <div className="space-y-6">
+                <div className="flex flex-wrap gap-3">
+                  <button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(false)}
-                    variant="outline"
                     className={cn(
-                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
+                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       isEmptyModelParams(draft.model_params)
-                        ? "border-white/10 bg-white/[0.075] text-foreground"
-                        : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
-                      isReadOnly && "cursor-default hover:bg-black/[0.18]",
+                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
+                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                      isReadOnly && "cursor-default",
                     )}
                   >
                     Use Settings Default
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="button"
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(true)}
-                    variant="outline"
                     className={cn(
-                      "h-auto justify-start px-3 py-2 text-left text-sm transition-colors",
+                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       !isEmptyModelParams(draft.model_params)
-                        ? "border-white/10 bg-white/[0.075] text-foreground"
-                        : "border-white/8 bg-black/[0.18] text-muted-foreground hover:bg-white/[0.04]",
-                      isReadOnly && "cursor-default hover:bg-black/[0.18]",
+                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
+                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                      isReadOnly && "cursor-default",
                     )}
                   >
                     Set Parameter Overrides
-                  </Button>
+                  </button>
                 </div>
 
                 {!isEmptyModelParams(draft.model_params) ? (
-                  <ModelParamsFields
-                    value={cloneModelParams(draft.model_params)}
-                    onChange={(params) =>
-                      setDraft((current) => ({
-                        ...current,
-                        model_params: params,
-                      }))
-                    }
-                    disabled={isReadOnly}
-                    emptyLabel="Inherit settings default"
-                    numberPlaceholder="Inherit settings default"
-                    reasoningDisableLabel="Disable"
-                    helperText="These canonical parameters override Settings only for this role. Unsupported fields are ignored by the resolved provider."
-                  />
+                  <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5">
+                    <ModelParamsFields
+                      value={cloneModelParams(draft.model_params)}
+                      onChange={(params) =>
+                        setDraft((current) => ({
+                          ...current,
+                          model_params: params,
+                        }))
+                      }
+                      disabled={isReadOnly}
+                      emptyLabel="Inherit settings default"
+                      numberPlaceholder="Inherit settings default"
+                      reasoningDisableLabel="Disable"
+                      helperText="These canonical parameters override Settings only for this role. Unsupported fields are ignored by the resolved provider."
+                    />
+                  </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-[13px] text-white/40">
                     This role inherits the default model parameters from
                     Settings.
                   </p>
@@ -734,47 +726,41 @@ export function RolesPage() {
               </div>
             </section>
 
-            <section className="mt-6 border-t border-white/6 pt-6">
+            <section className="mb-10 border-t border-white/[0.04] pt-8">
               <SectionHeader
                 title="Tool Configuration"
                 description="Minimum tools are injected by the framework. Configure the remaining tools as Allowed, Included, or Excluded."
               />
 
-              <div className="overflow-hidden rounded-md border border-white/6 bg-black/[0.18]">
+              <div className="overflow-hidden rounded-xl border border-white/[0.04] bg-white/[0.01]">
                 {configurableTools.map((tool) => {
                   const state = getToolState(tool.name);
                   return (
                     <div
                       key={tool.name}
-                      className="flex items-center justify-between gap-4 border-b border-white/6 px-4 py-3 last:border-b-0"
+                      className="flex items-center justify-between gap-4 border-b border-white/[0.04] px-5 py-4 last:border-b-0"
                     >
-                      <div
-                        className="min-w-0 flex flex-1 items-center gap-2"
-                        title={tool.description}
-                      >
-                        <p className="shrink-0 font-mono text-sm">
+                      <div className="min-w-0 flex-1" title={tool.description}>
+                        <p className="font-mono text-[13px] text-white/80">
                           {tool.name}
                         </p>
-                        <p className="truncate text-[11px] text-muted-foreground/72">
+                        <p className="mt-1 truncate text-[12px] text-white/40">
                           {tool.description}
                         </p>
                       </div>
-                      <Button
+                      <button
                         type="button"
                         onClick={() => cycleToolState(tool.name)}
                         disabled={isReadOnly || lockBuiltinFields}
-                        variant="outline"
-                        size="xs"
                         className={cn(
-                          "shrink-0 rounded-full transition-colors",
-                          state === "included" &&
-                            "border-white/14 bg-white/[0.07] text-white/88",
+                          "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                          state === "included" && "bg-white/[0.08] text-white",
                           state === "excluded" &&
-                            "border-white/10 bg-white/[0.03] text-white/52 line-through",
+                            "bg-transparent text-white/30 line-through",
                           state === "allowed" &&
-                            "border-white/8 bg-black/[0.24] text-muted-foreground",
+                            "bg-white/[0.02] text-white/50 hover:bg-white/[0.04]",
                           (isReadOnly || lockBuiltinFields) &&
-                            "cursor-default opacity-90 hover:bg-inherit",
+                            "cursor-default hover:bg-inherit opacity-60",
                         )}
                       >
                         {state === "allowed"
@@ -782,64 +768,104 @@ export function RolesPage() {
                           : state === "included"
                             ? "Included"
                             : "Excluded"}
-                      </Button>
+                      </button>
                     </div>
                   );
                 })}
               </div>
             </section>
 
-            <div className="mt-6 flex items-center justify-end gap-3 border-t border-white/6 pt-5">
-              <Button
+            <div className="flex items-center justify-end gap-3 border-t border-white/[0.04] pt-6">
+              <button
+                type="button"
                 onClick={handleCancel}
                 disabled={saving}
-                variant="ghost"
-                className="border border-white/8 bg-white/[0.024] text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
+                className="rounded-full px-5 py-2 text-[13px] font-medium text-white/60 transition-colors hover:text-white"
               >
                 Cancel
-              </Button>
+              </button>
               {!isReadOnly && (
-                <Button onClick={() => void handleSave()} disabled={saving}>
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="rounded-full bg-white px-6 py-2 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
                   {saving
                     ? "Saving..."
                     : panelMode === "create"
                       ? "Create Role"
                       : "Save Changes"}
-                </Button>
+                </button>
               )}
               {isReadOnly && activeRole && !activeRole.is_builtin && (
-                <Button onClick={() => handleEdit(activeRole)}>Edit</Button>
+                <button
+                  type="button"
+                  onClick={() => handleEdit(activeRole)}
+                  className="rounded-full bg-white/[0.08] px-6 py-2 text-[13px] font-medium text-white transition-colors hover:bg-white/[0.12]"
+                >
+                  Edit Role
+                </button>
               )}
             </div>
           </div>
         </div>
       ) : roles.length === 0 ? (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           className="flex h-full flex-col items-center justify-center text-center"
         >
-          <p className="text-sm text-muted-foreground">
-            No roles yet. Create one to get started.
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-sm">
+            <Users className="size-5 text-white/40" />
+          </div>
+          <h3 className="mt-5 text-[15px] font-medium text-white/90">
+            No Roles Created
+          </h3>
+          <p className="mt-1.5 max-w-sm text-[13px] text-white/40">
+            Roles define agent behavior. Create your first role to get started.
           </p>
         </motion.div>
       ) : (
-        <div className="h-full min-h-0 overflow-y-auto pr-2">
-          <div className="mx-auto max-w-5xl">
-            <div className="mb-1 flex items-center gap-4 border-b border-white/6 px-3 pb-2">
-              <span className="w-40 shrink-0 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+        <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none pt-8">
+          <div className="mx-auto w-full max-w-5xl">
+            <div className="mb-6 flex justify-end px-4">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void refreshRoles()}
+                  disabled={loading}
+                  className="flex size-9 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.04] hover:text-white"
+                >
+                  <RefreshCw
+                    className={cn("size-4", loading && "animate-spin")}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={isPanelOpen}
+                  className="flex h-9 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <Plus className="size-4" />
+                  New Role
+                </button>
+              </div>
+            </div>
+            <div className="mb-2 grid grid-cols-[200px_1fr_120px_100px] gap-4 px-4 pb-3">
+              <span className="text-[11px] font-medium text-white/40">
                 Name
               </span>
-              <span className="flex-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+              <span className="text-[11px] font-medium text-white/40">
                 Model
               </span>
-              <span className="w-24 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
+              <span className="text-[11px] font-medium text-white/40">
                 Tools
               </span>
-              <span className="w-20" />
+              <span />
             </div>
 
-            <div>
+            <div className="space-y-1">
               {roles.map((role, index) => {
                 const providerName = role.model
                   ? (providersById[role.model.provider_id]?.name ??
@@ -855,69 +881,70 @@ export function RolesPage() {
                 return (
                   <motion.div
                     key={role.name}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.04 }}
+                    transition={{ delay: index * 0.03 }}
                     className={cn(
-                      "group flex items-center gap-4 border-b border-white/[0.04] px-3 py-3 transition-colors hover:bg-white/[0.02]",
-                      activeRoleName === role.name && "bg-white/[0.03]",
+                      "group grid grid-cols-[160px_1fr_100px_80px] items-center gap-4 rounded-xl px-4 py-3.5 transition-colors",
+                      activeRoleName === role.name
+                        ? "bg-white/[0.04]"
+                        : "hover:bg-white/[0.02]",
                     )}
                   >
-                    <div className="w-40 shrink-0">
-                      <span className="text-sm font-medium">{role.name}</span>
+                    <div className="flex items-center gap-2 pr-2">
+                      <span className="truncate text-[13px] font-medium text-white/90">
+                        {role.name}
+                      </span>
                       {role.is_builtin && (
-                        <span className="ml-2 rounded-full bg-white/[0.065] px-2 py-0.5 text-[10px] font-medium tracking-[0.08em] text-muted-foreground">
+                        <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-white/40">
                           Built-in
                         </span>
                       )}
                     </div>
 
-                    <div className="min-w-0 flex-1">
-                      <span className="block truncate text-sm text-muted-foreground">
+                    <div className="min-w-0 pr-2">
+                      <span className="block truncate text-[13px] text-white/50">
                         {role.model
                           ? `${providerName} / ${role.model.model}`
                           : "Settings default"}
                       </span>
                     </div>
 
-                    <div className="w-24">
-                      <span className="text-sm text-muted-foreground">
+                    <div className="pr-2">
+                      <span className="text-[13px] font-mono text-white/50">
                         {toolSummary}
                       </span>
                     </div>
 
-                    <div className="flex w-20 items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <Button
+                    <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                      <button
+                        type="button"
                         onClick={() => handleView(role)}
                         aria-label={`View ${role.name}`}
                         title={`View ${role.name}`}
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                        className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
                       >
                         <Eye className="size-3.5" />
-                      </Button>
-                      <Button
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleEdit(role)}
                         aria-label={`Edit ${role.name}`}
                         title={`Edit ${role.name}`}
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
+                        className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
                       >
                         <Edit2 className="size-3.5" />
-                      </Button>
+                      </button>
                       {!role.is_builtin && (
-                        <Button
+                        <button
+                          type="button"
                           onClick={() => setRoleToDelete(role)}
                           aria-label={`Delete ${role.name}`}
                           title={`Delete ${role.name}`}
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-muted-foreground hover:bg-white/[0.06] hover:text-white"
+                          className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
                         >
                           <Trash2 className="size-3.5" />
-                        </Button>
+                        </button>
                       )}
                     </div>
                   </motion.div>

@@ -127,11 +127,8 @@ export function ChannelsPage() {
   }
 
   return (
-    <PageScaffold
-      title="Channels"
-      description="External messaging integrations."
-    >
-      <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none">
+    <PageScaffold>
+      <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none pt-8">
         <div className="mx-auto max-w-[680px] pb-10">
           <SoftPanel className="space-y-8">
             <div className="flex items-start justify-between gap-4">

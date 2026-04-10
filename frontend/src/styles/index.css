@@ -122,10 +122,10 @@
   --graph-handle-border: oklch(0.08 0 0 / 94%);
   --graph-attention: oklch(0.96 0 0);
   --graph-attention-text: oklch(0.96 0 0);
-  --graph-grid: rgba(255, 255, 255, 0.03);
-  --graph-edge: rgba(255, 255, 255, 0.06);
-  --graph-edge-active: rgba(52, 211, 153, 0.8);
-  --graph-glow: rgba(52, 211, 153, 0.2);
+  --graph-grid: oklch(0.98 0 0 / 7%);
+  --graph-edge: oklch(0.98 0 0 / 15%);
+  --graph-edge-active: oklch(0.98 0 0 / 86%);
+  --graph-glow: oklch(0.98 0 0 / 12%);
   --graph-assistant: oklch(0.94 0.002 260);
   --graph-status-running: oklch(0.72 0.16 148);
   --graph-status-idle: oklch(0.74 0.11 82);

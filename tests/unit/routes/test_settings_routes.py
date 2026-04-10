@@ -71,6 +71,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "active_provider_id": "",
                 "active_model": "",
                 "timeout_ms": 10000,
+                "retry_policy": "limited",
                 "max_retries": 5,
                 "params": {
                     "reasoning_effort": None,
@@ -464,6 +465,54 @@ def test_update_settings_accepts_model_max_retries(monkeypatch):
     assert settings.model.max_retries == 8
     assert result["settings"]["model"]["max_retries"] == 8
     assert saved == [settings]
+
+
+def test_update_settings_accepts_model_retry_policy(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                model={"retry_policy": "unlimited"},
+            )
+        )
+    )
+
+    assert settings.model.retry_policy == "unlimited"
+    assert result["settings"]["model"]["retry_policy"] == "unlimited"
+    assert saved == [settings]
+
+
+def test_update_settings_rejects_invalid_model_retry_policy(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(
+                    model={"retry_policy": "forever"},
+                )
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert (
+        excinfo.value.detail
+        == "model.retry_policy must be one of: limited, no_retry, unlimited"
+    )
 
 
 def test_update_settings_accepts_model_timeout_ms(monkeypatch):

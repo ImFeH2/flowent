@@ -1260,8 +1260,14 @@ class Agent:
         if self._interrupt_requested.is_set():
             raise InterruptRequestedError()
 
+    def _get_llm_retry_policy(self) -> str:
+        return get_settings().model.retry_policy
+
     def _get_llm_max_retries(self) -> int:
-        return get_settings().model.max_retries
+        settings = get_settings()
+        if settings.model.retry_policy != "limited":
+            return 0
+        return settings.model.max_retries
 
     def _get_llm_retry_delay(self, retry_number: int) -> float:
         return min(0.5 * (2 ** max(retry_number - 1, 0)), 8.0)
@@ -1280,6 +1286,7 @@ class Agent:
         messages: list[dict[str, Any]],
         tools_schema: list[dict[str, Any]] | None,
     ) -> tuple[LLMResponse, StreamingContentState]:
+        retry_policy = self._get_llm_retry_policy()
         retry_limit = self._get_llm_max_retries()
         retry_count = 0
 
@@ -1303,14 +1310,20 @@ class Agent:
                 self._raise_if_interrupt_requested()
                 return response, stream_state
             except LLMProviderError as exc:
-                if not exc.transient or retry_count >= retry_limit:
+                should_retry = False
+                if exc.transient:
+                    if retry_policy == "limited":
+                        should_retry = retry_count < retry_limit
+                    elif retry_policy == "unlimited":
+                        should_retry = True
+                if not should_retry:
                     raise
                 retry_count += 1
                 delay_seconds = self._get_llm_retry_delay(retry_count)
                 self._log.warning(
-                    "Transient LLM error, retry {}/{} in {:.2f}s: {}",
+                    "Transient LLM error, retry {} ({}) in {:.2f}s: {}",
                     retry_count,
-                    retry_limit,
+                    retry_policy,
                     delay_seconds,
                     exc,
                 )

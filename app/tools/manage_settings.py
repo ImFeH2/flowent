@@ -22,6 +22,7 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
             "active_provider_id": settings.model.active_provider_id,
             "active_model": settings.model.active_model,
             "timeout_ms": settings.model.timeout_ms,
+            "retry_policy": settings.model.retry_policy,
             "max_retries": settings.model.max_retries,
             "params": {
                 "reasoning_effort": settings.model.params.reasoning_effort,
@@ -70,7 +71,12 @@ class ManageSettingsTool(Tool):
             },
             "max_retries": {
                 "type": "integer",
-                "description": "Maximum retries for transient LLM call failures",
+                "description": "Maximum retries for transient LLM call failures when retry_policy is limited",
+            },
+            "retry_policy": {
+                "type": "string",
+                "enum": ["no_retry", "limited", "unlimited"],
+                "description": "System-wide retry policy for transient LLM call failures",
             },
             "timeout_ms": {
                 "type": "integer",
@@ -109,6 +115,7 @@ class ManageSettingsTool(Tool):
             build_default_model_params,
             build_model_max_retries,
             build_model_params_from_mapping,
+            build_model_retry_policy,
             build_model_timeout_ms,
             find_role,
             get_settings,
@@ -121,6 +128,7 @@ class ManageSettingsTool(Tool):
         active_provider_id = args.get("active_provider_id")
         active_model = args.get("active_model")
         timeout_ms = args.get("timeout_ms")
+        retry_policy = args.get("retry_policy")
         max_retries = args.get("max_retries")
         model_params = args.get("model_params")
         timestamp_format = args.get("timestamp_format")
@@ -136,6 +144,11 @@ class ManageSettingsTool(Tool):
             return json.dumps({"error": "active_provider_id must be a string"})
         if active_model is not None and not isinstance(active_model, str):
             return json.dumps({"error": "active_model must be a string"})
+        if retry_policy is not None:
+            try:
+                build_model_retry_policy(retry_policy, field_name="retry_policy")
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
         if timeout_ms is not None:
             try:
                 build_model_timeout_ms(timeout_ms, field_name="timeout_ms")
@@ -180,6 +193,11 @@ class ManageSettingsTool(Tool):
             settings.model.active_provider_id = active_provider_id
         if active_model is not None:
             settings.model.active_model = active_model
+        if retry_policy is not None:
+            settings.model.retry_policy = build_model_retry_policy(
+                retry_policy,
+                field_name="retry_policy",
+            )
         if timeout_ms is not None:
             settings.model.timeout_ms = build_model_timeout_ms(
                 timeout_ms,

@@ -16,6 +16,7 @@ from app.settings import (
     build_default_model_params,
     build_model_max_retries,
     build_model_params_from_mapping,
+    build_model_retry_policy,
     build_model_timeout_ms,
     find_role,
     get_settings,
@@ -106,6 +107,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         active_model = req.model.get("active_model", current.model.active_model)
         params = current.model.params
         timeout_ms = current.model.timeout_ms
+        retry_policy = current.model.retry_policy
         max_retries = current.model.max_retries
         if "params" in req.model:
             try:
@@ -116,6 +118,11 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         if "timeout_ms" in req.model:
             try:
                 timeout_ms = build_model_timeout_ms(req.model.get("timeout_ms"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "retry_policy" in req.model:
+            try:
+                retry_policy = build_model_retry_policy(req.model.get("retry_policy"))
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
         if "max_retries" in req.model:
@@ -132,6 +139,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             else current.model.active_model,
             params=params,
             timeout_ms=timeout_ms,
+            retry_policy=retry_policy,
             max_retries=max_retries,
         )
 

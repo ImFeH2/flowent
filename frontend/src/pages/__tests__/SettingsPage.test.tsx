@@ -39,6 +39,8 @@ describe("SettingsPage", () => {
           active_provider_id: "",
           active_model: "",
           timeout_ms: 10000,
+          retry_policy: "limited",
+          max_retries: 5,
           params: {
             reasoning_effort: null,
             verbosity: null,
@@ -72,6 +74,8 @@ describe("SettingsPage", () => {
           active_provider_id: "",
           active_model: "",
           timeout_ms: 15000,
+          retry_policy: "limited",
+          max_retries: 5,
           params: {
             reasoning_effort: null,
             verbosity: null,

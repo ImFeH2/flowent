@@ -185,6 +185,8 @@ export interface Provider {
   headers: Record<string, string>;
 }
 
+export type RetryPolicy = "no_retry" | "limited" | "unlimited";
+
 export interface TelegramPendingChat {
   chat_id: number;
   username: string | null;

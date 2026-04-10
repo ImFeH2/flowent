@@ -98,9 +98,11 @@ CONDUCTOR_ROLE_INCLUDED_TOOLS = [
 ]
 MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high", "xhigh"})
 MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
+MODEL_RETRY_POLICY_OPTIONS = frozenset({"no_retry", "limited", "unlimited"})
 REMOVED_TOOL_NAMES = frozenset({"exit", "list_connections"})
 DEFAULT_LLM_TIMEOUT_MS = 10000
 DEFAULT_LLM_MAX_RETRIES = 5
+DEFAULT_LLM_RETRY_POLICY = "limited"
 
 
 @dataclass
@@ -153,6 +155,7 @@ class ModelSettings:
     active_model: str = ""
     params: ModelParams = field(default_factory=build_default_model_params)
     timeout_ms: int = DEFAULT_LLM_TIMEOUT_MS
+    retry_policy: str = DEFAULT_LLM_RETRY_POLICY
     max_retries: int = DEFAULT_LLM_MAX_RETRIES
 
 
@@ -358,9 +361,25 @@ def build_model_max_retries(
 ) -> int:
     if isinstance(raw_max_retries, bool) or not isinstance(raw_max_retries, int):
         raise ValueError(f"{field_name} must be an integer")
-    if raw_max_retries < 0:
-        raise ValueError(f"{field_name} must be greater than or equal to 0")
+    if raw_max_retries <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
     return raw_max_retries
+
+
+def build_model_retry_policy(
+    raw_retry_policy: object,
+    *,
+    field_name: str = "model.retry_policy",
+) -> str:
+    if not isinstance(raw_retry_policy, str):
+        raise ValueError(f"{field_name} must be a string")
+    retry_policy = raw_retry_policy.strip().lower()
+    if retry_policy not in MODEL_RETRY_POLICY_OPTIONS:
+        raise ValueError(
+            f"{field_name} must be one of: "
+            + ", ".join(sorted(MODEL_RETRY_POLICY_OPTIONS))
+        )
+    return retry_policy
 
 
 def build_model_timeout_ms(
@@ -878,6 +897,16 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         model_data.get("params")
     )
     migrated = migrated or model_params_migrated
+    raw_model_retry_policy = model_data.get("retry_policy")
+    if raw_model_retry_policy is None:
+        model_retry_policy = DEFAULT_LLM_RETRY_POLICY
+        migrated = True
+    else:
+        try:
+            model_retry_policy = build_model_retry_policy(raw_model_retry_policy)
+        except ValueError:
+            model_retry_policy = DEFAULT_LLM_RETRY_POLICY
+            migrated = True
     raw_model_max_retries = model_data.get("max_retries")
     if raw_model_max_retries is None:
         model_max_retries = DEFAULT_LLM_MAX_RETRIES
@@ -903,6 +932,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         active_model=str(model_data.get("active_model", "")),
         params=model_params,
         timeout_ms=model_timeout_ms,
+        retry_policy=model_retry_policy,
         max_retries=model_max_retries,
     )
     custom_prompt = str(data.get("custom_prompt", ""))

@@ -24,7 +24,13 @@ import { Button } from "@/components/ui/button";
 import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
-import type { ModelParams, Provider, Role } from "@/types";
+import type { ModelParams, Provider, RetryPolicy, Role } from "@/types";
+
+const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
+  { value: "no_retry", label: "No retry" },
+  { value: "limited", label: "Limited" },
+  { value: "unlimited", label: "Unlimited" },
+];
 
 interface UserSettings {
   assistant: {
@@ -37,6 +43,8 @@ interface UserSettings {
     active_provider_id: string;
     active_model: string;
     timeout_ms: number;
+    retry_policy: RetryPolicy;
+    max_retries: number;
     params: ModelParams;
   };
 }
@@ -409,6 +417,83 @@ export function SettingsPage() {
                   <p className="text-[11px] text-white/40 leading-relaxed">
                     Applies to a single LLM request attempt. Default is 10000ms.
                     Automatic retries can still make the full call take longer.
+                  </p>
+                </div>
+              </SettingsRow>
+
+              <SettingsRow
+                label="Retry Policy"
+                description="Transient error behavior"
+              >
+                <div className="space-y-3">
+                  <Select
+                    value={settings.model.retry_policy}
+                    onValueChange={(value: RetryPolicy) =>
+                      setSettings({
+                        ...settings,
+                        model: {
+                          ...settings.model,
+                          retry_policy: value,
+                        },
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                      <SelectValue placeholder="Select a retry policy" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {retryPolicyOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {settings.model.retry_policy === "limited" ? (
+                    <div className="space-y-2">
+                      <div className="space-y-1">
+                        <label
+                          htmlFor="retry-attempts"
+                          className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                        >
+                          Retry Attempts
+                        </label>
+                        <input
+                          id="retry-attempts"
+                          aria-label="Retry Attempts"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={String(settings.model.max_retries)}
+                          onChange={(e) => {
+                            const nextValue = e.target.value.trim();
+                            if (!/^\d+$/.test(nextValue)) {
+                              return;
+                            }
+                            const parsed = Number.parseInt(nextValue, 10);
+                            if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+                              return;
+                            }
+                            setSettings({
+                              ...settings,
+                              model: {
+                                ...settings.model,
+                                max_retries: parsed,
+                              },
+                            });
+                          }}
+                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    No retry fails immediately on transient errors. Limited
+                    retries automatically up to the configured attempt count.
+                    Unlimited keeps retrying transient failures until success,
+                    interruption, or a non-transient error.
                   </p>
                 </div>
               </SettingsRow>

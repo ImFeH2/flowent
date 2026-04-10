@@ -464,7 +464,6 @@ export function RolesPage() {
 
             <section>
               <SectionHeader
-                eyebrow="Identity"
                 title="Role Identity"
                 description="Define the role name and baseline prompt used by agents created with this role."
               />
@@ -521,7 +520,6 @@ export function RolesPage() {
 
             <section className="mt-6 border-t border-white/6 pt-6">
               <SectionHeader
-                eyebrow="Model"
                 title="Model Configuration"
                 description="Choose whether this role follows Settings or uses its own provider and model override."
               />
@@ -674,7 +672,6 @@ export function RolesPage() {
 
             <section className="mt-6 border-t border-white/6 pt-6">
               <SectionHeader
-                eyebrow="Parameters"
                 title="Model Parameters"
                 description="Optionally override the canonical model parameters for this role."
               />
@@ -739,7 +736,6 @@ export function RolesPage() {
 
             <section className="mt-6 border-t border-white/6 pt-6">
               <SectionHeader
-                eyebrow="Tools"
                 title="Tool Configuration"
                 description="Minimum tools are injected by the framework. Configure the remaining tools as Allowed, Included, or Excluded."
               />

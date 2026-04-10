@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   Check,
-  ChevronRight,
   Eye,
   EyeOff,
   Plus,
@@ -248,69 +247,77 @@ export function ProvidersPage() {
   return (
     <PageScaffold
       title="Providers"
-      description="Manage available LLM providers and preview their resolved request endpoints."
-      className="overflow-hidden"
+      description="Manage LLM backends and connection endpoints."
+      className="overflow-hidden p-0 md:p-0"
     >
-      <div className="flex min-h-0 flex-1">
+      <div className="flex h-full w-full">
+        {/* Left Sidebar List */}
         <div
           style={{ width: `${panelWidth}px` }}
-          className="relative flex shrink-0 flex-col border-r border-white/6 bg-black/[0.18]"
+          className="relative flex shrink-0 flex-col border-r border-white/[0.04] bg-white/[0.01]"
         >
-          <div className="flex shrink-0 items-center justify-between border-b border-white/6 px-4 py-3">
-            <div className="min-w-0 flex items-center gap-2">
-              <Server className="size-4 shrink-0 text-primary" />
-              <span className="font-semibold truncate">Providers</span>
+          <div className="flex shrink-0 items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Server className="size-4 text-white/40" />
+              <span className="text-[13px] font-medium text-white/80">
+                Providers
+              </span>
             </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
                 onClick={() => void refreshProviders()}
                 disabled={loading}
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
-                title="Refresh"
+                className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white"
               >
                 <RefreshCw
                   className={cn("size-3.5", loading && "animate-spin")}
                 />
-              </Button>
-              <Button
+              </button>
+              <button
+                type="button"
                 onClick={handleCreateNew}
-                size="icon-sm"
-                title="Add Provider"
+                className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white"
               >
                 <Plus className="size-3.5" />
-              </Button>
+              </button>
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {loading ? (
-              <div className="space-y-2 py-4">
+              <div className="space-y-1">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-12 rounded-md skeleton-shimmer" />
+                  <div
+                    key={i}
+                    className="h-10 w-full animate-pulse rounded-lg bg-white/[0.02]"
+                  />
                 ))}
               </div>
             ) : providers.length === 0 ? (
               <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 className="py-10 text-center"
               >
-                <p className="text-sm text-muted-foreground">No providers</p>
-                <Button onClick={handleCreateNew} size="sm" className="mt-3">
-                  <Plus className="size-3.5" />
-                  Add your first provider
-                </Button>
+                <p className="text-[13px] text-white/40">No providers</p>
+                <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/[0.06]"
+                >
+                  <Plus className="size-3" />
+                  Add Provider
+                </button>
               </motion.div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {providers.map((provider, i) => (
                   <motion.div
                     key={provider.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
+                    initial={{ opacity: 0, x: -4 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.03 }}
                     role="button"
                     tabIndex={0}
                     onClick={() => handleSelect(provider)}
@@ -321,42 +328,30 @@ export function ProvidersPage() {
                       }
                     }}
                     className={cn(
-                      "group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left transition-all",
+                      "group flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-all",
                       selectedId === provider.id
-                        ? "bg-white/[0.065] text-foreground"
-                        : "hover:bg-white/[0.04]",
+                        ? "bg-white/[0.06] text-white"
+                        : "text-white/60 hover:bg-white/[0.03] hover:text-white/90",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "h-7 w-px shrink-0 rounded-full",
-                        selectedId === provider.id
-                          ? "bg-primary/70"
-                          : "bg-transparent",
-                      )}
-                    />
-                    <div className="min-w-0 flex flex-1 items-center gap-2">
-                      <p className="truncate text-sm font-medium">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-medium">
                         {provider.name}
                       </p>
-                      <span className="shrink-0 rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+                      <p className="truncate text-[11px] text-white/40">
                         {providerTypeLabel(provider.type)}
-                      </span>
+                      </p>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setProviderToDelete(provider);
-                        }}
-                        variant="ghost"
-                        size="icon-xs"
-                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 className="size-3" />
-                      </Button>
-                      <ChevronRight className="size-4 text-muted-foreground" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setProviderToDelete(provider);
+                      }}
+                      className="flex size-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-white/[0.08] hover:text-red-400 group-hover:opacity-100"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
                   </motion.div>
                 ))}
               </div>
@@ -369,50 +364,52 @@ export function ProvidersPage() {
           />
         </div>
 
-        <div className="min-w-0 flex-1 overflow-hidden bg-white/[0.012]">
+        {/* Right Content Area */}
+        <div className="min-w-0 flex-1 overflow-y-auto bg-transparent">
           {isCreating || selectedProvider ? (
-            <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b border-white/6 px-6 py-4">
+            <div className="flex min-h-full flex-col px-8 py-8 md:px-12 md:py-10">
+              <div className="mb-8 flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold">
+                  <h2 className="text-xl font-medium text-white/90">
                     {isCreating ? "New Provider" : selectedProvider?.name}
                   </h2>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="mt-1 text-[13px] text-white/40">
                     {isCreating
-                      ? "Configure a new LLM provider"
+                      ? "Configure a new LLM backend"
                       : `ID: ${selectedProvider?.id}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {hasChanges && (
                     <>
-                      <Button
+                      <button
+                        type="button"
                         onClick={handleCancel}
                         disabled={saving}
-                        variant="ghost"
-                        className="border border-white/8 text-foreground hover:bg-white/[0.05]"
+                        className="rounded-full px-4 py-1.5 text-[13px] font-medium text-white/60 transition-colors hover:text-white"
                       >
                         Cancel
-                      </Button>
-                      <Button
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void handleSave()}
                         disabled={saving}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
                       >
-                        <Check className="size-4" />
+                        <Check className="size-3.5" />
                         {saving ? "Saving..." : "Save"}
-                      </Button>
+                      </button>
                     </>
                   )}
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
-                <div className="mx-auto max-w-xl py-6">
-                  <SectionHeader
-                    title="Identity"
-                    eyebrow="Provider"
-                    description="Set the provider name and runtime type used across roles and settings."
-                  />
+              <div className="mx-auto w-full max-w-[640px] flex-1">
+                <SectionHeader
+                  title="Identity"
+                  description="Set the provider name and runtime type."
+                />
+                <div className="mb-10 space-y-2">
                   <SettingsRow label="Name">
                     <input
                       type="text"
@@ -421,7 +418,7 @@ export function ProvidersPage() {
                         setDraft({ ...draft, name: e.target.value })
                       }
                       placeholder="e.g., OpenAI Production"
-                      className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
                     />
                   </SettingsRow>
                   <SettingsRow label="Type">
@@ -431,25 +428,30 @@ export function ProvidersPage() {
                         setDraft({ ...draft, type: value })
                       }
                     >
-                      <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                      <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
                         {providerTypeOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value}>
+                          <SelectItem
+                            key={opt.value}
+                            value={opt.value}
+                            className="text-[13px]"
+                          >
                             {opt.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </SettingsRow>
+                </div>
 
-                  <div className="mt-8 border-t border-white/6 pt-8">
-                    <SectionHeader
-                      title="Endpoint"
-                      eyebrow="Endpoint"
-                      description="Configure the base URL, inspect the resolved request preview, and optionally store API credentials or header overrides."
-                    />
+                <div className="border-t border-white/[0.04] pt-8">
+                  <SectionHeader
+                    title="Endpoint Details"
+                    description="Configure connection details and optional credentials."
+                  />
+                  <div className="space-y-2">
                     <SettingsRow label="Base URL">
                       <input
                         type="text"
@@ -458,31 +460,30 @@ export function ProvidersPage() {
                           setDraft({ ...draft, base_url: e.target.value })
                         }
                         placeholder="https://api.openai.com/v1"
-                        className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
                       />
                     </SettingsRow>
                     <SettingsRow
                       label="Request Preview"
-                      description="Resolved endpoint"
+                      description="Resolved endpoint based on configuration"
                     >
                       <div
                         className={cn(
-                          "w-full rounded-md border px-3 py-2 text-sm",
+                          "w-full rounded-lg border px-3.5 py-2.5 text-[12px]",
                           endpointPreview.error
-                            ? "border-destructive/30 bg-destructive/5 text-destructive"
-                            : "border-white/8 bg-black/[0.22] text-foreground",
+                            ? "border-red-500/20 bg-red-500/5 text-red-400"
+                            : "border-white/[0.04] bg-white/[0.01] text-white/70",
                         )}
                       >
                         {endpointPreview.error ? (
                           endpointPreview.error
                         ) : endpointPreview.previewUrl ? (
-                          <code className="font-mono text-[12px]">
+                          <code className="font-mono">
                             {endpointPreview.previewUrl}
                           </code>
                         ) : (
-                          <span className="text-muted-foreground">
-                            Enter a base URL to preview the final request
-                            endpoint
+                          <span className="text-white/30">
+                            Enter a base URL to preview
                           </span>
                         )}
                       </div>
@@ -496,21 +497,19 @@ export function ProvidersPage() {
                             setDraft({ ...draft, api_key: e.target.value })
                           }
                           placeholder="sk-..."
-                          className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 pr-9 text-sm transition-all placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 pr-10 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
                         />
-                        <Button
+                        <button
                           type="button"
                           onClick={() => setShowKey(!showKey)}
-                          variant="ghost"
-                          size="icon-xs"
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:bg-white/[0.05] hover:text-foreground"
+                          className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
                         >
                           {showKey ? (
-                            <EyeOff className="size-4" />
+                            <EyeOff className="size-3.5" />
                           ) : (
-                            <Eye className="size-4" />
+                            <Eye className="size-3.5" />
                           )}
-                        </Button>
+                        </button>
                       </div>
                     </SettingsRow>
                     <SettingsRow
@@ -529,56 +528,39 @@ export function ProvidersPage() {
                           placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
                           spellCheck={false}
                           className={cn(
-                            "min-h-32 w-full rounded-md border bg-black/[0.22] px-3 py-2 font-mono text-sm transition-all placeholder:text-muted-foreground focus:outline-none",
+                            "min-h-[140px] w-full rounded-lg border bg-white/[0.02] px-3.5 py-3 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:outline-none",
                             parsedHeaders.error
-                              ? "border-destructive/40 text-destructive focus:border-destructive/60"
-                              : "border-white/8 focus:border-white/16",
+                              ? "border-red-500/30 focus:border-red-500/50 text-red-300"
+                              : "border-white/[0.06] focus:border-white/20 focus:bg-white/[0.04]",
                           )}
                         />
-                        <p
-                          className={cn(
-                            "text-xs",
-                            parsedHeaders.error
-                              ? "text-destructive"
-                              : "text-muted-foreground",
-                          )}
-                        >
-                          {parsedHeaders.error ??
-                            "Leave blank for no overrides. Values must all be strings."}
-                        </p>
+                        {parsedHeaders.error && (
+                          <p className="text-[11px] text-red-400">
+                            {parsedHeaders.error}
+                          </p>
+                        )}
                       </div>
                     </SettingsRow>
                   </div>
-
-                  {!isCreating && selectedProvider && (
-                    <div className="mt-8 border-t border-white/6 pt-4">
-                      <p className="text-xs text-muted-foreground">
-                        ID:{" "}
-                        <code className="font-mono">{selectedProvider.id}</code>
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
           ) : (
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex h-full flex-col items-center justify-center text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex h-full flex-col items-center justify-center px-6 text-center"
             >
-              <Server className="size-8 text-muted-foreground/60" />
-              <h3 className="mt-4 text-lg font-semibold">
+              <div className="flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-sm">
+                <Server className="size-5 text-white/40" />
+              </div>
+              <h3 className="mt-5 text-[15px] font-medium text-white/90">
                 No Provider Selected
               </h3>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Select a provider from the list to edit, or create a new one to
-                get started.
+              <p className="mt-1.5 max-w-sm text-[13px] text-white/40">
+                Select a provider from the sidebar to edit its connection
+                details.
               </p>
-              <Button onClick={handleCreateNew} className="mt-4">
-                <Plus className="size-4" />
-                Add Provider
-              </Button>
             </motion.div>
           )}
         </div>

@@ -167,7 +167,6 @@ export function SettingsPage() {
         <div className="mx-auto max-w-3xl pb-6">
           <section>
             <SectionHeader
-              eyebrow="Assistant"
               title="Assistant Configuration"
               description="Choose the role that powers the system assistant."
             />
@@ -201,7 +200,6 @@ export function SettingsPage() {
 
           <section className="mt-8 border-t border-white/6 pt-8">
             <SectionHeader
-              eyebrow="Model"
               title="Model Configuration"
               description="Set the default provider, model, and canonical parameters used when a role does not define its own override."
             />

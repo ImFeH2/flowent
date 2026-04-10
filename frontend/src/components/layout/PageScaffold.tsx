@@ -22,21 +22,14 @@ export function PageScaffold({
   className,
 }: PageScaffoldProps) {
   return (
-    <div
-      className={cn(
-        "flex h-full flex-col px-6 py-5 md:px-8 md:py-6",
-        className,
-      )}
-    >
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-white/6 pb-4">
+    <div className={cn("flex h-full flex-col px-8 py-8", className)}>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[1.38rem] font-semibold tracking-[-0.025em] text-foreground">
+          <h1 className="text-2xl font-medium tracking-tight text-white/90">
             {title}
           </h1>
           {description ? (
-            <p className="mt-1 max-w-[42rem] text-sm leading-6 text-muted-foreground/78">
-              {description}
-            </p>
+            <p className="mt-1.5 text-[13px] text-white/40">{description}</p>
           ) : null}
         </div>
         {actions ? (
@@ -54,7 +47,7 @@ export function SoftPanel({ children, className }: SoftPanelProps) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-white/6 bg-surface-2/80 p-3.5 backdrop-blur-xl md:p-4",
+        "rounded-xl border border-white/[0.04] bg-white/[0.01] p-5",
         className,
       )}
     >
@@ -64,26 +57,17 @@ export function SoftPanel({ children, className }: SoftPanelProps) {
 }
 
 export function SectionHeader({
-  eyebrow,
   title,
   description,
 }: {
-  eyebrow?: string;
   title: string;
   description?: string;
 }) {
   return (
-    <div className="mb-5">
-      {eyebrow ? (
-        <p className="mb-1 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50">
-          {eyebrow}
-        </p>
-      ) : null}
-      <h2 className="text-base font-semibold">{title}</h2>
+    <div className="mb-6">
+      <h2 className="text-base font-medium text-white/90">{title}</h2>
       {description ? (
-        <p className="mt-1 text-sm leading-6 text-muted-foreground/76">
-          {description}
-        </p>
+        <p className="mt-1 text-[13px] text-white/40">{description}</p>
       ) : null}
     </div>
   );
@@ -101,23 +85,16 @@ export function SettingsRow({
   valueClassName?: string;
 }) {
   return (
-    <div className="grid gap-2 border-b border-white/[0.04] py-3 last:border-0 md:grid-cols-[minmax(0,1fr)_16rem] md:items-start md:gap-6">
-      <div className="min-w-0 flex-1">
-        <div className="flex min-h-9 flex-wrap items-center gap-2">
-          <label className="text-sm font-medium">{label}</label>
-          {description ? (
-            <p className="text-[11px] text-muted-foreground/72">
-              {description}
-            </p>
-          ) : null}
-        </div>
+    <div className="flex flex-col gap-2 py-4 first:pt-0 md:flex-row md:items-start md:justify-between md:gap-8">
+      <div className="min-w-0 flex-1 md:max-w-[200px]">
+        <label className="text-[13px] font-medium text-white/80">{label}</label>
+        {description ? (
+          <p className="mt-1 text-[12px] text-white/40 leading-relaxed">
+            {description}
+          </p>
+        ) : null}
       </div>
-      <div
-        className={cn(
-          "w-full min-w-0 md:w-64 md:justify-self-end",
-          valueClassName,
-        )}
-      >
+      <div className={cn("w-full min-w-0 flex-1", valueClassName)}>
         {children}
       </div>
     </div>

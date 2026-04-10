@@ -319,9 +319,14 @@ function CollapsibleBlock({
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
   return (
-    <div className={cn("rounded border", className)}>
+    <div
+      className={cn(
+        "rounded-xl border transition-colors hover:bg-white/[0.02]",
+        className,
+      )}
+    >
       <div
-        className="flex cursor-pointer items-center gap-1.5 px-2 py-1.25 select-none"
+        className="flex cursor-pointer items-center gap-2 px-3 py-2 select-none"
         onClick={toggle}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -333,17 +338,13 @@ function CollapsibleBlock({
         tabIndex={0}
         aria-expanded={open}
       >
-        <ChevronRight
-          className={cn(
-            "size-3 shrink-0 text-muted-foreground transition-transform",
-            open && "rotate-90",
-          )}
-        />
-        <span className="shrink-0">{icon}</span>
+        <span className="shrink-0 flex items-center justify-center">
+          {icon}
+        </span>
         <span
           className={cn(
-            "flex-1 truncate text-[10px] font-medium text-muted-foreground",
-            labelClassName,
+            "flex-1 truncate text-[11px] font-medium uppercase tracking-wide",
+            labelClassName || "text-white/70",
           )}
         >
           {label}
@@ -356,6 +357,12 @@ function CollapsibleBlock({
             {actions}
           </span>
         ) : null}
+        <ChevronRight
+          className={cn(
+            "ml-2 size-3.5 shrink-0 text-white/30 transition-transform duration-200",
+            open && "rotate-90",
+          )}
+        />
       </div>
       <AnimatePresence initial={false}>
         {open ? (
@@ -363,10 +370,10 @@ function CollapsibleBlock({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <div className={cn("px-2.5 pb-2 pt-0.5", contentClassName)}>
+            <div className={cn("px-3 pb-3 pt-1", contentClassName)}>
               {children}
             </div>
           </motion.div>

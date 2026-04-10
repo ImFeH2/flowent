@@ -35,8 +35,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
       className={cn(
         "relative flex h-full flex-col",
         isFloating
-          ? "overflow-hidden rounded-[1.25rem] border border-glass-border bg-glass-bg text-foreground shadow-2xl backdrop-blur-2xl"
-          : "overflow-hidden rounded-[1rem] border border-glass-border bg-surface-raised shadow-[0_22px_64px_-42px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+          ? "overflow-hidden rounded-[1.25rem] border border-white/[0.08] bg-black/60 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_30px_60px_-16px_rgba(0,0,0,0.8)] backdrop-blur-3xl"
+          : "overflow-hidden border-l border-white/[0.04] bg-black/40 text-white shadow-2xl backdrop-blur-2xl",
       )}
     >
       <div
@@ -44,7 +44,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
         className={cn(
           "pointer-events-none absolute inset-0 border transition-[opacity,border-color,box-shadow] duration-300",
           assistantActivity.running
-            ? "animate-pulse border-white/14 opacity-100 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_0_30px_-12px_rgba(255,255,255,0.12)]"
+            ? "animate-pulse border-white/[0.12] opacity-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04),0_0_30px_-12px_rgba(255,255,255,0.1)]"
             : "border-transparent opacity-0",
         )}
       />
@@ -64,10 +64,10 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
             paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
           }}
           className={cn(
-            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3.5",
+            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4",
             isFloating
-              ? "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.08)_20%,rgba(10,10,11,0.68)_64%,rgba(10,10,11,0.9)_100%)] pt-8"
-              : "bg-[linear-gradient(180deg,transparent_0%,rgba(10,10,11,0.12)_22%,rgba(10,10,11,0.74)_64%,rgba(10,10,11,0.94)_100%)] pt-9",
+              ? "bg-gradient-to-b from-transparent via-black/60 to-black/90 pt-8"
+              : "bg-gradient-to-b from-transparent via-black/80 to-black pt-10",
           )}
         >
           <AssistantChatComposer
@@ -95,12 +95,14 @@ function PanelHeader({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 border-b px-3.5 py-2.5",
-        floating ? "border-glass-border" : "border-glass-border bg-surface-2",
+        "relative z-10 flex items-center justify-between border-b px-4 py-3",
+        floating
+          ? "border-white/[0.06] bg-white/[0.02]"
+          : "border-white/[0.04] bg-white/[0.01]",
       )}
     >
-      <span className="text-[13px] font-semibold text-foreground">
-        Assistant Chat
+      <span className="text-[13px] font-medium tracking-wide text-white/90">
+        Assistant
       </span>
       <StatusBadge connected={connected} />
     </div>
@@ -111,13 +113,13 @@ function StatusBadge({ connected }: { connected: boolean }) {
   return (
     <span
       className={cn(
-        "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
+        "rounded-full border px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-wider transition-colors",
         connected
-          ? "border border-graph-status-idle/12 bg-graph-status-idle/[0.08] text-graph-status-idle/88"
-          : "border border-graph-status-initializing/10 bg-graph-status-initializing/[0.03] text-graph-status-initializing/58",
+          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+          : "border-amber-500/20 bg-amber-500/10 text-amber-400",
       )}
     >
-      {connected ? "Online" : "Offline"}
+      {connected ? "Online" : "Connecting"}
     </span>
   );
 }

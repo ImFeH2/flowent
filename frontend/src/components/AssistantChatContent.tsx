@@ -196,12 +196,15 @@ export function AssistantChatComposer({
           disabled={actionDisabled}
           aria-label={busy ? "Stop assistant" : "Send message"}
           className={cn(
-            "flex shrink-0 items-center justify-center rounded-full transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+            "flex shrink-0 items-center justify-center rounded-full transition-all duration-300 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-30",
             isWorkspace
-              ? "h-8 gap-1.5 px-3 bg-primary/[0.92] text-primary-foreground hover:bg-primary/[0.86]"
-              : "size-7 bg-primary text-primary-foreground hover:bg-primary/90",
+              ? "h-8 gap-1.5 px-3.5 bg-white text-black hover:opacity-90"
+              : "size-8 bg-white/[0.1] text-white hover:bg-white/[0.15]",
             busy && isWorkspace
-              ? "bg-graph-status-error/[0.18] text-graph-status-error hover:bg-graph-status-error/[0.24]"
+              ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              : "",
+            busy && !isWorkspace
+              ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
               : "",
           )}
         >
@@ -520,35 +523,35 @@ function ToolCallCard({
   return (
     <ActivityDisclosure
       label={formatToolLabel(item.tool_name)}
-      icon={<Wrench className="size-3.5 text-foreground/66" />}
+      icon={<Wrench className="size-3.5 text-white/50" />}
       tone="tool"
       streaming={displayStreaming}
       variant={variant}
       defaultOpen={displayStreaming}
     >
-      <div className="space-y-3">
-        <div className="space-y-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">
             Arguments
           </div>
-          <pre className="whitespace-pre-wrap break-words rounded-lg bg-surface-1/80 px-2.5 py-2 text-[11px] leading-relaxed text-foreground/75">
+          <pre className="whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/70">
             {formattedArguments}
           </pre>
         </div>
         {item.result || !isIdleTool ? (
-          <div className="space-y-1">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">
               Result
             </div>
             {item.result ? (
               <RichContentBlock
                 content={formattedResult ?? item.result}
                 streaming={displayStreaming}
-                markdownClassName="text-[13px] text-foreground/80"
-                preClassName="text-foreground/75"
+                markdownClassName="text-[12px] text-white/80 leading-relaxed"
+                preClassName="text-white/70"
               />
             ) : (
-              <div className="rounded-lg bg-surface-1/80 px-2.5 py-2 text-[12px] text-muted-foreground">
+              <div className="rounded-xl border border-white/[0.04] bg-white/[0.02] px-3.5 py-3 text-[12px] text-white/40 italic">
                 {displayStreaming ? "Running..." : "No result"}
               </div>
             )}
@@ -571,20 +574,27 @@ function ErrorCard({
   return (
     <div
       className={cn(
-        "min-w-0 w-full space-y-2 border-l-2 border-white/18 bg-white/[0.045] px-2.5 py-1.5",
-        !isWorkspace && "rounded-xl",
+        "min-w-0 w-full space-y-3 px-3 py-2.5",
+        isWorkspace
+          ? "border-l-2 border-red-500/40 bg-red-500/10"
+          : "rounded-xl border border-red-500/20 bg-red-500/5",
       )}
     >
       <div className="flex items-center gap-2">
-        <AlertCircle className="size-3.5 text-white/82" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/72">
+        <AlertCircle className="size-4 text-red-400" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-red-400">
           Error
         </span>
         <span className="ml-auto">
-          <CopyButton text={content} />
+          <CopyButton
+            text={content}
+            className="text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
+            iconClassName="text-current"
+            copiedClassName="text-emerald-400"
+          />
         </span>
       </div>
-      <p className="whitespace-pre-wrap break-words text-[13px] text-white/82">
+      <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-red-200">
         {content}
       </p>
     </div>
@@ -614,12 +624,12 @@ function ActivityDisclosure({
   return (
     <div
       className={cn(
-        "min-w-0 w-full px-2 py-1.5",
-        isWorkspace ? "border-l border-white/8 pl-3" : "rounded-[12px]",
-        tone === "thinking" &&
-          "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.028),rgba(255,255,255,0.01))]",
-        tone === "tool" &&
-          "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.016),rgba(255,255,255,0.006))]",
+        "min-w-0 w-full transition-all duration-300",
+        isWorkspace
+          ? "border-l border-white/[0.04] pl-3 py-1.5"
+          : "rounded-xl border border-white/[0.04] bg-white/[0.01] px-3 py-2",
+        tone === "thinking" && !isWorkspace && "hover:bg-white/[0.02]",
+        tone === "tool" && !isWorkspace && "hover:bg-white/[0.02]",
       )}
     >
       <button
@@ -627,32 +637,32 @@ function ActivityDisclosure({
         onClick={() => setOpen((current) => !current)}
         className="flex w-full items-center gap-2 text-left"
       >
-        <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-current">
+        <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-white/50">
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[11px] font-semibold leading-none text-foreground/88">
+          <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-white/70">
             {label}
           </span>
         </span>
         {streaming ? (
           <span className="ml-auto inline-flex size-5 items-center justify-center">
             <span className="relative flex size-2.5 items-center justify-center">
-              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-white/28" />
-              <span className="relative inline-flex size-2 rounded-full bg-white/78" />
+              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-white/30" />
+              <span className="relative inline-flex size-2 rounded-full bg-white/80" />
             </span>
             <span className="sr-only">Live</span>
           </span>
         ) : null}
         <ChevronRight
           className={cn(
-            "size-4 shrink-0 text-muted-foreground transition-transform",
+            "size-3.5 shrink-0 text-white/30 transition-transform duration-200",
             open && "rotate-90",
           )}
         />
       </button>
 
-      {open ? <div className="mt-2.5 min-w-0">{children}</div> : null}
+      {open ? <div className="mt-3 min-w-0">{children}</div> : null}
     </div>
   );
 }
@@ -674,7 +684,7 @@ function RichContentBlock({
     return (
       <pre
         className={cn(
-          "whitespace-pre-wrap break-words rounded-lg bg-surface-1/80 px-2.5 py-2 text-[11px] leading-relaxed",
+          "whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/80",
           preClassName,
         )}
       >

@@ -121,6 +121,8 @@ export function HomePage() {
   const [pendingAction, setPendingAction] = useState<WorkspaceDialogKind>(null);
   const [createTabTitle, setCreateTabTitle] = useState("");
   const [createTabGoal, setCreateTabGoal] = useState("");
+  const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
+  const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
   const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
   const [createAgentName, setCreateAgentName] = useState("");
   const [connectSourceId, setConnectSourceId] = useState("");
@@ -317,11 +319,22 @@ export function HomePage() {
     }
     setPendingAction("create-tab");
     try {
-      const tab = await createTabRequest(title, createTabGoal.trim());
+      const writeDirsArray = createTabWriteDirs
+        .split("\n")
+        .map((dir) => dir.trim())
+        .filter(Boolean);
+      const tab = await createTabRequest(
+        title,
+        createTabGoal.trim(),
+        createTabAllowNetwork,
+        writeDirsArray,
+      );
       setActiveTabId(tab.id);
       setActiveDialog(null);
       setCreateTabTitle("");
       setCreateTabGoal("");
+      setCreateTabAllowNetwork(false);
+      setCreateTabWriteDirs("");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create tab",
@@ -740,6 +753,42 @@ export function HomePage() {
             onChange={(event) => setCreateTabGoal(event.target.value)}
             placeholder="Summarize the task or outcome this workspace should drive."
             className="min-h-[116px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+        <WorkspaceDialogField
+          label="Network Access"
+          hint="Allow the leader to connect to the internet"
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={createTabAllowNetwork}
+            onClick={() => setCreateTabAllowNetwork(!createTabAllowNetwork)}
+            className={cn(
+              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2",
+              createTabAllowNetwork ? "bg-white" : "bg-white/20",
+            )}
+          >
+            <span className="sr-only">Network Access</span>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none inline-block size-4 transform rounded-full bg-black shadow ring-0 transition duration-200 ease-in-out",
+                createTabAllowNetwork ? "translate-x-4" : "translate-x-0",
+              )}
+            />
+          </button>
+        </WorkspaceDialogField>
+        <WorkspaceDialogField
+          label="Write Dirs"
+          hint="One absolute path per line"
+        >
+          <Textarea
+            value={createTabWriteDirs}
+            aria-label="Write directories"
+            onChange={(event) => setCreateTabWriteDirs(event.target.value)}
+            placeholder="/project/autopoe/frontend&#10;/project/autopoe/app"
+            className="min-h-[80px] rounded-[1rem] border-white/10 bg-black/14 font-mono text-[13px] text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
           />
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>

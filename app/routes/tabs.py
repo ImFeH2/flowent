@@ -21,6 +21,8 @@ router = APIRouter()
 class CreateTabRequest(BaseModel):
     title: str
     goal: str = ""
+    allow_network: bool = False
+    write_dirs: list[str] = []
 
 
 class CreateTabNodeRequest(BaseModel):
@@ -47,7 +49,12 @@ async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
     title = req.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="title must not be empty")
-    tab = create_tab(title=title, goal=req.goal)
+    tab = create_tab(
+        title=title,
+        goal=req.goal,
+        allow_network=req.allow_network,
+        write_dirs=req.write_dirs,
+    )
     return serialize_tab_summary(tab)
 
 

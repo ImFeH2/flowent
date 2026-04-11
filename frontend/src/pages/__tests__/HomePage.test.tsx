@@ -258,6 +258,8 @@ describe("HomePage", () => {
       expect(createTabRequestMock).toHaveBeenCalledWith(
         "Release Prep",
         "Coordinate the launch work",
+        false,
+        [],
       ),
     );
     expect(setActiveTabId).toHaveBeenCalledWith("tab-2");

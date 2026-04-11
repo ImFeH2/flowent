@@ -105,6 +105,8 @@ def _build_leader_record(
     tab_id: str,
     leader_id: str,
     settings,
+    allow_network: bool = False,
+    write_dirs: list[str] | None = None,
 ) -> GraphNodeRecord:
     role_name = resolve_leader_role_name(settings=settings)
     return GraphNodeRecord(
@@ -115,8 +117,8 @@ def _build_leader_record(
             tab_id=tab_id,
             name=LEADER_NODE_NAME,
             tools=build_tools_for_role(role_name, settings=settings),
-            write_dirs=[],
-            allow_network=False,
+            write_dirs=[path for path in (write_dirs or []) if path.strip()],
+            allow_network=allow_network,
         ),
         state=AgentState.INITIALIZING,
     )
@@ -145,12 +147,6 @@ def _sync_leader_record(
         changed = True
     if record.config.tools != tools:
         record.config.tools = tools
-        changed = True
-    if record.config.write_dirs:
-        record.config.write_dirs = []
-        changed = True
-    if record.config.allow_network:
-        record.config.allow_network = False
         changed = True
     return changed
 
@@ -279,6 +275,8 @@ def create_tab(
     *,
     title: str,
     goal: str = "",
+    allow_network: bool = False,
+    write_dirs: list[str] | None = None,
 ) -> Tab:
     settings = settings_module.get_settings()
     leader_id = str(uuid.uuid4())
@@ -293,6 +291,8 @@ def create_tab(
         tab_id=tab.id,
         leader_id=leader_id,
         settings=settings,
+        allow_network=allow_network,
+        write_dirs=write_dirs,
     )
     workspace_store.upsert_node_record(leader_record)
     if registry.get_all():

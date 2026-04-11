@@ -24,10 +24,12 @@ export async function fetchTabs(signal?: AbortSignal): Promise<TaskTab[]> {
 export async function createTabRequest(
   title: string,
   goal = "",
+  allow_network = false,
+  write_dirs: string[] = [],
 ): Promise<TaskTab> {
   return requestJson<TaskTab, TaskTab>("/api/tabs", {
     method: "POST",
-    body: { title, goal },
+    body: { title, goal, allow_network, write_dirs },
     errorMessage: "Failed to create tab",
   });
 }

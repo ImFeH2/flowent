@@ -23,7 +23,7 @@ import {
 } from "@/lib/history";
 import type { AssistantChatItem, HistoryEntry, NodeDetail } from "@/types";
 
-const SCROLL_BOTTOM_EPSILON = 1;
+const SCROLL_BOTTOM_EPSILON = 10;
 
 function isScrolledToBottom(element: HTMLDivElement) {
   const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
@@ -200,13 +200,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     if (!element || !autoScrollRef.current) {
       return;
     }
-    const raf = requestAnimationFrame(() => {
-      if (!autoScrollRef.current) {
-        return;
-      }
-      element.scrollTop = element.scrollHeight;
-    });
-    return () => cancelAnimationFrame(raf);
+    element.scrollTop = element.scrollHeight;
   }, [bottomInset, runningHintKey, timelineItems]);
 
   useLayoutEffect(() => {
@@ -215,24 +209,16 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       return;
     }
 
-    let raf = 0;
     const observer = new ResizeObserver(() => {
       if (!autoScrollRef.current) {
         return;
       }
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        if (!autoScrollRef.current) {
-          return;
-        }
-        element.scrollTop = element.scrollHeight;
-      });
+      element.scrollTop = element.scrollHeight;
     });
 
     observer.observe(element);
 
     return () => {
-      cancelAnimationFrame(raf);
       observer.disconnect();
     };
   }, []);

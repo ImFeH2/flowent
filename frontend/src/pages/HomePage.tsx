@@ -464,6 +464,13 @@ export function HomePage() {
                 <button
                   type="button"
                   onClick={() => setActiveTabId(tab.id)}
+                  onAuxClick={(event) => {
+                    if (event.button !== 1) {
+                      return;
+                    }
+                    event.preventDefault();
+                    requestDeleteTab(tab.id, tab.title, tab.node_count);
+                  }}
                   className={cn(
                     "relative flex h-8 w-full items-center rounded-md px-3 pr-8 text-left text-[13px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
                     activeTabId === tab.id

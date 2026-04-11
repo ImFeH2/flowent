@@ -459,4 +459,46 @@ describe("HomePage", () => {
       expect(deleteTabRequestMock).toHaveBeenCalledWith("tab-1"),
     );
   });
+
+  it("middle-clicks a tab into the same delete flow without activating it first", async () => {
+    const setActiveTabId = vi.fn();
+    deleteTabRequestMock.mockResolvedValue(undefined);
+    useAgentTabsRuntimeMock.mockReturnValue({
+      tabs: new Map([
+        ["tab-1", buildTab()],
+        [
+          "tab-2",
+          buildTab({
+            id: "tab-2",
+            title: "Other Tab",
+            node_count: 2,
+          }),
+        ],
+      ]),
+    });
+    useAgentUIMock.mockReturnValue({
+      activeTabId: "tab-2",
+      pendingAssistantMessages: [],
+      selectedAgentId: null,
+      selectAgent: vi.fn(),
+      setActiveTabId,
+    });
+
+    render(<HomePage />);
+
+    fireEvent(
+      screen.getAllByRole("button", { name: "Example Tab" })[0],
+      new MouseEvent("auxclick", {
+        bubbles: true,
+        button: 1,
+      }),
+    );
+
+    expect(setActiveTabId).not.toHaveBeenCalledWith("tab-1");
+    fireEvent.click(screen.getByRole("button", { name: "Delete Tab" }));
+
+    await waitFor(() =>
+      expect(deleteTabRequestMock).toHaveBeenCalledWith("tab-1"),
+    );
+  });
 });

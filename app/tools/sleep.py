@@ -13,10 +13,9 @@ if TYPE_CHECKING:
 class SleepTool(Tool):
     name = "sleep"
     description = (
-        "Pause execution for a fixed duration in seconds, then continue. "
-        "Use this when you already know how long to wait before the next action. "
-        "Incoming messages remain queued until the sleep finishes, and the tool "
-        "returns the actual sleep duration."
+        "Enter a timed wait that resumes on whichever happens first: a new input "
+        "arrives or the requested duration elapses. Use this when you want to wait "
+        "until a deadline without missing messages."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",

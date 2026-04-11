@@ -63,6 +63,7 @@
   --color-graph-assistant: var(--graph-assistant);
   --color-graph-status-running: var(--graph-status-running);
   --color-graph-status-idle: var(--graph-status-idle);
+  --color-graph-status-sleeping: var(--graph-status-sleeping);
   --color-graph-status-initializing: var(--graph-status-initializing);
   --color-graph-status-error: var(--graph-status-error);
   --color-graph-status-terminated: var(--graph-status-terminated);
@@ -129,6 +130,7 @@
   --graph-assistant: oklch(0.94 0.002 260);
   --graph-status-running: oklch(0.72 0.16 148);
   --graph-status-idle: oklch(0.74 0.11 82);
+  --graph-status-sleeping: oklch(0.72 0.13 225);
   --graph-status-initializing: oklch(0.64 0 0);
   --graph-status-error: oklch(0.63 0.19 25);
   --graph-status-terminated: oklch(0.42 0 0);

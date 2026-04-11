@@ -491,9 +491,20 @@ def test_clear_assistant_chat_history_drops_conversation_entries():
     )
 
 
-def test_clear_assistant_chat_history_interrupts_running_agent(monkeypatch):
+@pytest.mark.parametrize(
+    ("state", "reason"),
+    [
+        (AgentState.RUNNING, "processing"),
+        (AgentState.SLEEPING, "waiting for reply"),
+    ],
+)
+def test_clear_assistant_chat_history_interrupts_active_agent(
+    monkeypatch,
+    state,
+    reason,
+):
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
-    assistant.set_state(AgentState.RUNNING, "processing")
+    assistant.set_state(state, reason)
     assistant.history.append(ReceivedMessage(content="hello", from_id="human"))
 
     def fake_request_interrupt() -> bool:
@@ -844,6 +855,55 @@ def test_request_sleep_raises_interrupt_when_running_agent_is_interrupted():
         pass
     else:
         raise AssertionError("expected interrupt during sleep")
+
+
+def test_request_sleep_wakes_early_when_new_message_arrives():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    agent.set_state(AgentState.RUNNING, "processing")
+
+    def enqueue_message() -> None:
+        time.sleep(0.02)
+        agent.enqueue_message(
+            Message(from_id="tester", to_id=agent.uuid, content="wake up")
+        )
+
+    wake_thread = threading.Thread(target=enqueue_message, daemon=True)
+    wake_thread.start()
+
+    result = agent.request_sleep(seconds=0.3)
+
+    wake_thread.join(timeout=1.0)
+
+    assert result.startswith("woken by message after ")
+    assert agent.state == AgentState.RUNNING
+    received_entries = [
+        entry
+        for entry in agent.get_history_snapshot()
+        if isinstance(entry, ReceivedMessage)
+    ]
+    assert len(received_entries) == 1
+    assert received_entries[0].content == "wake up"
+    assert [
+        entry.state
+        for entry in agent.get_history_snapshot()
+        if isinstance(entry, StateEntry)
+    ][-2:] == ["sleeping", "running"]
+
+
+def test_request_sleep_timeout_queues_deadline_notice():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    agent.set_state(AgentState.RUNNING, "processing")
+
+    result = agent.request_sleep(seconds=0.01)
+
+    assert result.startswith("slept ")
+    assert agent.state == AgentState.RUNNING
+    assert agent._consume_runtime_notices() == [agent._build_sleep_deadline_notice()]
+    assert [
+        entry.state
+        for entry in agent.get_history_snapshot()
+        if isinstance(entry, StateEntry)
+    ][-2:] == ["sleeping", "running"]
 
 
 def test_agent_interrupts_blocked_provider_without_streaming_output(monkeypatch):

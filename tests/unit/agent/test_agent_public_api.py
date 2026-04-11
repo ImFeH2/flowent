@@ -155,7 +155,17 @@ def test_request_interrupt_marks_running_agent():
     assert agent._interrupt_requested.is_set()
 
 
-def test_request_interrupt_ignores_non_running_agent():
+def test_request_interrupt_marks_sleeping_agent():
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
+    agent.set_state(AgentState.SLEEPING, "waiting for reply")
+
+    interrupted = agent.request_interrupt()
+
+    assert interrupted is True
+    assert agent._interrupt_requested.is_set()
+
+
+def test_request_interrupt_ignores_idle_agent():
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent-a")
 
     interrupted = agent.request_interrupt()

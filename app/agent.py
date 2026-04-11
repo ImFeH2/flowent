@@ -316,13 +316,31 @@ class Agent:
     def request_sleep(self, *, seconds: float) -> str:
         duration = max(0.0, seconds)
         started_at = _time.perf_counter()
-        remaining = duration
-        while remaining > 0 and not self._terminate.is_set():
+        if duration <= 0:
+            self._queue_runtime_notice(self._build_sleep_deadline_notice())
+            return "slept 0.00s"
+
+        self.set_state(AgentState.SLEEPING, f"sleeping for {duration:.2f}s")
+        while not self._terminate.is_set():
             self._raise_if_interrupt_requested()
-            step_started_at = _time.perf_counter()
-            self._terminate.wait(timeout=min(remaining, 0.1))
-            remaining -= _time.perf_counter() - step_started_at
-        elapsed = max(0.0, _time.perf_counter() - started_at)
+            remaining = duration - (_time.perf_counter() - started_at)
+            if remaining <= 0:
+                self._queue_runtime_notice(self._build_sleep_deadline_notice())
+                self.set_state(AgentState.RUNNING, "sleep deadline reached")
+                break
+            try:
+                signal = self._wake_queue.get(timeout=min(remaining, 0.1))
+            except Empty:
+                continue
+            if signal.reason == "termination":
+                self._terminate.set()
+                break
+            if signal.reason == "message":
+                self._resume_from_wakeup(signal)
+                self._drain_messages()
+                elapsed = max(0.0, _time.perf_counter() - started_at)
+                return f"woken by message after {elapsed:.2f}s"
+        elapsed = min(duration, max(0.0, _time.perf_counter() - started_at))
         return f"slept {elapsed:.2f}s"
 
     def _get_idle_elapsed_seconds(self, *, tool_call_id: str | None) -> float:
@@ -484,7 +502,7 @@ class Agent:
         if self.node_type != NodeType.ASSISTANT:
             raise RuntimeError("Only assistant chat history can be cleared")
 
-        if self.state == AgentState.RUNNING:
+        if self.state in {AgentState.RUNNING, AgentState.SLEEPING}:
             if not self.request_interrupt():
                 raise RuntimeError("Assistant is not interruptible")
             if not self.wait_until_idle(timeout=interrupt_timeout):
@@ -861,6 +879,14 @@ class Agent:
             f"(`{todo_text}`). Do that next, or update the TODO list so the "
             "first remaining item is the actual waiting step, before calling "
             "`idle`."
+        )
+
+    @staticmethod
+    def _build_sleep_deadline_notice() -> str:
+        return (
+            "Sleep deadline reached: the timed wait has expired. Continue from "
+            "that deadline wake-up and decide whether to retry, follow up, or "
+            "escalate."
         )
 
     def _queue_runtime_notice(self, content: str) -> None:
@@ -1775,7 +1801,7 @@ class Agent:
         )
 
     def request_interrupt(self) -> bool:
-        if self.state != AgentState.RUNNING:
+        if self.state not in {AgentState.RUNNING, AgentState.SLEEPING}:
             return False
         self._interrupt_requested.set()
         self._invoke_interrupt_callback()

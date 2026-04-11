@@ -1,6 +1,8 @@
 import json
 from uuid import UUID
 
+import pytest
+
 import app.settings as settings_module
 from app.agent import Agent
 from app.models import AgentState, StateEntry
@@ -388,7 +390,12 @@ def test_bootstrap_runtime_backfills_state_history_for_restored_nodes(
         registry.reset()
 
 
-def test_bootstrap_runtime_restores_running_nodes_as_idle(monkeypatch, tmp_path):
+@pytest.mark.parametrize("restored_state", ["running", "sleeping"])
+def test_bootstrap_runtime_restores_active_nodes_as_idle(
+    monkeypatch,
+    tmp_path,
+    restored_state,
+):
     settings_file = tmp_path / "settings.json"
     workspace_file = tmp_path / "workspace.json"
     registry.reset()
@@ -427,12 +434,12 @@ def test_bootstrap_runtime_restores_running_nodes_as_idle(monkeypatch, tmp_path)
                             "write_dirs": [],
                             "allow_network": False,
                         },
-                        "state": "running",
+                        "state": restored_state,
                         "todos": [{"text": "resume me"}],
                         "history": [
                             {
                                 "type": "StateEntry",
-                                "state": "running",
+                                "state": restored_state,
                                 "reason": "before restart",
                             }
                         ],

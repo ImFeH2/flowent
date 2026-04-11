@@ -259,6 +259,32 @@ describe("useAssistantChat", () => {
     });
   });
 
+  it("treats sleeping assistant state as interruptible active work", async () => {
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("sleeping")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    fetchNodeDetailMock.mockResolvedValue(
+      buildDetail([
+        {
+          type: "ReceivedMessage",
+          from_id: "human",
+          content: "Wait for the reply",
+          timestamp: 1,
+        },
+      ]),
+    );
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(result.current.assistantActivity.running).toBe(true);
+    });
+  });
+
   it("clears assistant chat and reloads the empty conversation detail", async () => {
     const clearAgentHistoryMock = vi.fn();
 

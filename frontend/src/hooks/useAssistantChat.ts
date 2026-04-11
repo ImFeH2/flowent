@@ -141,6 +141,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       connected &&
       (pendingCount > 0 ||
         assistantNode?.state === "running" ||
+        assistantNode?.state === "sleeping" ||
         activeToolCalls.has(assistantId ?? "") ||
         deltas.length > 0);
     const lastHumanIndex = [...timelineItems]

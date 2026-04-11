@@ -12,6 +12,7 @@ class NodeType(StrEnum):
 class AgentState(StrEnum):
     INITIALIZING = "initializing"
     IDLE = "idle"
+    SLEEPING = "sleeping"
     RUNNING = "running"
     ERROR = "error"
     TERMINATED = "terminated"

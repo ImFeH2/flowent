@@ -210,6 +210,18 @@
   --hover-ring-opacity: 0.7;
 }
 
+.agent-state-ring-sleeping {
+  --status-color: var(--graph-status-sleeping);
+  --agent-ring-shadow: color-mix(in srgb, var(--status-color) 24%, transparent);
+  --agent-ring-shadow-soft: color-mix(
+    in srgb,
+    var(--status-color) 9%,
+    transparent
+  );
+  --base-ring-opacity: 0.34;
+  --hover-ring-opacity: 0.56;
+}
+
 .agent-state-ring-initializing {
   --status-color: var(--graph-status-initializing);
   --agent-ring-shadow: color-mix(in srgb, var(--status-color) 24%, transparent);

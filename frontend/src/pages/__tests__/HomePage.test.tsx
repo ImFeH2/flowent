@@ -472,6 +472,67 @@ describe("HomePage", () => {
     });
   });
 
+  it("shows the same interrupt action for a sleeping task node detail view", async () => {
+    const worker = buildNode({
+      id: "agent-1",
+      name: "Docs Worker",
+      state: "sleeping",
+    });
+    const assistant = buildNode({
+      id: "assistant",
+      node_type: "assistant",
+      tab_id: null,
+      role_name: "Steward",
+    });
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([
+        [assistant.id, assistant],
+        [worker.id, worker],
+      ]),
+    });
+    useAgentUIMock.mockReturnValue({
+      activeTabId: "tab-1",
+      pendingAssistantMessages: [],
+      selectedAgentId: worker.id,
+      selectAgent: vi.fn(),
+      setActiveTabId: vi.fn(),
+    });
+    useAgentDetailMock.mockReturnValue({
+      detail: {
+        id: worker.id,
+        node_type: "agent",
+        tab_id: "tab-1",
+        state: "sleeping",
+        name: "Docs Worker",
+        contacts: ["assistant"],
+        connections: [],
+        role_name: "Worker",
+        todos: [],
+        tools: [],
+        write_dirs: [],
+        allow_network: false,
+        position: null,
+        history: [],
+      },
+      error: null,
+      loading: false,
+    });
+    interruptNodeMock.mockResolvedValue(undefined);
+
+    const view = render(<HomePage />);
+
+    const interruptButtons = within(view.container).getAllByRole("button", {
+      name: "Interrupt",
+    });
+    const interruptButton = interruptButtons[interruptButtons.length - 1];
+    expect(interruptButton).toHaveAttribute("data-variant", "destructive");
+    fireEvent.click(interruptButton);
+
+    await waitFor(() => {
+      expect(interruptNodeMock).toHaveBeenCalledWith("agent-1");
+    });
+  });
+
   it("deletes a tab through the confirmation dialog", async () => {
     deleteTabRequestMock.mockResolvedValue(undefined);
 

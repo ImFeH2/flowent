@@ -2,8 +2,9 @@ export type NodeType = "assistant" | "agent";
 
 export type AgentState =
   | "initializing"
-  | "running"
   | "idle"
+  | "sleeping"
+  | "running"
   | "error"
   | "terminated";
 

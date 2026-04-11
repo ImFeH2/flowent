@@ -183,6 +183,8 @@ async def clear_node_chat(node_id: str) -> dict:
 
     try:
         node.clear_chat_history()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except TimeoutError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

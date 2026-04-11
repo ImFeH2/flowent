@@ -285,6 +285,7 @@ export function HomePage() {
       connected &&
       (pendingAssistantMessages.length > 0 ||
         assistantNode?.state === "running" ||
+        assistantNode?.state === "sleeping" ||
         (assistantId ? activeToolCalls.has(assistantId) : false) ||
         assistantDeltas.length > 0)
     );
@@ -1242,7 +1243,7 @@ function AgentDetailPanel({
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          {detailState === "running" ? (
+          {detailState === "running" || detailState === "sleeping" ? (
             <Button
               type="button"
               size="sm"

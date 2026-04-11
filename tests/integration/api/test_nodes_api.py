@@ -173,7 +173,20 @@ def test_assistant_can_be_interrupted_via_nodes_api_when_running(client: TestCli
     assert assistant._interrupt_requested.is_set()
 
 
-def test_interrupt_ignores_non_running_node(client: TestClient):
+def test_assistant_can_be_interrupted_via_nodes_api_when_sleeping(client: TestClient):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+    assistant.set_state(AgentState.SLEEPING, "waiting for reply")
+
+    response = client.post(f"/api/nodes/{assistant_id}/interrupt")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "interrupting"}
+    assert assistant._interrupt_requested.is_set()
+
+
+def test_interrupt_ignores_idle_node(client: TestClient):
     assistant_id = _get_assistant_id(client)
     response = client.post(f"/api/nodes/{assistant_id}/interrupt")
 

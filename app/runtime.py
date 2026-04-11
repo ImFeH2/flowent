@@ -108,6 +108,7 @@ def bootstrap_runtime() -> None:
         if record.state in {
             AgentState.INITIALIZING,
             AgentState.RUNNING,
+            AgentState.SLEEPING,
         }:
             node.history.append(
                 StateEntry(state=AgentState.IDLE.value, reason="restored")

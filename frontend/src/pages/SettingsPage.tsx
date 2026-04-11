@@ -171,7 +171,10 @@ export function SettingsPage() {
     setSaving(true);
     try {
       const savedSettings = await saveSettings<UserSettings>({
-        assistant: settings.assistant,
+        assistant: {
+          ...settings.assistant,
+          write_dirs: normalizeWriteDirs(settings.assistant.write_dirs),
+        },
         leader: settings.leader,
         model: settings.model,
       });
@@ -299,9 +302,7 @@ export function SettingsPage() {
                         ...settings,
                         assistant: {
                           ...settings.assistant,
-                          write_dirs: normalizeWriteDirs(
-                            e.target.value.split("\n"),
-                          ),
+                          write_dirs: e.target.value.split("\n"),
                         },
                       })
                     }

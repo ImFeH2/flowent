@@ -346,24 +346,10 @@ export function AgentGraph() {
         } satisfies FlowNode,
       ];
     });
-    const leaderId = visibleAgents.find((agent) => agent.is_leader)?.id ?? null;
-    const layoutEdges =
-      leaderId && rawNodes.length > 1
-        ? [
-            ...baseEdges,
-            ...visibleAgents
-              .filter((agent) => agent.id !== leaderId)
-              .map((agent) => ({
-                id: `layout:${leaderId}->${agent.id}`,
-                source: leaderId,
-                target: agent.id,
-              })),
-          ]
-        : baseEdges;
 
     const layouted =
       rawNodes.length > 0
-        ? getLayoutedElements(rawNodes, layoutEdges)
+        ? getLayoutedElements(rawNodes, baseEdges)
         : { nodes: [] as FlowNode[], edges: baseEdges };
     const positions = new Map(
       layouted.nodes.map((node) => [node.id, node.position] as const),

@@ -208,7 +208,7 @@ def test_contacts_tool_uses_agent_public_api(monkeypatch):
     assert result == {"contacts": expected}
 
 
-def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
+def test_agent_get_contacts_info_excludes_leader_without_explicit_edge():
     registry.reset()
     workspace_store.reset_cache()
     workspace_store.upsert_tab(
@@ -249,14 +249,6 @@ def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
     try:
         assert agent.get_contacts_info() == [
             {
-                "id": "leader-a",
-                "node_type": "agent",
-                "role_name": "Conductor",
-                "name": "Leader",
-                "state": "initializing",
-                "is_leader": True,
-            },
-            {
                 "id": "agent-b",
                 "node_type": "agent",
                 "role_name": "Worker",
@@ -264,6 +256,50 @@ def test_agent_get_contacts_info_includes_assistant_and_direct_peer():
                 "state": "initializing",
                 "is_leader": False,
             },
+        ]
+    finally:
+        registry.reset()
+        workspace_store.reset_cache()
+
+
+def test_agent_get_contacts_info_includes_leader_when_explicitly_connected():
+    registry.reset()
+    workspace_store.reset_cache()
+    workspace_store.upsert_tab(
+        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
+    )
+    leader = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            name="Leader",
+            tab_id="tab-1",
+        ),
+        uuid="leader-a",
+    )
+    agent = Agent(
+        NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"),
+        uuid="agent-a",
+    )
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
+        uuid="assistant-a",
+    )
+    registry.register(leader)
+    registry.register(agent)
+    registry.register(assistant)
+    agent.add_connection(leader.uuid)
+
+    try:
+        assert agent.get_contacts_info() == [
+            {
+                "id": "leader-a",
+                "node_type": "agent",
+                "role_name": "Conductor",
+                "name": "Leader",
+                "state": "initializing",
+                "is_leader": True,
+            }
         ]
     finally:
         registry.reset()
@@ -311,15 +347,93 @@ def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
     try:
         assert agent.get_contacts_info() == [
             {
-                "id": "leader-a",
+                "id": "agent-b",
                 "node_type": "agent",
-                "role_name": "Conductor",
-                "name": "Leader",
+                "role_name": "Reviewer",
+                "name": "Reviewer",
                 "state": "initializing",
-                "is_leader": True,
+                "is_leader": False,
+            },
+        ]
+    finally:
+        registry.reset()
+        workspace_store.reset_cache()
+
+
+def test_leader_get_contacts_info_includes_assistant_and_explicit_edges_only():
+    registry.reset()
+    workspace_store.reset_cache()
+    workspace_store.upsert_tab(
+        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
+    )
+    assistant = Agent(
+        NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
+        uuid="assistant-a",
+    )
+    leader = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            name="Leader",
+            tab_id="tab-1",
+        ),
+        uuid="leader-a",
+    )
+    outgoing_worker = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Worker",
+            name="Writer",
+            tab_id="tab-1",
+        ),
+        uuid="agent-b",
+    )
+    incoming_worker = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Reviewer",
+            name="Reviewer",
+            tab_id="tab-1",
+        ),
+        uuid="agent-c",
+    )
+    detached_worker = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Analyst",
+            name="Analyst",
+            tab_id="tab-1",
+        ),
+        uuid="agent-d",
+    )
+    registry.register(assistant)
+    registry.register(leader)
+    registry.register(outgoing_worker)
+    registry.register(incoming_worker)
+    registry.register(detached_worker)
+    leader.add_connection(outgoing_worker.uuid)
+    incoming_worker.add_connection(leader.uuid)
+
+    try:
+        assert leader.get_contacts_info() == [
+            {
+                "id": "assistant-a",
+                "node_type": "assistant",
+                "role_name": "Steward",
+                "name": "Assistant",
+                "state": "initializing",
+                "is_leader": False,
             },
             {
                 "id": "agent-b",
+                "node_type": "agent",
+                "role_name": "Worker",
+                "name": "Writer",
+                "state": "initializing",
+                "is_leader": False,
+            },
+            {
+                "id": "agent-c",
                 "node_type": "agent",
                 "role_name": "Reviewer",
                 "name": "Reviewer",

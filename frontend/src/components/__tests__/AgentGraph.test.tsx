@@ -580,6 +580,40 @@ describe("AgentGraph", () => {
     );
   });
 
+  it("does not lay out detached workers as implicit leader children", async () => {
+    renderGraph([
+      buildNode({
+        id: "leader-1",
+        role_name: "Conductor",
+        is_leader: true,
+        name: "Leader",
+      }),
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+        name: "Worker",
+      }),
+    ]);
+
+    await screen.findByText("Leader");
+
+    const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
+      | {
+          nodes: Array<{ id: string; position: { x: number; y: number } }>;
+        }
+      | undefined;
+    const leaderNode = latestProps?.nodes.find(
+      (node) => node.id === "leader-1",
+    );
+    const workerNode = latestProps?.nodes.find(
+      (node) => node.id === "worker-1",
+    );
+
+    expect(leaderNode).toBeDefined();
+    expect(workerNode).toBeDefined();
+    expect(workerNode?.position.y).toBe(leaderNode?.position.y);
+  });
+
   it("keeps removed nodes briefly for exit transitions before unmounting them", () => {
     vi.useFakeTimers();
 

@@ -27,7 +27,7 @@ def reset_runtime_state(monkeypatch, tmp_path):
     monkeypatch.setattr(settings_module, "_cached_settings", None)
 
 
-def test_create_agent_defaults_to_current_tab(monkeypatch):
+def test_create_agent_defaults_to_current_tab_and_connects_to_creator(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
@@ -67,6 +67,55 @@ def test_create_agent_defaults_to_current_tab(monkeypatch):
 
     assert result["config"]["tab_id"] == tab.id
     assert result["config"]["name"] == "Peer Worker"
+    assert owner.get_connections_snapshot() == [result["id"]]
+    assert [
+        (edge.from_node_id, edge.to_node_id)
+        for edge in workspace_store.list_edges(tab.id)
+    ] == [(owner.uuid, result["id"])]
+
+
+def test_create_agent_can_disable_automatic_edge_to_creator(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="Do work.",
+                    included_tools=["read"],
+                )
+            ]
+        ),
+    )
+    tab = create_tab(title="Task", goal="Do work")
+
+    owner = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            tab_id=tab.id,
+            tools=["create_agent"],
+            write_dirs=["/tmp/workspace"],
+            allow_network=False,
+        ),
+        uuid=tab.leader_id,
+    )
+    registry.register(owner)
+
+    result = json.loads(
+        CreateAgentTool().execute(
+            owner,
+            {
+                "role_name": "Worker",
+                "name": "Detached Worker",
+                "connect_to_creator": False,
+            },
+        )
+    )
+
+    assert result["config"]["tab_id"] == tab.id
+    assert owner.get_connections_snapshot() == []
+    assert workspace_store.list_edges(tab.id) == []
 
 
 def test_create_agent_rejects_cross_tab_creation_for_non_assistant(monkeypatch):
@@ -242,4 +291,45 @@ def test_create_agent_respects_write_dir_and_network_boundaries(monkeypatch, tmp
     }
     assert network_result == {
         "error": "allow_network boundary exceeded: parent disallows network access"
+    }
+
+
+def test_create_agent_rejects_non_boolean_connect_to_creator(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
+    )
+    tab = create_tab(title="Task", goal="Do work")
+
+    owner = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Conductor",
+            tab_id=tab.id,
+            tools=["create_agent"],
+        ),
+        uuid=tab.leader_id,
+    )
+
+    result = json.loads(
+        CreateAgentTool().execute(
+            owner,
+            {
+                "role_name": "Worker",
+                "connect_to_creator": "yes",
+            },
+        )
+    )
+
+    assert result == {"error": "connect_to_creator must be a boolean"}
+
+
+def test_create_agent_tool_schema_exposes_connect_to_creator_default():
+    assert CreateAgentTool.parameters["properties"]["connect_to_creator"] == {
+        "type": "boolean",
+        "description": (
+            "Whether to automatically create an explicit edge from the "
+            "creator to the new node"
+        ),
+        "default": True,
     }

@@ -102,6 +102,7 @@ def test_compose_system_prompt_injects_create_agent_guidance_when_tool_present()
     assert (
         "If you also have `connect`, wire them as needed." in CREATE_AGENT_TOOL_GUIDANCE
     )
+    assert "`connect_to_creator` defaults to `true`" in CREATE_AGENT_TOOL_GUIDANCE
     assert "dispatch tasks to all of them before calling `idle`" in result
     assert "Each response can route to only one node." in result
     assert "Do not insert unrelated tool calls or Human-facing text" in result

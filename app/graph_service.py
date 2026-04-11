@@ -405,6 +405,8 @@ def create_agent_node(
     tools: list[str] | None = None,
     write_dirs: list[str] | None = None,
     allow_network: bool = False,
+    creator_node_id: str | None = None,
+    connect_to_creator: bool = True,
 ) -> tuple[GraphNodeRecord | None, str | None]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
@@ -433,15 +435,31 @@ def create_agent_node(
         config=config,
         state=AgentState.INITIALIZING,
     )
-    return _finalize_agent_creation(record=record)
+    return _finalize_agent_creation(
+        record=record,
+        creator_node_id=creator_node_id,
+        connect_to_creator=connect_to_creator,
+    )
 
 
 def _finalize_agent_creation(
     *,
     record: GraphNodeRecord,
+    creator_node_id: str | None = None,
+    connect_to_creator: bool = True,
 ) -> tuple[GraphNodeRecord | None, str | None]:
     workspace_store.upsert_node_record(record)
-    return _start_persisted_agent(record=record)
+    started_record, error = _start_persisted_agent(record=record)
+    if error is not None or started_record is None:
+        return None, error or "Failed to create agent"
+    if connect_to_creator and creator_node_id is not None:
+        _, edge_error = create_edge(
+            from_node_id=creator_node_id,
+            to_node_id=record.id,
+        )
+        if edge_error is not None:
+            return None, edge_error
+    return started_record, None
 
 
 def create_edge(

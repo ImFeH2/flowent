@@ -1131,6 +1131,23 @@ def test_route_content_output_reports_error_when_target_is_not_in_contacts():
     ]
 
 
+def test_route_content_output_reports_error_when_leader_lacks_explicit_edge():
+    registry.reset()
+    leader = _register_tab_leader()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    registry.register(child)
+
+    try:
+        routed_result = leader._route_content_output("@child: reply with the findings")
+    finally:
+        registry.reset()
+
+    assert routed_result.sent_messages == []
+    assert routed_result.route_errors == [
+        "Routing failed: target `child` is not in contacts."
+    ]
+
+
 def test_route_content_output_does_not_deliver_plain_content(monkeypatch):
     registry.reset()
     parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")

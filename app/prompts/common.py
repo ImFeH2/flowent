@@ -49,6 +49,7 @@ CREATE_AGENT_TOOL_GUIDANCE = """\
 - Use `create_agent` to add a new node to a tab's Agent Graph.
 - Prefer creating the right set of peer agents up front. If you also have `connect`, wire them as needed.
 - If you are already working inside a tab, you may omit `tab_id` and create the new peer in your current tab.
+- `connect_to_creator` defaults to `true`; set it to `false` only when you intentionally want a disconnected node and will wire explicit edges yourself.
 - Creating an agent does not start work by itself; explicitly send it its first task.
 - After creating multiple agents, dispatch tasks to all of them before calling `idle`.
 - Each response can route to only one node. When multiple agents need first-task dispatches, send one node-specific `@target:` task, continue to the next response, and keep going until every planned node has been dispatched.

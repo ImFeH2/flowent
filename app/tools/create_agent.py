@@ -49,6 +49,14 @@ class CreateAgentTool(Tool):
                 "description": "Whether the node can access the network",
                 "default": False,
             },
+            "connect_to_creator": {
+                "type": "boolean",
+                "description": (
+                    "Whether to automatically create an explicit edge from the "
+                    "creator to the new node"
+                ),
+                "default": True,
+            },
         },
         "required": ["role_name"],
     }
@@ -60,6 +68,7 @@ class CreateAgentTool(Tool):
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
+        connect_to_creator = args.get("connect_to_creator", True)
 
         resolved_tab_id: str | None
         if tab_id is None:
@@ -82,6 +91,8 @@ class CreateAgentTool(Tool):
             return json.dumps({"error": "write_dirs must be an array of strings"})
         if not isinstance(allow_network, bool):
             return json.dumps({"error": "allow_network must be a boolean"})
+        if not isinstance(connect_to_creator, bool):
+            return json.dumps({"error": "connect_to_creator must be a boolean"})
         if not resolved_tab_id:
             return json.dumps({"error": "tab_id is required"})
         normalized_role_name = role_name.strip()
@@ -133,6 +144,8 @@ class CreateAgentTool(Tool):
             tools=tools,
             write_dirs=write_dirs,
             allow_network=allow_network,
+            creator_node_id=agent.uuid,
+            connect_to_creator=connect_to_creator,
         )
         if error is not None or record is None:
             return json.dumps({"error": error or "Failed to create agent"})

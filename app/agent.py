@@ -367,22 +367,8 @@ class Agent:
         leader_id = get_tab_leader_id(self.config.tab_id)
         is_leader = leader_id == self.uuid
         assistant = registry.get_assistant()
-        if is_leader:
-            if assistant is not None:
-                append_contact(assistant.uuid)
-            for node in registry.get_all():
-                if (
-                    node.uuid == self.uuid
-                    or node.node_type != NodeType.AGENT
-                    or node.config.tab_id != self.config.tab_id
-                    or node.uuid == leader_id
-                ):
-                    continue
-                append_contact(node.uuid)
-            return contact_ids
-
-        if leader_id is not None:
-            append_contact(leader_id)
+        if is_leader and assistant is not None:
+            append_contact(assistant.uuid)
 
         with self._connections_lock:
             for node_id in self.connections:
@@ -392,8 +378,6 @@ class Agent:
             if node.uuid == self.uuid or node.node_type != NodeType.AGENT:
                 continue
             if node.config.tab_id != self.config.tab_id:
-                continue
-            if node.uuid == leader_id:
                 continue
             if node.is_connected_to(self.uuid):
                 append_contact(node.uuid)

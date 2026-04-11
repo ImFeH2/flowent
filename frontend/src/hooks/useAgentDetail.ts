@@ -86,12 +86,7 @@ export function useAgentDetail(
       cancelled = true;
       controller.abort();
     };
-  }, [
-    agentId,
-    clearAgentHistory,
-    detailHistoryClearedAt,
-    preserveIncrementalHistory,
-  ]);
+  }, [agentId, clearAgentHistory, preserveIncrementalHistory]);
 
   const merged = useMemo(() => {
     if (!detail || !agentId) return null;

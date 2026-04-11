@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useState, useCallback, type ReactNode } from "react";
+import { useState, useCallback, memo, type ReactNode } from "react";
 import {
   ChevronRight,
   MessageSquare,
@@ -32,12 +32,12 @@ export function HistoryView({
   return (
     <div className="space-y-1.5 p-2.5">
       {history.map((entry, index) => (
-        <HistoryItem
+        <div
           key={`${index}-${entry.timestamp}-${entry.type}-${entry.message_id ?? ""}-${entry.tool_call_id ?? ""}`}
-          agentLabel={agentLabel}
-          entry={entry}
-          nodes={nodes}
-        />
+          className="[content-visibility:auto] [contain-intrinsic-size:auto_100px]"
+        >
+          <HistoryItem agentLabel={agentLabel} entry={entry} nodes={nodes} />
+        </div>
       ))}
     </div>
   );
@@ -105,7 +105,7 @@ function StreamingText({
   );
 }
 
-function HistoryItem({
+const HistoryItem = memo(function HistoryItem({
   agentLabel,
   entry,
   nodes,
@@ -294,7 +294,7 @@ function HistoryItem({
     default:
       return null;
   }
-}
+});
 
 function CollapsibleBlock({
   actions,

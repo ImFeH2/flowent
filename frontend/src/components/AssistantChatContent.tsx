@@ -3,6 +3,7 @@ import {
   useRef,
   useState,
   type KeyboardEventHandler,
+  memo,
   type ReactNode,
   type RefObject,
   type UIEventHandler,
@@ -92,12 +93,12 @@ export function AssistantChatMessages({
         ))}
 
       {visibleItems.map((item, index) => (
-        <TimelineItem
+        <div
           key={getTimelineItemKey(item, index)}
-          item={item}
-          nodes={nodes}
-          variant={variant}
-        />
+          className="[content-visibility:auto] [contain-intrinsic-size:auto_100px]"
+        >
+          <TimelineItem item={item} nodes={nodes} variant={variant} />
+        </div>
       ))}
 
       {runningHint ? (
@@ -263,7 +264,7 @@ function AssistantRunningHint({
   );
 }
 
-function TimelineItem({
+const TimelineItem = memo(function TimelineItem({
   item,
   nodes,
   variant,
@@ -338,7 +339,7 @@ function TimelineItem({
     default:
       return null;
   }
-}
+});
 
 function HumanBubble({
   content,

@@ -9,6 +9,7 @@ from app.settings import (
     ModelSettings,
     RoleConfig,
     Settings,
+    build_assistant_write_dirs,
 )
 from app.tools.manage_settings import ManageSettingsTool
 
@@ -119,6 +120,7 @@ def test_manage_settings_update_changes_assistant_role(monkeypatch):
             RoleConfig(name="Reviewer", system_prompt="Review carefully."),
         ]
     )
+    expected_write_dirs = list(settings.assistant.write_dirs)
     saved: list[Settings] = []
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
@@ -140,7 +142,7 @@ def test_manage_settings_update_changes_assistant_role(monkeypatch):
     assert result["assistant"] == {
         "role_name": "Reviewer",
         "allow_network": True,
-        "write_dirs": ["/project/autopoe"],
+        "write_dirs": expected_write_dirs,
     }
     assert settings.assistant.role_name == "Reviewer"
     assert saved == [settings]
@@ -149,6 +151,7 @@ def test_manage_settings_update_changes_assistant_role(monkeypatch):
 def test_manage_settings_update_changes_assistant_permissions(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
+    expected_write_dirs = build_assistant_write_dirs([" ./tmp ", "./tmp/", ""])
 
     monkeypatch.setattr("app.settings.get_settings", lambda: settings)
     monkeypatch.setattr("app.settings.save_settings", lambda current: None)
@@ -168,10 +171,10 @@ def test_manage_settings_update_changes_assistant_permissions(monkeypatch):
     assert result["assistant"] == {
         "role_name": "Steward",
         "allow_network": False,
-        "write_dirs": ["/project/autopoe/tmp"],
+        "write_dirs": expected_write_dirs,
     }
     assert settings.assistant.allow_network is False
-    assert settings.assistant.write_dirs == ["/project/autopoe/tmp"]
+    assert settings.assistant.write_dirs == expected_write_dirs
 
 
 def test_manage_settings_update_changes_leader_role(monkeypatch):

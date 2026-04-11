@@ -105,6 +105,11 @@ def test_compose_system_prompt_injects_create_agent_guidance_when_tool_present()
         "If you also have `connect`, wire them as needed." in CREATE_AGENT_TOOL_GUIDANCE
     )
     assert "`connect_to_creator` defaults to `true`" in CREATE_AGENT_TOOL_GUIDANCE
+    assert "does not take `tab_id`" in CREATE_AGENT_TOOL_GUIDANCE
+    assert (
+        "Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them."
+        in CREATE_AGENT_TOOL_GUIDANCE
+    )
     assert "dispatch tasks to all of them before calling `idle`" in result
     assert "Each response can route to only one node." in result
     assert "Do not insert unrelated tool calls or Human-facing text" in result
@@ -397,6 +402,10 @@ def test_get_system_prompt_for_worker_omits_graph_creation_guidance(monkeypatch)
     assert CREATE_AGENT_TOOL_GUIDANCE not in prompt
     assert CONNECT_TOOL_GUIDANCE not in prompt
     assert DELEGATION_GENERAL_GUIDANCE not in prompt
+
+
+def test_worker_default_tools_do_not_include_create_agent():
+    assert "create_agent" not in WORKER_ROLE_INCLUDED_TOOLS
 
 
 def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):

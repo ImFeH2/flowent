@@ -1622,7 +1622,6 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
             tool_name="create_agent",
             tool_call_id="call-create-agent",
             arguments={
-                "tab_id": "tab-1",
                 "role_name": "Worker",
                 "name": "Directory Worker",
             },
@@ -1662,7 +1661,7 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
                     "type": "function",
                     "function": {
                         "name": "create_agent",
-                        "arguments": '{"tab_id": "tab-1", "role_name": "Worker", "name": "Directory Worker"}',
+                        "arguments": '{"role_name": "Worker", "name": "Directory Worker"}',
                     },
                 }
             ],
@@ -1690,7 +1689,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
         ToolCall(
             tool_name="create_agent",
             tool_call_id="call-create-agent",
-            arguments={"tab_id": "tab-1", "role_name": "Worker"},
+            arguments={"role_name": "Worker"},
             result=json.dumps(
                 {
                     "id": "12345678-aaaa-bbbb-cccc-ddddeeeeffff",
@@ -1727,7 +1726,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
                     "type": "function",
                     "function": {
                         "name": "create_agent",
-                        "arguments": '{"tab_id": "tab-1", "role_name": "Worker"}',
+                        "arguments": '{"role_name": "Worker"}',
                     },
                 }
             ],
@@ -1754,7 +1753,6 @@ def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkey
             tool_name="create_agent",
             tool_call_id="call-create-agent",
             arguments={
-                "tab_id": "tab-1",
                 "role_name": "Worker",
                 "name": "Directory Worker",
             },
@@ -1800,7 +1798,7 @@ def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkey
                     "type": "function",
                     "function": {
                         "name": "create_agent",
-                        "arguments": '{"tab_id": "tab-1", "role_name": "Worker", "name": "Directory Worker"}',
+                        "arguments": '{"role_name": "Worker", "name": "Directory Worker"}',
                     },
                 }
             ],

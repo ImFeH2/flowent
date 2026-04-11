@@ -228,7 +228,7 @@ class Agent:
         )
 
     def _persist_workspace_node(self) -> None:
-        if not self.config.tab_id:
+        if self.node_type != NodeType.ASSISTANT and not self.config.tab_id:
             return
         from app.models import GraphNodeRecord
         from app.workspace_store import workspace_store
@@ -1789,7 +1789,9 @@ class Agent:
         )
 
     def request_process_exit(self) -> None:
-        self._preserve_workspace_state_on_exit = bool(self.config.tab_id)
+        self._preserve_workspace_state_on_exit = (
+            self.node_type == NodeType.ASSISTANT or bool(self.config.tab_id)
+        )
         self._termination_reason = "process_exit"
         self._terminate.set()
         self._wake_queue.put(
@@ -1836,7 +1838,9 @@ class Agent:
         return not (self._thread and self._thread.is_alive())
 
     def _should_preserve_workspace_state_on_exit(self) -> bool:
-        return self._preserve_workspace_state_on_exit and bool(self.config.tab_id)
+        return self._preserve_workspace_state_on_exit and (
+            self.node_type == NodeType.ASSISTANT or bool(self.config.tab_id)
+        )
 
     def _finalize_termination(self, reason: str) -> None:
         from app.registry import registry

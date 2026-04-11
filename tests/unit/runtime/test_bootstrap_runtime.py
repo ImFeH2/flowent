@@ -5,7 +5,7 @@ import pytest
 
 import app.settings as settings_module
 from app.agent import Agent
-from app.models import AgentState, StateEntry
+from app.models import AgentState, AssistantText, ReceivedMessage, StateEntry
 from app.registry import registry
 from app.runtime import bootstrap_runtime, shutdown_runtime
 from app.settings import (
@@ -68,6 +68,86 @@ def test_bootstrap_runtime_creates_only_assistant(
         assert assistant.config.tools == list(STEWARD_ROLE_INCLUDED_TOOLS)
         assert assistant.config.write_dirs == build_default_assistant_write_dirs()
         assert assistant.config.allow_network is True
+    finally:
+        registry.reset()
+
+
+def test_bootstrap_runtime_restores_assistant_history(monkeypatch, tmp_path):
+    settings_file = tmp_path / "settings.json"
+    workspace_file = tmp_path / "workspace.json"
+    assistant_id = "00000000-0000-0000-0000-000000000001"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_file.write_text(
+        json.dumps(
+            {
+                "tabs": [],
+                "nodes": [
+                    {
+                        "id": assistant_id,
+                        "config": {
+                            "node_type": "assistant",
+                            "role_name": "Steward",
+                            "tab_id": None,
+                            "name": "Assistant",
+                            "tools": [],
+                            "write_dirs": [str(tmp_path)],
+                            "allow_network": True,
+                        },
+                        "state": "idle",
+                        "todos": [],
+                        "history": [
+                            {
+                                "type": "ReceivedMessage",
+                                "content": "hello",
+                                "from_id": "human",
+                                "timestamp": 1,
+                            },
+                            {
+                                "type": "AssistantText",
+                                "content": "hi there",
+                                "timestamp": 2,
+                            },
+                        ],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "edges": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        assistant = registry.get_assistant()
+        assert assistant is not None
+        assert assistant.uuid == assistant_id
+        assert assistant.state == AgentState.IDLE
+        assert any(
+            isinstance(entry, ReceivedMessage) and entry.content == "hello"
+            for entry in assistant.history
+        )
+        assert any(
+            isinstance(entry, AssistantText) and entry.content == "hi there"
+            for entry in assistant.history
+        )
     finally:
         registry.reset()
 
@@ -705,19 +785,48 @@ def test_shutdown_runtime_keeps_persistent_workspace_nodes_unterminated(
         persistent = registry.get("node-1")
         assert assistant is not None
         assert persistent is not None
+        assistant_id = assistant.uuid
+        assistant._append_history(ReceivedMessage(content="hello", from_id="human"))
+        assistant._append_history(AssistantText(content="hi there"))
 
         shutdown_runtime()
 
         assert assistant.wait_for_termination(timeout=1.0) is True
         assert persistent.wait_for_termination(timeout=1.0) is True
         assert registry.get_all() == []
+        assert assistant.state == AgentState.IDLE
         assert persistent.state == AgentState.IDLE
+        persisted_assistant = workspace_store.get_node_record(assistant_id)
+        assert persisted_assistant is not None
+        assert persisted_assistant.state == AgentState.IDLE
+        assert any(
+            isinstance(entry, ReceivedMessage) and entry.content == "hello"
+            for entry in persisted_assistant.history
+        )
+        assert any(
+            isinstance(entry, AssistantText) and entry.content == "hi there"
+            for entry in persisted_assistant.history
+        )
         persisted = workspace_store.get_node_record("node-1")
         assert persisted is not None
         assert persisted.state == AgentState.IDLE
         assert not any(
             isinstance(entry, StateEntry) and entry.state == "terminated"
             for entry in persistent.history
+        )
+
+        bootstrap_runtime()
+
+        restored_assistant = registry.get_assistant()
+        assert restored_assistant is not None
+        assert restored_assistant.uuid == assistant_id
+        assert any(
+            isinstance(entry, ReceivedMessage) and entry.content == "hello"
+            for entry in restored_assistant.history
+        )
+        assert any(
+            isinstance(entry, AssistantText) and entry.content == "hi there"
+            for entry in restored_assistant.history
         )
     finally:
         _stop_all_agents()

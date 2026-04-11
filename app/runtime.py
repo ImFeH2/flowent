@@ -67,6 +67,15 @@ def bootstrap_runtime() -> None:
         else list(STEWARD_ROLE_INCLUDED_TOOLS)
     )
 
+    assistant_record = next(
+        (
+            record
+            for record in workspace_store.list_node_records()
+            if record.config.node_type == NodeType.ASSISTANT
+            and record.state != AgentState.TERMINATED
+        ),
+        None,
+    )
     assistant = Agent(
         NodeConfig(
             node_type=NodeType.ASSISTANT,
@@ -76,7 +85,30 @@ def bootstrap_runtime() -> None:
             write_dirs=list(settings.assistant.write_dirs),
             allow_network=settings.assistant.allow_network,
         ),
+        uuid=assistant_record.id if assistant_record is not None else None,
     )
+    if assistant_record is not None:
+        assistant.history = list(assistant_record.history)
+        if not any(isinstance(entry, StateEntry) for entry in assistant.history):
+            assistant.history.insert(
+                0,
+                StateEntry(state=assistant_record.state.value, reason="restored"),
+            )
+        if assistant_record.state in {
+            AgentState.INITIALIZING,
+            AgentState.IDLE,
+            AgentState.RUNNING,
+            AgentState.SLEEPING,
+        }:
+            assistant.history.append(
+                StateEntry(state=AgentState.IDLE.value, reason="restored")
+            )
+        assistant.todos = list(assistant_record.todos)
+        assistant.prime_runtime_state(
+            AgentState.ERROR
+            if assistant_record.state == AgentState.ERROR
+            else AgentState.IDLE
+        )
     registry.register(assistant)
     assistant.start()
     logger.info("Assistant started with role {}", settings.assistant.role_name)
@@ -85,6 +117,8 @@ def bootstrap_runtime() -> None:
 
     restored_node_ids: set[str] = set()
     for record in workspace_store.list_node_records():
+        if record.config.node_type == NodeType.ASSISTANT:
+            continue
         if record.state == AgentState.TERMINATED:
             continue
         node = Agent(
@@ -140,11 +174,13 @@ def bootstrap_runtime() -> None:
 
 
 def shutdown_runtime(timeout: float = SYSTEM_NODE_TIMEOUT) -> None:
+    from app.models import NodeType
+
     logger.info("Shutting down runtime")
     _stop_telegram_channel()
     persistent_agents = []
     for agent in registry.get_all():
-        if agent.config.tab_id:
+        if agent.node_type == NodeType.ASSISTANT or agent.config.tab_id:
             agent.request_process_exit()
             persistent_agents.append(agent)
             continue

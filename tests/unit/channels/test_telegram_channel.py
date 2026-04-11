@@ -1,6 +1,9 @@
 import asyncio
 
+import pytest
+
 from app.channels.telegram import PRIVATE_ONLY_MESSAGE, TelegramChannel
+from app.models import Event, EventType
 from app.settings import (
     Settings,
     TelegramApprovedChat,
@@ -170,6 +173,247 @@ def test_telegram_channel_delivers_messages_from_approved_private_chat(monkeypat
     assert assistant.messages[0].from_id == "human"
     assert assistant.messages[0].to_id == assistant.uuid
     assert assistant.messages[0].content == "check status"
+
+
+def test_telegram_channel_sends_typing_while_running_before_first_visible_text(
+    monkeypatch,
+):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="123456:ABCDE",
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=4004,
+                    username="alice",
+                    display_name="Alice",
+                    approved_at=1.0,
+                )
+            ],
+        )
+    )
+    assistant = DummyAssistant()
+    sent_actions: list[tuple[int, str]] = []
+
+    monkeypatch.setattr("app.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.channels.telegram.registry.get_assistant",
+        lambda: assistant,
+    )
+
+    channel = TelegramChannel()
+
+    async def fake_send_chat_action(chat_id: int, *, action: str) -> None:
+        sent_actions.append((chat_id, action))
+
+    async def fake_sleep(_: float) -> None:
+        channel._assistant_running = False
+
+    monkeypatch.setattr(channel, "_send_chat_action", fake_send_chat_action)
+    monkeypatch.setattr("app.channels.telegram.asyncio.sleep", fake_sleep)
+
+    async def run_test() -> None:
+        await channel._process_event(
+            Event(
+                type=EventType.NODE_STATE_CHANGED,
+                agent_id=assistant.uuid,
+                data={"new_state": "running"},
+            )
+        )
+        assert channel._typing_task is not None
+        await channel._typing_task
+
+    asyncio.run(run_test())
+
+    assert sent_actions == [(4004, "typing")]
+
+
+def test_telegram_channel_stops_typing_after_first_visible_text(monkeypatch):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="123456:ABCDE",
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=4004,
+                    username="alice",
+                    display_name="Alice",
+                    approved_at=1.0,
+                )
+            ],
+        )
+    )
+    sent_messages: list[tuple[int, str, bool]] = []
+    sent_actions: list[tuple[int, str]] = []
+
+    monkeypatch.setattr("app.channels.telegram.get_settings", lambda: settings)
+
+    channel = TelegramChannel()
+
+    async def fake_send_message(chat_id: int, text: str, *, markdown: bool) -> int:
+        sent_messages.append((chat_id, text, markdown))
+        return 7
+
+    async def fake_send_chat_action(chat_id: int, *, action: str) -> None:
+        sent_actions.append((chat_id, action))
+
+    monkeypatch.setattr(channel, "_send_message", fake_send_message)
+    monkeypatch.setattr(channel, "_send_chat_action", fake_send_chat_action)
+
+    async def run_test() -> None:
+        channel._assistant_running = True
+        await channel._handle_assistant_content("hello")
+        await channel._send_typing_feedback_once()
+
+    asyncio.run(run_test())
+
+    assert sent_messages == [(4004, "hello", False)]
+    assert sent_actions == []
+    assert channel._stream_message_ids == {4004: 7}
+
+
+def test_telegram_channel_ignores_tool_progress_events(monkeypatch):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="123456:ABCDE",
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=4004,
+                    username="alice",
+                    display_name="Alice",
+                    approved_at=1.0,
+                )
+            ],
+        )
+    )
+    assistant = DummyAssistant()
+    broadcast_messages: list[str] = []
+
+    monkeypatch.setattr("app.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.channels.telegram.registry.get_assistant",
+        lambda: assistant,
+    )
+
+    channel = TelegramChannel()
+
+    async def fake_send_message(chat_id: int, text: str, *, markdown: bool) -> int:
+        broadcast_messages.append(text)
+        return 1
+
+    monkeypatch.setattr(channel, "_send_message", fake_send_message)
+
+    asyncio.run(
+        channel._process_event(
+            Event(
+                type=EventType.TOOL_CALLED,
+                agent_id=assistant.uuid,
+                data={"tool": "read"},
+            )
+        )
+    )
+
+    assert broadcast_messages == []
+
+
+@pytest.mark.parametrize("end_state", ["idle", "error", "terminated"])
+def test_telegram_channel_stops_without_placeholder_when_running_ends_no_content(
+    monkeypatch,
+    end_state,
+):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="123456:ABCDE",
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=4004,
+                    username="alice",
+                    display_name="Alice",
+                    approved_at=1.0,
+                )
+            ],
+        )
+    )
+    assistant = DummyAssistant()
+    sent_messages: list[tuple[int, str, bool]] = []
+    sent_actions: list[tuple[int, str]] = []
+
+    monkeypatch.setattr("app.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.channels.telegram.registry.get_assistant",
+        lambda: assistant,
+    )
+
+    channel = TelegramChannel()
+
+    async def fake_send_message(chat_id: int, text: str, *, markdown: bool) -> int:
+        sent_messages.append((chat_id, text, markdown))
+        return 1
+
+    async def fake_send_chat_action(chat_id: int, *, action: str) -> None:
+        sent_actions.append((chat_id, action))
+
+    async def fake_sleep(_: float) -> None:
+        await channel._process_event(
+            Event(
+                type=EventType.NODE_STATE_CHANGED,
+                agent_id=assistant.uuid,
+                data={"new_state": end_state},
+            )
+        )
+
+    monkeypatch.setattr(channel, "_send_message", fake_send_message)
+    monkeypatch.setattr(channel, "_send_chat_action", fake_send_chat_action)
+    monkeypatch.setattr("app.channels.telegram.asyncio.sleep", fake_sleep)
+
+    async def run_test() -> None:
+        await channel._process_event(
+            Event(
+                type=EventType.NODE_STATE_CHANGED,
+                agent_id=assistant.uuid,
+                data={"new_state": "running"},
+            )
+        )
+        assert channel._typing_task is not None
+        await channel._typing_task
+
+    asyncio.run(run_test())
+
+    assert sent_actions == [(4004, "typing")]
+    assert sent_messages == []
+    assert channel._stream_message_ids == {}
+
+
+def test_telegram_channel_stop_cancels_typing_task_on_app_loop(monkeypatch):
+    cancelled: list[str] = []
+
+    class FakeTask:
+        def cancel(self) -> None:
+            cancelled.append("typing")
+
+    class FakeLoop:
+        def __init__(self) -> None:
+            self.calls: list[str] = []
+
+        def is_closed(self) -> bool:
+            return False
+
+        def call_soon_threadsafe(self, callback) -> None:
+            self.calls.append(callback.__name__)
+            callback()
+
+    monkeypatch.setattr("app.channels.telegram.event_bus.unsubscribe", lambda _: None)
+
+    channel = TelegramChannel()
+    app_loop = FakeLoop()
+    polling_loop = FakeLoop()
+    channel._app_loop = app_loop
+    channel._thread_loop = polling_loop
+    channel._typing_task = FakeTask()
+
+    channel.stop()
+
+    assert app_loop.calls == ["cancel"]
+    assert polling_loop.calls == []
+    assert cancelled == ["typing"]
 
 
 def test_telegram_channel_call_api_uses_shared_async_transport(monkeypatch):

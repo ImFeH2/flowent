@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+from contextlib import suppress
 from typing import Any
 
 from loguru import logger
@@ -22,8 +23,8 @@ TELEGRAM_LONG_POLL_TIMEOUT_SECONDS = 30
 TELEGRAM_REQUEST_TIMEOUT_SECONDS = 35
 TELEGRAM_EDIT_INTERVAL_SECONDS = 1.0
 TELEGRAM_EDIT_THRESHOLD_CHARS = 100
+TELEGRAM_TYPING_INTERVAL_SECONDS = 4.0
 TELEGRAM_MAX_TEXT_LENGTH = 4000
-PLACEHOLDER_MESSAGE = "…"
 PRIVATE_ONLY_MESSAGE = "🔒 Telegram channel currently supports private chats only."
 
 
@@ -40,6 +41,8 @@ class TelegramChannel:
         self._event_lock: asyncio.Lock | None = None
         self._stream_buffer = ""
         self._stream_message_ids: dict[int, int] = {}
+        self._typing_task: asyncio.Task[None] | None = None
+        self._assistant_running = False
         self._last_edit_at = 0.0
         self._last_sent_length = 0
 
@@ -59,6 +62,8 @@ class TelegramChannel:
         self._event_lock = None
         self._stream_buffer = ""
         self._stream_message_ids = {}
+        self._typing_task = None
+        self._assistant_running = False
         self._last_edit_at = 0.0
         self._last_sent_length = 0
 
@@ -75,10 +80,18 @@ class TelegramChannel:
         event_bus.unsubscribe(self._on_event)
         self._stop_event.set()
 
-        loop = self._thread_loop
+        polling_loop = self._thread_loop
         task = self._polling_task
-        if loop is not None and task is not None:
-            loop.call_soon_threadsafe(task.cancel)
+        if polling_loop is not None and task is not None:
+            polling_loop.call_soon_threadsafe(task.cancel)
+        typing_task = self._typing_task
+        app_loop = self._app_loop
+        if (
+            app_loop is not None
+            and not app_loop.is_closed()
+            and typing_task is not None
+        ):
+            app_loop.call_soon_threadsafe(typing_task.cancel)
 
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=5.0)
@@ -86,10 +99,9 @@ class TelegramChannel:
         self._thread = None
         self._thread_loop = None
         self._polling_task = None
-        self._stream_buffer = ""
-        self._stream_message_ids = {}
-        self._last_edit_at = 0.0
-        self._last_sent_length = 0
+        self._typing_task = None
+        self._assistant_running = False
+        self._reset_stream_state()
         logger.info("Telegram channel stopped")
 
     def _run_polling_thread(self) -> None:
@@ -188,7 +200,6 @@ class TelegramChannel:
     def _on_event(self, event: Event) -> None:
         if event.type not in {
             EventType.ASSISTANT_CONTENT,
-            EventType.TOOL_CALLED,
             EventType.NODE_STATE_CHANGED,
         }:
             return
@@ -224,26 +235,19 @@ class TelegramChannel:
                     await self._handle_assistant_content(content)
                 return
 
-            if event.type == EventType.TOOL_CALLED:
-                tool_name = event.data.get("tool")
-                if isinstance(tool_name, str) and tool_name != "idle":
-                    await self._broadcast_message(
-                        f"🔧 {tool_name}",
-                        markdown=False,
-                    )
+            if event.type != EventType.NODE_STATE_CHANGED:
                 return
 
-            if (
-                event.type == EventType.NODE_STATE_CHANGED
-                and event.data.get("new_state") == "idle"
-            ):
-                await self._finalize_stream()
+            new_state = event.data.get("new_state")
+            if new_state == "running":
+                await self._begin_running_feedback()
+                return
+
+            await self._end_running_feedback()
 
     async def _handle_assistant_content(self, chunk: str) -> None:
-        if not self._stream_message_ids:
-            await self._open_stream_messages()
-
         self._stream_buffer += chunk
+        await self._ensure_stream_messages()
         now = time.monotonic()
         if (
             len(self._stream_buffer) - self._last_sent_length
@@ -254,36 +258,84 @@ class TelegramChannel:
 
     async def _finalize_stream(self) -> None:
         if not self._stream_buffer and not self._stream_message_ids:
+            self._reset_stream_state()
             return
         await self._flush_stream(force=True)
-        self._stream_buffer = ""
-        self._stream_message_ids = {}
-        self._last_edit_at = 0.0
-        self._last_sent_length = 0
+        self._reset_stream_state()
 
-    async def _open_stream_messages(self) -> None:
+    async def _begin_running_feedback(self) -> None:
+        if self._assistant_running:
+            return
+        await self._stop_typing_task()
+        self._assistant_running = True
+        self._reset_stream_state()
+        self._typing_task = asyncio.create_task(self._typing_loop())
+
+    async def _end_running_feedback(self) -> None:
+        self._assistant_running = False
+        await self._stop_typing_task()
+        await self._finalize_stream()
+
+    async def _stop_typing_task(self) -> None:
+        task = self._typing_task
+        if task is None:
+            return
+        self._typing_task = None
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+    async def _typing_loop(self) -> None:
+        while self._assistant_running and not self._stop_event.is_set():
+            try:
+                await self._send_typing_feedback_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Telegram typing loop failed")
+            await asyncio.sleep(TELEGRAM_TYPING_INTERVAL_SECONDS)
+
+    async def _send_typing_feedback_once(self) -> None:
         settings = get_settings()
+        approved_chat_ids = {chat.chat_id for chat in settings.telegram.approved_chats}
+        for chat_id in list(self._stream_message_ids):
+            if chat_id not in approved_chat_ids:
+                self._stream_message_ids.pop(chat_id, None)
         for approved_chat in settings.telegram.approved_chats:
+            if approved_chat.chat_id in self._stream_message_ids:
+                continue
+            await self._send_chat_action(approved_chat.chat_id, action="typing")
+
+    async def _ensure_stream_messages(self) -> None:
+        if not self._stream_buffer:
+            return
+        settings = get_settings()
+        had_stream_messages = bool(self._stream_message_ids)
+        for approved_chat in settings.telegram.approved_chats:
+            if approved_chat.chat_id in self._stream_message_ids:
+                continue
             message_id = await self._send_message(
                 approved_chat.chat_id,
-                PLACEHOLDER_MESSAGE,
+                self._stream_buffer,
                 markdown=False,
             )
             if message_id is not None:
                 self._stream_message_ids[approved_chat.chat_id] = message_id
-        self._last_edit_at = time.monotonic()
-        self._last_sent_length = 0
+        if not had_stream_messages and self._stream_message_ids:
+            self._last_edit_at = time.monotonic()
+            self._last_sent_length = len(self._stream_buffer)
 
     async def _flush_stream(self, *, force: bool = False) -> None:
-        if not self._stream_message_ids:
-            return
         if not self._stream_buffer and not force:
+            return
+        await self._ensure_stream_messages()
+        if not self._stream_message_ids or not self._stream_buffer:
             return
 
         current_chat_ids = {
             chat.chat_id for chat in get_settings().telegram.approved_chats
         }
-        text = self._format_text(self._stream_buffer or PLACEHOLDER_MESSAGE)
+        text = self._format_text(self._stream_buffer)
         for chat_id, message_id in list(self._stream_message_ids.items()):
             if chat_id not in current_chat_ids:
                 self._stream_message_ids.pop(chat_id, None)
@@ -294,11 +346,6 @@ class TelegramChannel:
 
         self._last_edit_at = time.monotonic()
         self._last_sent_length = len(self._stream_buffer)
-
-    async def _broadcast_message(self, text: str, *, markdown: bool) -> None:
-        settings = get_settings()
-        for approved_chat in settings.telegram.approved_chats:
-            await self._send_message(approved_chat.chat_id, text, markdown=markdown)
 
     async def _send_message(
         self,
@@ -321,6 +368,16 @@ class TelegramChannel:
         message_id = result.get("message_id")
         return message_id if isinstance(message_id, int) else None
 
+    async def _send_chat_action(self, chat_id: int, *, action: str) -> None:
+        await self._call_api(
+            "sendChatAction",
+            {
+                "chat_id": chat_id,
+                "action": action,
+            },
+            parse_mode=None,
+        )
+
     async def _edit_message(
         self,
         chat_id: int,
@@ -340,10 +397,15 @@ class TelegramChannel:
         return result is not None
 
     def _format_text(self, text: str) -> str:
-        stripped = text if text else PLACEHOLDER_MESSAGE
-        if len(stripped) <= TELEGRAM_MAX_TEXT_LENGTH:
-            return stripped
-        return stripped[: TELEGRAM_MAX_TEXT_LENGTH - 1] + "…"
+        if len(text) <= TELEGRAM_MAX_TEXT_LENGTH:
+            return text
+        return text[: TELEGRAM_MAX_TEXT_LENGTH - 1] + "…"
+
+    def _reset_stream_state(self) -> None:
+        self._stream_buffer = ""
+        self._stream_message_ids = {}
+        self._last_edit_at = 0.0
+        self._last_sent_length = 0
 
     @staticmethod
     def _build_display_name(

@@ -705,6 +705,6 @@ def test_todo_tool_writes_via_set_todos(monkeypatch):
 
     result = json.loads(TodoTool().execute(agent, {"todos": ["step 1", "step 2"]}))
 
-    assert result == {"todos": ["step 1", "step 2"]}
+    assert result == {"status": "updated"}
     assert len(applied) == 1
     assert [item.text for item in applied[0]] == ["step 1", "step 2"]

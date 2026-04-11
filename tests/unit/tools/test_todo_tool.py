@@ -14,7 +14,7 @@ def test_todo_tool_emits_node_todos_changed(monkeypatch):
 
     result = json.loads(TodoTool().execute(agent, {"todos": ["step 1"]}))
 
-    assert result == {"todos": ["step 1"]}
+    assert result == {"status": "updated"}
     assert len(events) == 1
     assert events[0].type == EventType.NODE_TODOS_CHANGED
     assert events[0].data == {
@@ -33,5 +33,5 @@ def test_todo_tool_overwrites_and_clears_existing_items():
     TodoTool().execute(agent, {"todos": ["step 1", "step 2"]})
     result = json.loads(TodoTool().execute(agent, {"todos": []}))
 
-    assert result == {"todos": []}
+    assert result == {"status": "updated"}
     assert agent.get_todos_snapshot() == []

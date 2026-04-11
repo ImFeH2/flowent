@@ -36,7 +36,7 @@ class TodoTool(Tool):
         next_todos = [TodoItem(text=item) for item in raw_todos]
         agent.set_todos(next_todos)
         self._emit_todo_event(agent)
-        return json.dumps({"todos": [item.text for item in next_todos]})
+        return json.dumps({"status": "updated"})
 
     @staticmethod
     def _emit_todo_event(agent: Agent) -> None:

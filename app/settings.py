@@ -20,6 +20,7 @@ CONDUCTOR_ROLE_NAME = "Conductor"
 STEWARD_ROLE_INCLUDED_TOOLS = [
     "create_tab",
     "delete_tab",
+    "set_permissions",
     "list_tabs",
     "list_roles",
     "list_tools",

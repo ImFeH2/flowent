@@ -34,6 +34,7 @@ def test_tool_registry_registers_connect_and_removes_create_root():
 
     assert "create_tab" in tool_names
     assert "delete_tab" in tool_names
+    assert "set_permissions" in tool_names
     assert "create_agent" in tool_names
     assert "connect" in tool_names
     assert "list_tabs" in tool_names
@@ -82,3 +83,4 @@ def test_tool_registry_shows_management_tools_in_agent_visible_list():
     assert "manage_roles" in visible_tool_names
     assert "manage_settings" in visible_tool_names
     assert "manage_prompts" in visible_tool_names
+    assert "set_permissions" in visible_tool_names

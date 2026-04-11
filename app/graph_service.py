@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from app import settings as settings_module
 from app.events import event_bus
@@ -305,6 +306,143 @@ def create_tab(
         )
     )
     return tab
+
+
+def _is_path_within_boundary(path: str, boundary_dirs: list[str]) -> bool:
+    resolved_path = Path(path).resolve()
+    return any(
+        resolved_path.is_relative_to(Path(boundary_dir).resolve())
+        for boundary_dir in boundary_dirs
+    )
+
+
+def _clamp_write_dirs_to_boundary(
+    write_dirs: list[str],
+    boundary_dirs: list[str],
+) -> list[str]:
+    if not boundary_dirs:
+        return []
+    return [
+        path for path in write_dirs if _is_path_within_boundary(path, boundary_dirs)
+    ]
+
+
+def set_tab_permissions(
+    *,
+    tab_id: str,
+    allow_network: bool | None = None,
+    write_dirs: list[str] | None = None,
+    caller_allow_network: bool,
+    caller_write_dirs: list[str],
+    actor_id: str,
+) -> tuple[dict[str, object] | None, str | None]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None, f"Tab '{tab_id}' not found"
+
+    leader_id = get_tab_leader_id(tab_id)
+    if not leader_id:
+        return None, f"Tab '{tab_id}' does not have a bound Leader"
+
+    leader_record = workspace_store.get_node_record(leader_id)
+    if leader_record is None:
+        return None, f"Leader '{leader_id}' not found"
+
+    if allow_network is not None and allow_network and not caller_allow_network:
+        return (
+            None,
+            "allow_network boundary exceeded: caller disallows network access",
+        )
+    if write_dirs is not None:
+        invalid_write_dirs = sorted(
+            path
+            for path in write_dirs
+            if not _is_path_within_boundary(path, caller_write_dirs)
+        )
+        if invalid_write_dirs:
+            return (
+                None,
+                "write_dirs boundary exceeded: " + ", ".join(invalid_write_dirs),
+            )
+
+    next_allow_network = (
+        leader_record.config.allow_network if allow_network is None else allow_network
+    )
+    next_write_dirs = (
+        list(leader_record.config.write_dirs)
+        if write_dirs is None
+        else list(write_dirs)
+    )
+
+    changed_node_ids: list[str] = []
+
+    if (
+        leader_record.config.allow_network != next_allow_network
+        or leader_record.config.write_dirs != next_write_dirs
+    ):
+        leader_record.config.allow_network = next_allow_network
+        leader_record.config.write_dirs = list(next_write_dirs)
+        workspace_store.upsert_node_record(leader_record)
+        changed_node_ids.append(leader_record.id)
+
+    for record in list_tab_nodes(tab_id):
+        if record.id == leader_id:
+            continue
+        next_node_allow_network = record.config.allow_network and next_allow_network
+        next_node_write_dirs = _clamp_write_dirs_to_boundary(
+            record.config.write_dirs,
+            next_write_dirs,
+        )
+        if (
+            record.config.allow_network == next_node_allow_network
+            and record.config.write_dirs == next_node_write_dirs
+        ):
+            continue
+        record.config.allow_network = next_node_allow_network
+        record.config.write_dirs = list(next_node_write_dirs)
+        workspace_store.upsert_node_record(record)
+        changed_node_ids.append(record.id)
+
+        live_node = registry.get(record.id)
+        if live_node is not None:
+            live_node.config.allow_network = next_node_allow_network
+            live_node.config.write_dirs = list(next_node_write_dirs)
+            live_node.set_state(
+                live_node.state,
+                "tab_permissions_updated",
+                force_emit=True,
+            )
+
+    live_leader = registry.get(leader_id)
+    if live_leader is not None:
+        live_leader.config.allow_network = next_allow_network
+        live_leader.config.write_dirs = list(next_write_dirs)
+        live_leader.set_state(
+            live_leader.state,
+            "tab_permissions_updated",
+            force_emit=True,
+        )
+
+    updated_tab = workspace_store.get_tab(tab_id)
+    if updated_tab is not None:
+        event_bus.emit(
+            Event(
+                type=EventType.TAB_UPDATED,
+                agent_id=actor_id,
+                data=serialize_tab_summary(updated_tab),
+            )
+        )
+
+    return (
+        {
+            "tab_id": tab_id,
+            "leader_id": leader_id,
+            "allow_network": next_allow_network,
+            "write_dirs": list(next_write_dirs),
+            "updated_node_ids": changed_node_ids,
+        },
+        None,
+    )
 
 
 def delete_tab(

@@ -15,6 +15,7 @@ from app.prompts.common import (
     LIST_TABS_TOOL_GUIDANCE,
     LIST_TOOLS_TOOL_GUIDANCE,
     MANAGE_TOOLS_GUIDANCE,
+    SET_PERMISSIONS_TOOL_GUIDANCE,
     SLEEP_TOOL_GUIDANCE,
     compose_system_prompt,
 )
@@ -24,6 +25,7 @@ from app.settings import (
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
+    WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_SYSTEM_PROMPT,
     RoleConfig,
     Settings,
@@ -151,6 +153,16 @@ def test_compose_system_prompt_injects_tab_graph_guidance_when_tools_present():
     assert LIST_TABS_TOOL_GUIDANCE in result
     assert "create_tab" in CREATE_TAB_TOOL_GUIDANCE
     assert "current tab" in CREATE_AGENT_TOOL_GUIDANCE
+
+
+def test_compose_system_prompt_injects_set_permissions_guidance_when_tool_present():
+    result = compose_system_prompt(
+        "Role-specific instructions.",
+        tools=["set_permissions"],
+    )
+
+    assert SET_PERMISSIONS_TOOL_GUIDANCE in result
+    assert "bound Leader's `allow_network` and `write_dirs`" in result
 
 
 def test_common_communication_guidance_requires_explicit_target_routing():
@@ -432,12 +444,14 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
 
 def test_steward_included_tools_contains_list_roles_and_list_tools():
     assert "delete_tab" in STEWARD_ROLE_INCLUDED_TOOLS
+    assert "set_permissions" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_roles" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tabs" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tools" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "connect" not in STEWARD_ROLE_INCLUDED_TOOLS
-    assert "connect" not in STEWARD_ROLE_INCLUDED_TOOLS
     assert "connect" in CONDUCTOR_ROLE_INCLUDED_TOOLS
+    assert "set_permissions" not in CONDUCTOR_ROLE_INCLUDED_TOOLS
+    assert "set_permissions" not in WORKER_ROLE_INCLUDED_TOOLS
 
 
 def test_steward_prompt_requires_same_response_dispatch_and_no_rebroadcast():

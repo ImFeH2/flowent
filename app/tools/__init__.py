@@ -88,6 +88,7 @@ def build_tool_registry() -> ToolRegistry:
     from app.tools.manage_roles import ManageRolesTool
     from app.tools.manage_settings import ManageSettingsTool
     from app.tools.read import ReadTool
+    from app.tools.set_permissions import SetPermissionsTool
     from app.tools.sleep import SleepTool
     from app.tools.todo import TodoTool
 
@@ -99,6 +100,7 @@ def build_tool_registry() -> ToolRegistry:
         ContactsTool,
         CreateTabTool,
         DeleteTabTool,
+        SetPermissionsTool,
         CreateAgentTool,
         ConnectTool,
         ManageProvidersTool,

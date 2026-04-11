@@ -43,6 +43,15 @@ DELETE_TAB_TOOL_GUIDANCE = """\
 - Deleting a tab permanently removes the tab and its persisted Agent Graph after active nodes are terminated.
 """
 
+SET_PERMISSIONS_TOOL_GUIDANCE = """\
+## Set Permissions Tool Rules
+
+- Use `set_permissions` to patch a tab's permission boundary after the tab already exists.
+- `set_permissions` updates the target tab by writing directly to its bound Leader's `allow_network` and `write_dirs`.
+- Treat `allow_network` and `write_dirs` as patch fields: omitted fields stay unchanged.
+- When the Human asks to change a tab's network or writable directory boundary, prefer `set_permissions` instead of delegating that change to the tab's Leader.
+"""
+
 CREATE_AGENT_TOOL_GUIDANCE = """\
 ## Create Agent Tool Rules
 
@@ -114,6 +123,7 @@ MANAGE_TOOLS_GUIDANCE = """\
 - `manage_roles` manages role configuration.
 - `manage_settings` reads and updates runtime defaults.
 - `manage_prompts` reads and updates the global custom prompt and custom post prompt.
+- `set_permissions` updates an existing tab's permission boundary.
 """
 
 COMMUNICATION_USAGE_GUIDANCE = """\
@@ -184,6 +194,8 @@ def _build_conditional_tool_guidance(tools: list[str]) -> list[str]:
         parts.append(CREATE_TAB_TOOL_GUIDANCE.strip())
     if "delete_tab" in tool_names:
         parts.append(DELETE_TAB_TOOL_GUIDANCE.strip())
+    if "set_permissions" in tool_names:
+        parts.append(SET_PERMISSIONS_TOOL_GUIDANCE.strip())
     if "create_agent" in tool_names:
         parts.append(CREATE_AGENT_TOOL_GUIDANCE.strip())
     if "create_agent" in tool_names:

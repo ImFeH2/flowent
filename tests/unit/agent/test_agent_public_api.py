@@ -538,6 +538,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             "optional_tools": [
                 "create_tab",
                 "delete_tab",
+                "set_permissions",
                 "create_agent",
                 "connect",
                 "manage_providers",
@@ -563,6 +564,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             "optional_tools": [
                 "create_tab",
                 "delete_tab",
+                "set_permissions",
                 "create_agent",
                 "connect",
                 "manage_providers",
@@ -602,6 +604,7 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "fetch",
         "create_tab",
         "delete_tab",
+        "set_permissions",
         "create_agent",
         "connect",
         "manage_providers",

@@ -14,6 +14,7 @@ from app.routes.roles import (
 )
 from app.settings import (
     CONDUCTOR_ROLE_NAME,
+    DESIGNER_ROLE_NAME,
     AssistantSettings,
     ProviderConfig,
     RoleConfig,
@@ -39,6 +40,11 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                     "list_roles",
                     "list_tools",
                 ],
+            ),
+            RoleConfig(
+                name=DESIGNER_ROLE_NAME,
+                system_prompt="Design interfaces.",
+                included_tools=["read", "edit", "exec"],
             ),
             RoleConfig(
                 name="Reviewer",
@@ -75,6 +81,15 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
                     "list_roles",
                     "list_tools",
                 ],
+                "excluded_tools": [],
+                "is_builtin": True,
+            },
+            {
+                "name": DESIGNER_ROLE_NAME,
+                "system_prompt": "Design interfaces.",
+                "model": None,
+                "model_params": None,
+                "included_tools": ["read", "edit", "exec"],
                 "excluded_tools": [],
                 "is_builtin": True,
             },
@@ -214,7 +229,10 @@ def test_update_role_rejects_duplicate_name(monkeypatch):
     assert excinfo.value.detail == "Role 'Architect' already exists"
 
 
-@pytest.mark.parametrize("builtin_role_name", ["Worker", CONDUCTOR_ROLE_NAME])
+@pytest.mark.parametrize(
+    "builtin_role_name",
+    ["Worker", CONDUCTOR_ROLE_NAME, DESIGNER_ROLE_NAME],
+)
 def test_update_role_rejects_renaming_builtin_role(monkeypatch, builtin_role_name):
     settings = Settings(
         roles=[RoleConfig(name=builtin_role_name, system_prompt="Do work.")]
@@ -277,7 +295,10 @@ def test_delete_role_uses_name_path_parameter(monkeypatch):
     assert saved == [["Architect"]]
 
 
-@pytest.mark.parametrize("builtin_role_name", ["Worker", CONDUCTOR_ROLE_NAME])
+@pytest.mark.parametrize(
+    "builtin_role_name",
+    ["Worker", CONDUCTOR_ROLE_NAME, DESIGNER_ROLE_NAME],
+)
 def test_delete_role_rejects_builtin_role(monkeypatch, builtin_role_name):
     settings = Settings(
         roles=[RoleConfig(name=builtin_role_name, system_prompt="Do work.")]

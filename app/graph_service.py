@@ -21,6 +21,8 @@ from app.runtime import SYSTEM_NODE_TIMEOUT
 from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
+    DESIGNER_ROLE_INCLUDED_TOOLS,
+    DESIGNER_ROLE_NAME,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
     find_role,
@@ -43,6 +45,8 @@ def build_tools_for_role(
     if role is None:
         if normalized_role_name == CONDUCTOR_ROLE_NAME:
             included_tools = list(CONDUCTOR_ROLE_INCLUDED_TOOLS)
+        elif normalized_role_name == DESIGNER_ROLE_NAME:
+            included_tools = list(DESIGNER_ROLE_INCLUDED_TOOLS)
         elif normalized_role_name == STEWARD_ROLE_NAME:
             included_tools = list(STEWARD_ROLE_INCLUDED_TOOLS)
         else:

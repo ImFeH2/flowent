@@ -9,13 +9,14 @@ from app.settings import (
 )
 
 
-def test_roles_api_lists_worker_and_conductor_as_builtin(client: TestClient):
+def test_roles_api_lists_worker_conductor_and_designer_as_builtin(client: TestClient):
     response = client.get("/api/roles")
 
     assert response.status_code == 200
     roles = {role["name"]: role for role in response.json()["roles"]}
     assert roles["Worker"]["is_builtin"] is True
     assert roles[CONDUCTOR_ROLE_NAME]["is_builtin"] is True
+    assert roles["Designer"]["is_builtin"] is True
 
 
 def test_roles_bootstrap_includes_tools_and_providers(client: TestClient, monkeypatch):

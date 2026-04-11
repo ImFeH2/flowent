@@ -17,6 +17,7 @@ _SETTINGS_FILE = WORKING_DIR / "settings.json"
 STEWARD_ROLE_NAME = "Steward"
 WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
+DESIGNER_ROLE_NAME = "Designer"
 STEWARD_ROLE_INCLUDED_TOOLS = [
     "create_tab",
     "delete_tab",
@@ -78,7 +79,8 @@ Your responsibilities:
 - Prefer `create_agent` and `connect` as the primary control plane for the current tab
 - Do not create a node and then `idle` without dispatching work unless you intentionally want the new node to stay idle
 - Your default posture is orchestration, not being the long-running executor for specialized work
-- When a task requires `read`, `exec`, `edit`, `fetch`, or similarly execution-heavy tools, create a Worker node to do that work
+- When a task is primarily frontend implementation, UI design, visual design, page redesign, or interaction refinement, prefer creating a Designer node for that work
+- When a task needs execution-heavy tools such as `read`, `exec`, `edit`, or `fetch` outside that frontend or UI design scope, create a Worker node to do that work
 - Create agents with only the tools they need
 - Use `write_dirs` for file write access
 - When dispatching tasks to nodes, specify where each node should send its result (e.g. "send your result to @Synthesizer"). Use `connect` to wire direct communication paths between nodes, so results flow directly to the right destination without relaying through you.
@@ -86,8 +88,24 @@ Your responsibilities:
 - Once delegation is clearly the right move, execute it directly without asking the Assistant or Human
 - Keep the overall tab graph understandable; add complexity only when it materially improves throughput, quality, or resilience
 """
+DESIGNER_ROLE_SYSTEM_PROMPT = """\
+You are the Designer role - a frontend implementation and visual design node inside a task tab.
+
+Your responsibilities:
+- Implement and refine frontend surfaces such as pages, components, layouts, and interaction details
+- Make concrete design decisions about typography, spacing, color, motion, and overall visual direction when the task calls for them
+- Produce polished UI changes directly with the tools you were given
+- Report back clearly on what changed, what remains open, and any design tradeoffs that matter
+
+## Boundaries
+
+- You are not the Human-facing system entrypoint
+- You are not the tab-level orchestrator
+- You are not the default executor for unrelated backend or general-purpose coding work
+- If the task is not actually about frontend implementation, UI design, or visual styling, hand it back or ask for a more suitable node
+"""
 BUILTIN_ROLE_NAMES = frozenset(
-    {STEWARD_ROLE_NAME, WORKER_ROLE_NAME, CONDUCTOR_ROLE_NAME}
+    {STEWARD_ROLE_NAME, WORKER_ROLE_NAME, CONDUCTOR_ROLE_NAME, DESIGNER_ROLE_NAME}
 )
 WORKER_ROLE_INCLUDED_TOOLS = ["read", "exec"]
 CONDUCTOR_ROLE_INCLUDED_TOOLS = [
@@ -97,6 +115,7 @@ CONDUCTOR_ROLE_INCLUDED_TOOLS = [
     "list_roles",
     "list_tools",
 ]
+DESIGNER_ROLE_INCLUDED_TOOLS = ["read", "edit", "exec"]
 MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high", "xhigh"})
 MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
 MODEL_RETRY_POLICY_OPTIONS = frozenset({"no_retry", "limited", "unlimited"})
@@ -1396,6 +1415,15 @@ def build_conductor_role() -> RoleConfig:
     )
 
 
+def build_designer_role() -> RoleConfig:
+    return RoleConfig(
+        name=DESIGNER_ROLE_NAME,
+        system_prompt=DESIGNER_ROLE_SYSTEM_PROMPT,
+        included_tools=list(DESIGNER_ROLE_INCLUDED_TOOLS),
+        excluded_tools=[],
+    )
+
+
 def rename_role_references(
     settings: Settings,
     old_role_name: str,
@@ -1459,6 +1487,7 @@ def ensure_builtin_roles(settings: Settings) -> bool:
         build_steward_role(),
         build_worker_role(),
         build_conductor_role(),
+        build_designer_role(),
     ]
     for standard_role in builtin_role_order:
         changed = _ensure_builtin_role(settings, standard_role) or changed

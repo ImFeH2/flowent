@@ -10,6 +10,9 @@ from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    DESIGNER_ROLE_INCLUDED_TOOLS,
+    DESIGNER_ROLE_NAME,
+    DESIGNER_ROLE_SYSTEM_PROMPT,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
     STEWARD_ROLE_SYSTEM_PROMPT,
@@ -71,7 +74,7 @@ def _stop_all_agents(timeout: float = 1.0) -> None:
     registry.reset()
 
 
-def test_bootstrap_runtime_creates_builtin_worker_and_conductor_roles(
+def test_bootstrap_runtime_creates_builtin_roles(
     monkeypatch,
     tmp_path,
 ):
@@ -113,6 +116,11 @@ def test_bootstrap_runtime_creates_builtin_worker_and_conductor_roles(
                 name=CONDUCTOR_ROLE_NAME,
                 system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
                 included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
+            ),
+            RoleConfig(
+                name=DESIGNER_ROLE_NAME,
+                system_prompt=DESIGNER_ROLE_SYSTEM_PROMPT,
+                included_tools=DESIGNER_ROLE_INCLUDED_TOOLS,
             ),
         ]
     finally:
@@ -165,6 +173,11 @@ def test_bootstrap_runtime_reconciles_existing_builtin_roles(monkeypatch, tmp_pa
                 name=CONDUCTOR_ROLE_NAME,
                 system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
                 included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
+            ),
+            RoleConfig(
+                name=DESIGNER_ROLE_NAME,
+                system_prompt=DESIGNER_ROLE_SYSTEM_PROMPT,
+                included_tools=DESIGNER_ROLE_INCLUDED_TOOLS,
             ),
         ]
     finally:

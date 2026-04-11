@@ -23,6 +23,8 @@ from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
 from app.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    DESIGNER_ROLE_INCLUDED_TOOLS,
+    DESIGNER_ROLE_SYSTEM_PROMPT,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
     WORKER_ROLE_INCLUDED_TOOLS,
@@ -30,6 +32,7 @@ from app.settings import (
     RoleConfig,
     Settings,
     build_conductor_role,
+    build_designer_role,
 )
 from app.tools import MINIMUM_TOOLS
 
@@ -404,8 +407,51 @@ def test_get_system_prompt_for_worker_omits_graph_creation_guidance(monkeypatch)
     assert DELEGATION_GENERAL_GUIDANCE not in prompt
 
 
+def test_get_system_prompt_reads_designer_prompt_via_role_system(monkeypatch):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[build_designer_role()],
+        ),
+    )
+
+    prompt = get_system_prompt(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Designer",
+            tools=list(DESIGNER_ROLE_INCLUDED_TOOLS),
+        )
+    )
+
+    assert prompt == compose_system_prompt(
+        DESIGNER_ROLE_SYSTEM_PROMPT,
+        custom_prompt="",
+        tools=_with_minimum_tools(*DESIGNER_ROLE_INCLUDED_TOOLS),
+    )
+    assert CREATE_AGENT_TOOL_GUIDANCE not in prompt
+    assert CONNECT_TOOL_GUIDANCE not in prompt
+    assert DELEGATION_GENERAL_GUIDANCE not in prompt
+    assert (
+        "frontend implementation and visual design node" in DESIGNER_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "pages, components, layouts, and interaction details"
+        in DESIGNER_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "not the default executor for unrelated backend" in DESIGNER_ROLE_SYSTEM_PROMPT
+    )
+
+
 def test_worker_default_tools_do_not_include_create_agent():
     assert "create_agent" not in WORKER_ROLE_INCLUDED_TOOLS
+
+
+def test_designer_default_tools_match_frontend_scope():
+    assert DESIGNER_ROLE_INCLUDED_TOOLS == ["read", "edit", "exec"]
+    assert "create_agent" not in DESIGNER_ROLE_INCLUDED_TOOLS
+    assert "set_permissions" not in DESIGNER_ROLE_INCLUDED_TOOLS
+    assert "fetch" not in DESIGNER_ROLE_INCLUDED_TOOLS
 
 
 def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):

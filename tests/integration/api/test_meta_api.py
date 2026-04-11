@@ -30,3 +30,4 @@ def test_settings_bootstrap_returns_settings_related_resources(client: TestClien
     role_names = {role["name"] for role in payload["roles"]}
     assert "Steward" in role_names
     assert "Worker" in role_names
+    assert "Designer" in role_names

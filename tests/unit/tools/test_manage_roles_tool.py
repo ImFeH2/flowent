@@ -295,6 +295,46 @@ def test_manage_roles_delete_rejects_builtin_role(monkeypatch):
     assert result == {"error": "Cannot delete built-in role 'Worker'"}
 
 
+def test_manage_roles_update_rejects_designer_builtin_rename(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
+    settings = Settings(
+        roles=[RoleConfig(name="Designer", system_prompt="Design interfaces.")]
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(
+        ManageRolesTool().execute(
+            agent,
+            {
+                "action": "update",
+                "name": "Designer",
+                "new_name": "Builder",
+            },
+        )
+    )
+
+    assert result == {"error": "Cannot rename built-in role 'Designer'"}
+
+
+def test_manage_roles_delete_rejects_designer_builtin_role(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
+    settings = Settings(
+        roles=[RoleConfig(name="Designer", system_prompt="Design interfaces.")]
+    )
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(
+        ManageRolesTool().execute(
+            agent,
+            {"action": "delete", "name": "Designer"},
+        )
+    )
+
+    assert result == {"error": "Cannot delete built-in role 'Designer'"}
+
+
 def test_manage_roles_update_renames_selected_assistant_role(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(

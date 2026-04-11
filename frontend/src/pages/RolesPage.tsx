@@ -51,6 +51,7 @@ const MINIMUM_TOOLS = new Set(["idle", "sleep", "todo", "contacts"]);
 
 const emptyDraft = (): RoleDraft => ({
   name: "",
+  description: "",
   system_prompt: "",
   model: null,
   model_params: null,
@@ -164,6 +165,7 @@ export function RolesPage() {
     setActiveRoleName(role.name);
     setDraft({
       name: role.name,
+      description: role.description,
       system_prompt: role.system_prompt,
       model: role.model
         ? {
@@ -184,6 +186,7 @@ export function RolesPage() {
     setActiveRoleName(role.name);
     setDraft({
       name: role.name,
+      description: role.description,
       system_prompt: role.system_prompt,
       model: role.model
         ? {
@@ -251,6 +254,10 @@ export function RolesPage() {
       toast.error("Role name is required");
       return;
     }
+    if (!draft.description.trim()) {
+      toast.error("Role description is required");
+      return;
+    }
     if (!draft.system_prompt.trim()) {
       toast.error("System prompt is required");
       return;
@@ -278,6 +285,7 @@ export function RolesPage() {
     try {
       const nextDraft = {
         name: nextName,
+        description: draft.description.trim(),
         system_prompt: draft.system_prompt,
         model: draft.model
           ? {
@@ -446,7 +454,7 @@ export function RolesPage() {
             <section className="mb-10">
               <SectionHeader
                 title="Identity"
-                description="Define the role name and baseline prompt used by agents created with this role."
+                description="Define the role name, selection description, and baseline prompt used by agents created with this role."
               />
 
               <div className="space-y-4">
@@ -461,6 +469,27 @@ export function RolesPage() {
                     placeholder="e.g., Code Reviewer"
                     className={cn(
                       "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30",
+                      isReadOnly || lockBuiltinFields
+                        ? "cursor-default opacity-60 focus:outline-none"
+                        : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                    )}
+                  />
+                </SettingsRow>
+
+                <SettingsRow
+                  label="Description"
+                  description="Short summary shown when humans or agents choose a role"
+                >
+                  <textarea
+                    value={draft.description}
+                    onChange={(e) =>
+                      setDraft({ ...draft, description: e.target.value })
+                    }
+                    readOnly={isReadOnly || lockBuiltinFields}
+                    placeholder="Briefly explain what this role is best suited for"
+                    rows={3}
+                    className={cn(
+                      "w-full resize-y rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30",
                       isReadOnly || lockBuiltinFields
                         ? "cursor-default opacity-60 focus:outline-none"
                         : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
@@ -788,7 +817,12 @@ export function RolesPage() {
                 <button
                   type="button"
                   onClick={() => void handleSave()}
-                  disabled={saving}
+                  disabled={
+                    saving ||
+                    !draft.name.trim() ||
+                    !draft.description.trim() ||
+                    !draft.system_prompt.trim()
+                  }
                   className="rounded-full bg-white px-6 py-2 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {saving
@@ -852,7 +886,7 @@ export function RolesPage() {
                 </button>
               </div>
             </div>
-            <div className="mb-2 grid grid-cols-[200px_1fr_120px_100px] gap-4 px-4 pb-3">
+            <div className="mb-2 grid grid-cols-[260px_1fr_120px_100px] gap-4 px-4 pb-3">
               <span className="text-[11px] font-medium text-white/40">
                 Name
               </span>
@@ -885,21 +919,26 @@ export function RolesPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.03 }}
                     className={cn(
-                      "group grid grid-cols-[160px_1fr_100px_80px] items-center gap-4 rounded-xl px-4 py-3.5 transition-colors",
+                      "group grid grid-cols-[220px_1fr_100px_80px] items-center gap-4 rounded-xl px-4 py-3.5 transition-colors",
                       activeRoleName === role.name
                         ? "bg-white/[0.04]"
                         : "hover:bg-white/[0.02]",
                     )}
                   >
-                    <div className="flex items-center gap-2 pr-2">
-                      <span className="truncate text-[13px] font-medium text-white/90">
-                        {role.name}
-                      </span>
-                      {role.is_builtin && (
-                        <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-white/40">
-                          Built-in
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-[13px] font-medium text-white/90">
+                          {role.name}
                         </span>
-                      )}
+                        {role.is_builtin && (
+                          <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-white/40">
+                            Built-in
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-white/40">
+                        {role.description}
+                      </p>
                     </div>
 
                     <div className="min-w-0 pr-2">

@@ -28,11 +28,13 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
         roles=[
             RoleConfig(
                 name="Worker",
+                description="General execution role",
                 system_prompt="Do work.",
                 included_tools=["read", "exec"],
             ),
             RoleConfig(
                 name=CONDUCTOR_ROLE_NAME,
+                description="Leader role",
                 system_prompt="Coordinate tasks.",
                 included_tools=[
                     "create_agent",
@@ -43,11 +45,13 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             ),
             RoleConfig(
                 name=DESIGNER_ROLE_NAME,
+                description="Frontend design role",
                 system_prompt="Design interfaces.",
                 included_tools=["read", "edit", "exec"],
             ),
             RoleConfig(
                 name="Reviewer",
+                description="Review code carefully",
                 system_prompt="Review code carefully",
                 included_tools=["read"],
                 excluded_tools=["fetch"],
@@ -63,6 +67,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
         "roles": [
             {
                 "name": "Worker",
+                "description": "General execution role",
                 "system_prompt": "Do work.",
                 "model": None,
                 "model_params": None,
@@ -72,6 +77,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             },
             {
                 "name": CONDUCTOR_ROLE_NAME,
+                "description": "Leader role",
                 "system_prompt": "Coordinate tasks.",
                 "model": None,
                 "model_params": None,
@@ -86,6 +92,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             },
             {
                 "name": DESIGNER_ROLE_NAME,
+                "description": "Frontend design role",
                 "system_prompt": "Design interfaces.",
                 "model": None,
                 "model_params": None,
@@ -95,6 +102,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
             },
             {
                 "name": "Reviewer",
+                "description": "Review code carefully",
                 "system_prompt": "Review code carefully",
                 "model": None,
                 "model_params": None,
@@ -120,6 +128,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
         create_role(
             CreateRoleRequest(
                 name="Reviewer",
+                description="Review code carefully",
                 system_prompt="Review code carefully",
                 included_tools=["read"],
             )
@@ -128,6 +137,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
 
     assert result == {
         "name": "Reviewer",
+        "description": "Review code carefully",
         "system_prompt": "Review code carefully",
         "model": None,
         "model_params": None,
@@ -138,6 +148,7 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
     assert settings.roles == [
         RoleConfig(
             name="Reviewer",
+            description="Review code carefully",
             system_prompt="Review code carefully",
             included_tools=["read"],
         )
@@ -155,7 +166,11 @@ def test_create_role_rejects_duplicate_name(monkeypatch):
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
             create_role(
-                CreateRoleRequest(name="Reviewer", system_prompt="Different prompt")
+                CreateRoleRequest(
+                    name="Reviewer",
+                    description="Different description",
+                    system_prompt="Different prompt",
+                )
             )
         )
 
@@ -168,6 +183,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
         roles=[
             RoleConfig(
                 name="Reviewer",
+                description="Review code carefully",
                 system_prompt="Review code carefully",
                 included_tools=["read"],
             )
@@ -186,6 +202,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
             "Reviewer",
             UpdateRoleRequest(
                 name="Architect",
+                description="Design systems role",
                 system_prompt="Design systems",
                 excluded_tools=["fetch"],
             ),
@@ -194,6 +211,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
 
     assert result == {
         "name": "Architect",
+        "description": "Design systems role",
         "system_prompt": "Design systems",
         "model": None,
         "model_params": None,
@@ -204,6 +222,7 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
     assert settings.roles == [
         RoleConfig(
             name="Architect",
+            description="Design systems role",
             system_prompt="Design systems",
             included_tools=["read"],
             excluded_tools=["fetch"],
@@ -321,6 +340,7 @@ def test_create_role_rejects_overlapping_included_and_excluded_tools(monkeypatch
             create_role(
                 CreateRoleRequest(
                     name="Reviewer",
+                    description="Review code carefully",
                     system_prompt="Review code carefully",
                     included_tools=["read"],
                     excluded_tools=["read"],

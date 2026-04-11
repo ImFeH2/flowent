@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 
 const {
   clearChatMock,
+  fetchRolesMock,
   createTabRequestMock,
   createTabNodeRequestMock,
   deleteTabRequestMock,
@@ -21,6 +22,7 @@ const {
   toastErrorMock,
 } = vi.hoisted(() => ({
   clearChatMock: vi.fn(),
+  fetchRolesMock: vi.fn(),
   createTabRequestMock: vi.fn(),
   createTabNodeRequestMock: vi.fn(),
   deleteTabRequestMock: vi.fn(),
@@ -49,6 +51,7 @@ const {
 }));
 
 vi.mock("@/lib/api", () => ({
+  fetchRoles: (...args: unknown[]) => fetchRolesMock(...args),
   createTabRequest: (...args: unknown[]) => createTabRequestMock(...args),
   createTabNodeRequest: (...args: unknown[]) =>
     createTabNodeRequestMock(...args),
@@ -164,9 +167,27 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
   };
 }
 
+function buildRole(
+  overrides: Partial<{ name: string; description: string }> & {
+    name: string;
+  },
+) {
+  return {
+    name: overrides.name,
+    description: overrides.description ?? `${overrides.name} description`,
+    system_prompt: `${overrides.name} prompt`,
+    model: null,
+    model_params: null,
+    included_tools: [],
+    excluded_tools: [],
+    is_builtin: overrides.name === "Worker" || overrides.name === "Designer",
+  };
+}
+
 describe("HomePage", () => {
   beforeEach(() => {
     clearChatMock.mockReset();
+    fetchRolesMock.mockReset();
     createTabRequestMock.mockReset();
     createTabNodeRequestMock.mockReset();
     deleteTabRequestMock.mockReset();
@@ -220,6 +241,11 @@ describe("HomePage", () => {
       selectAgent: vi.fn(),
       setActiveTabId: vi.fn(),
     });
+    fetchRolesMock.mockResolvedValue([
+      buildRole({ name: "Worker", description: "General execution role" }),
+      buildRole({ name: "Reviewer", description: "Review results carefully" }),
+      buildRole({ name: "Designer", description: "Frontend design role" }),
+    ]);
 
     globalThis.ResizeObserver = class {
       observe() {}
@@ -271,9 +297,8 @@ describe("HomePage", () => {
     render(<HomePage />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Add Agent" })[0]);
-    fireEvent.change(screen.getByLabelText("Agent role"), {
-      target: { value: "Reviewer" },
-    });
+    await screen.findByText("Review results carefully");
+    fireEvent.click(screen.getByRole("button", { name: /Reviewer/ }));
     fireEvent.change(screen.getByLabelText("Agent display name"), {
       target: { value: "Release Reviewer" },
     });

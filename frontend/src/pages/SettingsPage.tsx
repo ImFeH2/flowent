@@ -88,6 +88,18 @@ export function SettingsPage() {
       providers.find((p) => p.id === settings.model.active_provider_id) ?? null
     );
   }, [providers, settings]);
+  const assistantRole = useMemo(() => {
+    if (!settings) return null;
+    return (
+      roles.find((role) => role.name === settings.assistant.role_name) ?? null
+    );
+  }, [roles, settings]);
+  const leaderRole = useMemo(() => {
+    if (!settings) return null;
+    return (
+      roles.find((role) => role.name === settings.leader.role_name) ?? null
+    );
+  }, [roles, settings]);
 
   useEffect(() => {
     let mounted = true;
@@ -238,11 +250,21 @@ export function SettingsPage() {
                   <SelectContent>
                     {roles.map((role) => (
                       <SelectItem key={role.name} value={role.name}>
-                        {role.name}
+                        <div className="flex min-w-0 flex-col items-start">
+                          <span>{role.name}</span>
+                          <span className="text-[11px] text-white/50">
+                            {role.description}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {assistantRole ? (
+                  <p className="mt-2 text-[11px] leading-relaxed text-white/40">
+                    {assistantRole.description}
+                  </p>
+                ) : null}
               </SettingsRow>
 
               <SettingsRow
@@ -348,11 +370,21 @@ export function SettingsPage() {
                   <SelectContent>
                     {roles.map((role) => (
                       <SelectItem key={role.name} value={role.name}>
-                        {role.name}
+                        <div className="flex min-w-0 flex-col items-start">
+                          <span>{role.name}</span>
+                          <span className="text-[11px] text-white/50">
+                            {role.description}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {leaderRole ? (
+                  <p className="mt-2 text-[11px] leading-relaxed text-white/40">
+                    {leaderRole.description}
+                  </p>
+                ) : null}
               </SettingsRow>
             </div>
           </section>

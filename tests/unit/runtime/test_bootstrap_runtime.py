@@ -7,15 +7,19 @@ from app.models import AgentState, StateEntry
 from app.registry import registry
 from app.runtime import bootstrap_runtime, shutdown_runtime
 from app.settings import (
+    CONDUCTOR_ROLE_DESCRIPTION,
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    DESIGNER_ROLE_DESCRIPTION,
     DESIGNER_ROLE_INCLUDED_TOOLS,
     DESIGNER_ROLE_NAME,
     DESIGNER_ROLE_SYSTEM_PROMPT,
+    STEWARD_ROLE_DESCRIPTION,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
     STEWARD_ROLE_SYSTEM_PROMPT,
+    WORKER_ROLE_DESCRIPTION,
     WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
@@ -104,21 +108,25 @@ def test_bootstrap_runtime_creates_builtin_roles(
         assert settings.roles == [
             RoleConfig(
                 name=STEWARD_ROLE_NAME,
+                description=STEWARD_ROLE_DESCRIPTION,
                 system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
                 included_tools=STEWARD_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=WORKER_ROLE_NAME,
+                description=WORKER_ROLE_DESCRIPTION,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
                 included_tools=WORKER_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=CONDUCTOR_ROLE_NAME,
+                description=CONDUCTOR_ROLE_DESCRIPTION,
                 system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
                 included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=DESIGNER_ROLE_NAME,
+                description=DESIGNER_ROLE_DESCRIPTION,
                 system_prompt=DESIGNER_ROLE_SYSTEM_PROMPT,
                 included_tools=DESIGNER_ROLE_INCLUDED_TOOLS,
             ),
@@ -161,21 +169,25 @@ def test_bootstrap_runtime_reconciles_existing_builtin_roles(monkeypatch, tmp_pa
         assert settings.roles == [
             RoleConfig(
                 name=STEWARD_ROLE_NAME,
+                description=STEWARD_ROLE_DESCRIPTION,
                 system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
                 included_tools=STEWARD_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=WORKER_ROLE_NAME,
+                description=WORKER_ROLE_DESCRIPTION,
                 system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
                 included_tools=WORKER_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=CONDUCTOR_ROLE_NAME,
+                description=CONDUCTOR_ROLE_DESCRIPTION,
                 system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
                 included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
             ),
             RoleConfig(
                 name=DESIGNER_ROLE_NAME,
+                description=DESIGNER_ROLE_DESCRIPTION,
                 system_prompt=DESIGNER_ROLE_SYSTEM_PROMPT,
                 included_tools=DESIGNER_ROLE_INCLUDED_TOOLS,
             ),

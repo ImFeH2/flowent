@@ -31,8 +31,16 @@ def test_roles_bootstrap_includes_tools_and_providers(client: TestClient, monkey
             )
         ],
         roles=[
-            RoleConfig(name="Steward", system_prompt="Default assistant role."),
-            RoleConfig(name="Reviewer", system_prompt="Review carefully."),
+            RoleConfig(
+                name="Steward",
+                description="Default assistant role.",
+                system_prompt="Default assistant role.",
+            ),
+            RoleConfig(
+                name="Reviewer",
+                description="Review carefully.",
+                system_prompt="Review carefully.",
+            ),
         ],
     )
 
@@ -72,7 +80,11 @@ def test_create_role_rejects_duplicate_name(client: TestClient, monkeypatch):
 
     response = client.post(
         "/api/roles",
-        json={"name": "Writer", "system_prompt": "another prompt"},
+        json={
+            "name": "Writer",
+            "description": "Write drafts",
+            "system_prompt": "another prompt",
+        },
     )
 
     assert response.status_code == 409
@@ -108,12 +120,17 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
 
     update = client.put(
         "/api/roles/Writer",
-        json={"name": "Researcher", "system_prompt": "investigate"},
+        json={
+            "name": "Researcher",
+            "description": "Investigate systems",
+            "system_prompt": "investigate",
+        },
     )
 
     assert update.status_code == 200
     assert update.json() == {
         "name": "Researcher",
+        "description": "Investigate systems",
         "system_prompt": "investigate",
         "model": None,
         "model_params": None,
@@ -156,6 +173,7 @@ def test_create_role_rejects_overlapping_included_and_excluded_tools(
         "/api/roles",
         json={
             "name": "Writer",
+            "description": "Write drafts",
             "system_prompt": "another prompt",
             "included_tools": ["read"],
             "excluded_tools": ["read"],
@@ -188,6 +206,7 @@ def test_create_role_accepts_model_override(client: TestClient, monkeypatch):
         "/api/roles",
         json={
             "name": "Reviewer",
+            "description": "Review work carefully",
             "system_prompt": "Review work",
             "model": {
                 "provider_id": "provider-1",

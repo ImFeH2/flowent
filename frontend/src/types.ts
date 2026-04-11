@@ -168,6 +168,7 @@ export type StreamingDelta =
 
 export interface Role {
   name: string;
+  description: string;
   system_prompt: string;
   model: RoleModelConfig | null;
   model_params: ModelParams | null;

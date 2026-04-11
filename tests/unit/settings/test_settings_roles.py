@@ -2,15 +2,19 @@ import json
 
 import app.settings as settings_module
 from app.settings import (
+    CONDUCTOR_ROLE_DESCRIPTION,
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
+    DESIGNER_ROLE_DESCRIPTION,
     DESIGNER_ROLE_INCLUDED_TOOLS,
     DESIGNER_ROLE_NAME,
     DESIGNER_ROLE_SYSTEM_PROMPT,
+    STEWARD_ROLE_DESCRIPTION,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
     STEWARD_ROLE_SYSTEM_PROMPT,
+    WORKER_ROLE_DESCRIPTION,
     WORKER_ROLE_INCLUDED_TOOLS,
     WORKER_ROLE_NAME,
     WORKER_ROLE_SYSTEM_PROMPT,
@@ -58,6 +62,7 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
     assert loaded.roles == [
         RoleConfig(
             name="Worker",
+            description="Do work.",
             system_prompt="Do work.",
             included_tools=["read"],
         )
@@ -81,6 +86,7 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
     assert persisted["roles"] == [
         {
             "name": "Worker",
+            "description": "Do work.",
             "system_prompt": "Do work.",
             "model": None,
             "model_params": None,
@@ -371,6 +377,7 @@ def test_load_settings_drops_removed_exit_tool_from_roles(monkeypatch, tmp_path)
     assert loaded.roles == [
         RoleConfig(
             name="Worker",
+            description="Do work.",
             system_prompt="Do work.",
             included_tools=["read", "exec"],
             excluded_tools=["fetch"],
@@ -381,6 +388,7 @@ def test_load_settings_drops_removed_exit_tool_from_roles(monkeypatch, tmp_path)
     assert persisted["roles"] == [
         {
             "name": "Worker",
+            "description": "Do work.",
             "system_prompt": "Do work.",
             "model": None,
             "model_params": None,
@@ -457,6 +465,7 @@ def test_load_settings_migrates_legacy_model_override(monkeypatch, tmp_path):
     assert loaded.roles == [
         RoleConfig(
             name="Reviewer",
+            description="Review carefully.",
             system_prompt="Review carefully.",
             model=RoleModelConfig(
                 provider_id="provider-1",
@@ -471,6 +480,7 @@ def test_load_settings_migrates_legacy_model_override(monkeypatch, tmp_path):
     assert persisted["roles"] == [
         {
             "name": "Reviewer",
+            "description": "Review carefully.",
             "system_prompt": "Review carefully.",
             "model": {
                 "provider_id": "provider-1",
@@ -517,6 +527,7 @@ def test_load_settings_parses_role_model_object(monkeypatch, tmp_path):
     assert loaded.roles == [
         RoleConfig(
             name="Reviewer",
+            description="Review carefully.",
             system_prompt="Review carefully.",
             model=RoleModelConfig(
                 provider_id="provider-2",
@@ -602,24 +613,28 @@ def test_ensure_builtin_roles_repairs_and_creates_builtin_roles():
     assert settings.roles == [
         RoleConfig(
             name=STEWARD_ROLE_NAME,
+            description=STEWARD_ROLE_DESCRIPTION,
             system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
             included_tools=STEWARD_ROLE_INCLUDED_TOOLS,
             excluded_tools=[],
         ),
         RoleConfig(
             name=WORKER_ROLE_NAME,
+            description=WORKER_ROLE_DESCRIPTION,
             system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
             included_tools=WORKER_ROLE_INCLUDED_TOOLS,
             excluded_tools=[],
         ),
         RoleConfig(
             name=CONDUCTOR_ROLE_NAME,
+            description=CONDUCTOR_ROLE_DESCRIPTION,
             system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
             included_tools=CONDUCTOR_ROLE_INCLUDED_TOOLS,
             excluded_tools=[],
         ),
         RoleConfig(
             name=DESIGNER_ROLE_NAME,
+            description=DESIGNER_ROLE_DESCRIPTION,
             system_prompt=DESIGNER_ROLE_SYSTEM_PROMPT,
             included_tools=DESIGNER_ROLE_INCLUDED_TOOLS,
             excluded_tools=[],

@@ -4,6 +4,7 @@ import { requestJson, requestVoid } from "./shared";
 
 type RolePayload = {
   name: string;
+  description: string;
   system_prompt: string;
   model: RoleModelConfig | null;
   model_params: ModelParams | null;

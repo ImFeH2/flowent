@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
-import type { HistoryEntry, Node } from "@/types";
+import type { HistoryEntry, Node, Role } from "@/types";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -49,6 +49,7 @@ import {
 import { PanelResizer } from "@/components/PanelResizer";
 import { getAssistantNode } from "@/lib/assistant";
 import {
+  fetchRoles,
   createTabEdgeRequest,
   createTabNodeRequest,
   createTabRequest,
@@ -123,7 +124,10 @@ export function HomePage() {
   const [createTabGoal, setCreateTabGoal] = useState("");
   const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
   const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
   const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
+  const [createAgentRoleQuery, setCreateAgentRoleQuery] = useState("");
   const [createAgentName, setCreateAgentName] = useState("");
   const [connectSourceId, setConnectSourceId] = useState("");
   const [connectTargetId, setConnectTargetId] = useState("");
@@ -191,6 +195,33 @@ export function HomePage() {
     }
   }, [isCompactWorkspace]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRoles(true);
+    fetchRoles()
+      .then((items) => {
+        if (cancelled) {
+          return;
+        }
+        setRoles(items);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        toast.error("Failed to load roles");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingRoles(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const selectedAgent = selectedAgentId ? agents.get(selectedAgentId) : null;
   const activeTab = activeTabId ? (tabs.get(activeTabId) ?? null) : null;
   const tabAgents = useMemo(
@@ -214,6 +245,19 @@ export function HomePage() {
       })),
     [tabAgents],
   );
+  const selectedCreateAgentRole = useMemo(
+    () => roles.find((role) => role.name === createAgentRoleName) ?? null,
+    [createAgentRoleName, roles],
+  );
+  const filteredCreateAgentRoles = useMemo(() => {
+    const query = createAgentRoleQuery.trim().toLowerCase();
+    if (!query) {
+      return roles;
+    }
+    return roles.filter((role) =>
+      `${role.name} ${role.description}`.toLowerCase().includes(query),
+    );
+  }, [createAgentRoleQuery, roles]);
   const panelVisible = panelOpen || !!selectedAgent;
   const resolvedPanelWidth = useMemo(() => {
     if (!isCompactWorkspace) {
@@ -350,12 +394,13 @@ export function HomePage() {
       return;
     }
     setCreateAgentRoleName("Worker");
+    setCreateAgentRoleQuery("");
     setCreateAgentName("");
     setActiveDialog("create-agent");
   };
 
   const handleCreateAgent = async () => {
-    const roleName = createAgentRoleName.trim();
+    const roleName = selectedCreateAgentRole?.name ?? "";
     if (!activeTabId || !roleName) {
       return;
     }
@@ -367,6 +412,7 @@ export function HomePage() {
       });
       setActiveDialog(null);
       setCreateAgentRoleName("Worker");
+      setCreateAgentRoleQuery("");
       setCreateAgentName("");
     } catch (error) {
       toast.error(
@@ -821,7 +867,7 @@ export function HomePage() {
               onClick={() => void handleCreateAgent()}
               disabled={
                 !activeTabId ||
-                !createAgentRoleName.trim() ||
+                !selectedCreateAgentRole ||
                 pendingAction === "create-agent"
               }
             >
@@ -840,14 +886,58 @@ export function HomePage() {
           label="Role"
           hint="Required · Leader is managed by the tab"
         >
-          <Input
-            autoFocus
-            aria-label="Agent role"
-            value={createAgentRoleName}
-            onChange={(event) => setCreateAgentRoleName(event.target.value)}
-            placeholder="Worker"
-            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
-          />
+          <div className="space-y-3">
+            <Input
+              autoFocus
+              aria-label="Search roles"
+              value={createAgentRoleQuery}
+              onChange={(event) => setCreateAgentRoleQuery(event.target.value)}
+              placeholder="Search roles"
+              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            />
+            {selectedCreateAgentRole ? (
+              <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] px-4 py-3">
+                <div className="text-[13px] font-medium text-white">
+                  {selectedCreateAgentRole.name}
+                </div>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                  {selectedCreateAgentRole.description}
+                </p>
+              </div>
+            ) : null}
+            <div className="max-h-56 space-y-2 overflow-y-auto rounded-[1rem] border border-white/10 bg-black/14 p-2 scrollbar-none">
+              {loadingRoles ? (
+                <p className="px-2 py-3 text-[12px] text-white/40">
+                  Loading roles...
+                </p>
+              ) : filteredCreateAgentRoles.length === 0 ? (
+                <p className="px-2 py-3 text-[12px] text-white/40">
+                  No roles match your search.
+                </p>
+              ) : (
+                filteredCreateAgentRoles.map((role) => (
+                  <button
+                    key={role.name}
+                    type="button"
+                    onClick={() => setCreateAgentRoleName(role.name)}
+                    className={cn(
+                      "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors",
+                      createAgentRoleName === role.name
+                        ? "border-white/20 bg-white/[0.06]"
+                        : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                    )}
+                  >
+                    <div className="text-[13px] font-medium text-white">
+                      {role.name}
+                    </div>
+                    <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                      {role.description}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
         </WorkspaceDialogField>
         <WorkspaceDialogField label="Display Name" hint="Optional">
           <Input

@@ -18,6 +18,10 @@ STEWARD_ROLE_NAME = "Steward"
 WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
 DESIGNER_ROLE_NAME = "Designer"
+STEWARD_ROLE_DESCRIPTION = "Human-facing system entry role for task intake and workspace-level boundary management."
+WORKER_ROLE_DESCRIPTION = "General execution role for narrow implementation, research, and file-oriented task work inside a tab."
+CONDUCTOR_ROLE_DESCRIPTION = "Default Leader role for tab-level planning, graph orchestration, and result synthesis."
+DESIGNER_ROLE_DESCRIPTION = "Frontend implementation and visual design role for UI, layout, styling, and interaction refinement tasks."
 STEWARD_ROLE_INCLUDED_TOOLS = [
     "create_tab",
     "delete_tab",
@@ -176,6 +180,7 @@ def _normalize_assistant_write_dir(raw_write_dir: str) -> str:
 class RoleConfig:
     name: str
     system_prompt: str
+    description: str = ""
     model: RoleModelConfig | None = None
     model_params: ModelParams | None = None
     included_tools: list[str] = field(default_factory=list)
@@ -566,6 +571,30 @@ def _normalize_provider_headers(raw_headers: object) -> tuple[dict[str, str], bo
     return headers, migrated
 
 
+def _fallback_role_description(role_name: str, system_prompt: str) -> str:
+    for line in system_prompt.splitlines():
+        stripped = " ".join(line.split())
+        if stripped:
+            return stripped[:160]
+    normalized_role_name = " ".join(role_name.split())
+    if normalized_role_name:
+        return f"{normalized_role_name} role."
+    return "Custom role."
+
+
+def _normalize_role_description(
+    raw_description: object,
+    *,
+    role_name: str,
+    system_prompt: str,
+) -> tuple[str, bool]:
+    if isinstance(raw_description, str):
+        stripped = " ".join(raw_description.split())
+        if stripped:
+            return stripped, stripped != raw_description
+    return _fallback_role_description(role_name, system_prompt), True
+
+
 def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
     return {
         "id": provider.id,
@@ -581,6 +610,7 @@ def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
 def serialize_role(role: RoleConfig) -> dict[str, object]:
     return {
         "name": role.name,
+        "description": role.description,
         "system_prompt": role.system_prompt,
         "model": serialize_role_model(role.model),
         "model_params": serialize_model_params(role.model_params),
@@ -1245,11 +1275,19 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
                 _normalize_optional_model_params(role.get("model_params"))
             )
             migrated = migrated or role_model_params_migrated
+        role_system_prompt = str(role.get("system_prompt", ""))
+        role_description, role_description_migrated = _normalize_role_description(
+            role.get("description"),
+            role_name=role_name,
+            system_prompt=role_system_prompt,
+        )
+        migrated = migrated or role_description_migrated
 
         roles.append(
             RoleConfig(
                 name=role_name,
-                system_prompt=str(role.get("system_prompt", "")),
+                system_prompt=role_system_prompt,
+                description=role_description,
                 model=role_model,
                 model_params=role_model_params,
                 included_tools=normalize_tool_names(
@@ -1392,6 +1430,7 @@ def build_steward_role() -> RoleConfig:
     return RoleConfig(
         name=STEWARD_ROLE_NAME,
         system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
+        description=STEWARD_ROLE_DESCRIPTION,
         included_tools=list(STEWARD_ROLE_INCLUDED_TOOLS),
         excluded_tools=[],
     )
@@ -1401,6 +1440,7 @@ def build_worker_role() -> RoleConfig:
     return RoleConfig(
         name=WORKER_ROLE_NAME,
         system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
+        description=WORKER_ROLE_DESCRIPTION,
         included_tools=list(WORKER_ROLE_INCLUDED_TOOLS),
         excluded_tools=[],
     )
@@ -1410,6 +1450,7 @@ def build_conductor_role() -> RoleConfig:
     return RoleConfig(
         name=CONDUCTOR_ROLE_NAME,
         system_prompt=CONDUCTOR_ROLE_SYSTEM_PROMPT,
+        description=CONDUCTOR_ROLE_DESCRIPTION,
         included_tools=list(CONDUCTOR_ROLE_INCLUDED_TOOLS),
         excluded_tools=[],
     )
@@ -1419,6 +1460,7 @@ def build_designer_role() -> RoleConfig:
     return RoleConfig(
         name=DESIGNER_ROLE_NAME,
         system_prompt=DESIGNER_ROLE_SYSTEM_PROMPT,
+        description=DESIGNER_ROLE_DESCRIPTION,
         included_tools=list(DESIGNER_ROLE_INCLUDED_TOOLS),
         excluded_tools=[],
     )
@@ -1470,10 +1512,12 @@ def _ensure_builtin_role(settings: Settings, standard_role: RoleConfig) -> bool:
         settings.roles.append(standard_role)
         return True
     if (
-        current_role.system_prompt != standard_role.system_prompt
+        current_role.description != standard_role.description
+        or current_role.system_prompt != standard_role.system_prompt
         or current_role.included_tools != standard_role.included_tools
         or current_role.excluded_tools != standard_role.excluded_tools
     ):
+        current_role.description = standard_role.description
         current_role.system_prompt = standard_role.system_prompt
         current_role.included_tools = list(standard_role.included_tools)
         current_role.excluded_tools = list(standard_role.excluded_tools)

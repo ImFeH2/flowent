@@ -31,6 +31,7 @@ class RoleModelRequest(BaseModel):
 
 class CreateRoleRequest(BaseModel):
     name: str
+    description: str
     system_prompt: str
     model: RoleModelRequest | None = None
     model_params: dict[str, object] | None = None
@@ -40,6 +41,7 @@ class CreateRoleRequest(BaseModel):
 
 class UpdateRoleRequest(BaseModel):
     name: str | None = None
+    description: str | None = None
     system_prompt: str | None = None
     model: RoleModelRequest | None = None
     model_params: dict[str, object] | None = None
@@ -128,6 +130,7 @@ def _enforce_builtin_role_guards(
     role: RoleConfig,
     *,
     next_name: str | None,
+    next_description: str | None,
     next_system_prompt: str | None,
     next_included_tools: list[str],
     next_excluded_tools: list[str],
@@ -138,6 +141,14 @@ def _enforce_builtin_role_guards(
         raise HTTPException(
             status_code=400,
             detail=f"Cannot rename built-in role '{role.name}'",
+        )
+    if next_description is not None and next_description != role.description:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Cannot modify built-in role '{role.name}' fields other than "
+                "model or model_params"
+            ),
         )
     if next_system_prompt is not None and next_system_prompt != role.system_prompt:
         raise HTTPException(
@@ -186,6 +197,9 @@ async def create_role(req: CreateRoleRequest) -> dict:
     name = req.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Role name is required")
+    description = req.description.strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="Role description is required")
     if any(role.name == name for role in settings.roles):
         raise HTTPException(status_code=409, detail=f"Role '{name}' already exists")
 
@@ -196,6 +210,7 @@ async def create_role(req: CreateRoleRequest) -> dict:
     )
     role = RoleConfig(
         name=name,
+        description=description,
         system_prompt=req.system_prompt,
         model=_resolve_role_model(
             req.model,
@@ -235,6 +250,14 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
         next_name = req.name.strip() if req.name is not None else None
         if next_name is not None and not next_name:
             raise HTTPException(status_code=400, detail="Role name is required")
+        next_description = (
+            req.description.strip() if req.description is not None else None
+        )
+        if next_description is not None and not next_description:
+            raise HTTPException(
+                status_code=400,
+                detail="Role description is required",
+            )
         if next_name is not None and any(
             existing.name == next_name and existing.name != role_name
             for existing in settings.roles
@@ -247,6 +270,7 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
         _enforce_builtin_role_guards(
             role,
             next_name=next_name,
+            next_description=next_description,
             next_system_prompt=req.system_prompt,
             next_included_tools=included_tools,
             next_excluded_tools=excluded_tools,
@@ -256,6 +280,8 @@ async def update_role(role_name: str, req: UpdateRoleRequest) -> dict:
         if next_name is not None:
             role.name = next_name
             rename_role_references(settings, previous_name, role.name)
+        if next_description is not None:
+            role.description = next_description
         if req.system_prompt is not None:
             role.system_prompt = req.system_prompt
         if "model" in req.model_fields_set:

@@ -509,11 +509,13 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
             roles=[
                 RoleConfig(
                     name="Worker",
+                    description="General execution role",
                     system_prompt="Do work.",
                     included_tools=["read", "exec"],
                 ),
                 RoleConfig(
                     name="Reviewer",
+                    description="Review code carefully",
                     system_prompt="Review code.",
                     excluded_tools=["fetch"],
                 ),
@@ -526,6 +528,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
     assert result == [
         {
             "name": "Worker",
+            "description": "General execution role",
             "system_prompt": "Do work.",
             "builtin_tools": [
                 "idle",
@@ -554,6 +557,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
         },
         {
             "name": "Reviewer",
+            "description": "Review code carefully",
             "system_prompt": "Review code.",
             "builtin_tools": [
                 "idle",

@@ -79,6 +79,7 @@ def _enforce_builtin_role_guards(
     role: RoleConfig,
     *,
     new_name: str | None,
+    description: str | None,
     system_prompt: str | None,
     next_included_tools: list[str],
     next_excluded_tools: list[str],
@@ -89,6 +90,11 @@ def _enforce_builtin_role_guards(
         return None
     if new_name is not None and new_name != role.name:
         return f"Cannot rename built-in role '{role.name}'"
+    if description is not None and description != role.description:
+        return (
+            f"Cannot modify built-in role '{role.name}' fields other than "
+            "model or model_params"
+        )
     if system_prompt is not None and system_prompt != role.system_prompt:
         return (
             f"Cannot modify built-in role '{role.name}' fields other than "
@@ -127,6 +133,10 @@ class ManageRolesTool(Tool):
             "new_name": {
                 "type": "string",
                 "description": "New role name for update",
+            },
+            "description": {
+                "type": "string",
+                "description": "Short role description used when choosing a role",
             },
             "system_prompt": {
                 "type": "string",
@@ -191,6 +201,7 @@ class ManageRolesTool(Tool):
         action = args.get("action")
         role_name = args.get("name")
         new_name = args.get("new_name")
+        description = args.get("description")
         system_prompt = args.get("system_prompt")
         role_model = args.get("model")
         role_model_params = args.get("model_params")
@@ -204,6 +215,8 @@ class ManageRolesTool(Tool):
             return json.dumps({"error": "name must be a string"})
         if new_name is not None and not isinstance(new_name, str):
             return json.dumps({"error": "new_name must be a string"})
+        if description is not None and not isinstance(description, str):
+            return json.dumps({"error": "description must be a string"})
         if system_prompt is not None and not isinstance(system_prompt, str):
             return json.dumps({"error": "system_prompt must be a string"})
         if included_tools is not None and (
@@ -225,6 +238,8 @@ class ManageRolesTool(Tool):
         if action == "create":
             if not isinstance(role_name, str) or not role_name.strip():
                 return json.dumps({"error": "Role name is required"})
+            if not isinstance(description, str) or not description.strip():
+                return json.dumps({"error": "Role description is required"})
             if not isinstance(system_prompt, str):
                 return json.dumps({"error": "system_prompt is required"})
             if _find_role_by_name(settings.roles, role_name.strip()) is not None:
@@ -256,6 +271,7 @@ class ManageRolesTool(Tool):
 
             new_role = RoleConfig(
                 name=role_name.strip(),
+                description=description.strip(),
                 system_prompt=system_prompt,
                 model=next_model,
                 model_params=next_model_params,
@@ -317,10 +333,16 @@ class ManageRolesTool(Tool):
                     return json.dumps(
                         {"error": f"Role '{stripped_name}' already exists"}
                     )
+            stripped_description = None
+            if description is not None:
+                stripped_description = description.strip()
+                if not stripped_description:
+                    return json.dumps({"error": "Role description is required"})
 
             builtin_error = _enforce_builtin_role_guards(
                 target_role,
                 new_name=stripped_name,
+                description=stripped_description,
                 system_prompt=system_prompt,
                 next_included_tools=next_included,
                 next_excluded_tools=next_excluded,
@@ -332,6 +354,8 @@ class ManageRolesTool(Tool):
             if stripped_name is not None:
                 target_role.name = stripped_name
                 rename_role_references(settings, previous_name, target_role.name)
+            if stripped_description is not None:
+                target_role.description = stripped_description
             if system_prompt is not None:
                 target_role.system_prompt = system_prompt
             if "model" in args:

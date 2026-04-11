@@ -58,7 +58,28 @@ describe("SettingsPage", () => {
         },
       },
       providers: [],
-      roles: [{ name: "Steward", system_prompt: "Default.", is_builtin: true }],
+      roles: [
+        {
+          name: "Steward",
+          description: "Human-facing assistant role",
+          system_prompt: "Default.",
+          model: null,
+          model_params: null,
+          included_tools: [],
+          excluded_tools: [],
+          is_builtin: true,
+        },
+        {
+          name: "Conductor",
+          description: "Default leader role",
+          system_prompt: "Lead.",
+          model: null,
+          model_params: null,
+          included_tools: [],
+          excluded_tools: [],
+          is_builtin: true,
+        },
+      ],
       version: "1.2.3",
     });
     saveSettings.mockResolvedValue({
@@ -100,6 +121,12 @@ describe("SettingsPage", () => {
     expect(screen.getByText("ms")).toBeInTheDocument();
     expect(initialDelayInput).toHaveValue("0.5");
     expect(writeDirsTextarea).toHaveValue("/project/autopoe");
+    expect(
+      screen.getAllByText("Human-facing assistant role").length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText("Default leader role").length).toBeGreaterThan(
+      0,
+    );
 
     fireEvent.change(timeoutInput, { target: { value: "15000" } });
     fireEvent.change(initialDelayInput, { target: { value: "0.75" } });

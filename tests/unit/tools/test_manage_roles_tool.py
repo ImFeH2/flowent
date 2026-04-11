@@ -16,8 +16,16 @@ def test_manage_roles_list_includes_builtin_flags(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(
         roles=[
-            RoleConfig(name="Worker", system_prompt="Do work."),
-            RoleConfig(name="Reviewer", system_prompt="Review work."),
+            RoleConfig(
+                name="Worker",
+                description="General execution role",
+                system_prompt="Do work.",
+            ),
+            RoleConfig(
+                name="Reviewer",
+                description="Review work carefully",
+                system_prompt="Review work.",
+            ),
         ]
     )
 
@@ -28,6 +36,7 @@ def test_manage_roles_list_includes_builtin_flags(monkeypatch):
     assert result == [
         {
             "name": "Worker",
+            "description": "General execution role",
             "system_prompt": "Do work.",
             "model": None,
             "model_params": None,
@@ -37,6 +46,7 @@ def test_manage_roles_list_includes_builtin_flags(monkeypatch):
         },
         {
             "name": "Reviewer",
+            "description": "Review work carefully",
             "system_prompt": "Review work.",
             "model": None,
             "model_params": None,
@@ -73,6 +83,7 @@ def test_manage_roles_create_adds_custom_role(monkeypatch):
             {
                 "action": "create",
                 "name": "Reviewer",
+                "description": "Review work carefully",
                 "system_prompt": "Review carefully.",
                 "model": {
                     "provider_id": "provider-1",
@@ -86,6 +97,7 @@ def test_manage_roles_create_adds_custom_role(monkeypatch):
 
     assert result == {
         "name": "Reviewer",
+        "description": "Review work carefully",
         "system_prompt": "Review carefully.",
         "model": {
             "provider_id": "provider-1",
@@ -99,6 +111,7 @@ def test_manage_roles_create_adds_custom_role(monkeypatch):
     assert settings.roles == [
         RoleConfig(
             name="Reviewer",
+            description="Review work carefully",
             system_prompt="Review carefully.",
             model=RoleModelConfig(
                 provider_id="provider-1",
@@ -123,6 +136,7 @@ def test_manage_roles_create_rejects_duplicate_name(monkeypatch):
             {
                 "action": "create",
                 "name": "Reviewer",
+                "description": "Review work carefully",
                 "system_prompt": "Another prompt.",
             },
         )
@@ -141,6 +155,7 @@ def test_manage_roles_create_rejects_overlapping_tool_config(monkeypatch):
             {
                 "action": "create",
                 "name": "Reviewer",
+                "description": "Review work carefully",
                 "system_prompt": "Review carefully.",
                 "included_tools": ["read"],
                 "excluded_tools": ["read"],
@@ -163,7 +178,13 @@ def test_manage_roles_update_renames_and_updates_role(monkeypatch):
                 api_key="secret",
             )
         ],
-        roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully.")],
+        roles=[
+            RoleConfig(
+                name="Reviewer",
+                description="Review existing work",
+                system_prompt="Review carefully.",
+            )
+        ],
     )
     saved: list[Settings] = []
 
@@ -179,6 +200,7 @@ def test_manage_roles_update_renames_and_updates_role(monkeypatch):
                 "action": "update",
                 "name": "Reviewer",
                 "new_name": "Researcher",
+                "description": "Investigate code and system behavior",
                 "system_prompt": "Investigate carefully.",
                 "model": {
                     "provider_id": "provider-1",
@@ -192,6 +214,7 @@ def test_manage_roles_update_renames_and_updates_role(monkeypatch):
 
     assert result == {
         "name": "Researcher",
+        "description": "Investigate code and system behavior",
         "system_prompt": "Investigate carefully.",
         "model": {
             "provider_id": "provider-1",
@@ -205,6 +228,7 @@ def test_manage_roles_update_renames_and_updates_role(monkeypatch):
     assert settings.roles == [
         RoleConfig(
             name="Researcher",
+            description="Investigate code and system behavior",
             system_prompt="Investigate carefully.",
             model=RoleModelConfig(
                 provider_id="provider-1",

@@ -40,6 +40,7 @@ class ListRolesTool(Tool):
             payload.append(
                 {
                     "name": role.name,
+                    "description": role.description,
                     "system_prompt": role.system_prompt,
                     "builtin_tools": builtin_tools,
                     "optional_tools": optional_tools,

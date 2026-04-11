@@ -55,7 +55,13 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 api_key="secret",
             )
         ],
-        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")],
+        roles=[
+            RoleConfig(
+                name="Steward",
+                description="Default assistant role.",
+                system_prompt="Default assistant role.",
+            )
+        ],
     )
 
     monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
@@ -110,6 +116,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
             "roles": [
                 {
                     "name": "Steward",
+                    "description": "Default assistant role.",
                     "system_prompt": "Default assistant role.",
                     "model": None,
                     "model_params": None,
@@ -132,6 +139,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
         "roles": [
             {
                 "name": "Steward",
+                "description": "Default assistant role.",
                 "system_prompt": "Default assistant role.",
                 "model": None,
                 "model_params": None,

@@ -145,8 +145,10 @@ function useTransientGraphElements(
 
   useEffect(() => {
     setRenderEdges((prev) => {
-      const nextIds = new Set(edges.map((edge) => edge.id));
-      const prevMap = new Map(prev.map((edge) => [edge.id, edge] as const));
+      const nextIds = new Set<string>();
+      for (let i = 0; i < edges.length; i++) nextIds.add(edges[i].id);
+      const prevMap = new Map<string, FlowEdge>();
+      for (let i = 0; i < prev.length; i++) prevMap.set(prev[i].id, prev[i]);
       const nextEdges = edges.map((edge) => {
         const timer = edgeTimers.current.get(edge.id);
         if (timer) {
@@ -262,7 +264,9 @@ export function AgentGraph() {
   );
 
   const transientData = useMemo(() => {
-    const visibleAgentIds = new Set(visibleAgents.map((agent) => agent.id));
+    const visibleAgentIds = new Set<string>();
+    for (let i = 0; i < visibleAgents.length; i++)
+      visibleAgentIds.add(visibleAgents[i].id);
     const incomingAgentIds = new Set<string>();
     for (const agent of visibleAgents) {
       for (const targetId of agent.connections) {
@@ -317,7 +321,9 @@ export function AgentGraph() {
   ]);
 
   const graphElements = useMemo(() => {
-    const visibleAgentIds = new Set(visibleAgents.map((agent) => agent.id));
+    const visibleAgentIds = new Set<string>();
+    for (let i = 0; i < visibleAgents.length; i++)
+      visibleAgentIds.add(visibleAgents[i].id);
     const baseEdges = visibleAgents.flatMap((agent) =>
       agent.connections
         .filter((targetId) => visibleAgentIds.has(targetId))

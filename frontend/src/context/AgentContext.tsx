@@ -18,14 +18,20 @@ import {
   normalizeEventTimestampMs,
   type ActivityFeedEntry,
 } from "@/context/AgentFeedContext";
+import {
+  deleteMapEntries,
+  deleteMapEntry,
+  filterStreamingDeltas,
+  removePendingAssistantMessage,
+} from "@/context/agentRuntimeState";
 import type {
   AgentEvent,
   AssistantChatMessage,
   HistoryEntry,
   Node,
   PendingAssistantChatMessage,
-  StreamingDelta,
   TaskTab,
+  StreamingDelta,
 } from "@/types";
 
 export interface ActiveMessage {
@@ -197,32 +203,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       try {
         const response = await sendAssistantMessageRequest(content);
         if (response.status === "command_executed") {
-          setPendingAssistantMessages((prev) => {
-            const idx = prev.findIndex(
-              (message) =>
-                message.content === content && message.timestamp === timestamp,
-            );
-            if (idx < 0) {
-              return prev;
-            }
-            const next = [...prev];
-            next.splice(idx, 1);
-            return next;
-          });
+          setPendingAssistantMessages((prev) =>
+            removePendingAssistantMessage(prev, content, timestamp),
+          );
         }
       } catch (error) {
-        setPendingAssistantMessages((prev) => {
-          const idx = prev.findIndex(
-            (message) =>
-              message.content === content && message.timestamp === timestamp,
-          );
-          if (idx < 0) {
-            return prev;
-          }
-          const next = [...prev];
-          next.splice(idx, 1);
-          return next;
-        });
+        setPendingAssistantMessages((prev) =>
+          removePendingAssistantMessage(prev, content, timestamp),
+        );
         throw error;
       }
     },
@@ -230,12 +218,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   );
 
   const clearAgentHistory = useCallback((agentId: string) => {
-    setAgentHistories((prev) => {
-      if (!prev.has(agentId)) return prev;
-      const next = new Map(prev);
-      next.delete(agentId);
-      return next;
-    });
+    setAgentHistories((prev) => deleteMapEntry(prev, agentId));
   }, []);
 
   const onDisplayEvent = useCallback(() => {}, []);
@@ -271,20 +254,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         }
 
         if (removedNodeIdSet.size > 0) {
-          setAgentHistories((prev) => {
-            const next = new Map(prev);
-            for (const nodeId of removedNodeIdSet) {
-              next.delete(nodeId);
-            }
-            return next;
-          });
-          setStreamingDeltas((prev) => {
-            const next = new Map(prev);
-            for (const nodeId of removedNodeIdSet) {
-              next.delete(nodeId);
-            }
-            return next;
-          });
+          setAgentHistories((prev) => deleteMapEntries(prev, removedNodeIdSet));
+          setStreamingDeltas((prev) =>
+            deleteMapEntries(prev, removedNodeIdSet),
+          );
           setActiveMessages((prev) =>
             prev.filter(
               (message) =>
@@ -292,13 +265,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
                 !removedNodeIdSet.has(message.toId),
             ),
           );
-          setActiveToolCalls((prev) => {
-            const next = new Map(prev);
-            for (const nodeId of removedNodeIdSet) {
-              next.delete(nodeId);
-            }
-            return next;
-          });
+          setActiveToolCalls((prev) =>
+            deleteMapEntries(prev, removedNodeIdSet),
+          );
           setRecentActivities((prev) =>
             prev.filter((activity) => !removedNodeIdSet.has(activity.agentId)),
           );
@@ -336,11 +305,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           return next;
         });
         const timer = setTimeout(() => {
-          setActiveToolCalls((current) => {
-            const next = new Map(current);
-            next.delete(agentId);
-            return next;
-          });
+          setActiveToolCalls((current) => deleteMapEntry(current, agentId));
           toolTimers.current.delete(agentId);
         }, TOOL_CALL_ANIMATION_MS);
         toolTimers.current.set(agentId, timer);
@@ -364,30 +329,9 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           next.set(agentId, clearedAt);
           return next;
         });
-        setAgentHistories((prev) => {
-          if (!prev.has(agentId)) {
-            return prev;
-          }
-          const next = new Map(prev);
-          next.delete(agentId);
-          return next;
-        });
-        setStreamingDeltas((prev) => {
-          if (!prev.has(agentId)) {
-            return prev;
-          }
-          const next = new Map(prev);
-          next.delete(agentId);
-          return next;
-        });
-        setActiveToolCalls((prev) => {
-          if (!prev.has(agentId)) {
-            return prev;
-          }
-          const next = new Map(prev);
-          next.delete(agentId);
-          return next;
-        });
+        setAgentHistories((prev) => deleteMapEntry(prev, agentId));
+        setStreamingDeltas((prev) => deleteMapEntry(prev, agentId));
+        setActiveToolCalls((prev) => deleteMapEntry(prev, agentId));
         setRecentActivities((prev) =>
           prev.filter((activity) => activity.agentId !== agentId),
         );
@@ -457,70 +401,46 @@ export function AgentProvider({ children }: { children: ReactNode }) {
           entry.from_id === "human" &&
           entry.content
         ) {
-          setPendingAssistantMessages((prev) => {
-            const idx = prev.findIndex(
-              (message) => message.content === entry.content,
-            );
-            if (idx < 0) {
-              return prev;
-            }
-            const next = [...prev];
-            next.splice(idx, 1);
-            return next;
-          });
+          const pendingContent = entry.content;
+          setPendingAssistantMessages((prev) =>
+            removePendingAssistantMessage(prev, pendingContent),
+          );
         }
 
         if (
           entry.type === "AssistantText" ||
           entry.type === "AssistantThinking"
         ) {
-          setStreamingDeltas((prev) => {
-            const list = prev.get(event.agent_id);
-            if (!list || list.length === 0) return prev;
-            const next = new Map(prev);
-            const filtered = list.filter(
+          setStreamingDeltas((prev) =>
+            filterStreamingDeltas(
+              prev,
+              event.agent_id,
               (delta) =>
                 delta.type !== "ContentDelta" && delta.type !== "ThinkingDelta",
-            );
-            if (filtered.length === 0) {
-              next.delete(event.agent_id);
-            } else {
-              next.set(event.agent_id, filtered);
-            }
-            return next;
-          });
+            ),
+          );
         } else if (
           entry.type === "ToolCall" &&
           entry.tool_call_id &&
           !entry.streaming
         ) {
-          setStreamingDeltas((prev) => {
-            const list = prev.get(event.agent_id);
-            if (!list || list.length === 0) return prev;
-            const next = new Map(prev);
-            const filtered = list.filter(
+          setStreamingDeltas((prev) =>
+            filterStreamingDeltas(
+              prev,
+              event.agent_id,
               (delta) =>
                 !(
                   delta.type === "ToolResultDelta" &&
                   delta.tool_call_id === entry.tool_call_id
                 ),
-            );
-            if (filtered.length === 0) {
-              next.delete(event.agent_id);
-            } else {
-              next.set(event.agent_id, filtered);
-            }
-            return next;
-          });
+            ),
+          );
         } else if (
           (entry.type === "SentMessage" || entry.type === "ReceivedMessage") &&
           entry.message_id
         ) {
-          setStreamingDeltas((prev) => {
-            const list = prev.get(event.agent_id);
-            if (!list || list.length === 0) return prev;
-            const next = new Map(prev);
-            const filtered = list.filter((delta) => {
+          setStreamingDeltas((prev) =>
+            filterStreamingDeltas(prev, event.agent_id, (delta) => {
               if (delta.type === "SentMessageDelta") {
                 return delta.message_id !== entry.message_id;
               }
@@ -528,14 +448,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
                 return delta.message_id !== entry.message_id;
               }
               return true;
-            });
-            if (filtered.length === 0) {
-              next.delete(event.agent_id);
-            } else {
-              next.set(event.agent_id, filtered);
-            }
-            return next;
-          });
+            }),
+          );
         }
 
         setAgentHistories((prev) => {

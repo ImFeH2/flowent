@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
 import { useRef, type CSSProperties } from "react";
@@ -29,7 +30,7 @@ interface AgentNodeData {
   [key: string]: unknown;
 }
 
-export function AgentNode({ data }: NodeProps) {
+export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
   const {
     label,
     node_type,
@@ -196,4 +197,4 @@ export function AgentNode({ data }: NodeProps) {
       />
     </motion.div>
   );
-}
+});

@@ -24,7 +24,7 @@ interface HistoryViewProps {
   nodes?: Map<string, Node>;
 }
 
-export function HistoryView({
+export const HistoryView = memo(function HistoryView({
   agentLabel = "Agent",
   history,
   nodes,
@@ -41,7 +41,7 @@ export function HistoryView({
       ))}
     </div>
   );
-}
+});
 
 function MarkdownOrJsonBlock({
   content,

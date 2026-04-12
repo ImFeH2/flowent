@@ -5,110 +5,24 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     from app.agent import Agent
-    from app.settings import ModelParams, RoleConfig, RoleModelConfig
 
+from app.role_management import (
+    apply_role_update,
+    build_role_config,
+    ensure_role_name_available,
+    find_role_by_name,
+    normalize_optional_role_description,
+    normalize_optional_role_name,
+    remove_role,
+    require_role_description,
+    require_role_name,
+    resolve_role_model,
+    resolve_role_model_params,
+    resolve_role_tool_config,
+    sync_running_system_roles,
+    validate_builtin_role_update,
+)
 from app.tools import Tool
-
-
-def _find_role_by_name(roles: list[RoleConfig], role_name: str) -> RoleConfig | None:
-    for role in roles:
-        if role.name == role_name:
-            return role
-    return None
-
-
-def _sync_running_system_roles() -> None:
-    from app.graph_service import sync_assistant_role, sync_tab_leaders
-
-    sync_assistant_role(reason="assistant role updated")
-    sync_tab_leaders(reason="leader role updated")
-
-
-def _resolve_role_model(
-    requested: object,
-    *,
-    current: RoleModelConfig | None,
-    provided: bool,
-) -> tuple[RoleModelConfig | None, str | None]:
-    from app.settings import RoleModelConfig, find_provider, get_settings
-
-    if not provided:
-        return current, None
-    if requested is None:
-        return None, None
-    if not isinstance(requested, dict):
-        return None, "model must be an object or null"
-
-    provider_id = requested.get("provider_id")
-    model = requested.get("model")
-
-    if not isinstance(provider_id, str) or not provider_id.strip():
-        return None, "model.provider_id must be a non-empty string"
-    if not isinstance(model, str) or not model.strip():
-        return None, "model.model must be a non-empty string"
-    if find_provider(get_settings(), provider_id.strip()) is None:
-        return None, f"Provider '{provider_id.strip()}' not found"
-
-    return (
-        RoleModelConfig(
-            provider_id=provider_id.strip(),
-            model=model.strip(),
-        ),
-        None,
-    )
-
-
-def _resolve_role_model_params(
-    requested: object,
-    *,
-    current: ModelParams | None,
-    provided: bool,
-) -> tuple[ModelParams | None, str | None]:
-    from app.settings import build_model_params_from_mapping
-
-    if not provided:
-        return current, None
-
-    try:
-        return build_model_params_from_mapping(requested), None
-    except ValueError as exc:
-        return None, str(exc)
-
-
-def _enforce_builtin_role_guards(
-    role: RoleConfig,
-    *,
-    new_name: str | None,
-    description: str | None,
-    system_prompt: str | None,
-    next_included_tools: list[str],
-    next_excluded_tools: list[str],
-) -> str | None:
-    from app.settings import is_builtin_role_name
-
-    if not is_builtin_role_name(role.name):
-        return None
-    if new_name is not None and new_name != role.name:
-        return f"Cannot rename built-in role '{role.name}'"
-    if description is not None and description != role.description:
-        return (
-            f"Cannot modify built-in role '{role.name}' fields other than "
-            "model or model_params"
-        )
-    if system_prompt is not None and system_prompt != role.system_prompt:
-        return (
-            f"Cannot modify built-in role '{role.name}' fields other than "
-            "model or model_params"
-        )
-    if (
-        next_included_tools != role.included_tools
-        or next_excluded_tools != role.excluded_tools
-    ):
-        return (
-            f"Cannot modify built-in role '{role.name}' fields other than "
-            "model or model_params"
-        )
-    return None
 
 
 class ManageRolesTool(Tool):
@@ -187,15 +101,10 @@ class ManageRolesTool(Tool):
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         from app.providers.gateway import gateway
         from app.settings import (
-            RoleConfig,
-            clear_role_references,
             get_settings,
             is_builtin_role_name,
-            normalize_tool_names,
-            rename_role_references,
             save_settings,
             serialize_role,
-            validate_role_tool_config,
         )
 
         action = args.get("action")
@@ -236,42 +145,38 @@ class ManageRolesTool(Tool):
             return json.dumps([serialize_role(role) for role in settings.roles])
 
         if action == "create":
-            if not isinstance(role_name, str) or not role_name.strip():
-                return json.dumps({"error": "Role name is required"})
-            if not isinstance(description, str) or not description.strip():
-                return json.dumps({"error": "Role description is required"})
             if not isinstance(system_prompt, str):
                 return json.dumps({"error": "system_prompt is required"})
-            if _find_role_by_name(settings.roles, role_name.strip()) is not None:
-                return json.dumps(
-                    {"error": f"Role '{role_name.strip()}' already exists"}
-                )
-
-            next_included = normalize_tool_names(included_tools or [])
-            next_excluded = normalize_tool_names(excluded_tools or [])
             try:
-                validate_role_tool_config(next_included, next_excluded)
+                name = require_role_name(role_name or "")
+                description_text = require_role_description(description or "")
+                ensure_role_name_available(settings.roles, name)
+                next_included, next_excluded = resolve_role_tool_config(
+                    None,
+                    included_tools,
+                    excluded_tools,
+                )
+                next_model = resolve_role_model(
+                    role_model,
+                    settings=settings,
+                    current=None,
+                    provided="model" in args,
+                    invalid_type_error="model must be an object or null",
+                    missing_provider_id_error=(
+                        "model.provider_id must be a non-empty string"
+                    ),
+                    missing_model_error="model.model must be a non-empty string",
+                )
+                next_model_params = resolve_role_model_params(
+                    role_model_params,
+                    current=None,
+                    provided="model_params" in args,
+                )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
-
-            next_model, role_model_error = _resolve_role_model(
-                role_model,
-                current=None,
-                provided="model" in args,
-            )
-            if role_model_error is not None:
-                return json.dumps({"error": role_model_error})
-            next_model_params, role_model_params_error = _resolve_role_model_params(
-                role_model_params,
-                current=None,
-                provided="model_params" in args,
-            )
-            if role_model_params_error is not None:
-                return json.dumps({"error": role_model_params_error})
-
-            new_role = RoleConfig(
-                name=role_name.strip(),
-                description=description.strip(),
+            new_role = build_role_config(
+                name=name,
+                description=description_text,
                 system_prompt=system_prompt,
                 model=next_model,
                 model_params=next_model_params,
@@ -287,85 +192,65 @@ class ManageRolesTool(Tool):
             if not isinstance(role_name, str) or not role_name:
                 return json.dumps({"error": "name is required"})
 
-            target_role = _find_role_by_name(settings.roles, role_name)
+            target_role = find_role_by_name(settings.roles, role_name)
             if target_role is None:
                 return json.dumps({"error": f"Role '{role_name}' not found"})
 
-            next_included = normalize_tool_names(
-                included_tools
-                if included_tools is not None
-                else target_role.included_tools
-            )
-            next_excluded = normalize_tool_names(
-                excluded_tools
-                if excluded_tools is not None
-                else target_role.excluded_tools
-            )
             try:
-                validate_role_tool_config(next_included, next_excluded)
+                next_included, next_excluded = resolve_role_tool_config(
+                    target_role,
+                    included_tools,
+                    excluded_tools,
+                )
+                next_model = resolve_role_model(
+                    role_model,
+                    settings=settings,
+                    current=target_role.model,
+                    provided="model" in args,
+                    invalid_type_error="model must be an object or null",
+                    missing_provider_id_error=(
+                        "model.provider_id must be a non-empty string"
+                    ),
+                    missing_model_error="model.model must be a non-empty string",
+                )
+                next_model_params = resolve_role_model_params(
+                    role_model_params,
+                    current=target_role.model_params,
+                    provided="model_params" in args,
+                )
+                stripped_name = normalize_optional_role_name(new_name)
+                stripped_description = normalize_optional_role_description(description)
+                if stripped_name is not None:
+                    ensure_role_name_available(
+                        settings.roles,
+                        stripped_name,
+                        current_name=target_role.name,
+                    )
+                validate_builtin_role_update(
+                    target_role,
+                    next_name=stripped_name,
+                    next_description=stripped_description,
+                    next_system_prompt=system_prompt,
+                    next_included_tools=next_included,
+                    next_excluded_tools=next_excluded,
+                )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
-
-            next_model, role_model_error = _resolve_role_model(
-                role_model,
-                current=target_role.model,
-                provided="model" in args,
-            )
-            if role_model_error is not None:
-                return json.dumps({"error": role_model_error})
-            next_model_params, role_model_params_error = _resolve_role_model_params(
-                role_model_params,
-                current=target_role.model_params,
-                provided="model_params" in args,
-            )
-            if role_model_params_error is not None:
-                return json.dumps({"error": role_model_params_error})
-
-            stripped_name = None
-            if new_name is not None:
-                stripped_name = new_name.strip()
-                if not stripped_name:
-                    return json.dumps({"error": "Role name is required"})
-                if any(
-                    other.name == stripped_name and other.name != target_role.name
-                    for other in settings.roles
-                ):
-                    return json.dumps(
-                        {"error": f"Role '{stripped_name}' already exists"}
-                    )
-            stripped_description = None
-            if description is not None:
-                stripped_description = description.strip()
-                if not stripped_description:
-                    return json.dumps({"error": "Role description is required"})
-
-            builtin_error = _enforce_builtin_role_guards(
-                target_role,
-                new_name=stripped_name,
-                description=stripped_description,
-                system_prompt=system_prompt,
+            target_role = apply_role_update(
+                settings=settings,
+                role=target_role,
+                next_name=stripped_name,
+                next_description=stripped_description,
+                next_system_prompt=system_prompt,
+                next_model=next_model,
+                update_model="model" in args,
+                next_model_params=next_model_params,
+                update_model_params="model_params" in args,
                 next_included_tools=next_included,
                 next_excluded_tools=next_excluded,
             )
-            if builtin_error is not None:
-                return json.dumps({"error": builtin_error})
-
-            previous_name = target_role.name
-            if stripped_name is not None:
-                target_role.name = stripped_name
-                rename_role_references(settings, previous_name, target_role.name)
-            if stripped_description is not None:
-                target_role.description = stripped_description
-            if system_prompt is not None:
-                target_role.system_prompt = system_prompt
-            if "model" in args:
-                target_role.model = next_model
-            if "model_params" in args:
-                target_role.model_params = next_model_params
-            target_role.included_tools = next_included
-            target_role.excluded_tools = next_excluded
             save_settings(settings)
-            _sync_running_system_roles()
+            sync_running_system_roles()
             gateway.invalidate_cache()
             return json.dumps(serialize_role(target_role))
 
@@ -377,16 +262,13 @@ class ManageRolesTool(Tool):
                     {"error": f"Cannot delete built-in role '{role_name}'"}
                 )
 
-            target_role = _find_role_by_name(settings.roles, role_name)
+            target_role = find_role_by_name(settings.roles, role_name)
             if target_role is None:
                 return json.dumps({"error": f"Role '{role_name}' not found"})
 
-            settings.roles = [
-                existing for existing in settings.roles if existing != target_role
-            ]
-            clear_role_references(settings, role_name)
+            remove_role(settings, target_role)
             save_settings(settings)
-            _sync_running_system_roles()
+            sync_running_system_roles()
             gateway.invalidate_cache()
             return json.dumps({"status": "deleted"})
 

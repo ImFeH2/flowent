@@ -60,7 +60,7 @@ interface AssistantChatComposerProps {
   variant: AssistantChatVariant;
 }
 
-export function AssistantChatMessages({
+export const AssistantChatMessages = memo(function AssistantChatMessages({
   bottomInset = 0,
   scrollRef,
   items,
@@ -115,7 +115,7 @@ export function AssistantChatMessages({
       ) : null}
     </div>
   );
-}
+});
 
 export function AssistantChatComposer({
   busy = false,

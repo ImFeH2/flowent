@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import { motion } from "motion/react";
 import { Edit2, Eye, Plus, RefreshCw, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
@@ -9,7 +10,6 @@ import {
   fetchRolesBootstrap,
   updateRole,
   type ModelOption,
-  type ToolInfo,
 } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
 import {
@@ -41,7 +41,7 @@ import {
   modelParamsToPayload,
 } from "@/lib/modelParams";
 import { cn } from "@/lib/utils";
-import type { Provider, Role, RoleModelConfig } from "@/types";
+import type { Role, RoleModelConfig } from "@/types";
 
 type RoleDraft = Omit<Role, "is_builtin">;
 type ToolState = "allowed" | "included" | "excluded";
@@ -60,10 +60,6 @@ const emptyDraft = (): RoleDraft => ({
 });
 
 export function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [tools, setTools] = useState<ToolInfo[]>([]);
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [loading, setLoading] = useState(true);
   const [panelMode, setPanelMode] = useState<PanelMode | null>(null);
   const [activeRoleName, setActiveRoleName] = useState<string | null>(null);
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
@@ -75,6 +71,25 @@ export function RolesPage() {
   const [loadingModelProviderId, setLoadingModelProviderId] = useState<
     string | null
   >(null);
+
+  const {
+    data: bootstrapData,
+    isLoading: loading,
+    mutate: mutateRolesBootstrap,
+  } = useSWR("rolesBootstrap", fetchRolesBootstrap);
+
+  const roles = useMemo(
+    () => bootstrapData?.roles ?? [],
+    [bootstrapData?.roles],
+  );
+  const tools = useMemo(
+    () => bootstrapData?.tools ?? [],
+    [bootstrapData?.tools],
+  );
+  const providers = useMemo(
+    () => bootstrapData?.providers ?? [],
+    [bootstrapData?.providers],
+  );
 
   const configurableTools = useMemo(
     () => tools.filter((tool) => !MINIMUM_TOOLS.has(tool.name)),
@@ -91,26 +106,8 @@ export function RolesPage() {
     : [];
 
   const refreshRoles = async () => {
-    setLoading(true);
-    try {
-      const {
-        roles: roleItems,
-        tools: toolItems,
-        providers: providerItems,
-      } = await fetchRolesBootstrap();
-      setRoles(roleItems);
-      setTools(toolItems);
-      setProviders(providerItems);
-    } catch {
-      toast.error("Failed to load roles");
-    } finally {
-      setLoading(false);
-    }
+    await mutateRolesBootstrap();
   };
-
-  useEffect(() => {
-    void refreshRoles();
-  }, []);
 
   useEffect(() => {
     const providerId = draft.model?.provider_id;
@@ -308,13 +305,27 @@ export function RolesPage() {
             }
           : nextDraft;
         const updated = await updateRole(activeRoleName, updates);
-        setRoles((prev) =>
-          prev.map((role) => (role.name === activeRoleName ? updated : role)),
+        void mutateRolesBootstrap(
+          {
+            roles: roles.map((role) =>
+              role.name === activeRoleName ? updated : role,
+            ),
+            tools,
+            providers,
+          },
+          false,
         );
         toast.success("Role updated");
       } else {
         const created = await createRole(nextDraft);
-        setRoles((prev) => [created, ...prev]);
+        void mutateRolesBootstrap(
+          {
+            roles: [created, ...roles],
+            tools,
+            providers,
+          },
+          false,
+        );
         toast.success("Role created");
       }
       handleCancel();
@@ -333,7 +344,14 @@ export function RolesPage() {
     setRoleToDelete(null);
     try {
       await deleteRole(name);
-      setRoles((prev) => prev.filter((role) => role.name !== name));
+      void mutateRolesBootstrap(
+        {
+          roles: roles.filter((role) => role.name !== name),
+          tools,
+          providers,
+        },
+        false,
+      );
       if (activeRoleName === name) {
         handleCancel();
       }

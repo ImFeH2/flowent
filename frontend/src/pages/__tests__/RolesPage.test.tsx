@@ -81,7 +81,10 @@ describe("RolesPage", () => {
 
     render(<RolesPage />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "New Role" }));
+    const newRoleButtons = await screen.findAllByRole("button", {
+      name: "New Role",
+    });
+    fireEvent.click(newRoleButtons[0]);
 
     const createButton = screen.getByRole("button", { name: "Create Role" });
     fireEvent.change(screen.getByPlaceholderText("e.g., Code Reviewer"), {

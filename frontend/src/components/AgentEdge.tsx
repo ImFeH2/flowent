@@ -1,7 +1,8 @@
+import { memo } from "react";
 import { motion } from "motion/react";
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
 
-export function AgentEdge(props: EdgeProps) {
+export const AgentEdge = memo(function AgentEdge(props: EdgeProps) {
   const {
     sourceX,
     sourceY,
@@ -148,4 +149,4 @@ export function AgentEdge(props: EdgeProps) {
       )}
     </motion.g>
   );
-}
+});

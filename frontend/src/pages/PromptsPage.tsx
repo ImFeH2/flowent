@@ -1,45 +1,37 @@
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageScaffold } from "@/components/layout/PageScaffold";
 import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
 
 export function PromptsPage() {
+  const {
+    data,
+    isLoading: loading,
+    mutate,
+  } = useSWR("promptSettings", fetchPromptSettings);
+
   const [customPrompt, setCustomPrompt] = useState("");
   const [customPostPrompt, setCustomPostPrompt] = useState("");
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
-    fetchPromptSettings()
-      .then((data) => {
-        if (!mounted) return;
-        setCustomPrompt(data.custom_prompt);
-        setCustomPostPrompt(data.custom_post_prompt);
-      })
-      .catch(() => {
-        toast.error("Failed to load prompts");
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (data) {
+      setCustomPrompt(data.custom_prompt);
+      setCustomPostPrompt(data.custom_post_prompt);
+    }
+  }, [data]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const saved = await savePromptSettings({
+      const payload = {
         custom_prompt: customPrompt,
         custom_post_prompt: customPostPrompt,
-      });
-      setCustomPrompt(saved.custom_prompt);
-      setCustomPostPrompt(saved.custom_post_prompt);
+      };
+      const saved = await savePromptSettings(payload);
+      void mutate(saved, false);
       toast.success("Prompts saved");
     } catch {
       toast.error("Failed to save prompts");

@@ -10,7 +10,9 @@ import {
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Edge as FlowEdge, Node as FlowNode } from "@xyflow/react";
 import { AgentGraph } from "@/components/AgentGraph";
+import { getLayoutedElements } from "@/lib/layout";
 import type { Node, TaskTab } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
@@ -21,6 +23,36 @@ const useAgentActivityRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
 const reactFlowPropsMock = vi.fn();
 const resizeObservers: ResizeObserverMock[] = [];
+const defaultWorker = globalThis.Worker;
+
+class DeferredWorkerMock {
+  static instances: DeferredWorkerMock[] = [];
+  onmessage: ((ev: MessageEvent) => void) | null = null;
+  messages: Array<{ nodes: FlowNode[]; edges: FlowEdge[]; key: string }> = [];
+
+  constructor() {
+    DeferredWorkerMock.instances.push(this);
+  }
+
+  postMessage(data: { nodes: FlowNode[]; edges: FlowEdge[]; key: string }) {
+    this.messages.push(data);
+  }
+
+  flush(index: number) {
+    const message = this.messages[index];
+    if (!message || !this.onmessage) {
+      return;
+    }
+    const layouted = getLayoutedElements(message.nodes, message.edges);
+    const positions = layouted.nodes.map((node) => ({
+      id: node.id,
+      position: node.position,
+    }));
+    this.onmessage({ data: { positions, key: message.key } } as MessageEvent);
+  }
+
+  terminate() {}
+}
 
 class ResizeObserverMock {
   callback: ResizeObserverCallback;
@@ -245,6 +277,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.stubGlobal("Worker", defaultWorker);
+  DeferredWorkerMock.instances.splice(0, DeferredWorkerMock.instances.length);
 });
 
 describe("AgentGraph", () => {
@@ -612,6 +646,112 @@ describe("AgentGraph", () => {
     expect(leaderNode).toBeDefined();
     expect(workerNode).toBeDefined();
     expect(workerNode?.position.y).toBe(leaderNode?.position.y);
+  });
+
+  it("ignores stale worker layout results after structure changes", async () => {
+    vi.stubGlobal("Worker", DeferredWorkerMock as unknown as typeof Worker);
+
+    const view = renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Planner",
+        connections: [],
+      }),
+    ]);
+
+    const worker = DeferredWorkerMock.instances[0];
+    expect(worker).toBeDefined();
+    expect(worker?.messages).toHaveLength(1);
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map(
+        [
+          buildNode({
+            id: "worker-1",
+            role_name: "Planner",
+            connections: ["worker-2"],
+          }),
+          buildNode({
+            id: "worker-2",
+            role_name: "Reviewer",
+            connections: [],
+          }),
+        ].map((node) => [node.id, node] as const),
+      ),
+    });
+
+    view.rerender(<AgentGraph />);
+
+    await waitFor(() => {
+      expect(worker?.messages).toHaveLength(2);
+    });
+
+    act(() => {
+      worker?.flush(1);
+    });
+
+    await waitFor(() => {
+      const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
+        | {
+            nodes: Array<{ id: string; position: { x: number; y: number } }>;
+          }
+        | undefined;
+      const plannerNode = latestProps?.nodes.find(
+        (node) => node.id === "worker-1",
+      );
+      const reviewerNode = latestProps?.nodes.find(
+        (node) => node.id === "worker-2",
+      );
+      expect(reviewerNode?.position.y ?? 0).toBeGreaterThan(
+        plannerNode?.position.y ?? 0,
+      );
+    });
+
+    const renderCountAfterFreshLayout = reactFlowPropsMock.mock.calls.length;
+
+    act(() => {
+      worker?.flush(0);
+    });
+
+    await waitFor(() => {
+      expect(reactFlowPropsMock.mock.calls).toHaveLength(
+        renderCountAfterFreshLayout,
+      );
+    });
+  });
+
+  it("does not repost layout work for state-only rerenders while a layout is pending", async () => {
+    vi.stubGlobal("Worker", DeferredWorkerMock as unknown as typeof Worker);
+
+    const view = renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+        state: "idle",
+      }),
+    ]);
+
+    const worker = DeferredWorkerMock.instances[0];
+    expect(worker).toBeDefined();
+    expect(worker?.messages).toHaveLength(1);
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map(
+        [
+          buildNode({
+            id: "worker-1",
+            role_name: "Worker",
+            state: "running",
+          }),
+        ].map((node) => [node.id, node] as const),
+      ),
+    });
+
+    view.rerender(<AgentGraph />);
+
+    await waitFor(() => {
+      expect(worker?.messages).toHaveLength(1);
+    });
   });
 
   it("keeps removed nodes briefly for exit transitions before unmounting them", () => {

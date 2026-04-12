@@ -219,6 +219,7 @@ export function AgentGraph() {
   );
   const [connecting, setConnecting] = useState(false);
   const layoutWorker = useRef<Worker | null>(null);
+  const requestedLayoutKey = useRef("");
   const [layoutState, setLayoutState] = useState<{
     key: string;
     positions: Map<string, { x: number; y: number }>;
@@ -231,6 +232,9 @@ export function AgentGraph() {
     );
     worker.onmessage = (event) => {
       const { positions, key } = event.data;
+      if (key !== requestedLayoutKey.current) {
+        return;
+      }
       const map = new Map<string, { x: number; y: number }>();
       for (const pos of positions) {
         map.set(pos.id, pos.position);
@@ -390,14 +394,20 @@ export function AgentGraph() {
   }, [activeTabId, transientData, visibleAgents]);
 
   useEffect(() => {
-    if (layoutState.key !== structureKey && rawNodes.length > 0) {
-      layoutWorker.current?.postMessage({
-        nodes: rawNodes,
-        edges: baseEdges,
-        key: structureKey,
-      });
+    if (rawNodes.length === 0) {
+      requestedLayoutKey.current = "";
+      return;
     }
-  }, [structureKey, rawNodes, baseEdges, layoutState.key]);
+    if (requestedLayoutKey.current === structureKey) {
+      return;
+    }
+    requestedLayoutKey.current = structureKey;
+    layoutWorker.current?.postMessage({
+      nodes: rawNodes,
+      edges: baseEdges,
+      key: structureKey,
+    });
+  }, [structureKey, rawNodes, baseEdges]);
 
   const graphElements = useMemo(() => {
     const positions = layoutState.positions;

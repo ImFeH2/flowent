@@ -49,5 +49,7 @@ class WorkerMock {
 }
 
 Object.defineProperty(globalThis, "Worker", {
+  configurable: true,
+  writable: true,
   value: WorkerMock,
 });

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useMemo, useState, type ComponentType } from "react";
+import useSWR from "swr";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Clock,
@@ -107,17 +108,10 @@ function ToolCard({
 }
 
 export function ToolsPage() {
-  const [tools, setTools] = useState<ToolInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: tools = [], isLoading: loading } = useSWR("tools", fetchTools);
+
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    fetchTools()
-      .then((items) => setTools(items))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const filteredTools = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();

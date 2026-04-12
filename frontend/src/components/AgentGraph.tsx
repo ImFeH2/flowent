@@ -24,11 +24,7 @@ import { AgentEdge } from "@/components/AgentEdge";
 import { AgentNode } from "@/components/AgentNode";
 import { AgentTooltip } from "@/components/AgentTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
-import {
-  AGENT_NODE_HEIGHT,
-  getAgentNodeWidth,
-  getLayoutedElements,
-} from "@/lib/layout";
+import { AGENT_NODE_HEIGHT, getAgentNodeWidth } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import {
   useAgentActivityRuntime,
@@ -222,6 +218,29 @@ export function AgentGraph() {
     null,
   );
   const [connecting, setConnecting] = useState(false);
+  const layoutWorker = useRef<Worker | null>(null);
+  const [layoutState, setLayoutState] = useState<{
+    key: string;
+    positions: Map<string, { x: number; y: number }>;
+  }>({ key: "", positions: new Map() });
+
+  useEffect(() => {
+    const worker = new Worker(
+      new URL("../lib/layout.worker.ts", import.meta.url),
+      { type: "module" },
+    );
+    worker.onmessage = (event) => {
+      const { positions, key } = event.data;
+      const map = new Map<string, { x: number; y: number }>();
+      for (const pos of positions) {
+        map.set(pos.id, pos.position);
+      }
+      setLayoutState({ key, positions: map });
+    };
+    layoutWorker.current = worker;
+    return () => worker.terminate();
+  }, []);
+
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const lastViewportStructureKey = useRef<string | null>(null);
@@ -320,7 +339,7 @@ export function AgentGraph() {
     visibleAgents,
   ]);
 
-  const graphElements = useMemo(() => {
+  const { rawNodes, baseEdges, structureKey } = useMemo(() => {
     const visibleAgentIds = new Set<string>();
     for (let i = 0; i < visibleAgents.length; i++)
       visibleAgentIds.add(visibleAgents[i].id);
@@ -353,13 +372,35 @@ export function AgentGraph() {
       ];
     });
 
-    const layouted =
-      rawNodes.length > 0
-        ? getLayoutedElements(rawNodes, baseEdges)
-        : { nodes: [] as FlowNode[], edges: baseEdges };
-    const positions = new Map(
-      layouted.nodes.map((node) => [node.id, node.position] as const),
-    );
+    const structureKey = `${activeTabId ?? "unassigned"}:${visibleAgents
+      .map((agent) => {
+        const data = transientData.get(agent.id);
+        return `${agent.id}:${data?.label ?? ""}:${agent.connections
+          .filter((targetId) => visibleAgentIds.has(targetId))
+          .sort()
+          .join(",")}`;
+      })
+      .sort()
+      .join("|")}:${baseEdges
+      .map((edge) => edge.id)
+      .sort()
+      .join("|")}`;
+
+    return { rawNodes, baseEdges, structureKey };
+  }, [activeTabId, transientData, visibleAgents]);
+
+  useEffect(() => {
+    if (layoutState.key !== structureKey && rawNodes.length > 0) {
+      layoutWorker.current?.postMessage({
+        nodes: rawNodes,
+        edges: baseEdges,
+        key: structureKey,
+      });
+    }
+  }, [structureKey, rawNodes, baseEdges, layoutState.key]);
+
+  const graphElements = useMemo(() => {
+    const positions = layoutState.positions;
     const nodes = rawNodes.map((node) => ({
       ...node,
       position: positions.get(node.id) ?? { x: 0, y: 0 },
@@ -377,24 +418,14 @@ export function AgentGraph() {
       } satisfies FlowEdge;
     });
 
-    return {
-      nodes,
-      edges,
-      structureKey: `${activeTabId ?? "unassigned"}:${visibleAgents
-        .map((agent) => {
-          const data = transientData.get(agent.id);
-          return `${agent.id}:${data?.label ?? ""}:${agent.connections
-            .filter((targetId) => visibleAgentIds.has(targetId))
-            .sort()
-            .join(",")}`;
-        })
-        .sort()
-        .join("|")}:${edges
-        .map((edge) => edge.id)
-        .sort()
-        .join("|")}`,
-    };
-  }, [activeEdgeMessages, activeTabId, transientData, visibleAgents]);
+    return { nodes, edges, structureKey };
+  }, [
+    rawNodes,
+    baseEdges,
+    layoutState.positions,
+    activeEdgeMessages,
+    structureKey,
+  ]);
 
   const { nodes: animatedNodes, edges: animatedEdges } =
     useTransientGraphElements(graphElements.nodes, graphElements.edges);

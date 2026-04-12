@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
 import { Check, Eye, EyeOff, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -36,25 +37,16 @@ function getChatLabel(
 }
 
 export function ChannelsPage() {
-  const [settings, setSettings] = useState<TelegramSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: settings,
+    isLoading: loading,
+    mutate,
+  } = useSWR("telegramSettings", fetchTelegramSettings);
+
   const [saving, setSaving] = useState(false);
   const [showToken, setShowToken] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
   const [tokenDirty, setTokenDirty] = useState(false);
-
-  useEffect(() => {
-    void fetchTelegramSettings()
-      .then((data) => {
-        setSettings(data);
-      })
-      .catch(() => {
-        toast.error("Failed to load Telegram settings");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
 
   const configured = useMemo(
     () => Boolean(settings?.bot_token),
@@ -74,7 +66,7 @@ export function ChannelsPage() {
       }
 
       const result = await updateTelegramSettings(payload);
-      setSettings(result.telegram);
+      void mutate(result.telegram, false);
       setTokenInput("");
       setTokenDirty(false);
       toast.success("Telegram settings saved");
@@ -88,7 +80,7 @@ export function ChannelsPage() {
   const handleApprove = async (chatId: number) => {
     try {
       const result = await approveTelegramChat(chatId);
-      setSettings(result.telegram);
+      void mutate(result.telegram, false);
       toast.success("Telegram chat approved");
     } catch {
       toast.error("Failed to approve Telegram chat");
@@ -98,7 +90,7 @@ export function ChannelsPage() {
   const handleReject = async (chatId: number) => {
     try {
       const result = await deletePendingTelegramChat(chatId);
-      setSettings(result.telegram);
+      void mutate(result.telegram, false);
       toast.success("Pending Telegram chat removed");
     } catch {
       toast.error("Failed to remove pending Telegram chat");
@@ -108,7 +100,7 @@ export function ChannelsPage() {
   const handleRevoke = async (chatId: number) => {
     try {
       const result = await deleteTelegramChat(chatId);
-      setSettings(result.telegram);
+      void mutate(result.telegram, false);
       toast.success("Approved Telegram chat removed");
     } catch {
       toast.error("Failed to remove approved Telegram chat");

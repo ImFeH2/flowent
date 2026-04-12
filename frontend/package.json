@@ -31,6 +31,7 @@
     "react-rnd": "^10.5.2",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
+    "swr": "^2.4.1",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.18"
   },

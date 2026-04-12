@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import useSWR from "swr";
 import { motion } from "motion/react";
 import {
   Check,
@@ -64,8 +65,6 @@ const emptyDraft = (): ProviderDraft => ({
 });
 
 export function ProvidersPage() {
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [draft, setDraft] = useState<ProviderDraft>(emptyDraft());
@@ -74,6 +73,20 @@ export function ProvidersPage() {
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(
     null,
   );
+
+  const {
+    data: providers = [],
+    isLoading: loading,
+    mutate: mutateProviders,
+  } = useSWR("providers", fetchProviders, {
+    onSuccess: (items) => {
+      if (selectedId && !items.find((p) => p.id === selectedId)) {
+        setSelectedId(null);
+        setIsCreating(false);
+      }
+    },
+  });
+
   const [panelWidth, setPanelWidth] = usePanelWidth(
     "providers-panel-width",
     300,
@@ -97,24 +110,8 @@ export function ProvidersPage() {
   );
 
   const refreshProviders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const items = await fetchProviders();
-      setProviders(items);
-      if (selectedId && !items.find((p) => p.id === selectedId)) {
-        setSelectedId(null);
-        setIsCreating(false);
-      }
-    } catch {
-      toast.error("Failed to load providers");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedId]);
-
-  useEffect(() => {
-    void refreshProviders();
-  }, [refreshProviders]);
+    await mutateProviders();
+  }, [mutateProviders]);
 
   const handleSelect = (provider: Provider) => {
     setSelectedId(provider.id);
@@ -184,7 +181,7 @@ export function ProvidersPage() {
     try {
       if (isCreating) {
         const created = await createProvider(payload);
-        setProviders((prev) => [...prev, created]);
+        void mutateProviders([...providers, created], false);
         setIsCreating(false);
         setSelectedId(created.id);
         setDraft({
@@ -198,8 +195,9 @@ export function ProvidersPage() {
         toast.success("Provider created");
       } else if (selectedId) {
         const updated = await updateProvider(selectedId, payload);
-        setProviders((prev) =>
-          prev.map((p) => (p.id === selectedId ? updated : p)),
+        void mutateProviders(
+          providers.map((p) => (p.id === selectedId ? updated : p)),
+          false,
         );
         setDraft({
           name: updated.name,
@@ -226,7 +224,10 @@ export function ProvidersPage() {
     setProviderToDelete(null);
     try {
       await deleteProvider(id);
-      setProviders((prev) => prev.filter((p) => p.id !== id));
+      void mutateProviders(
+        providers.filter((p) => p.id !== id),
+        false,
+      );
       if (selectedId === id) {
         setSelectedId(null);
         setDraft(emptyDraft());

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import { RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -24,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
-import type { ModelParams, Provider, RetryPolicy, Role } from "@/types";
+import type { ModelParams, RetryPolicy } from "@/types";
 
 const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
   { value: "no_retry", label: "No retry" },
@@ -73,14 +74,35 @@ function normalizeWriteDirs(writeDirs: string[]): string[] {
 }
 
 export function SettingsPage() {
-  const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
+  const {
+    data: bootstrapData,
+    isLoading: loading,
+    mutate: mutateSettings,
+  } = useSWR("settingsBootstrap", () => fetchSettingsBootstrap<UserSettings>());
+
+  const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [models, setModels] = useState<ModelOption[]>([]);
-  const [appVersion, setAppVersion] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
+
+  const providers = useMemo(
+    () => bootstrapData?.providers ?? [],
+    [bootstrapData?.providers],
+  );
+  const roles = useMemo(
+    () => bootstrapData?.roles ?? [],
+    [bootstrapData?.roles],
+  );
+  const appVersion = bootstrapData?.version ?? null;
+
+  // Sync local settings when bootstrap data loads
+  useEffect(() => {
+    if (bootstrapData?.settings && !localSettings) {
+      setLocalSettings(bootstrapData.settings);
+    }
+  }, [bootstrapData?.settings, localSettings]);
+
+  const settings = localSettings ?? bootstrapData?.settings ?? null;
 
   const activeProvider = useMemo(() => {
     if (!settings) return null;
@@ -100,35 +122,6 @@ export function SettingsPage() {
       roles.find((role) => role.name === settings.leader.role_name) ?? null
     );
   }, [roles, settings]);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchSettingsBootstrap<UserSettings>()
-      .then(
-        ({
-          settings: settingsData,
-          providers: providersData,
-          roles: rolesData,
-          version,
-        }) => {
-          if (!mounted) return;
-          setSettings(settingsData);
-          setProviders(providersData);
-          setRoles(rolesData);
-          setAppVersion(version);
-        },
-      )
-      .catch(() => {
-        toast.error("Failed to load settings");
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!settings?.model.active_provider_id) {
@@ -182,15 +175,23 @@ export function SettingsPage() {
     }
     setSaving(true);
     try {
-      const savedSettings = await saveSettings<UserSettings>({
+      const payload = {
         assistant: {
           ...settings.assistant,
           write_dirs: normalizeWriteDirs(settings.assistant.write_dirs),
         },
         leader: settings.leader,
         model: settings.model,
-      });
-      setSettings(savedSettings);
+      };
+      const savedSettings = await saveSettings<UserSettings>(payload);
+
+      setLocalSettings(savedSettings);
+      void mutateSettings(
+        (current) =>
+          current ? { ...current, settings: savedSettings } : current,
+        false,
+      );
+
       toast.success("Settings saved");
     } catch {
       toast.error("Failed to save settings");
@@ -235,7 +236,7 @@ export function SettingsPage() {
                 <Select
                   value={settings.assistant.role_name}
                   onValueChange={(value) =>
-                    setSettings({
+                    setLocalSettings({
                       ...settings,
                       assistant: {
                         ...settings.assistant,
@@ -278,7 +279,7 @@ export function SettingsPage() {
                     aria-checked={settings.assistant.allow_network}
                     aria-label="Network Access"
                     onClick={() =>
-                      setSettings({
+                      setLocalSettings({
                         ...settings,
                         assistant: {
                           ...settings.assistant,
@@ -320,7 +321,7 @@ export function SettingsPage() {
                     aria-label="Write Dirs"
                     value={settings.assistant.write_dirs.join("\n")}
                     onChange={(e) =>
-                      setSettings({
+                      setLocalSettings({
                         ...settings,
                         assistant: {
                           ...settings.assistant,
@@ -356,7 +357,7 @@ export function SettingsPage() {
                 <Select
                   value={settings.leader.role_name}
                   onValueChange={(value) =>
-                    setSettings({
+                    setLocalSettings({
                       ...settings,
                       leader: {
                         role_name: value,
@@ -402,7 +403,7 @@ export function SettingsPage() {
                 <Select
                   value={settings.model.active_provider_id}
                   onValueChange={(value) =>
-                    setSettings({
+                    setLocalSettings({
                       ...settings,
                       model: {
                         ...settings.model,
@@ -452,7 +453,7 @@ export function SettingsPage() {
                   <Select
                     value={settings.model.active_model}
                     onValueChange={(value) =>
-                      setSettings({
+                      setLocalSettings({
                         ...settings,
                         model: {
                           ...settings.model,
@@ -477,7 +478,7 @@ export function SettingsPage() {
                     type="text"
                     value={settings.model.active_model}
                     onChange={(e) =>
-                      setSettings({
+                      setLocalSettings({
                         ...settings,
                         model: {
                           ...settings.model,
@@ -504,7 +505,7 @@ export function SettingsPage() {
                     className="w-full"
                     value={cloneModelParams(settings.model.params)}
                     onChange={(params) =>
-                      setSettings({
+                      setLocalSettings({
                         ...settings,
                         model: {
                           ...settings.model,
@@ -541,7 +542,7 @@ export function SettingsPage() {
                         if (!Number.isSafeInteger(parsed) || parsed <= 0) {
                           return;
                         }
-                        setSettings({
+                        setLocalSettings({
                           ...settings,
                           model: {
                             ...settings.model,
@@ -570,7 +571,7 @@ export function SettingsPage() {
                   <Select
                     value={settings.model.retry_policy}
                     onValueChange={(value: RetryPolicy) =>
-                      setSettings({
+                      setLocalSettings({
                         ...settings,
                         model: {
                           ...settings.model,
@@ -616,7 +617,7 @@ export function SettingsPage() {
                             if (!Number.isSafeInteger(parsed) || parsed <= 0) {
                               return;
                             }
-                            setSettings({
+                            setLocalSettings({
                               ...settings,
                               model: {
                                 ...settings.model,
@@ -670,7 +671,7 @@ export function SettingsPage() {
                             if (!Number.isFinite(parsed) || parsed <= 0) {
                               return;
                             }
-                            setSettings({
+                            setLocalSettings({
                               ...settings,
                               model: {
                                 ...settings.model,
@@ -709,7 +710,7 @@ export function SettingsPage() {
                             if (!Number.isFinite(parsed) || parsed <= 0) {
                               return;
                             }
-                            setSettings({
+                            setLocalSettings({
                               ...settings,
                               model: {
                                 ...settings.model,
@@ -748,7 +749,7 @@ export function SettingsPage() {
                           if (!Number.isSafeInteger(parsed) || parsed <= 0) {
                             return;
                           }
-                          setSettings({
+                          setLocalSettings({
                             ...settings,
                             model: {
                               ...settings.model,

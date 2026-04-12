@@ -5,6 +5,11 @@ export interface AssistantCommandSpec {
   acceptsArgument?: boolean;
 }
 
+export interface AssistantCommandSelectionState {
+  index: number;
+  token: string;
+}
+
 export const ASSISTANT_COMMANDS: AssistantCommandSpec[] = [
   {
     name: "/clear",
@@ -24,30 +29,61 @@ export const ASSISTANT_COMMANDS: AssistantCommandSpec[] = [
   },
 ];
 
+const COMMAND_TOKEN_PATTERN = /^\/\S*/;
+
 export interface ParsedAssistantCommandInput {
   filtered: AssistantCommandSpec[];
   isCommandInput: boolean;
-  leadingWhitespace: string;
   token: string;
+}
+
+interface NormalizedAssistantCommandInput {
+  leadingWhitespace: string;
+  trimmedStart: string;
+  token: string;
+  suffix: string;
+}
+
+function normalizeAssistantCommandInput(
+  input: string,
+): NormalizedAssistantCommandInput {
+  const trimmedStart = input.trimStart();
+  const leadingWhitespace = input.slice(0, input.length - trimmedStart.length);
+  const tokenMatch = trimmedStart.match(COMMAND_TOKEN_PATTERN);
+  const token = tokenMatch?.[0] ?? "/";
+  const suffix = trimmedStart.slice(token.length);
+
+  return {
+    leadingWhitespace,
+    trimmedStart,
+    token,
+    suffix,
+  };
+}
+
+function clampAssistantCommandIndex(
+  index: number,
+  optionCount: number,
+): number {
+  if (optionCount <= 0) {
+    return 0;
+  }
+  return Math.min(index, optionCount - 1);
 }
 
 export function parseAssistantCommandInput(
   input: string,
 ): ParsedAssistantCommandInput {
-  const trimmedStart = input.trimStart();
-  const leadingWhitespace = input.slice(0, input.length - trimmedStart.length);
+  const { trimmedStart, token } = normalizeAssistantCommandInput(input);
 
   if (!trimmedStart.startsWith("/")) {
     return {
       filtered: [],
       isCommandInput: false,
-      leadingWhitespace,
       token: "",
     };
   }
 
-  const tokenMatch = trimmedStart.match(/^\/\S*/);
-  const token = tokenMatch?.[0] ?? "/";
   const filtered =
     token === "/"
       ? ASSISTANT_COMMANDS
@@ -56,20 +92,76 @@ export function parseAssistantCommandInput(
   return {
     filtered,
     isCommandInput: true,
-    leadingWhitespace,
     token,
   };
+}
+
+export function resolveAssistantCommandSelection(
+  commandOptions: AssistantCommandSpec[],
+  selectionState: AssistantCommandSelectionState,
+  commandToken: string,
+): {
+  selectedCommand: AssistantCommandSpec | null;
+  selectedCommandIndex: number;
+} {
+  const selectedCommandIndex =
+    selectionState.token === commandToken
+      ? clampAssistantCommandIndex(selectionState.index, commandOptions.length)
+      : 0;
+
+  return {
+    selectedCommand:
+      commandOptions[
+        Math.min(selectedCommandIndex, Math.max(commandOptions.length - 1, 0))
+      ] ?? null,
+    selectedCommandIndex,
+  };
+}
+
+export function stepAssistantCommandSelection(
+  commandOptions: AssistantCommandSpec[],
+  selectionState: AssistantCommandSelectionState,
+  commandToken: string,
+  direction: 1 | -1,
+): AssistantCommandSelectionState {
+  if (commandOptions.length === 0) {
+    return {
+      index: 0,
+      token: commandToken,
+    };
+  }
+
+  const { selectedCommandIndex } = resolveAssistantCommandSelection(
+    commandOptions,
+    selectionState,
+    commandToken,
+  );
+
+  return {
+    index:
+      (selectedCommandIndex + direction + commandOptions.length) %
+      commandOptions.length,
+    token: commandToken,
+  };
+}
+
+export function isAssistantCommandReadyToSend(
+  input: string,
+  commandName: string,
+): boolean {
+  const { trimmedStart, token } = normalizeAssistantCommandInput(input);
+
+  return (
+    token === commandName &&
+    (trimmedStart === commandName || trimmedStart.startsWith(`${commandName} `))
+  );
 }
 
 export function insertAssistantCommand(
   input: string,
   command: AssistantCommandSpec,
 ): string {
-  const trimmedStart = input.trimStart();
-  const leadingWhitespace = input.slice(0, input.length - trimmedStart.length);
-  const tokenMatch = trimmedStart.match(/^\/\S*/);
-  const tokenLength = tokenMatch?.[0].length ?? 0;
-  const suffix = trimmedStart.slice(tokenLength);
+  const { leadingWhitespace, suffix } = normalizeAssistantCommandInput(input);
 
   if (!command.acceptsArgument) {
     return `${leadingWhitespace}${command.name}`;

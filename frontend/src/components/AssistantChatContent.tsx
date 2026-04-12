@@ -24,7 +24,10 @@ import { CopyButton } from "@/components/CopyButton";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import {
   insertAssistantCommand,
+  isAssistantCommandReadyToSend,
   parseAssistantCommandInput,
+  resolveAssistantCommandSelection,
+  stepAssistantCommandSelection,
   type AssistantCommandSpec,
 } from "@/lib/assistantCommands";
 import { formatJsonOutput } from "@/lib/formatJsonOutput";
@@ -147,14 +150,12 @@ export function AssistantChatComposer({
   >(null);
   const commandPanelVisible =
     isCommandInput && dismissedCommandToken !== commandToken;
-  const selectedCommandIndex =
-    selectedCommandState.token === commandToken
-      ? selectedCommandState.index
-      : 0;
-  const selectedCommand =
-    commandOptions[
-      Math.min(selectedCommandIndex, Math.max(commandOptions.length - 1, 0))
-    ] ?? null;
+  const { selectedCommand, selectedCommandIndex } =
+    resolveAssistantCommandSelection(
+      commandOptions,
+      selectedCommandState,
+      commandToken,
+    );
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -221,21 +222,27 @@ export function AssistantChatComposer({
 
       if (commandOptions.length > 0 && event.key === "ArrowDown") {
         event.preventDefault();
-        setSelectedCommandState({
-          index: (selectedCommandIndex + 1) % commandOptions.length,
-          token: commandToken,
-        });
+        setSelectedCommandState(
+          stepAssistantCommandSelection(
+            commandOptions,
+            selectedCommandState,
+            commandToken,
+            1,
+          ),
+        );
         return;
       }
 
       if (commandOptions.length > 0 && event.key === "ArrowUp") {
         event.preventDefault();
-        setSelectedCommandState({
-          index:
-            (selectedCommandIndex - 1 + commandOptions.length) %
-            commandOptions.length,
-          token: commandToken,
-        });
+        setSelectedCommandState(
+          stepAssistantCommandSelection(
+            commandOptions,
+            selectedCommandState,
+            commandToken,
+            -1,
+          ),
+        );
         return;
       }
 
@@ -245,13 +252,7 @@ export function AssistantChatComposer({
         !event.shiftKey &&
         selectedCommand
       ) {
-        const trimmed = input.trimStart();
-        const canSendCurrentInput =
-          commandToken === selectedCommand.name &&
-          (trimmed === selectedCommand.name ||
-            trimmed.startsWith(`${selectedCommand.name} `));
-
-        if (!canSendCurrentInput) {
+        if (!isAssistantCommandReadyToSend(input, selectedCommand.name)) {
           event.preventDefault();
           selectCommand(selectedCommand);
           return;

@@ -613,7 +613,7 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="absolute right-4 top-4 z-30 sm:right-5 sm:top-5">
+        <div className="absolute bottom-4 right-4 z-30 sm:bottom-5 sm:right-5">
           <PanelToggleButton expanded={panelVisible} onClick={togglePanel} />
         </div>
       </div>

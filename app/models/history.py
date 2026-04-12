@@ -64,6 +64,14 @@ class ErrorEntry(Serializable):
     timestamp: float = field(default_factory=time.time)
 
 
+@dataclass
+class CommandResultEntry(Serializable):
+    command_name: str
+    content: str
+    include_in_context: bool = False
+    timestamp: float = field(default_factory=time.time)
+
+
 HistoryEntry = (
     SystemEntry
     | ReceivedMessage
@@ -73,6 +81,7 @@ HistoryEntry = (
     | StateEntry
     | ToolCall
     | ErrorEntry
+    | CommandResultEntry
 )
 
 
@@ -143,6 +152,13 @@ def deserialize_history_entry(data: dict[str, Any]) -> HistoryEntry:
     if entry_type == "ErrorEntry":
         return ErrorEntry(
             content=str(data.get("content", "")),
+            timestamp=timestamp_value,
+        )
+    if entry_type == "CommandResultEntry":
+        return CommandResultEntry(
+            command_name=str(data.get("command_name", "")),
+            content=str(data.get("content", "")),
+            include_in_context=bool(data.get("include_in_context", False)),
             timestamp=timestamp_value,
         )
     raise ValueError(f"Unknown history entry type: {entry_type}")

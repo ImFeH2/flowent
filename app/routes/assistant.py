@@ -3,7 +3,12 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.assistant_commands import (
+    AssistantCommandError,
+    execute_assistant_command_input,
+)
 from app.models import Message
+from app.providers.errors import LLMProviderError
 from app.registry import registry
 
 router = APIRouter()
@@ -36,6 +41,19 @@ async def send_assistant_message(req: AssistantMessageRequest) -> dict:
     assistant = _get_assistant()
     if assistant is None:
         raise HTTPException(status_code=404, detail="Assistant not found")
+
+    try:
+        executed_command = execute_assistant_command_input(assistant, req.content)
+    except AssistantCommandError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (RuntimeError, TimeoutError, LLMProviderError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    if executed_command is not None:
+        return {
+            "status": "command_executed",
+            "command_name": executed_command.command_name,
+        }
 
     msg = Message(from_id="human", to_id=assistant.uuid, content=req.content)
     assistant.enqueue_message(msg)

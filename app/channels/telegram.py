@@ -8,9 +8,14 @@ from typing import Any
 
 from loguru import logger
 
+from app.assistant_commands import (
+    AssistantCommandError,
+    execute_assistant_command_input,
+)
 from app.events import event_bus
 from app.models import Event, EventType, Message
 from app.network import create_async_http_session, is_success_status
+from app.providers.errors import LLMProviderError
 from app.registry import registry
 from app.settings import (
     TelegramPendingChat,
@@ -182,6 +187,21 @@ class TelegramChannel:
             assistant = registry.get_assistant()
             if assistant is None:
                 logger.warning("Telegram message dropped: assistant not available")
+                return
+
+            try:
+                executed_command = execute_assistant_command_input(assistant, text)
+            except AssistantCommandError as exc:
+                await self._send_message(chat_id, str(exc), markdown=False)
+                return
+            except (RuntimeError, TimeoutError, LLMProviderError) as exc:
+                await self._send_message(chat_id, str(exc), markdown=False)
+                return
+
+            if executed_command is not None:
+                await self._send_message(
+                    chat_id, executed_command.feedback, markdown=False
+                )
                 return
 
             assistant.enqueue_message(

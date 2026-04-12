@@ -1,11 +1,21 @@
 import { createRef } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AssistantChatComposer,
   AssistantChatMessages,
 } from "@/components/AssistantChatContent";
 import type { AssistantChatItem, Node } from "@/types";
+
+afterEach(() => {
+  cleanup();
+});
 
 describe("AssistantChatMessages", () => {
   it("renders idle tool calls before and after the result is available", () => {
@@ -357,7 +367,9 @@ describe("AssistantChatComposer", () => {
       />,
     );
 
-    const textarea = screen.getByPlaceholderText("Message the Assistant...");
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
     const sendButton = screen.getByRole("button", { name: "Send message" });
     const composerShell = textarea.parentElement;
 
@@ -450,5 +462,102 @@ describe("AssistantChatComposer", () => {
 
     expect(onStop).toHaveBeenCalledTimes(1);
     expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it("shows filtered command suggestions and inserts compact with a trailing space", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/"
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+
+    expect(
+      screen.getByRole("listbox", { name: "Assistant commands" }),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    expect(onChange).toHaveBeenCalledWith("/compact ");
+    expect(onKeyDown).not.toHaveBeenCalled();
+  });
+
+  it("dismisses the command suggestions with Escape without clearing the input", () => {
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/"
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    ) as HTMLTextAreaElement;
+
+    fireEvent.keyDown(textarea, { key: "Escape" });
+
+    expect(
+      screen.queryByRole("listbox", { name: "Assistant commands" }),
+    ).not.toBeInTheDocument();
+    expect(textarea.value).toBe("/");
+  });
+
+  it("keeps the command panel open with an empty state when no command matches", () => {
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/unknown"
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    expect(
+      screen.getByRole("listbox", { name: "Assistant commands" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("No matching commands.")).toBeInTheDocument();
+  });
+
+  it("keeps the exact command selected and lets Enter pass through for sending", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/help"
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

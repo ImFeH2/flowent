@@ -77,7 +77,8 @@ export type HistoryEntryType =
   | "AssistantThinking"
   | "StateEntry"
   | "ToolCall"
-  | "ErrorEntry";
+  | "ErrorEntry"
+  | "CommandResultEntry";
 
 export interface HistoryEntry {
   type: HistoryEntryType;
@@ -91,6 +92,8 @@ export interface HistoryEntry {
   tool_call_id?: string | null;
   arguments?: Record<string, unknown> | null;
   result?: string | null;
+  command_name?: string | null;
+  include_in_context?: boolean;
   timestamp: number;
   streaming?: boolean;
 }

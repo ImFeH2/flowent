@@ -13,6 +13,7 @@ from app.models.graph import GraphEdge, GraphNodeRecord, NodePosition
 from app.models.history import (
     AssistantText,
     AssistantThinking,
+    CommandResultEntry,
     ErrorEntry,
     HistoryEntry,
     ReceivedMessage,
@@ -31,6 +32,7 @@ __all__ = [
     "AgentState",
     "AssistantText",
     "AssistantThinking",
+    "CommandResultEntry",
     "ContentDelta",
     "ErrorEntry",
     "Event",

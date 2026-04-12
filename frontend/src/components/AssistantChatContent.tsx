@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { MarkdownContent } from "@/components/MarkdownContent";
+import {
+  insertAssistantCommand,
+  parseAssistantCommandInput,
+  type AssistantCommandSpec,
+} from "@/lib/assistantCommands";
 import { formatJsonOutput } from "@/lib/formatJsonOutput";
 import { getNodeLabel } from "@/lib/nodeLabel";
 import { cn } from "@/lib/utils";
@@ -128,6 +133,28 @@ export function AssistantChatComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const actionLabel = busy ? (stopping ? "Stopping..." : "Stop") : "Send";
   const actionDisabled = busy ? stopping || !onStop : disabled;
+  const {
+    filtered: commandOptions,
+    isCommandInput,
+    token: commandToken,
+  } = parseAssistantCommandInput(input);
+  const [selectedCommandState, setSelectedCommandState] = useState<{
+    index: number;
+    token: string;
+  }>({ index: 0, token: "" });
+  const [dismissedCommandToken, setDismissedCommandToken] = useState<
+    string | null
+  >(null);
+  const commandPanelVisible =
+    isCommandInput && dismissedCommandToken !== commandToken;
+  const selectedCommandIndex =
+    selectedCommandState.token === commandToken
+      ? selectedCommandState.index
+      : 0;
+  const selectedCommand =
+    commandOptions[
+      Math.min(selectedCommandIndex, Math.max(commandOptions.length - 1, 0))
+    ] ?? null;
 
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
@@ -156,6 +183,85 @@ export function AssistantChatComposer({
       textarea.scrollHeight > maxHeight ? "auto" : "hidden";
   }, [input, isWorkspace]);
 
+  const handleInputChange = (nextValue: string) => {
+    const nextCommandInput = parseAssistantCommandInput(nextValue);
+
+    if (!nextCommandInput.isCommandInput) {
+      setDismissedCommandToken(null);
+      setSelectedCommandState({ index: 0, token: "" });
+    } else if (nextCommandInput.token !== commandToken) {
+      setSelectedCommandState({ index: 0, token: nextCommandInput.token });
+      if (
+        dismissedCommandToken &&
+        dismissedCommandToken !== nextCommandInput.token
+      ) {
+        setDismissedCommandToken(null);
+      }
+    }
+
+    onChange(nextValue);
+  };
+
+  const selectCommand = (command: AssistantCommandSpec) => {
+    onChange(insertAssistantCommand(input, command));
+    setSelectedCommandState({ index: 0, token: command.name });
+    setDismissedCommandToken(null);
+    textareaRef.current?.focus();
+  };
+
+  const handleComposerKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (
+    event,
+  ) => {
+    if (commandPanelVisible) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setDismissedCommandToken(commandToken);
+        return;
+      }
+
+      if (commandOptions.length > 0 && event.key === "ArrowDown") {
+        event.preventDefault();
+        setSelectedCommandState({
+          index: (selectedCommandIndex + 1) % commandOptions.length,
+          token: commandToken,
+        });
+        return;
+      }
+
+      if (commandOptions.length > 0 && event.key === "ArrowUp") {
+        event.preventDefault();
+        setSelectedCommandState({
+          index:
+            (selectedCommandIndex - 1 + commandOptions.length) %
+            commandOptions.length,
+          token: commandToken,
+        });
+        return;
+      }
+
+      if (
+        commandOptions.length > 0 &&
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        selectedCommand
+      ) {
+        const trimmed = input.trimStart();
+        const canSendCurrentInput =
+          commandToken === selectedCommand.name &&
+          (trimmed === selectedCommand.name ||
+            trimmed.startsWith(`${selectedCommand.name} `));
+
+        if (!canSendCurrentInput) {
+          event.preventDefault();
+          selectCommand(selectedCommand);
+          return;
+        }
+      }
+    }
+
+    onKeyDown(event);
+  };
+
   return (
     <div
       className={cn(
@@ -167,6 +273,56 @@ export function AssistantChatComposer({
             ),
       )}
     >
+      {commandPanelVisible ? (
+        <div
+          role="listbox"
+          aria-label="Assistant commands"
+          className={cn(
+            "pointer-events-auto mb-2 overflow-hidden rounded-[1rem] border backdrop-blur-xl",
+            isWorkspace
+              ? "border-white/12 bg-black/[0.74] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.92)]"
+              : "border-white/10 bg-black/[0.78] shadow-[0_20px_44px_-30px_rgba(0,0,0,0.88)]",
+          )}
+        >
+          {commandOptions.length > 0 ? (
+            commandOptions.map((command, index) => {
+              const selected = index === selectedCommandIndex;
+              return (
+                <button
+                  key={command.name}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    selectCommand(command);
+                  }}
+                  className={cn(
+                    "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors",
+                    selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]",
+                  )}
+                >
+                  <span className="mt-0.5 shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 font-mono text-[11px] text-white/88">
+                    {command.name}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-medium text-white/88">
+                      {command.description}
+                    </span>
+                    <span className="mt-1 block font-mono text-[11px] text-white/48">
+                      {command.usage}
+                    </span>
+                  </span>
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-3 text-[12px] text-white/54">
+              No matching commands.
+            </div>
+          )}
+        </div>
+      ) : null}
       <div
         className={cn(
           "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[0.8rem] border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
@@ -178,13 +334,9 @@ export function AssistantChatComposer({
         <textarea
           ref={textareaRef}
           value={input}
-          onChange={(event) => onChange(event.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={
-            isWorkspace
-              ? "Message the Assistant..."
-              : "Message the Assistant... (Enter to send)"
-          }
+          onChange={(event) => handleInputChange(event.target.value)}
+          onKeyDown={handleComposerKeyDown}
+          placeholder="Message Assistant or type / for commands"
           rows={1}
           className={cn(
             "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
@@ -331,6 +483,13 @@ const TimelineItem = memo(function TimelineItem({
       return (
         <ToolCallCard
           item={item as HistoryEntry & { type: "ToolCall" }}
+          variant={variant}
+        />
+      );
+    case "CommandResultEntry":
+      return (
+        <CommandResultCard
+          item={item as HistoryEntry & { type: "CommandResultEntry" }}
           variant={variant}
         />
       );
@@ -560,6 +719,52 @@ function ToolCallCard({
         ) : null}
       </div>
     </ActivityDisclosure>
+  );
+}
+
+function CommandResultCard({
+  item,
+  variant,
+}: {
+  item: HistoryEntry & { type: "CommandResultEntry" };
+  variant: AssistantChatVariant;
+}) {
+  const isWorkspace = variant === "workspace";
+
+  return (
+    <div
+      className={cn(
+        "min-w-0 w-full space-y-3 px-3 py-2.5",
+        isWorkspace
+          ? "border-l border-emerald-400/30 bg-emerald-400/[0.08]"
+          : "rounded-xl border border-emerald-400/18 bg-emerald-400/[0.06]",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <Sparkles className="size-4 text-emerald-300" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-emerald-200/88">
+          Command Result
+        </span>
+        {item.command_name ? (
+          <span className="rounded-full border border-emerald-200/12 bg-black/20 px-2 py-0.5 font-mono text-[10px] text-emerald-100/78">
+            {item.command_name}
+          </span>
+        ) : null}
+        <span className="ml-auto">
+          <CopyButton
+            text={item.content ?? ""}
+            className="text-emerald-100/54 hover:bg-emerald-400/10 hover:text-emerald-100/86"
+            iconClassName="text-current"
+            copiedClassName="text-emerald-200"
+          />
+        </span>
+      </div>
+      <RichContentBlock
+        content={item.content}
+        markdownClassName="text-[13px] text-emerald-50/92"
+        preClassName="text-emerald-50/88"
+      />
+    </div>
   );
 }
 

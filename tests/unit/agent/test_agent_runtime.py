@@ -5,12 +5,13 @@ import time
 import pytest
 from loguru import logger
 
-from app.agent import Agent, InterruptRequestedError, extract_routed_content
+from app.agent import Agent, InterruptRequestedError, WakeSignal, extract_routed_content
 from app.events import event_bus
 from app.models import (
     AgentState,
     AssistantText,
     AssistantThinking,
+    CommandResultEntry,
     ErrorEntry,
     EventType,
     LLMResponse,
@@ -506,9 +507,15 @@ def test_clear_assistant_chat_history_interrupts_active_agent(
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     assistant.set_state(state, reason)
     assistant.history.append(ReceivedMessage(content="hello", from_id="human"))
+    interrupt_thread = threading.Thread(
+        target=assistant._handle_interrupt,
+        args=(None,),
+        daemon=True,
+    )
 
     def fake_request_interrupt() -> bool:
-        assistant.set_state(AgentState.IDLE, "interrupted by clear chat")
+        if not interrupt_thread.is_alive():
+            interrupt_thread.start()
         return True
 
     monkeypatch.setattr(assistant, "request_interrupt", fake_request_interrupt)
@@ -519,6 +526,168 @@ def test_clear_assistant_chat_history_interrupts_active_agent(
     assert not any(
         isinstance(entry, ReceivedMessage) for entry in assistant.get_history_snapshot()
     )
+
+    assistant.request_termination("done")
+    interrupt_thread.join(timeout=1.0)
+    assert interrupt_thread.is_alive() is False
+
+
+def test_clear_assistant_chat_history_drops_queued_messages_after_interrupt(
+    monkeypatch,
+):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant.set_state(AgentState.RUNNING, "processing")
+    assistant._wake_queue.put(
+        WakeSignal(
+            reason="message",
+            payload={"message": {"content": "queued message", "from": "human"}},
+            resume_reason="received message from human",
+        )
+    )
+
+    interrupt_thread = threading.Thread(
+        target=assistant._handle_interrupt,
+        args=(None,),
+        daemon=True,
+    )
+
+    def fake_request_interrupt() -> bool:
+        if not interrupt_thread.is_alive():
+            interrupt_thread.start()
+        return True
+
+    monkeypatch.setattr(assistant, "request_interrupt", fake_request_interrupt)
+    assistant.clear_chat_history()
+
+    assert assistant.state == AgentState.IDLE
+    assert not any(
+        isinstance(entry, ReceivedMessage) and entry.content == "queued message"
+        for entry in assistant.get_history_snapshot()
+    )
+
+    assistant.request_termination("done")
+    interrupt_thread.join(timeout=1.0)
+    assert interrupt_thread.is_alive() is False
+
+
+def test_execute_compact_command_replaces_history_with_summary(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant.history.extend(
+        [
+            ReceivedMessage(content="Summarize the rollout", from_id="human"),
+            AssistantText(content="Working through the changes."),
+            ErrorEntry(content="temporary failure"),
+        ]
+    )
+
+    monkeypatch.setattr(
+        "app.agent.gateway.chat",
+        lambda *args, **kwargs: LLMResponse(
+            content=(
+                "## Current Goal\nShip the command layer.\n\n"
+                "## Active Task Boundary\nKeep the change in Assistant chat.\n\n"
+                "## Key Constraints\nPreserve persistence.\n\n"
+                "## Confirmed Decisions\nUse built-in commands only.\n\n"
+                "## Open Questions\nNone.\n\n"
+                "## Next Actions\nFinish the UI."
+            )
+        ),
+    )
+
+    entry = assistant.execute_assistant_command(
+        command_name="/compact",
+        argument="slash rollout",
+    )
+
+    history = assistant.get_history_snapshot()
+
+    assert isinstance(entry, CommandResultEntry)
+    assert entry.include_in_context is True
+    assert history[-1] == entry
+    assert all(
+        isinstance(item, (SystemEntry, StateEntry, CommandResultEntry))
+        for item in history
+    )
+    assert not any(
+        isinstance(item, ReceivedMessage) and item.content == "Summarize the rollout"
+        for item in history
+    )
+
+    messages = assistant._build_messages()
+    serialized = json.dumps(messages)
+
+    assert "Summarize the rollout" not in serialized
+    assert "Compacted conversation summary" in serialized
+    assert "Ship the command layer." in serialized
+
+
+def test_compact_command_excludes_queued_messages_from_summary(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant.history.extend(
+        [
+            ReceivedMessage(content="Existing history", from_id="human"),
+            AssistantText(content="Existing reply"),
+        ]
+    )
+    assistant.set_state(AgentState.RUNNING, "processing")
+    assistant._wake_queue.put(
+        WakeSignal(
+            reason="message",
+            payload={"message": {"content": "queued message", "from": "human"}},
+            resume_reason="received message from human",
+        )
+    )
+
+    captured_messages: list[list[dict]] = []
+
+    def fake_chat(*, messages, **kwargs):
+        captured_messages.append(messages)
+        return LLMResponse(
+            content=(
+                "## Current Goal\nShip the command layer.\n\n"
+                "## Active Task Boundary\nKeep the change in Assistant chat.\n\n"
+                "## Key Constraints\nPreserve persistence.\n\n"
+                "## Confirmed Decisions\nUse built-in commands only.\n\n"
+                "## Open Questions\nNone.\n\n"
+                "## Next Actions\nFinish the UI."
+            )
+        )
+
+    interrupt_thread = threading.Thread(
+        target=assistant._handle_interrupt,
+        args=(None,),
+        daemon=True,
+    )
+
+    def fake_request_interrupt() -> bool:
+        if not interrupt_thread.is_alive():
+            interrupt_thread.start()
+        return True
+
+    monkeypatch.setattr(assistant, "request_interrupt", fake_request_interrupt)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    assistant.compact_chat_history()
+
+    assert captured_messages
+    assert "queued message" not in json.dumps(captured_messages[0])
+
+    assistant.request_termination("done")
+    interrupt_thread.join(timeout=1.0)
+    assert interrupt_thread.is_alive() is False
+
+
+def test_help_command_result_does_not_reenter_model_context():
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+
+    entry = assistant.execute_assistant_command(command_name="/help")
+    messages = assistant._build_messages()
+    serialized = json.dumps(messages)
+
+    assert isinstance(entry, CommandResultEntry)
+    assert entry.include_in_context is False
+    assert "/compact" in entry.content
+    assert "Built-in Assistant commands" not in serialized
 
 
 def test_agent_normalizes_think_tags_in_final_content(monkeypatch):

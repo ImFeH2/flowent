@@ -14,11 +14,13 @@ from typing import Any
 
 from loguru import logger
 
+from app.assistant_commands import build_assistant_help_text
 from app.events import event_bus
 from app.models import (
     AgentState,
     AssistantText,
     AssistantThinking,
+    CommandResultEntry,
     ContentDelta,
     ErrorEntry,
     Event,
@@ -208,6 +210,10 @@ class Agent:
         self._interrupt_requested = threading.Event()
         self._interrupt_callback_lock = threading.Lock()
         self._interrupt_callback: Callable[[], None] | None = None
+        self._command_interrupt_lock = threading.Lock()
+        self._pause_after_interrupt_requested = threading.Event()
+        self._paused_for_command = threading.Event()
+        self._resume_after_command = threading.Event()
         self._idle_state_event = threading.Event()
         self._idle_started_at: float | None = None
         self._idle_started_by_tool_call_id: str | None = None
@@ -498,37 +504,145 @@ class Agent:
         for signal in preserved_signals:
             self._wake_queue.put(signal)
 
+    def _pause_for_command_execution(self, *, timeout: float) -> bool:
+        if self.state not in {AgentState.RUNNING, AgentState.SLEEPING}:
+            return False
+        if not self._command_interrupt_lock.acquire(timeout=timeout):
+            raise TimeoutError("Assistant did not pause for the command in time")
+
+        self._pause_after_interrupt_requested.set()
+        self._paused_for_command.clear()
+        self._resume_after_command.clear()
+
+        try:
+            if not self.request_interrupt():
+                self._pause_after_interrupt_requested.clear()
+                self._resume_after_command.set()
+                self._command_interrupt_lock.release()
+                return False
+            if not self._paused_for_command.wait(timeout=timeout):
+                raise TimeoutError("Assistant did not pause after interrupt")
+            return True
+        except Exception:
+            self._pause_after_interrupt_requested.clear()
+            self._resume_after_command.set()
+            self._command_interrupt_lock.release()
+            raise
+
+    def _resume_after_command_execution(self) -> None:
+        self._pause_after_interrupt_requested.clear()
+        self._resume_after_command.set()
+        self._command_interrupt_lock.release()
+
     def clear_chat_history(self, *, interrupt_timeout: float = 5.0) -> None:
         if self.node_type != NodeType.ASSISTANT:
             raise RuntimeError("Only assistant chat history can be cleared")
 
-        if self.state in {AgentState.RUNNING, AgentState.SLEEPING}:
-            if not self.request_interrupt():
-                raise RuntimeError("Assistant is not interruptible")
-            if not self.wait_until_idle(timeout=interrupt_timeout):
-                raise TimeoutError("Assistant did not reach idle before clearing")
-
-        self._clear_pending_message_wakeups()
-        with self._runtime_notice_lock:
-            self._pending_runtime_notices.clear()
-        with self._history_lock:
-            self.history = [
-                entry
-                for entry in self.history
-                if isinstance(entry, (SystemEntry, StateEntry))
-            ]
-            self._pending_input_turn = False
-            self._turn_started_with_pending_input = False
-            self._turn_made_progress = False
-
-        event_bus.emit(
-            Event(
-                type=EventType.HISTORY_CLEARED,
-                agent_id=self.uuid,
-                data={"scope": "assistant_chat"},
-            )
+        paused_for_command = self._pause_for_command_execution(
+            timeout=interrupt_timeout
         )
-        self._persist_workspace_node()
+        try:
+            self._clear_pending_message_wakeups()
+            with self._runtime_notice_lock:
+                self._pending_runtime_notices.clear()
+            with self._history_lock:
+                self.history = [
+                    entry
+                    for entry in self.history
+                    if isinstance(entry, (SystemEntry, StateEntry))
+                ]
+                self._pending_input_turn = False
+                self._turn_started_with_pending_input = False
+                self._turn_made_progress = False
+
+            event_bus.emit(
+                Event(
+                    type=EventType.HISTORY_CLEARED,
+                    agent_id=self.uuid,
+                    data={"scope": "assistant_chat"},
+                )
+            )
+            self._persist_workspace_node()
+        finally:
+            if paused_for_command:
+                self._resume_after_command_execution()
+
+    def compact_chat_history(
+        self,
+        *,
+        focus: str | None = None,
+        interrupt_timeout: float = 5.0,
+    ) -> CommandResultEntry:
+        if self.node_type != NodeType.ASSISTANT:
+            raise RuntimeError("Only assistant chat history can be compacted")
+
+        paused_for_command = self._pause_for_command_execution(
+            timeout=interrupt_timeout
+        )
+        try:
+            summary = self._generate_compacted_history_summary(focus=focus)
+            content = "Compacted the current Assistant chat into a durable summary."
+            if focus and focus.strip():
+                content += f"\n\nFocus: {focus.strip()}"
+            content += f"\n\n## Compacted Summary\n{summary}"
+
+            with self._runtime_notice_lock:
+                self._pending_runtime_notices.clear()
+            with self._history_lock:
+                self.history = [
+                    entry
+                    for entry in self.history
+                    if isinstance(entry, (SystemEntry, StateEntry))
+                ]
+                self._pending_input_turn = False
+                self._turn_started_with_pending_input = False
+                self._turn_made_progress = False
+
+            event_bus.emit(
+                Event(
+                    type=EventType.HISTORY_CLEARED,
+                    agent_id=self.uuid,
+                    data={"scope": "assistant_chat"},
+                )
+            )
+
+            return CommandResultEntry(
+                command_name="/compact",
+                content=content,
+                include_in_context=True,
+            )
+        finally:
+            if paused_for_command:
+                self._resume_after_command_execution()
+
+    def execute_assistant_command(
+        self,
+        *,
+        command_name: str,
+        argument: str = "",
+        interrupt_timeout: float = 5.0,
+    ) -> CommandResultEntry:
+        if command_name == "/clear":
+            self.clear_chat_history(interrupt_timeout=interrupt_timeout)
+            entry = CommandResultEntry(
+                command_name=command_name,
+                content="Cleared the current Assistant chat history.",
+            )
+        elif command_name == "/compact":
+            entry = self.compact_chat_history(
+                focus=argument or None,
+                interrupt_timeout=interrupt_timeout,
+            )
+        elif command_name == "/help":
+            entry = CommandResultEntry(
+                command_name=command_name,
+                content=build_assistant_help_text(),
+            )
+        else:
+            raise RuntimeError(f"Unsupported Assistant command: {command_name}")
+
+        self._append_history(entry)
+        return entry
 
     def _run(self) -> None:
         with logger.contextualize(
@@ -1392,16 +1506,78 @@ class Agent:
         self.set_interrupt_callback(None)
         self._pending_input_turn = False
         self.set_state(AgentState.IDLE, "interrupted by human")
+        if self._pause_after_interrupt_requested.is_set():
+            self._paused_for_command.set()
+            self._resume_after_command.wait()
+            self._paused_for_command.clear()
+            self._resume_after_command.clear()
         self._wait_for_input()
+
+    def _generate_compacted_history_summary(self, *, focus: str | None = None) -> str:
+        with self._history_lock:
+            history_snapshot = list(self.history)
+
+        history_messages = self._build_history_messages(history_snapshot)
+        if not history_messages:
+            return "- No prior conversation details were available to compact."
+
+        focus_text = focus.strip() if focus else ""
+        request_lines = [
+            "Compact this Assistant conversation into a durable markdown summary.",
+            "Preserve only confirmed information.",
+            "Keep the summary concise and directly reusable as future context.",
+            "Use these sections in order:",
+            "## Current Goal",
+            "## Active Task Boundary",
+            "## Key Constraints",
+            "## Confirmed Decisions",
+            "## Open Questions",
+            "## Next Actions",
+        ]
+        if focus_text:
+            request_lines.append(f"Prioritize this focus: {focus_text}")
+        request_lines.append("Return only the markdown summary.")
+
+        response = gateway.chat(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You compress Assistant conversations into durable "
+                        "task summaries. Do not address the human. Do not "
+                        "invent facts. Keep the result tightly scoped to what "
+                        "future turns need."
+                    ),
+                },
+                *history_messages,
+                {"role": "user", "content": "\n".join(request_lines)},
+            ],
+            tools=None,
+            role_name=self.config.role_name,
+        )
+        summary = (response.content or response.thinking or "").strip()
+        if not summary:
+            raise RuntimeError("Assistant compact did not produce a summary")
+        return summary
 
     def _build_messages(self) -> list[dict[str, Any]]:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": get_system_prompt(self.config)}
         ]
-        pending_tool_calls: list[dict[str, Any]] = []
 
         with self._history_lock:
             history_snapshot = list(self.history)
+
+        messages.extend(self._build_history_messages(history_snapshot))
+        messages.extend(self._build_runtime_tail_messages())
+        return messages
+
+    def _build_history_messages(
+        self,
+        history_snapshot: list[HistoryEntry],
+    ) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
+        pending_tool_calls: list[dict[str, Any]] = []
 
         for entry in history_snapshot:
             if isinstance(entry, SystemEntry):
@@ -1465,8 +1641,17 @@ class Agent:
                     }
                 )
 
+            elif isinstance(entry, CommandResultEntry):
+                if not entry.include_in_context:
+                    continue
+                self._flush_tool_calls(messages, pending_tool_calls)
+                messages.append(
+                    self._build_runtime_system_message(
+                        f"Compacted conversation summary:\n{entry.content}"
+                    )
+                )
+
         self._flush_tool_calls(messages, pending_tool_calls)
-        messages.extend(self._build_runtime_tail_messages())
         return messages
 
     @staticmethod

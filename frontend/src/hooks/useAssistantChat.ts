@@ -237,8 +237,10 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
 
     try {
       await sendAssistantMessage(content);
-    } catch {
-      toast.error("Failed to send message");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send message",
+      );
     } finally {
       setSending(false);
     }
@@ -256,8 +258,12 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       const data = await fetchNodeDetail(assistantId);
       setDetail(data);
       setFetchedAt(Date.now());
-    } catch {
-      toast.error("Failed to clear assistant chat");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to clear assistant chat",
+      );
     } finally {
       setClearing(false);
     }

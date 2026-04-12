@@ -195,7 +195,21 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       ]);
 
       try {
-        await sendAssistantMessageRequest(content);
+        const response = await sendAssistantMessageRequest(content);
+        if (response.status === "command_executed") {
+          setPendingAssistantMessages((prev) => {
+            const idx = prev.findIndex(
+              (message) =>
+                message.content === content && message.timestamp === timestamp,
+            );
+            if (idx < 0) {
+              return prev;
+            }
+            const next = [...prev];
+            next.splice(idx, 1);
+            return next;
+          });
+        }
       } catch (error) {
         setPendingAssistantMessages((prev) => {
           const idx = prev.findIndex(

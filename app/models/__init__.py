@@ -1,5 +1,6 @@
 from app.models.agent import AgentState, NodeConfig, NodeType
 from app.models.base import Serializable
+from app.models.blueprint import BlueprintEdge, BlueprintSlot, RouteBlueprint
 from app.models.content import (
     ContentPart,
     ImagePart,
@@ -41,6 +42,8 @@ __all__ = [
     "AgentState",
     "AssistantText",
     "AssistantThinking",
+    "BlueprintEdge",
+    "BlueprintSlot",
     "CommandResultEntry",
     "ContentDelta",
     "ContentPart",
@@ -60,6 +63,7 @@ __all__ = [
     "NodeType",
     "ReceivedMessage",
     "ReceivedMessageDelta",
+    "RouteBlueprint",
     "SentMessage",
     "SentMessageDelta",
     "Serializable",

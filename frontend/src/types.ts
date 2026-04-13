@@ -137,6 +137,40 @@ export interface NodeDetail {
   history: HistoryEntry[];
 }
 
+export type RouteSourceState = "manual" | "blueprint-derived" | "drifted";
+
+export interface RouteSource {
+  state: RouteSourceState;
+  blueprint_id: string | null;
+  blueprint_name: string | null;
+  blueprint_version: number | null;
+  blueprint_available: boolean;
+}
+
+export interface BlueprintSlot {
+  id: string;
+  role_name: string;
+  display_name: string | null;
+}
+
+export interface BlueprintEdge {
+  from_slot_id: string;
+  to_slot_id: string;
+}
+
+export interface RouteBlueprint {
+  id: string;
+  name: string;
+  description: string;
+  version: number;
+  slots: BlueprintSlot[];
+  edges: BlueprintEdge[];
+  created_at: number;
+  updated_at: number;
+  node_count: number;
+  edge_count: number;
+}
+
 export interface TaskTab {
   id: string;
   title: string;
@@ -144,6 +178,7 @@ export interface TaskTab {
   leader_id?: string | null;
   created_at: number;
   updated_at: number;
+  route_source: RouteSource;
   node_count?: number;
   edge_count?: number;
 }

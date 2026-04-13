@@ -45,7 +45,7 @@ class ListTabsTool(Tool):
             edges = list_tab_edges(tab.id)
             return json.dumps(
                 {
-                    "tab": tab.serialize(),
+                    "tab": serialize_tab_summary(tab),
                     "nodes": [
                         {
                             "id": node.id,

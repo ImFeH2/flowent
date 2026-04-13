@@ -8,12 +8,15 @@ from app.events import event_bus
 from app.graph_runtime import connect_nodes
 from app.models import (
     AgentState,
+    BlueprintEdge,
+    BlueprintSlot,
     Event,
     EventType,
     GraphEdge,
     GraphNodeRecord,
     NodeConfig,
     NodeType,
+    RouteBlueprint,
     Tab,
 )
 from app.registry import registry
@@ -31,6 +34,7 @@ from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
 LEADER_NODE_NAME = "Leader"
+LEADER_BLUEPRINT_ANCHOR = "leader"
 
 
 def build_tools_for_role(
@@ -97,9 +101,239 @@ def is_tab_leader(*, node_id: str, tab_id: str | None = None) -> bool:
     return get_tab_leader_id(resolved_tab_id) == node_id
 
 
+def _sorted_tab_nodes(tab_id: str) -> list[GraphNodeRecord]:
+    return sorted(
+        list_tab_nodes(tab_id),
+        key=lambda record: (record.created_at, record.id),
+    )
+
+
+def _sorted_tab_edges(tab_id: str) -> list[GraphEdge]:
+    return sorted(
+        list_tab_edges(tab_id),
+        key=lambda edge: (edge.created_at, edge.id),
+    )
+
+
+def _validate_blueprint_graph(
+    *,
+    slots: list[BlueprintSlot],
+    edges: list[BlueprintEdge],
+) -> str | None:
+    settings = settings_module.get_settings()
+    slot_ids: set[str] = set()
+    slot_names: set[str] = set()
+    for slot in slots:
+        if slot.id in slot_ids:
+            return f"Blueprint slot '{slot.id}' is duplicated"
+        slot_ids.add(slot.id)
+        if slot.role_name == CONDUCTOR_ROLE_NAME:
+            return f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a tab Leader"
+        if find_role(settings, slot.role_name) is None:
+            return f"Role '{slot.role_name}' not found"
+        if slot.display_name is None:
+            continue
+        if slot.display_name in slot_names:
+            return f"Node name '{slot.display_name}' already exists"
+        slot_names.add(slot.display_name)
+
+    seen_edges: set[tuple[str, str]] = set()
+    valid_targets = {LEADER_BLUEPRINT_ANCHOR, *slot_ids}
+    for edge in edges:
+        if edge.from_slot_id not in valid_targets:
+            return f"Blueprint edge source '{edge.from_slot_id}' is invalid"
+        if edge.to_slot_id not in valid_targets:
+            return f"Blueprint edge target '{edge.to_slot_id}' is invalid"
+        if (
+            edge.from_slot_id == LEADER_BLUEPRINT_ANCHOR
+            and edge.to_slot_id == LEADER_BLUEPRINT_ANCHOR
+        ):
+            return "Blueprint may not connect leader to leader"
+        edge_key = (edge.from_slot_id, edge.to_slot_id)
+        if edge_key in seen_edges:
+            return (
+                "Blueprint edge "
+                f"'{edge.from_slot_id} -> {edge.to_slot_id}' is duplicated"
+            )
+        seen_edges.add(edge_key)
+
+    return None
+
+
+def serialize_blueprint(blueprint: RouteBlueprint) -> dict[str, object]:
+    return {
+        **blueprint.serialize(),
+        "node_count": len(blueprint.slots),
+        "edge_count": len(blueprint.edges),
+    }
+
+
+def list_blueprints() -> list[RouteBlueprint]:
+    return sorted(
+        workspace_store.list_blueprints(),
+        key=lambda blueprint: (
+            -blueprint.updated_at,
+            blueprint.name.lower(),
+            blueprint.id,
+        ),
+    )
+
+
+def create_blueprint(
+    *,
+    name: str,
+    description: str = "",
+    slots: list[BlueprintSlot],
+    edges: list[BlueprintEdge],
+) -> tuple[RouteBlueprint | None, str | None]:
+    if not name.strip():
+        return None, "name must not be empty"
+    error = _validate_blueprint_graph(slots=slots, edges=edges)
+    if error is not None:
+        return None, error
+    blueprint = RouteBlueprint(
+        id=str(uuid.uuid4()),
+        name=name.strip(),
+        description=description.strip(),
+        version=1,
+        slots=list(slots),
+        edges=list(edges),
+    )
+    workspace_store.upsert_blueprint(blueprint)
+    return blueprint, None
+
+
+def update_blueprint(
+    *,
+    blueprint_id: str,
+    name: str,
+    description: str = "",
+    slots: list[BlueprintSlot],
+    edges: list[BlueprintEdge],
+) -> tuple[RouteBlueprint | None, str | None]:
+    blueprint = workspace_store.get_blueprint(blueprint_id)
+    if blueprint is None:
+        return None, f"Blueprint '{blueprint_id}' not found"
+    if not name.strip():
+        return None, "name must not be empty"
+    error = _validate_blueprint_graph(slots=slots, edges=edges)
+    if error is not None:
+        return None, error
+    blueprint.name = name.strip()
+    blueprint.description = description.strip()
+    blueprint.version += 1
+    blueprint.slots = list(slots)
+    blueprint.edges = list(edges)
+    workspace_store.upsert_blueprint(blueprint)
+    return blueprint, None
+
+
+def delete_blueprint(blueprint_id: str) -> tuple[dict[str, object] | None, str | None]:
+    blueprint = workspace_store.get_blueprint(blueprint_id)
+    if blueprint is None:
+        return None, f"Blueprint '{blueprint_id}' not found"
+    workspace_store.delete_blueprint(blueprint_id)
+    return {"id": blueprint.id}, None
+
+
+def _route_matches_blueprint_source(tab: Tab) -> bool:
+    if (
+        tab.route_blueprint_id is None
+        or tab.route_blueprint_version is None
+        or tab.leader_id is None
+    ):
+        return False
+
+    slot_by_id = {slot.id: slot for slot in tab.route_blueprint_slots}
+    if len(slot_by_id) != len(tab.route_blueprint_slots):
+        return False
+
+    current_nodes = [
+        record for record in _sorted_tab_nodes(tab.id) if record.id != tab.leader_id
+    ]
+    if len(current_nodes) != len(tab.route_blueprint_slots):
+        return False
+
+    node_by_slot_id: dict[str, GraphNodeRecord] = {}
+    for record in current_nodes:
+        slot_id = record.config.blueprint_slot_id
+        if slot_id is None or slot_id not in slot_by_id or slot_id in node_by_slot_id:
+            return False
+        node_by_slot_id[slot_id] = record
+
+    for slot_id, slot in slot_by_id.items():
+        matched_record = node_by_slot_id.get(slot_id)
+        if matched_record is None:
+            return False
+        if matched_record.config.role_name != slot.role_name:
+            return False
+        if matched_record.config.name != slot.display_name:
+            return False
+
+    expected_edges: set[tuple[str, str]] = set()
+    for edge in tab.route_blueprint_edges:
+        from_record = node_by_slot_id.get(edge.from_slot_id)
+        to_record = node_by_slot_id.get(edge.to_slot_id)
+        from_node_id = (
+            tab.leader_id
+            if edge.from_slot_id == LEADER_BLUEPRINT_ANCHOR
+            else from_record.id
+            if from_record is not None
+            else None
+        )
+        to_node_id = (
+            tab.leader_id
+            if edge.to_slot_id == LEADER_BLUEPRINT_ANCHOR
+            else to_record.id
+            if to_record is not None
+            else None
+        )
+        if from_node_id is None or to_node_id is None:
+            return False
+        expected_edges.add((from_node_id, to_node_id))
+
+    current_edges = {
+        (edge.from_node_id, edge.to_node_id) for edge in _sorted_tab_edges(tab.id)
+    }
+    return current_edges == expected_edges
+
+
+def serialize_route_source(tab: Tab) -> dict[str, object]:
+    blueprint = (
+        workspace_store.get_blueprint(tab.route_blueprint_id)
+        if tab.route_blueprint_id is not None
+        else None
+    )
+    if tab.route_blueprint_id is None or tab.route_blueprint_version is None:
+        return {
+            "state": "manual",
+            "blueprint_id": None,
+            "blueprint_name": None,
+            "blueprint_version": None,
+            "blueprint_available": False,
+        }
+    return {
+        "state": (
+            "blueprint-derived" if _route_matches_blueprint_source(tab) else "drifted"
+        ),
+        "blueprint_id": tab.route_blueprint_id,
+        "blueprint_name": (
+            blueprint.name if blueprint is not None else tab.route_blueprint_name
+        ),
+        "blueprint_version": tab.route_blueprint_version,
+        "blueprint_available": blueprint is not None,
+    }
+
+
 def serialize_tab_summary(tab: Tab) -> dict[str, object]:
     return {
-        **tab.serialize(),
+        "id": tab.id,
+        "title": tab.title,
+        "goal": tab.goal,
+        "leader_id": tab.leader_id,
+        "created_at": tab.created_at,
+        "updated_at": tab.updated_at,
+        "route_source": serialize_route_source(tab),
         "node_count": len(list_tab_nodes(tab.id)),
         "edge_count": len(list_tab_edges(tab.id)),
     }
@@ -276,20 +510,177 @@ def sync_tab_leaders(*, reason: str) -> None:
         )
 
 
+def _emit_tab_updated(*, tab_id: str, agent_id: str) -> None:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return
+    event_bus.emit(
+        Event(
+            type=EventType.TAB_UPDATED,
+            agent_id=agent_id,
+            data=serialize_tab_summary(tab),
+        )
+    )
+
+
+def _start_tab_runtime(tab_id: str) -> None:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return
+    ordered_records = sorted(
+        list_tab_nodes(tab_id),
+        key=lambda record: (
+            record.id != tab.leader_id,
+            record.created_at,
+            record.id,
+        ),
+    )
+    for record in ordered_records:
+        if registry.get(record.id) is not None:
+            continue
+        _start_persisted_agent(record=record)
+    for edge in _sorted_tab_edges(tab_id):
+        if (
+            registry.get(edge.from_node_id) is None
+            or registry.get(edge.to_node_id) is None
+        ):
+            continue
+        try:
+            connect_nodes(edge.from_node_id, edge.to_node_id)
+        except ValueError:
+            continue
+
+
+def _validate_blueprint_for_tab(blueprint: RouteBlueprint) -> str | None:
+    return _validate_blueprint_graph(slots=blueprint.slots, edges=blueprint.edges)
+
+
+def _materialize_blueprint_route(*, tab: Tab, blueprint: RouteBlueprint) -> None:
+    slot_node_ids: dict[str, str] = {}
+    for slot in blueprint.slots:
+        config, error = build_node_config(
+            role_name=slot.role_name,
+            tab_id=tab.id,
+            name=slot.display_name,
+        )
+        if error is not None or config is None:
+            raise ValueError(error or "Failed to build blueprint node config")
+        config.blueprint_slot_id = slot.id
+        record = GraphNodeRecord(
+            id=str(uuid.uuid4()),
+            config=config,
+            state=AgentState.INITIALIZING,
+        )
+        workspace_store.upsert_node_record(record)
+        slot_node_ids[slot.id] = record.id
+
+    for blueprint_edge in blueprint.edges:
+        from_node_id = (
+            tab.leader_id
+            if blueprint_edge.from_slot_id == LEADER_BLUEPRINT_ANCHOR
+            else slot_node_ids.get(blueprint_edge.from_slot_id)
+        )
+        to_node_id = (
+            tab.leader_id
+            if blueprint_edge.to_slot_id == LEADER_BLUEPRINT_ANCHOR
+            else slot_node_ids.get(blueprint_edge.to_slot_id)
+        )
+        if from_node_id is None or to_node_id is None:
+            raise ValueError("Blueprint edge references an unknown slot")
+        _, error = create_edge(
+            from_node_id=from_node_id,
+            to_node_id=to_node_id,
+        )
+        if error is not None:
+            raise ValueError(error)
+
+
+def save_tab_as_blueprint(
+    *,
+    tab_id: str,
+    name: str,
+    description: str = "",
+) -> tuple[RouteBlueprint | None, str | None]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None, f"Tab '{tab_id}' not found"
+    if tab.leader_id is None:
+        return None, f"Tab '{tab_id}' does not have a bound Leader"
+
+    slot_id_by_node_id: dict[str, str] = {}
+    slots: list[BlueprintSlot] = []
+    for index, record in enumerate(
+        record for record in _sorted_tab_nodes(tab.id) if record.id != tab.leader_id
+    ):
+        if record.config.role_name is None or not record.config.role_name.strip():
+            return None, f"Node '{record.id}' does not have a role_name"
+        slot_id = f"slot-{index + 1}"
+        slot_id_by_node_id[record.id] = slot_id
+        slots.append(
+            BlueprintSlot(
+                id=slot_id,
+                role_name=record.config.role_name,
+                display_name=record.config.name,
+            )
+        )
+
+    edges: list[BlueprintEdge] = []
+    for edge in _sorted_tab_edges(tab.id):
+        from_slot_id: str | None
+        if edge.from_node_id == tab.leader_id:
+            from_slot_id = LEADER_BLUEPRINT_ANCHOR
+        else:
+            from_slot_id = slot_id_by_node_id.get(edge.from_node_id)
+        to_slot_id: str | None
+        if edge.to_node_id == tab.leader_id:
+            to_slot_id = LEADER_BLUEPRINT_ANCHOR
+        else:
+            to_slot_id = slot_id_by_node_id.get(edge.to_node_id)
+        if from_slot_id is None or to_slot_id is None:
+            return None, "Route contains an edge that points outside the current tab"
+        edges.append(
+            BlueprintEdge(
+                from_slot_id=from_slot_id,
+                to_slot_id=to_slot_id,
+            )
+        )
+
+    return create_blueprint(
+        name=name,
+        description=description,
+        slots=slots,
+        edges=edges,
+    )
+
+
 def create_tab(
     *,
     title: str,
     goal: str = "",
     allow_network: bool = False,
     write_dirs: list[str] | None = None,
+    blueprint_id: str | None = None,
 ) -> Tab:
     settings = settings_module.get_settings()
+    blueprint = None
+    if isinstance(blueprint_id, str) and blueprint_id.strip():
+        blueprint = workspace_store.get_blueprint(blueprint_id.strip())
+        if blueprint is None:
+            raise ValueError(f"Blueprint '{blueprint_id.strip()}' not found")
+        blueprint_error = _validate_blueprint_for_tab(blueprint)
+        if blueprint_error is not None:
+            raise ValueError(blueprint_error)
     leader_id = str(uuid.uuid4())
     tab = Tab(
         id=str(uuid.uuid4()),
         title=title.strip(),
         goal=goal.strip(),
         leader_id=leader_id,
+        route_blueprint_id=blueprint.id if blueprint is not None else None,
+        route_blueprint_name=blueprint.name if blueprint is not None else None,
+        route_blueprint_version=blueprint.version if blueprint is not None else None,
+        route_blueprint_slots=list(blueprint.slots) if blueprint is not None else [],
+        route_blueprint_edges=list(blueprint.edges) if blueprint is not None else [],
     )
     workspace_store.upsert_tab(tab)
     leader_record = _build_leader_record(
@@ -300,8 +691,14 @@ def create_tab(
         write_dirs=write_dirs,
     )
     workspace_store.upsert_node_record(leader_record)
+    try:
+        if blueprint is not None:
+            _materialize_blueprint_route(tab=tab, blueprint=blueprint)
+    except Exception:
+        workspace_store.delete_tab(tab.id)
+        raise
     if registry.get_all():
-        _start_persisted_agent(record=leader_record)
+        _start_tab_runtime(tab.id)
     event_bus.emit(
         Event(
             type=EventType.TAB_CREATED,
@@ -566,10 +963,6 @@ def create_agent_node(
         return None, error
     if config.role_name == CONDUCTOR_ROLE_NAME:
         return None, f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a tab Leader"
-    if config.name:
-        for existing in workspace_store.list_node_records():
-            if existing.config.name == config.name:
-                return None, f"Node name '{config.name}' already exists"
 
     node_id = str(uuid.uuid4())
     record = GraphNodeRecord(
@@ -601,6 +994,13 @@ def _finalize_agent_creation(
         )
         if edge_error is not None:
             return None, edge_error
+    if record.config.tab_id is not None and (
+        not connect_to_creator or creator_node_id is None
+    ):
+        _emit_tab_updated(
+            tab_id=record.config.tab_id,
+            agent_id=creator_node_id or record.id,
+        )
     return started_record, None
 
 
@@ -637,6 +1037,10 @@ def create_edge(
     target = registry.get(to_node_id)
     if source is not None and target is not None:
         connect_nodes(from_node_id, to_node_id)
+    _emit_tab_updated(
+        tab_id=edge.tab_id,
+        agent_id=from_node_id,
+    )
     return edge, None
 
 

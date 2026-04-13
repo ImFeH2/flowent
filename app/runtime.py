@@ -134,6 +134,7 @@ def bootstrap_runtime() -> None:
                 tools=list(record.config.tools),
                 write_dirs=list(record.config.write_dirs),
                 allow_network=record.config.allow_network,
+                blueprint_slot_id=record.config.blueprint_slot_id,
             ),
             uuid=record.id,
         )

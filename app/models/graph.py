@@ -83,6 +83,7 @@ class GraphNodeRecord:
                 "tools": list(self.config.tools),
                 "write_dirs": list(self.config.write_dirs),
                 "allow_network": self.config.allow_network,
+                "blueprint_slot_id": self.config.blueprint_slot_id,
             },
             "state": self.state.value,
             "todos": [item.serialize() for item in self.todos],
@@ -170,6 +171,12 @@ class GraphNodeRecord:
                 if isinstance(config.get("write_dirs"), list)
                 else [],
                 allow_network=bool(config.get("allow_network", False)),
+                blueprint_slot_id=(
+                    str(config["blueprint_slot_id"])
+                    if isinstance(config.get("blueprint_slot_id"), str)
+                    and str(config["blueprint_slot_id"]).strip()
+                    else None
+                ),
             ),
             state=state,
             todos=todos,

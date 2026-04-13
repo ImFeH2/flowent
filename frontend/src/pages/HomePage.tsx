@@ -9,19 +9,31 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  ArrowLeft,
+  BookCopy,
   Bot,
   Link2,
+  Pencil,
   Plus,
   PanelRightClose,
   PanelRightOpen,
   Radio,
+  Save,
   Shield,
   Trash2,
   X,
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
-import type { HistoryEntry, Node, Role } from "@/types";
+import type {
+  BlueprintEdge,
+  BlueprintSlot,
+  HistoryEntry,
+  Node,
+  Role,
+  RouteBlueprint,
+  TaskTab,
+} from "@/types";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -49,12 +61,17 @@ import {
 import { PanelResizer } from "@/components/PanelResizer";
 import { getAssistantNode } from "@/lib/assistant";
 import {
+  createBlueprintRequest,
   fetchRoles,
+  fetchBlueprints,
   createTabEdgeRequest,
   createTabNodeRequest,
   createTabRequest,
+  deleteBlueprintRequest,
   deleteTabRequest,
   interruptNode,
+  saveTabAsBlueprintRequest,
+  updateBlueprintRequest,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -95,10 +112,33 @@ type WorkspaceDialogKind =
   | "create-tab"
   | "create-agent"
   | "connect-agents"
+  | "save-blueprint"
   | "delete-tab"
   | null;
 
 type AssistantPanelView = "chat" | "detail";
+type WorkspacePanelView = "assistant" | "blueprints";
+type BlueprintEditorMode = "create" | "edit" | null;
+
+function createBlueprintSlotDraft(roleName = "Worker"): BlueprintSlot {
+  return {
+    id:
+      globalThis.crypto?.randomUUID?.() ??
+      `slot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role_name: roleName,
+    display_name: null,
+  };
+}
+
+function createBlueprintEdgeDraft(
+  fromSlotId = "leader",
+  toSlotId = "",
+): BlueprintEdge {
+  return {
+    from_slot_id: fromSlotId,
+    to_slot_id: toSlotId,
+  };
+}
 
 export function HomePage() {
   const { agents } = useAgentNodesRuntime();
@@ -114,6 +154,8 @@ export function HomePage() {
     setActiveTabId,
   } = useAgentUI();
   const [panelOpen, setPanelOpen] = useState(true);
+  const [workspacePanelView, setWorkspacePanelView] =
+    useState<WorkspacePanelView>("assistant");
   const [assistantPanelView, setAssistantPanelView] =
     useState<AssistantPanelView>("chat");
   const [interruptingAssistant, setInterruptingAssistant] = useState(false);
@@ -124,11 +166,38 @@ export function HomePage() {
   const [createTabGoal, setCreateTabGoal] = useState("");
   const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
   const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
+  const [createTabBlueprintId, setCreateTabBlueprintId] = useState("");
+  const [createTabBlueprintQuery, setCreateTabBlueprintQuery] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
+  const [blueprints, setBlueprints] = useState<RouteBlueprint[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
+  const [loadingBlueprints, setLoadingBlueprints] = useState(false);
   const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
   const [createAgentRoleQuery, setCreateAgentRoleQuery] = useState("");
   const [createAgentName, setCreateAgentName] = useState("");
+  const [selectedBlueprintId, setSelectedBlueprintId] = useState<string | null>(
+    null,
+  );
+  const [blueprintEditorMode, setBlueprintEditorMode] =
+    useState<BlueprintEditorMode>(null);
+  const [editingBlueprintId, setEditingBlueprintId] = useState<string | null>(
+    null,
+  );
+  const [blueprintDraftName, setBlueprintDraftName] = useState("");
+  const [blueprintDraftDescription, setBlueprintDraftDescription] =
+    useState("");
+  const [blueprintDraftSlots, setBlueprintDraftSlots] = useState<
+    BlueprintSlot[]
+  >([]);
+  const [blueprintDraftEdges, setBlueprintDraftEdges] = useState<
+    BlueprintEdge[]
+  >([]);
+  const [savingBlueprintEditor, setSavingBlueprintEditor] = useState(false);
+  const [deletingBlueprintId, setDeletingBlueprintId] = useState<string | null>(
+    null,
+  );
+  const [saveBlueprintName, setSaveBlueprintName] = useState("");
+  const [saveBlueprintDescription, setSaveBlueprintDescription] = useState("");
   const [connectSourceId, setConnectSourceId] = useState("");
   const [connectTargetId, setConnectTargetId] = useState("");
   const [deleteTabTarget, setDeleteTabTarget] = useState<{
@@ -195,6 +264,18 @@ export function HomePage() {
     }
   }, [isCompactWorkspace]);
 
+  const refreshBlueprints = useCallback(async () => {
+    setLoadingBlueprints(true);
+    try {
+      const items = await fetchBlueprints();
+      setBlueprints(items);
+    } catch {
+      toast.error("Failed to load blueprints");
+    } finally {
+      setLoadingBlueprints(false);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoadingRoles(true);
@@ -222,8 +303,18 @@ export function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    void refreshBlueprints();
+  }, [refreshBlueprints]);
+
   const selectedAgent = selectedAgentId ? agents.get(selectedAgentId) : null;
   const activeTab = activeTabId ? (tabs.get(activeTabId) ?? null) : null;
+  const selectedCreateTabBlueprint = useMemo(
+    () =>
+      blueprints.find((blueprint) => blueprint.id === createTabBlueprintId) ??
+      null,
+    [blueprints, createTabBlueprintId],
+  );
   const tabAgents = useMemo(
     () =>
       Array.from(agents.values()).filter(
@@ -258,6 +349,42 @@ export function HomePage() {
       `${role.name} ${role.description}`.toLowerCase().includes(query),
     );
   }, [createAgentRoleQuery, roles]);
+  const filteredCreateTabBlueprints = useMemo(() => {
+    const query = createTabBlueprintQuery.trim().toLowerCase();
+    if (!query) {
+      return blueprints;
+    }
+    return blueprints.filter((blueprint) =>
+      `${blueprint.name} ${blueprint.description}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [blueprints, createTabBlueprintQuery]);
+
+  useEffect(() => {
+    if (blueprints.length === 0) {
+      if (selectedBlueprintId !== null) {
+        setSelectedBlueprintId(null);
+      }
+      return;
+    }
+    if (
+      selectedBlueprintId !== null &&
+      blueprints.some((blueprint) => blueprint.id === selectedBlueprintId)
+    ) {
+      return;
+    }
+    const sourceBlueprintId = activeTab?.route_source.blueprint_id;
+    if (
+      sourceBlueprintId &&
+      blueprints.some((blueprint) => blueprint.id === sourceBlueprintId)
+    ) {
+      setSelectedBlueprintId(sourceBlueprintId);
+      return;
+    }
+    setSelectedBlueprintId(blueprints[0]?.id ?? null);
+  }, [activeTab?.route_source.blueprint_id, blueprints, selectedBlueprintId]);
+
   const panelVisible = panelOpen || !!selectedAgent;
   const resolvedPanelWidth = useMemo(() => {
     if (!isCompactWorkspace) {
@@ -300,12 +427,26 @@ export function HomePage() {
 
   const handleOpenAssistantDetails = useCallback(() => {
     setPanelOpen(true);
+    setWorkspacePanelView("assistant");
     setAssistantPanelView("detail");
   }, []);
 
   const handleCloseAssistantDetails = useCallback(() => {
     setAssistantPanelView("chat");
   }, []);
+
+  const openAssistantPanel = useCallback(() => {
+    setPanelOpen(true);
+    setWorkspacePanelView("assistant");
+    setAssistantPanelView("chat");
+  }, []);
+
+  const openBlueprintsPanel = useCallback(() => {
+    selectAgent(null);
+    setPanelOpen(true);
+    setAssistantPanelView("chat");
+    setWorkspacePanelView("blueprints");
+  }, [selectAgent]);
 
   const handleInterruptAssistant = useCallback(() => {
     if (!assistantId || interruptingAssistant) {
@@ -332,12 +473,221 @@ export function HomePage() {
     setPanelOpen(true);
   };
 
-  const renderAssistantPanel = () => {
+  const resetBlueprintEditor = useCallback(() => {
+    setBlueprintEditorMode(null);
+    setEditingBlueprintId(null);
+    setBlueprintDraftName("");
+    setBlueprintDraftDescription("");
+    setBlueprintDraftSlots([]);
+    setBlueprintDraftEdges([]);
+  }, []);
+
+  const startNewBlueprintEditor = useCallback(() => {
+    openBlueprintsPanel();
+    setBlueprintEditorMode("create");
+    setEditingBlueprintId(null);
+    setBlueprintDraftName("");
+    setBlueprintDraftDescription("");
+    setBlueprintDraftSlots([createBlueprintSlotDraft()]);
+    setBlueprintDraftEdges([]);
+  }, [openBlueprintsPanel]);
+
+  const startEditBlueprintEditor = useCallback(
+    (blueprint: RouteBlueprint) => {
+      openBlueprintsPanel();
+      setBlueprintEditorMode("edit");
+      setEditingBlueprintId(blueprint.id);
+      setBlueprintDraftName(blueprint.name);
+      setBlueprintDraftDescription(blueprint.description);
+      setBlueprintDraftSlots(
+        blueprint.slots.map((slot) => ({
+          id: slot.id,
+          role_name: slot.role_name,
+          display_name: slot.display_name,
+        })),
+      );
+      setBlueprintDraftEdges(
+        blueprint.edges.map((edge) => ({
+          from_slot_id: edge.from_slot_id,
+          to_slot_id: edge.to_slot_id,
+        })),
+      );
+    },
+    [openBlueprintsPanel],
+  );
+
+  const handleSaveBlueprintEditor = useCallback(async () => {
+    const name = blueprintDraftName.trim();
+    if (!name) {
+      return;
+    }
+    setSavingBlueprintEditor(true);
+    try {
+      const payload = {
+        name,
+        description: blueprintDraftDescription.trim(),
+        slots: blueprintDraftSlots.map((slot) => ({
+          id: slot.id,
+          role_name: slot.role_name.trim(),
+          display_name: slot.display_name?.trim() || null,
+        })),
+        edges: blueprintDraftEdges.map((edge) => ({
+          from_slot_id: edge.from_slot_id,
+          to_slot_id: edge.to_slot_id,
+        })),
+      };
+      const blueprint =
+        blueprintEditorMode === "edit" && editingBlueprintId
+          ? await updateBlueprintRequest(editingBlueprintId, payload)
+          : await createBlueprintRequest(payload);
+      await refreshBlueprints();
+      setSelectedBlueprintId(blueprint.id);
+      resetBlueprintEditor();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save blueprint",
+      );
+    } finally {
+      setSavingBlueprintEditor(false);
+    }
+  }, [
+    blueprintDraftDescription,
+    blueprintDraftEdges,
+    blueprintDraftName,
+    blueprintDraftSlots,
+    blueprintEditorMode,
+    editingBlueprintId,
+    refreshBlueprints,
+    resetBlueprintEditor,
+  ]);
+
+  const handleDeleteBlueprint = useCallback(
+    async (blueprintId: string) => {
+      setDeletingBlueprintId(blueprintId);
+      try {
+        await deleteBlueprintRequest(blueprintId);
+        await refreshBlueprints();
+        if (editingBlueprintId === blueprintId) {
+          resetBlueprintEditor();
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to delete blueprint",
+        );
+      } finally {
+        setDeletingBlueprintId(null);
+      }
+    },
+    [editingBlueprintId, refreshBlueprints, resetBlueprintEditor],
+  );
+
+  const addBlueprintDraftSlot = useCallback(() => {
+    setBlueprintDraftSlots((current) => [
+      ...current,
+      createBlueprintSlotDraft(),
+    ]);
+  }, []);
+
+  const updateBlueprintDraftSlot = useCallback(
+    (slotId: string, field: "role_name" | "display_name", value: string) => {
+      setBlueprintDraftSlots((current) =>
+        current.map((slot) =>
+          slot.id === slotId
+            ? {
+                ...slot,
+                [field]: field === "display_name" ? value || null : value,
+              }
+            : slot,
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeBlueprintDraftSlot = useCallback((slotId: string) => {
+    setBlueprintDraftSlots((current) =>
+      current.filter((slot) => slot.id !== slotId),
+    );
+    setBlueprintDraftEdges((current) =>
+      current.filter(
+        (edge) => edge.from_slot_id !== slotId && edge.to_slot_id !== slotId,
+      ),
+    );
+  }, []);
+
+  const addBlueprintDraftEdge = useCallback(() => {
+    const initialTarget = blueprintDraftSlots[0]?.id ?? "";
+    setBlueprintDraftEdges((current) => [
+      ...current,
+      createBlueprintEdgeDraft("leader", initialTarget),
+    ]);
+  }, [blueprintDraftSlots]);
+
+  const updateBlueprintDraftEdge = useCallback(
+    (index: number, field: "from_slot_id" | "to_slot_id", value: string) => {
+      setBlueprintDraftEdges((current) =>
+        current.map((edge, edgeIndex) =>
+          edgeIndex === index ? { ...edge, [field]: value } : edge,
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeBlueprintDraftEdge = useCallback((index: number) => {
+    setBlueprintDraftEdges((current) =>
+      current.filter((_, edgeIndex) => edgeIndex !== index),
+    );
+  }, []);
+
+  const renderPrimaryPanel = () => {
     if (assistantDetailVisible && assistantNode) {
       return (
         <AgentDetailPanel
           agent={assistantNode}
           onClose={handleCloseAssistantDetails}
+        />
+      );
+    }
+
+    if (workspacePanelView === "blueprints") {
+      return blueprintEditorMode ? (
+        <BlueprintEditorPanel
+          blueprints={blueprints}
+          draftDescription={blueprintDraftDescription}
+          draftEdges={blueprintDraftEdges}
+          draftName={blueprintDraftName}
+          draftSlots={blueprintDraftSlots}
+          editing={blueprintEditorMode === "edit"}
+          loadingRoles={loadingRoles}
+          roles={roles}
+          saving={savingBlueprintEditor}
+          onAddEdge={addBlueprintDraftEdge}
+          onAddSlot={addBlueprintDraftSlot}
+          onBack={resetBlueprintEditor}
+          onChangeEdge={updateBlueprintDraftEdge}
+          onChangeName={setBlueprintDraftName}
+          onChangeDescription={setBlueprintDraftDescription}
+          onChangeSlot={updateBlueprintDraftSlot}
+          onRemoveEdge={removeBlueprintDraftEdge}
+          onRemoveSlot={removeBlueprintDraftSlot}
+          onSave={() => void handleSaveBlueprintEditor()}
+        />
+      ) : (
+        <BlueprintLibraryPanel
+          activeTab={activeTab}
+          blueprints={blueprints}
+          deletingBlueprintId={deletingBlueprintId}
+          loading={loadingBlueprints}
+          selectedBlueprintId={selectedBlueprintId}
+          onDeleteBlueprint={(blueprintId) =>
+            void handleDeleteBlueprint(blueprintId)
+          }
+          onEditBlueprint={startEditBlueprintEditor}
+          onNewBlueprint={startNewBlueprintEditor}
+          onOpenAssistant={openAssistantPanel}
+          onSaveCurrentRoute={openSaveBlueprintDialog}
+          onSelectBlueprint={setSelectedBlueprintId}
         />
       );
     }
@@ -354,6 +704,10 @@ export function HomePage() {
   const openCreateTabDialog = () => {
     setCreateTabTitle("");
     setCreateTabGoal("");
+    setCreateTabAllowNetwork(false);
+    setCreateTabWriteDirs("");
+    setCreateTabBlueprintId("");
+    setCreateTabBlueprintQuery("");
     setActiveDialog("create-tab");
   };
 
@@ -373,6 +727,7 @@ export function HomePage() {
         createTabGoal.trim(),
         createTabAllowNetwork,
         writeDirsArray,
+        createTabBlueprintId || undefined,
       );
       setActiveTabId(tab.id);
       setActiveDialog(null);
@@ -380,9 +735,52 @@ export function HomePage() {
       setCreateTabGoal("");
       setCreateTabAllowNetwork(false);
       setCreateTabWriteDirs("");
+      setCreateTabBlueprintId("");
+      setCreateTabBlueprintQuery("");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create tab",
+      );
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  function openSaveBlueprintDialog() {
+    if (!activeTabId || !activeTab) {
+      toast.error("Create or select a tab first");
+      return;
+    }
+    setSaveBlueprintName(activeTab.title);
+    setSaveBlueprintDescription("");
+    setActiveDialog("save-blueprint");
+  }
+
+  const handleSaveCurrentRouteAsBlueprint = async () => {
+    if (!activeTabId) {
+      return;
+    }
+    const name = saveBlueprintName.trim();
+    if (!name) {
+      return;
+    }
+    setPendingAction("save-blueprint");
+    try {
+      const blueprint = await saveTabAsBlueprintRequest(
+        activeTabId,
+        name,
+        saveBlueprintDescription.trim(),
+      );
+      await refreshBlueprints();
+      setSelectedBlueprintId(blueprint.id);
+      setWorkspacePanelView("blueprints");
+      setPanelOpen(true);
+      setActiveDialog(null);
+      setSaveBlueprintName("");
+      setSaveBlueprintDescription("");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save blueprint",
       );
     } finally {
       setPendingAction(null);
@@ -596,6 +994,17 @@ export function HomePage() {
 
           <div className="pointer-events-auto absolute bottom-4 left-1/2 z-40 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-[14px] border border-white/10 bg-[rgba(12,12,13,0.76)] p-0.5 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md">
             <ToolbarButton
+              active={workspacePanelView === "blueprints" && !selectedAgent}
+              onClick={() => {
+                resetBlueprintEditor();
+                openBlueprintsPanel();
+              }}
+            >
+              <BookCopy className="size-4 opacity-70" />
+              Blueprints
+            </ToolbarButton>
+            <ToolbarDivider />
+            <ToolbarButton
               disabled={!activeTabId}
               onClick={openCreateAgentDialog}
             >
@@ -667,7 +1076,7 @@ export function HomePage() {
                       )}
                       aria-hidden={selectedAgent ? true : undefined}
                     >
-                      {renderAssistantPanel()}
+                      {renderPrimaryPanel()}
                     </motion.div>
 
                     <AnimatePresence>
@@ -733,7 +1142,7 @@ export function HomePage() {
                     )}
                     aria-hidden={selectedAgent ? true : undefined}
                   >
-                    {renderAssistantPanel()}
+                    {renderPrimaryPanel()}
                   </motion.div>
 
                   <AnimatePresence>
@@ -809,6 +1218,96 @@ export function HomePage() {
             className="min-h-[116px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
           />
         </WorkspaceDialogField>
+        <WorkspaceDialogField label="Blueprint" hint="Optional">
+          <div className="space-y-3">
+            <Input
+              aria-label="Search blueprints"
+              value={createTabBlueprintQuery}
+              onChange={(event) =>
+                setCreateTabBlueprintQuery(event.target.value)
+              }
+              placeholder="Search blueprints"
+              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            />
+            {selectedCreateTabBlueprint ? (
+              <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] px-4 py-3">
+                <div className="text-[13px] font-medium text-white">
+                  {selectedCreateTabBlueprint.name}
+                </div>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                  {selectedCreateTabBlueprint.description || "No description"}
+                </p>
+                <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-white/35">
+                  {selectedCreateTabBlueprint.node_count} nodes ·{" "}
+                  {selectedCreateTabBlueprint.edge_count} edges
+                </p>
+              </div>
+            ) : null}
+            <div className="max-h-56 space-y-2 overflow-y-auto rounded-[1rem] border border-white/10 bg-black/14 p-2 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setCreateTabBlueprintId("")}
+                className={cn(
+                  "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors",
+                  !createTabBlueprintId
+                    ? "border-white/20 bg-white/[0.06]"
+                    : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                )}
+              >
+                <div className="text-[13px] font-medium text-white">
+                  Start blank
+                </div>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                  Create a tab with only its bound Leader. Permissions do not
+                  inherit from a blueprint.
+                </p>
+              </button>
+              {loadingBlueprints ? (
+                <p className="px-2 py-3 text-[12px] text-white/40">
+                  Loading blueprints...
+                </p>
+              ) : filteredCreateTabBlueprints.length === 0 ? (
+                <p className="px-2 py-3 text-[12px] text-white/40">
+                  No blueprints match your search.
+                </p>
+              ) : (
+                filteredCreateTabBlueprints.map((blueprint) => (
+                  <button
+                    key={blueprint.id}
+                    type="button"
+                    onClick={() => setCreateTabBlueprintId(blueprint.id)}
+                    className={cn(
+                      "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors",
+                      createTabBlueprintId === blueprint.id
+                        ? "border-white/20 bg-white/[0.06]"
+                        : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[13px] font-medium text-white">
+                        {blueprint.name}
+                      </div>
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/35">
+                        v{blueprint.version}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                      {blueprint.description || "No description"}
+                    </p>
+                    <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-white/35">
+                      {blueprint.node_count} nodes · {blueprint.edge_count}{" "}
+                      edges
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </WorkspaceDialogField>
+        <WorkspaceDialogMeta>
+          The selected Network Access and Write Dirs initialize the bound Leader
+          for this tab. They do not inherit from a blueprint.
+        </WorkspaceDialogMeta>
         <WorkspaceDialogField
           label="Network Access"
           hint="Allow the leader to connect to the internet"
@@ -843,6 +1342,63 @@ export function HomePage() {
             onChange={(event) => setCreateTabWriteDirs(event.target.value)}
             placeholder="/project/autopoe/frontend&#10;/project/autopoe/app"
             className="min-h-[80px] rounded-[1rem] border-white/10 bg-black/14 font-mono text-[13px] text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+      </WorkspaceCommandDialog>
+
+      <WorkspaceCommandDialog
+        open={activeDialog === "save-blueprint"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveDialog(null);
+          }
+        }}
+        title="Save as Blueprint"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setActiveDialog(null)}
+              disabled={pendingAction === "save-blueprint"}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleSaveCurrentRouteAsBlueprint()}
+              disabled={
+                !saveBlueprintName.trim() || pendingAction === "save-blueprint"
+              }
+            >
+              {pendingAction === "save-blueprint"
+                ? "Saving..."
+                : "Save as Blueprint"}
+            </Button>
+          </>
+        }
+      >
+        <WorkspaceDialogMeta>
+          This only saves the current route structure. History, runtime state,
+          todos, and permissions are not copied into the blueprint.
+        </WorkspaceDialogMeta>
+        <WorkspaceDialogField label="Name" hint="Required">
+          <Input
+            autoFocus
+            aria-label="Blueprint name"
+            value={saveBlueprintName}
+            onChange={(event) => setSaveBlueprintName(event.target.value)}
+            placeholder="Review Pipeline"
+            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+          />
+        </WorkspaceDialogField>
+        <WorkspaceDialogField label="Description" hint="Optional">
+          <Textarea
+            aria-label="Blueprint description"
+            value={saveBlueprintDescription}
+            onChange={(event) =>
+              setSaveBlueprintDescription(event.target.value)
+            }
+            placeholder="Describe the reusable collaboration architecture."
+            className="min-h-[116px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
           />
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>
@@ -1108,10 +1664,12 @@ export function HomePage() {
 function ToolbarButton({
   children,
   disabled = false,
+  active = false,
   onClick,
 }: {
   children: ReactNode;
   disabled?: boolean;
+  active?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1119,7 +1677,10 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex shrink-0 items-center gap-1.5 rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-white/68 transition-[background-color,border-color,color] duration-150 hover:border-white/8 hover:bg-white/[0.04] hover:text-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:bg-transparent"
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-white/68 transition-[background-color,border-color,color] duration-150 hover:border-white/8 hover:bg-white/[0.04] hover:text-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:bg-transparent",
+        active && "border-white/12 bg-white/[0.06] text-white",
+      )}
     >
       {children}
     </button>
@@ -1147,6 +1708,565 @@ function BadgeChip({
       )}
     >
       {children}
+    </div>
+  );
+}
+
+function BlueprintLibraryPanel({
+  activeTab,
+  blueprints,
+  deletingBlueprintId,
+  loading,
+  selectedBlueprintId,
+  onDeleteBlueprint,
+  onEditBlueprint,
+  onNewBlueprint,
+  onOpenAssistant,
+  onSaveCurrentRoute,
+  onSelectBlueprint,
+}: {
+  activeTab: TaskTab | null;
+  blueprints: RouteBlueprint[];
+  deletingBlueprintId: string | null;
+  loading: boolean;
+  selectedBlueprintId: string | null;
+  onDeleteBlueprint: (blueprintId: string) => void;
+  onEditBlueprint: (blueprint: RouteBlueprint) => void;
+  onNewBlueprint: () => void;
+  onOpenAssistant: () => void;
+  onSaveCurrentRoute: () => void;
+  onSelectBlueprint: (blueprintId: string) => void;
+}) {
+  const selectedBlueprint =
+    blueprints.find((blueprint) => blueprint.id === selectedBlueprintId) ??
+    null;
+  const routeSource = activeTab?.route_source ?? null;
+  const selectedSourceBlueprint =
+    routeSource?.blueprint_id != null &&
+    selectedBlueprint?.id === routeSource.blueprint_id;
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
+        <div>
+          <div className="text-[0.95rem] font-medium text-white">
+            Blueprints
+          </div>
+          <p className="mt-1 text-[12px] text-white/45">
+            Global route blueprints for reusable task structure.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onOpenAssistant}>
+            Assistant
+          </Button>
+          <Button size="sm" onClick={onNewBlueprint}>
+            New Blueprint
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 scrollbar-none">
+        {activeTab ? (
+          <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-white/36">
+                  Current Route
+                </div>
+                <div className="mt-2 text-[14px] text-white">
+                  {activeTab.title}
+                </div>
+              </div>
+              <Button size="sm" onClick={onSaveCurrentRoute}>
+                <Save className="mr-1 size-3.5" />
+                Save Current Route
+              </Button>
+            </div>
+            <div className="mt-3 rounded-[0.9rem] border border-white/8 bg-black/16 px-3 py-3">
+              <div className="text-[11px] uppercase tracking-[0.14em] text-white/36">
+                Source State
+              </div>
+              <div className="mt-2 text-[13px] font-medium text-white">
+                {routeSource?.state === "manual"
+                  ? "Manual"
+                  : routeSource?.state === "blueprint-derived"
+                    ? "Blueprint-derived"
+                    : "Drifted"}
+              </div>
+              <p className="mt-1 text-[12px] leading-relaxed text-white/48">
+                {routeSource?.blueprint_id
+                  ? routeSource.blueprint_available
+                    ? `Source: ${routeSource.blueprint_name ?? routeSource.blueprint_id} v${routeSource.blueprint_version ?? "?"}`
+                    : `Source blueprint deleted: ${routeSource.blueprint_name ?? routeSource.blueprint_id} v${routeSource.blueprint_version ?? "?"}`
+                  : "This route does not currently come from a blueprint."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] p-4 text-[12px] leading-relaxed text-white/48">
+            Blueprint Library stays available even when no task tab is active.
+          </div>
+        )}
+
+        <div className="rounded-[1rem] border border-white/10 bg-black/14 p-2">
+          {loading ? (
+            <div className="px-3 py-6 text-[12px] text-white/40">
+              Loading blueprints...
+            </div>
+          ) : blueprints.length === 0 ? (
+            <div className="px-3 py-6 text-[12px] text-white/40">
+              No blueprints yet. Create one from scratch or save the current
+              route as a blueprint.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {blueprints.map((blueprint) => {
+                const isSelected = blueprint.id === selectedBlueprintId;
+                const isSource = blueprint.id === routeSource?.blueprint_id;
+                return (
+                  <button
+                    key={blueprint.id}
+                    type="button"
+                    onClick={() => onSelectBlueprint(blueprint.id)}
+                    className={cn(
+                      "w-full rounded-[0.9rem] border px-3 py-3 text-left transition-colors",
+                      isSelected
+                        ? "border-white/16 bg-white/[0.06]"
+                        : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[13px] font-medium text-white">
+                        {blueprint.name}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isSource ? (
+                          <span className="rounded-full border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white/62">
+                            Source v{routeSource?.blueprint_version ?? "?"}
+                          </span>
+                        ) : null}
+                        <span className="text-[10px] uppercase tracking-[0.12em] text-white/36">
+                          v{blueprint.version}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-[12px] leading-relaxed text-white/48">
+                      {blueprint.description || "No description"}
+                    </p>
+                    <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-white/34">
+                      {blueprint.node_count} nodes · {blueprint.edge_count}{" "}
+                      edges
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {selectedBlueprint ? (
+          <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[14px] font-medium text-white">
+                  {selectedBlueprint.name}
+                </div>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/48">
+                  {selectedBlueprint.description || "No description"}
+                </p>
+                <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-white/34">
+                  Version {selectedBlueprint.version}
+                  {selectedSourceBlueprint ? " · Current route source" : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEditBlueprint(selectedBlueprint)}
+                >
+                  <Pencil className="mr-1 size-3.5" />
+                  Edit
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={deletingBlueprintId === selectedBlueprint.id}
+                  onClick={() => onDeleteBlueprint(selectedBlueprint.id)}
+                >
+                  <Trash2 className="mr-1 size-3.5" />
+                  {deletingBlueprintId === selectedBlueprint.id
+                    ? "Deleting..."
+                    : "Delete"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-[0.9rem] border border-white/8 bg-black/16 p-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-white/34">
+                  Slots
+                </div>
+                {selectedBlueprint.slots.length === 0 ? (
+                  <p className="mt-2 text-[12px] text-white/40">
+                    No regular nodes in this blueprint.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {selectedBlueprint.slots.map((slot) => (
+                      <div
+                        key={slot.id}
+                        className="rounded-[0.8rem] border border-white/8 bg-white/[0.03] px-3 py-2"
+                      >
+                        <div className="text-[12px] font-medium text-white">
+                          {slot.display_name || slot.role_name}
+                        </div>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-white/34">
+                          {slot.role_name}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-[0.9rem] border border-white/8 bg-black/16 p-3">
+                <div className="text-[11px] uppercase tracking-[0.14em] text-white/34">
+                  Edges
+                </div>
+                {selectedBlueprint.edges.length === 0 ? (
+                  <p className="mt-2 text-[12px] text-white/40">
+                    No edges in this blueprint.
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {selectedBlueprint.edges.map((edge, index) => (
+                      <div
+                        key={`${edge.from_slot_id}-${edge.to_slot_id}-${index}`}
+                        className="rounded-[0.8rem] border border-white/8 bg-white/[0.03] px-3 py-2 text-[12px] text-white/70"
+                      >
+                        {edge.from_slot_id} → {edge.to_slot_id}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function BlueprintEditorPanel({
+  blueprints,
+  draftDescription,
+  draftEdges,
+  draftName,
+  draftSlots,
+  editing,
+  loadingRoles,
+  roles,
+  saving,
+  onAddEdge,
+  onAddSlot,
+  onBack,
+  onChangeDescription,
+  onChangeEdge,
+  onChangeName,
+  onChangeSlot,
+  onRemoveEdge,
+  onRemoveSlot,
+  onSave,
+}: {
+  blueprints: RouteBlueprint[];
+  draftDescription: string;
+  draftEdges: BlueprintEdge[];
+  draftName: string;
+  draftSlots: BlueprintSlot[];
+  editing: boolean;
+  loadingRoles: boolean;
+  roles: Role[];
+  saving: boolean;
+  onAddEdge: () => void;
+  onAddSlot: () => void;
+  onBack: () => void;
+  onChangeDescription: (value: string) => void;
+  onChangeEdge: (
+    index: number,
+    field: "from_slot_id" | "to_slot_id",
+    value: string,
+  ) => void;
+  onChangeName: (value: string) => void;
+  onChangeSlot: (
+    slotId: string,
+    field: "role_name" | "display_name",
+    value: string,
+  ) => void;
+  onRemoveEdge: (index: number) => void;
+  onRemoveSlot: (slotId: string) => void;
+  onSave: () => void;
+}) {
+  const edgeTargets = useMemo(
+    () => [
+      { id: "leader", label: "Leader" },
+      ...draftSlots.map((slot) => ({
+        id: slot.id,
+        label: slot.display_name || slot.role_name || slot.id,
+      })),
+    ],
+    [draftSlots],
+  );
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ArrowLeft className="mr-1 size-3.5" />
+            Back
+          </Button>
+          <div>
+            <div className="text-[0.95rem] font-medium text-white">
+              {editing ? "Edit Blueprint" : "New Blueprint"}
+            </div>
+            <p className="mt-1 text-[12px] text-white/45">
+              Define slots and explicit route edges.
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          disabled={!draftName.trim() || saving}
+          onClick={onSave}
+        >
+          <Save className="mr-1 size-3.5" />
+          {saving
+            ? "Saving..."
+            : editing
+              ? "Update Blueprint"
+              : "Create Blueprint"}
+        </Button>
+      </div>
+
+      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4 scrollbar-none">
+        <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] p-4">
+          <WorkspaceDialogField label="Name" hint="Required">
+            <Input
+              aria-label="Blueprint draft name"
+              value={draftName}
+              onChange={(event) => onChangeName(event.target.value)}
+              placeholder="Review Pipeline"
+              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            />
+          </WorkspaceDialogField>
+          <div className="mt-4">
+            <WorkspaceDialogField label="Description" hint="Optional">
+              <Textarea
+                aria-label="Blueprint draft description"
+                value={draftDescription}
+                onChange={(event) => onChangeDescription(event.target.value)}
+                placeholder="Describe the reusable collaboration structure."
+                className="min-h-[112px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+              />
+            </WorkspaceDialogField>
+          </div>
+        </div>
+
+        <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-medium text-white">Slots</div>
+              <p className="mt-1 text-[12px] text-white/45">
+                Define the regular nodes that will be materialized for a tab.
+              </p>
+            </div>
+            <Button size="sm" onClick={onAddSlot}>
+              <Plus className="mr-1 size-3.5" />
+              Add Slot
+            </Button>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {draftSlots.length === 0 ? (
+              <p className="text-[12px] text-white/40">
+                No slots yet. Add a slot to define the blueprint graph.
+              </p>
+            ) : (
+              draftSlots.map((slot) => (
+                <div
+                  key={slot.id}
+                  className="rounded-[0.95rem] border border-white/10 bg-black/16 p-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[11px] uppercase tracking-[0.14em] text-white/34">
+                      {slot.id}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemoveSlot(slot.id)}
+                    >
+                      <Trash2 className="mr-1 size-3.5" />
+                      Remove
+                    </Button>
+                  </div>
+                  <div className="mt-3 grid gap-3">
+                    <WorkspaceDialogField label="Role" hint="Required">
+                      <Select
+                        value={slot.role_name}
+                        onValueChange={(value) =>
+                          onChangeSlot(slot.id, "role_name", value)
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={`Blueprint slot role ${slot.id}`}
+                          className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8"
+                        >
+                          <SelectValue placeholder="Choose role" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
+                          {loadingRoles ? (
+                            <SelectItem value="__loading" disabled>
+                              Loading roles...
+                            </SelectItem>
+                          ) : (
+                            roles.map((role) => (
+                              <SelectItem key={role.name} value={role.name}>
+                                {role.name}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </WorkspaceDialogField>
+                    <WorkspaceDialogField label="Display Name" hint="Optional">
+                      <Input
+                        aria-label={`Blueprint slot display name ${slot.id}`}
+                        value={slot.display_name ?? ""}
+                        onChange={(event) =>
+                          onChangeSlot(
+                            slot.id,
+                            "display_name",
+                            event.target.value,
+                          )
+                        }
+                        placeholder="Docs Worker"
+                        className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+                      />
+                    </WorkspaceDialogField>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-medium text-white">Edges</div>
+              <p className="mt-1 text-[12px] text-white/45">
+                Connect the Leader anchor and blueprint slots with explicit
+                edges.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              disabled={draftSlots.length === 0}
+              onClick={onAddEdge}
+            >
+              <Plus className="mr-1 size-3.5" />
+              Add Edge
+            </Button>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {draftEdges.length === 0 ? (
+              <p className="text-[12px] text-white/40">
+                No edges yet. Add an edge to define the route topology.
+              </p>
+            ) : (
+              draftEdges.map((edge, index) => (
+                <div
+                  key={`${edge.from_slot_id}-${edge.to_slot_id}-${index}`}
+                  className="rounded-[0.95rem] border border-white/10 bg-black/16 p-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[11px] uppercase tracking-[0.14em] text-white/34">
+                      Edge {index + 1}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onRemoveEdge(index)}
+                    >
+                      <Trash2 className="mr-1 size-3.5" />
+                      Remove
+                    </Button>
+                  </div>
+                  <div className="mt-3 grid gap-3">
+                    <WorkspaceDialogField label="Source">
+                      <Select
+                        value={edge.from_slot_id}
+                        onValueChange={(value) =>
+                          onChangeEdge(index, "from_slot_id", value)
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={`Blueprint edge source ${index + 1}`}
+                          className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8"
+                        >
+                          <SelectValue placeholder="Choose source" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
+                          {edgeTargets.map((target) => (
+                            <SelectItem key={target.id} value={target.id}>
+                              {target.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </WorkspaceDialogField>
+                    <WorkspaceDialogField label="Target">
+                      <Select
+                        value={edge.to_slot_id}
+                        onValueChange={(value) =>
+                          onChangeEdge(index, "to_slot_id", value)
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={`Blueprint edge target ${index + 1}`}
+                          className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8"
+                        >
+                          <SelectValue placeholder="Choose target" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
+                          {edgeTargets.map((target) => (
+                            <SelectItem key={target.id} value={target.id}>
+                              {target.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </WorkspaceDialogField>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {blueprints.length > 0 ? (
+            <p className="mt-4 text-[12px] leading-relaxed text-white/40">
+              Existing blueprints stay independent. Editing this blueprint
+              creates a new version and does not silently rewrite existing
+              routes.
+            </p>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

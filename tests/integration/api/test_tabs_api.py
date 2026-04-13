@@ -146,3 +146,152 @@ def test_create_tab_rejects_reserved_conductor_role_for_regular_nodes(
     assert reserved_role_response.json()["detail"] == (
         "Role 'Conductor' is reserved for a tab Leader"
     )
+
+
+def test_create_tab_from_blueprint_materializes_route(client: TestClient):
+    blueprint_response = client.post(
+        "/api/blueprints",
+        json={
+            "name": "Review Pipeline",
+            "description": "Leader fans out to implementation",
+            "slots": [
+                {
+                    "id": "slot-review",
+                    "role_name": "Worker",
+                    "display_name": "Primary Reviewer",
+                },
+                {
+                    "id": "slot-design",
+                    "role_name": "Designer",
+                    "display_name": "UI Designer",
+                },
+            ],
+            "edges": [
+                {"from_slot_id": "leader", "to_slot_id": "slot-review"},
+                {"from_slot_id": "slot-review", "to_slot_id": "slot-design"},
+            ],
+        },
+    )
+
+    assert blueprint_response.status_code == 200
+    blueprint = blueprint_response.json()
+    assert blueprint["node_count"] == 2
+    assert blueprint["edge_count"] == 2
+
+    create_tab_response = client.post(
+        "/api/tabs",
+        json={
+            "title": "Blueprint Task",
+            "goal": "Apply the saved route",
+            "blueprint_id": blueprint["id"],
+        },
+    )
+
+    assert create_tab_response.status_code == 200
+    tab = create_tab_response.json()
+    assert tab["node_count"] == 3
+    assert tab["edge_count"] == 2
+    assert tab["route_source"] == {
+        "state": "blueprint-derived",
+        "blueprint_id": blueprint["id"],
+        "blueprint_name": "Review Pipeline",
+        "blueprint_version": 1,
+        "blueprint_available": True,
+    }
+
+    tab_detail_response = client.get(f"/api/tabs/{tab['id']}")
+
+    assert tab_detail_response.status_code == 200
+    tab_detail = tab_detail_response.json()
+    assert tab_detail["tab"]["route_source"]["state"] == "blueprint-derived"
+    assert {node["name"] for node in tab_detail["nodes"]} == {
+        "Leader",
+        "Primary Reviewer",
+        "UI Designer",
+    }
+    assert len(tab_detail["edges"]) == 2
+
+
+def test_save_route_as_blueprint_and_mark_drifted_after_manual_change(
+    client: TestClient,
+):
+    create_tab_response = client.post(
+        "/api/tabs",
+        json={"title": "Manual Route", "goal": "Build and reuse"},
+    )
+    assert create_tab_response.status_code == 200
+    tab = create_tab_response.json()
+    tab_id = tab["id"]
+
+    detail_response = client.get(f"/api/tabs/{tab_id}")
+    assert detail_response.status_code == 200
+    leader_id = next(
+        node["id"]
+        for node in detail_response.json()["nodes"]
+        if node["is_leader"] is True
+    )
+
+    reader_response = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Reader"},
+    )
+    writer_response = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Designer", "name": "Writer"},
+    )
+    assert reader_response.status_code == 200
+    assert writer_response.status_code == 200
+    reader_id = reader_response.json()["id"]
+    writer_id = writer_response.json()["id"]
+
+    first_edge_response = client.post(
+        f"/api/tabs/{tab_id}/edges",
+        json={"from_node_id": leader_id, "to_node_id": reader_id},
+    )
+    second_edge_response = client.post(
+        f"/api/tabs/{tab_id}/edges",
+        json={"from_node_id": reader_id, "to_node_id": writer_id},
+    )
+    assert first_edge_response.status_code == 200
+    assert second_edge_response.status_code == 200
+
+    save_blueprint_response = client.post(
+        f"/api/tabs/{tab_id}/blueprint",
+        json={
+            "name": "Saved Manual Route",
+            "description": "Derived from the current route",
+        },
+    )
+
+    assert save_blueprint_response.status_code == 200
+    blueprint = save_blueprint_response.json()
+    assert blueprint["node_count"] == 2
+    assert blueprint["edge_count"] == 2
+
+    derived_tab_response = client.post(
+        "/api/tabs",
+        json={
+            "title": "Derived Route",
+            "goal": "Start from blueprint",
+            "blueprint_id": blueprint["id"],
+        },
+    )
+    assert derived_tab_response.status_code == 200
+    derived_tab = derived_tab_response.json()
+    assert derived_tab["route_source"]["state"] == "blueprint-derived"
+
+    extra_node_response = client.post(
+        f"/api/tabs/{derived_tab['id']}/nodes",
+        json={"role_name": "Worker", "name": "Extra Worker"},
+    )
+    assert extra_node_response.status_code == 200
+
+    updated_detail_response = client.get(f"/api/tabs/{derived_tab['id']}")
+    assert updated_detail_response.status_code == 200
+    assert updated_detail_response.json()["tab"]["route_source"] == {
+        "state": "drifted",
+        "blueprint_id": blueprint["id"],
+        "blueprint_name": "Saved Manual Route",
+        "blueprint_version": 1,
+        "blueprint_available": True,
+    }

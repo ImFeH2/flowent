@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.models import GraphEdge, GraphNodeRecord, Tab
+from app.models import GraphEdge, GraphNodeRecord, RouteBlueprint, Tab
 
 
 def _get_workspace_file() -> Path:
@@ -21,12 +21,16 @@ class WorkspaceSnapshot:
     tabs: dict[str, Tab] = field(default_factory=dict)
     nodes: dict[str, GraphNodeRecord] = field(default_factory=dict)
     edges: dict[str, GraphEdge] = field(default_factory=dict)
+    blueprints: dict[str, RouteBlueprint] = field(default_factory=dict)
 
     def serialize(self) -> dict[str, object]:
         return {
             "tabs": [tab.serialize() for tab in self.tabs.values()],
             "nodes": [node.serialize() for node in self.nodes.values()],
             "edges": [edge.serialize() for edge in self.edges.values()],
+            "blueprints": [
+                blueprint.serialize() for blueprint in self.blueprints.values()
+            ],
         }
 
     @classmethod
@@ -34,6 +38,7 @@ class WorkspaceSnapshot:
         raw_tabs = data.get("tabs")
         raw_nodes = data.get("nodes")
         raw_edges = data.get("edges")
+        raw_blueprints = data.get("blueprints")
         tabs = {
             tab.id: tab
             for tab in (
@@ -58,7 +63,16 @@ class WorkspaceSnapshot:
                 if isinstance(item, dict)
             )
         }
-        return cls(tabs=tabs, nodes=nodes, edges=edges)
+        blueprints = {
+            blueprint.id: blueprint
+            for blueprint in (
+                RouteBlueprint.from_mapping(item)
+                for item in (raw_blueprints if isinstance(raw_blueprints, list) else [])
+                if isinstance(item, dict)
+            )
+            if blueprint.id
+        }
+        return cls(tabs=tabs, nodes=nodes, edges=edges, blueprints=blueprints)
 
 
 class WorkspaceStore:
@@ -202,6 +216,28 @@ class WorkspaceStore:
                 return
             if edge.tab_id in snapshot.tabs:
                 snapshot.tabs[edge.tab_id].updated_at = time.time()
+            self._persist_snapshot(snapshot)
+
+    def list_blueprints(self) -> list[RouteBlueprint]:
+        with self._lock:
+            return list(self._load_snapshot().blueprints.values())
+
+    def get_blueprint(self, blueprint_id: str) -> RouteBlueprint | None:
+        with self._lock:
+            return self._load_snapshot().blueprints.get(blueprint_id)
+
+    def upsert_blueprint(self, blueprint: RouteBlueprint) -> None:
+        with self._lock:
+            snapshot = self._load_snapshot()
+            blueprint.updated_at = time.time()
+            snapshot.blueprints[blueprint.id] = blueprint
+            self._persist_snapshot(snapshot)
+
+    def delete_blueprint(self, blueprint_id: str) -> None:
+        with self._lock:
+            snapshot = self._load_snapshot()
+            if snapshot.blueprints.pop(blueprint_id, None) is None:
+                return
             self._persist_snapshot(snapshot)
 
 

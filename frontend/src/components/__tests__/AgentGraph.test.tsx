@@ -233,6 +233,13 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     leader_id: "leader-1",
     created_at: 1,
     updated_at: 1,
+    route_source: {
+      state: "manual",
+      blueprint_id: null,
+      blueprint_name: null,
+      blueprint_version: null,
+      blueprint_available: false,
+    },
     ...overrides,
   };
 }

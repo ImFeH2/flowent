@@ -15,6 +15,13 @@ export {
   createTabEdgeRequest,
 } from "./tabs";
 export {
+  fetchBlueprints,
+  createBlueprintRequest,
+  updateBlueprintRequest,
+  deleteBlueprintRequest,
+  saveTabAsBlueprintRequest,
+} from "./blueprints";
+export {
   fetchRoles,
   fetchRolesBootstrap,
   createRole,

@@ -23,6 +23,7 @@ class CreateTabRequest(BaseModel):
     goal: str = ""
     allow_network: bool = False
     write_dirs: list[str] = []
+    blueprint_id: str | None = None
 
 
 class CreateTabNodeRequest(BaseModel):
@@ -49,12 +50,16 @@ async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
     title = req.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="title must not be empty")
-    tab = create_tab(
-        title=title,
-        goal=req.goal,
-        allow_network=req.allow_network,
-        write_dirs=req.write_dirs,
-    )
+    try:
+        tab = create_tab(
+            title=title,
+            goal=req.goal,
+            allow_network=req.allow_network,
+            write_dirs=req.write_dirs,
+            blueprint_id=req.blueprint_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_tab_summary(tab)
 
 
@@ -66,7 +71,7 @@ async def get_tab(tab_id: str) -> dict[str, object]:
     nodes = list_tab_nodes(tab_id)
     edges = list_tab_edges(tab_id)
     return {
-        "tab": tab.serialize(),
+        "tab": serialize_tab_summary(tab),
         "nodes": [
             {
                 "id": node.id,

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.routes.assistant import router as assistant_router
+from app.routes.blueprints import router as blueprints_router
 from app.routes.meta import router as meta_router
 from app.routes.nodes import router as nodes_router
 from app.routes.prompts import router as prompts_router
@@ -13,6 +14,7 @@ from app.routes.ws import router as ws_router
 router = APIRouter()
 router.include_router(nodes_router)
 router.include_router(assistant_router)
+router.include_router(blueprints_router)
 router.include_router(roles_router)
 router.include_router(providers_router)
 router.include_router(prompts_router)

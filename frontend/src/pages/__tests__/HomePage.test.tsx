@@ -12,24 +12,34 @@ import type { ReactNode } from "react";
 
 const {
   clearChatMock,
+  createBlueprintRequestMock,
   fetchRolesMock,
+  fetchBlueprintsMock,
   createTabRequestMock,
   createTabNodeRequestMock,
   deleteTabRequestMock,
+  deleteBlueprintRequestMock,
   dispatchNodeMessageRequestMock,
   createTabEdgeRequestMock,
   interruptNodeMock,
+  saveTabAsBlueprintRequestMock,
   toastErrorMock,
+  updateBlueprintRequestMock,
 } = vi.hoisted(() => ({
   clearChatMock: vi.fn(),
+  createBlueprintRequestMock: vi.fn(),
   fetchRolesMock: vi.fn(),
+  fetchBlueprintsMock: vi.fn(),
   createTabRequestMock: vi.fn(),
   createTabNodeRequestMock: vi.fn(),
   deleteTabRequestMock: vi.fn(),
+  deleteBlueprintRequestMock: vi.fn(),
   dispatchNodeMessageRequestMock: vi.fn(),
   createTabEdgeRequestMock: vi.fn(),
   interruptNodeMock: vi.fn(),
+  saveTabAsBlueprintRequestMock: vi.fn(),
   toastErrorMock: vi.fn(),
+  updateBlueprintRequestMock: vi.fn(),
 }));
 
 const {
@@ -51,16 +61,25 @@ const {
 }));
 
 vi.mock("@/lib/api", () => ({
+  createBlueprintRequest: (...args: unknown[]) =>
+    createBlueprintRequestMock(...args),
   fetchRoles: (...args: unknown[]) => fetchRolesMock(...args),
+  fetchBlueprints: (...args: unknown[]) => fetchBlueprintsMock(...args),
   createTabRequest: (...args: unknown[]) => createTabRequestMock(...args),
   createTabNodeRequest: (...args: unknown[]) =>
     createTabNodeRequestMock(...args),
+  deleteBlueprintRequest: (...args: unknown[]) =>
+    deleteBlueprintRequestMock(...args),
   deleteTabRequest: (...args: unknown[]) => deleteTabRequestMock(...args),
   dispatchNodeMessageRequest: (...args: unknown[]) =>
     dispatchNodeMessageRequestMock(...args),
   createTabEdgeRequest: (...args: unknown[]) =>
     createTabEdgeRequestMock(...args),
   interruptNode: (...args: unknown[]) => interruptNodeMock(...args),
+  saveTabAsBlueprintRequest: (...args: unknown[]) =>
+    saveTabAsBlueprintRequestMock(...args),
+  updateBlueprintRequest: (...args: unknown[]) =>
+    updateBlueprintRequestMock(...args),
 }));
 
 vi.mock("@/context/AgentContext", () => ({
@@ -162,6 +181,13 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     leader_id: overrides.leader_id ?? "leader-1",
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 1,
+    route_source: overrides.route_source ?? {
+      state: "manual",
+      blueprint_id: null,
+      blueprint_name: null,
+      blueprint_version: null,
+      blueprint_available: false,
+    },
     node_count: overrides.node_count ?? 2,
     edge_count: overrides.edge_count ?? 1,
   };
@@ -187,14 +213,19 @@ function buildRole(
 describe("HomePage", () => {
   beforeEach(() => {
     clearChatMock.mockReset();
+    createBlueprintRequestMock.mockReset();
     fetchRolesMock.mockReset();
+    fetchBlueprintsMock.mockReset();
     createTabRequestMock.mockReset();
     createTabNodeRequestMock.mockReset();
     deleteTabRequestMock.mockReset();
+    deleteBlueprintRequestMock.mockReset();
     dispatchNodeMessageRequestMock.mockReset();
     createTabEdgeRequestMock.mockReset();
     interruptNodeMock.mockReset();
+    saveTabAsBlueprintRequestMock.mockReset();
     toastErrorMock.mockReset();
+    updateBlueprintRequestMock.mockReset();
 
     const assistant = buildNode({
       id: "assistant",
@@ -246,6 +277,7 @@ describe("HomePage", () => {
       buildRole({ name: "Reviewer", description: "Review results carefully" }),
       buildRole({ name: "Designer", description: "Frontend design role" }),
     ]);
+    fetchBlueprintsMock.mockResolvedValue([]);
 
     globalThis.ResizeObserver = class {
       observe() {}
@@ -267,6 +299,13 @@ describe("HomePage", () => {
       id: "tab-2",
       title: "Release Prep",
       goal: "Coordinate the launch work",
+      route_source: {
+        state: "manual",
+        blueprint_id: null,
+        blueprint_name: null,
+        blueprint_version: null,
+        blueprint_available: false,
+      },
     });
 
     render(<HomePage />);
@@ -286,9 +325,70 @@ describe("HomePage", () => {
         "Coordinate the launch work",
         false,
         [],
+        undefined,
       ),
     );
     expect(setActiveTabId).toHaveBeenCalledWith("tab-2");
+  });
+
+  it("opens the blueprint library and saves the current route as a blueprint", async () => {
+    fetchBlueprintsMock.mockResolvedValue([
+      {
+        id: "blueprint-1",
+        name: "Review Pipeline",
+        description: "Leader plus reviewers",
+        version: 1,
+        slots: [
+          {
+            id: "slot-1",
+            role_name: "Reviewer",
+            display_name: "Primary Reviewer",
+          },
+        ],
+        edges: [{ from_slot_id: "leader", to_slot_id: "slot-1" }],
+        created_at: 1,
+        updated_at: 1,
+        node_count: 1,
+        edge_count: 1,
+      },
+    ]);
+    saveTabAsBlueprintRequestMock.mockResolvedValue({
+      id: "blueprint-2",
+      name: "Saved Route",
+      description: "Saved from current route",
+      version: 1,
+      slots: [],
+      edges: [],
+      created_at: 1,
+      updated_at: 1,
+      node_count: 0,
+      edge_count: 0,
+    });
+    useAgentUIMock.mockReturnValue({
+      activeTabId: "tab-1",
+      pendingAssistantMessages: [],
+      selectedAgentId: null,
+      selectAgent: vi.fn(),
+      setActiveTabId: vi.fn(),
+    });
+
+    render(<HomePage />);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Blueprints" })[0]);
+    expect(screen.getByText("Current Route")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save Current Route" }));
+    fireEvent.change(screen.getByLabelText("Blueprint name"), {
+      target: { value: "Saved Route" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save as Blueprint" }));
+
+    await waitFor(() =>
+      expect(saveTabAsBlueprintRequestMock).toHaveBeenCalledWith(
+        "tab-1",
+        "Saved Route",
+        "",
+      ),
+    );
   });
 
   it("adds an agent through the custom dialog", async () => {

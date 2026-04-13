@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from app.graph_service import create_tab
+from app.graph_service import create_tab, serialize_tab_summary
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -33,6 +33,10 @@ class CreateTabTool(Tool):
                 "items": {"type": "string"},
                 "description": "List of directory paths the tab's leader is allowed to write to",
             },
+            "blueprint_id": {
+                "type": "string",
+                "description": "Optional global Route Blueprint ID to materialize as the tab's initial route",
+            },
         },
         "required": ["title"],
     }
@@ -42,6 +46,7 @@ class CreateTabTool(Tool):
         goal = args.get("goal", "")
         allow_network = args.get("allow_network", False)
         write_dirs = args.get("write_dirs", [])
+        blueprint_id = args.get("blueprint_id")
         if not isinstance(title, str) or not title.strip():
             return json.dumps({"error": "title must be a non-empty string"})
         if not isinstance(goal, str):
@@ -52,11 +57,17 @@ class CreateTabTool(Tool):
             isinstance(x, str) for x in write_dirs
         ):
             return json.dumps({"error": "write_dirs must be a list of strings"})
+        if blueprint_id is not None and not isinstance(blueprint_id, str):
+            return json.dumps({"error": "blueprint_id must be a string"})
 
-        tab = create_tab(
-            title=title,
-            goal=goal,
-            allow_network=allow_network,
-            write_dirs=write_dirs,
-        )
-        return json.dumps(tab.serialize())
+        try:
+            tab = create_tab(
+                title=title,
+                goal=goal,
+                allow_network=allow_network,
+                write_dirs=write_dirs,
+                blueprint_id=blueprint_id,
+            )
+        except ValueError as exc:
+            return json.dumps({"error": str(exc)})
+        return json.dumps(serialize_tab_summary(tab))

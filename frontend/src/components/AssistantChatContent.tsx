@@ -221,6 +221,13 @@ export function AssistantChatComposer({
     event,
   ) => {
     if (commandPanelVisible) {
+      const completionCommand =
+        commandOptions.length > 0 &&
+        selectedCommand &&
+        !isAssistantCommandReadyToSend(input, selectedCommand.name)
+          ? selectedCommand
+          : null;
+
       if (event.key === "Escape") {
         event.preventDefault();
         setDismissedCommandToken(commandToken);
@@ -253,17 +260,16 @@ export function AssistantChatComposer({
         return;
       }
 
-      if (
-        commandOptions.length > 0 &&
-        event.key === "Enter" &&
-        !event.shiftKey &&
-        selectedCommand
-      ) {
-        if (!isAssistantCommandReadyToSend(input, selectedCommand.name)) {
-          event.preventDefault();
-          selectCommand(selectedCommand);
-          return;
-        }
+      if (completionCommand && event.key === "Tab" && !event.shiftKey) {
+        event.preventDefault();
+        selectCommand(completionCommand);
+        return;
+      }
+
+      if (completionCommand && event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        selectCommand(completionCommand);
+        return;
       }
     }
 

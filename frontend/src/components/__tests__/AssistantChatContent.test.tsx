@@ -1,4 +1,4 @@
-import { createRef } from "react";
+import { createRef, type KeyboardEventHandler } from "react";
 import {
   cleanup,
   fireEvent,
@@ -496,6 +496,38 @@ describe("AssistantChatComposer", () => {
     expect(onKeyDown).not.toHaveBeenCalled();
   });
 
+  it("completes the selected command with Tab and keeps focus in the composer", () => {
+    const onChange = vi.fn();
+    const onKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = vi.fn(
+      (event) => {
+        event.currentTarget.blur();
+      },
+    );
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/"
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    ) as HTMLTextAreaElement;
+
+    textarea.focus();
+    fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    fireEvent.keyDown(textarea, { key: "Tab" });
+
+    expect(onChange).toHaveBeenCalledWith("/compact ");
+    expect(onKeyDown).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(textarea);
+  });
+
   it("dismisses the command suggestions with Escape without clearing the input", () => {
     render(
       <AssistantChatComposer
@@ -558,6 +590,81 @@ describe("AssistantChatComposer", () => {
     );
 
     fireEvent.keyDown(textarea, { key: "Enter" });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not rewrite an already-sendable command when Tab is pressed", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/help"
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+
+    fireEvent.keyDown(textarea, { key: "Tab" });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not hijack Tab when there is no matching command candidate", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/unknown"
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+
+    fireEvent.keyDown(textarea, { key: "Tab" });
+
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("leaves Shift+Tab to the browser instead of using it for command completion", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/"
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+
+    fireEvent.keyDown(textarea, { key: "Tab", shiftKey: true });
 
     expect(onKeyDown).toHaveBeenCalledTimes(1);
     expect(onChange).not.toHaveBeenCalled();

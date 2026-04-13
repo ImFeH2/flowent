@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from app.model_metadata import build_model_info
 from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.network import (
@@ -331,7 +332,17 @@ class GeminiProvider(LLMProvider):
                 methods = m.get("supportedGenerationMethods", [])
                 if "generateContent" in methods:
                     model_id = m.get("name", "").removeprefix("models/")
-                    result.append(ModelInfo(id=model_id))
+                    result.append(
+                        build_model_info(
+                            provider_type="gemini",
+                            model_id=model_id,
+                            context_window_tokens=(
+                                m.get("inputTokenLimit")
+                                if isinstance(m.get("inputTokenLimit"), int)
+                                else None
+                            ),
+                        )
+                    )
             return result
         except Exception as e:
             logger.error(

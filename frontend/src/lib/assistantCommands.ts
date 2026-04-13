@@ -18,7 +18,7 @@ export const ASSISTANT_COMMANDS: AssistantCommandSpec[] = [
   },
   {
     name: "/compact",
-    description: "Compact the current chat into a durable summary.",
+    description: "Compact the current execution context.",
     usage: "/compact [focus]",
     acceptsArgument: true,
   },

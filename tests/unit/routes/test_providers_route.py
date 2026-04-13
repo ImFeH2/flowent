@@ -218,7 +218,18 @@ def test_list_provider_models_runs_gateway_in_threadpool(monkeypatch):
         )
     )
 
-    assert result == {"models": [{"id": "gpt-5"}]}
+    assert result == {
+        "models": [
+            {
+                "id": "gpt-5",
+                "capabilities": {
+                    "input_image": False,
+                    "output_image": False,
+                },
+                "context_window_tokens": None,
+            }
+        ]
+    }
     assert calls == [
         ("threadpool", ("provider-1",)),
         ("gateway", ("provider-1",)),

@@ -1,5 +1,7 @@
-import type { Provider } from "@/types";
+import type { ModelOption, Provider } from "@/types";
 import { requestJson, requestVoid } from "./shared";
+
+export type { ModelOption } from "@/types";
 
 export async function fetchProviders(): Promise<Provider[]> {
   return requestJson<{ providers?: Provider[] }, Provider[]>("/api/providers", {
@@ -35,10 +37,6 @@ export async function deleteProvider(id: string): Promise<void> {
     method: "DELETE",
     errorMessage: "Failed to delete provider",
   });
-}
-
-export interface ModelOption {
-  id: string;
 }
 
 export async function fetchProviderModels(

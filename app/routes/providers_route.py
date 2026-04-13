@@ -149,7 +149,19 @@ async def list_provider_models(req: ListModelsRequest) -> dict[str, object]:
 
     try:
         models = await run_in_threadpool(gateway.list_models_for, req.provider_id)
-        return {"models": [{"id": m.id} for m in models]}
+        return {
+            "models": [
+                {
+                    "id": m.id,
+                    "capabilities": {
+                        "input_image": m.capabilities.input_image,
+                        "output_image": m.capabilities.output_image,
+                    },
+                    "context_window_tokens": m.context_window_tokens,
+                }
+                for m in models
+            ]
+        }
     except Exception as e:
         logger.error("Failed to list models for provider '{}': {}", req.provider_id, e)
         raise HTTPException(status_code=500, detail=str(e)) from e

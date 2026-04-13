@@ -89,6 +89,10 @@ def bootstrap_runtime() -> None:
     )
     if assistant_record is not None:
         assistant.history = list(assistant_record.history)
+        assistant._set_execution_context(
+            summary=assistant_record.execution_context_summary,
+            history_cutoff=assistant_record.execution_context_history_cutoff,
+        )
         if not any(isinstance(entry, StateEntry) for entry in assistant.history):
             assistant.history.insert(
                 0,
@@ -134,6 +138,10 @@ def bootstrap_runtime() -> None:
             uuid=record.id,
         )
         node.history = list(record.history)
+        node._set_execution_context(
+            summary=record.execution_context_summary,
+            history_cutoff=record.execution_context_history_cutoff,
+        )
         if not any(isinstance(entry, StateEntry) for entry in node.history):
             node.history.insert(
                 0,

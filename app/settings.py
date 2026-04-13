@@ -130,6 +130,8 @@ DEFAULT_LLM_RETRY_POLICY = "limited"
 DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS = 0.5
 DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS = 8.0
 DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES = 5
+DEFAULT_LLM_AUTO_COMPACT = True
+DEFAULT_LLM_AUTO_COMPACT_THRESHOLD = 0.75
 DEFAULT_ASSISTANT_ALLOW_NETWORK = True
 
 
@@ -198,6 +200,8 @@ class ModelSettings:
     retry_initial_delay_seconds: float = DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS
     retry_max_delay_seconds: float = DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS
     retry_backoff_cap_retries: int = DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES
+    auto_compact: bool = DEFAULT_LLM_AUTO_COMPACT
+    auto_compact_threshold: float = DEFAULT_LLM_AUTO_COMPACT_THRESHOLD
 
 
 @dataclass
@@ -407,6 +411,31 @@ def build_model_max_retries(
     if raw_max_retries <= 0:
         raise ValueError(f"{field_name} must be greater than 0")
     return raw_max_retries
+
+
+def build_model_auto_compact(
+    raw_auto_compact: object,
+    *,
+    field_name: str = "model.auto_compact",
+) -> bool:
+    if not isinstance(raw_auto_compact, bool):
+        raise ValueError(f"{field_name} must be a boolean")
+    return raw_auto_compact
+
+
+def build_model_auto_compact_threshold(
+    raw_auto_compact_threshold: object,
+    *,
+    field_name: str = "model.auto_compact_threshold",
+) -> float:
+    if isinstance(raw_auto_compact_threshold, bool) or not isinstance(
+        raw_auto_compact_threshold, (int, float)
+    ):
+        raise ValueError(f"{field_name} must be a number")
+    threshold = float(raw_auto_compact_threshold)
+    if not isfinite(threshold) or threshold <= 0 or threshold >= 1:
+        raise ValueError(f"{field_name} must be greater than 0 and less than 1")
+    return threshold
 
 
 def build_assistant_allow_network(
@@ -645,7 +674,23 @@ def serialize_settings(
     *,
     mask_telegram_token: bool = True,
 ) -> dict[str, object]:
+    from app.model_metadata import build_model_info
+
     data = asdict(settings)
+    provider = find_provider(settings, settings.model.active_provider_id)
+    if provider is None or not settings.model.active_model.strip():
+        model_info = None
+    else:
+        model_info = build_model_info(
+            provider_type=provider.type,
+            model_id=settings.model.active_model,
+        )
+    data["model"]["capabilities"] = (
+        asdict(model_info.capabilities) if model_info is not None else None
+    )
+    data["model"]["context_window_tokens"] = (
+        model_info.context_window_tokens if model_info is not None else None
+    )
     data["telegram"] = serialize_telegram_settings(
         settings.telegram,
         mask_token=mask_telegram_token,
@@ -1161,6 +1206,28 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         except ValueError:
             retry_backoff_cap_retries = DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES
             migrated = True
+    raw_auto_compact = model_data.get("auto_compact")
+    if raw_auto_compact is None:
+        auto_compact = DEFAULT_LLM_AUTO_COMPACT
+        migrated = True
+    else:
+        try:
+            auto_compact = build_model_auto_compact(raw_auto_compact)
+        except ValueError:
+            auto_compact = DEFAULT_LLM_AUTO_COMPACT
+            migrated = True
+    raw_auto_compact_threshold = model_data.get("auto_compact_threshold")
+    if raw_auto_compact_threshold is None:
+        auto_compact_threshold = DEFAULT_LLM_AUTO_COMPACT_THRESHOLD
+        migrated = True
+    else:
+        try:
+            auto_compact_threshold = build_model_auto_compact_threshold(
+                raw_auto_compact_threshold
+            )
+        except ValueError:
+            auto_compact_threshold = DEFAULT_LLM_AUTO_COMPACT_THRESHOLD
+            migrated = True
     try:
         validate_model_retry_backoff_settings(
             retry_initial_delay_seconds=retry_initial_delay_seconds,
@@ -1190,6 +1257,8 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         retry_initial_delay_seconds=retry_initial_delay_seconds,
         retry_max_delay_seconds=retry_max_delay_seconds,
         retry_backoff_cap_retries=retry_backoff_cap_retries,
+        auto_compact=auto_compact,
+        auto_compact_threshold=auto_compact_threshold,
     )
     custom_prompt = str(data.get("custom_prompt", ""))
     if "custom_post_prompt" in data:

@@ -36,7 +36,7 @@ COMMAND_DEFINITIONS: tuple[AssistantCommandDefinition, ...] = (
     ),
     AssistantCommandDefinition(
         name="/compact",
-        description="Compact the current chat into a durable summary.",
+        description="Compact the current execution context.",
         usage="/compact [focus]",
         accepts_argument=True,
     ),

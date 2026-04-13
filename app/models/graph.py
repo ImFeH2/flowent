@@ -66,6 +66,8 @@ class GraphNodeRecord:
     state: AgentState
     todos: list[TodoItem] = field(default_factory=list)
     history: list[HistoryEntry] = field(default_factory=list)
+    execution_context_summary: str = ""
+    execution_context_history_cutoff: int = 0
     position: NodePosition | None = None
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
@@ -85,6 +87,8 @@ class GraphNodeRecord:
             "state": self.state.value,
             "todos": [item.serialize() for item in self.todos],
             "history": [entry.serialize() for entry in self.history],
+            "execution_context_summary": self.execution_context_summary,
+            "execution_context_history_cutoff": self.execution_context_history_cutoff,
             "position": self.position.serialize()
             if self.position is not None
             else None,
@@ -100,6 +104,10 @@ class GraphNodeRecord:
         config = raw_config if isinstance(raw_config, dict) else {}
         raw_todos = data.get("todos")
         raw_history = data.get("history")
+        raw_execution_context_summary = data.get("execution_context_summary")
+        raw_execution_context_history_cutoff = data.get(
+            "execution_context_history_cutoff"
+        )
         created_at = data.get("created_at")
         updated_at = data.get("updated_at")
         raw_state = data.get("state")
@@ -166,6 +174,17 @@ class GraphNodeRecord:
             state=state,
             todos=todos,
             history=history_items,
+            execution_context_summary=(
+                str(raw_execution_context_summary)
+                if isinstance(raw_execution_context_summary, str)
+                else ""
+            ),
+            execution_context_history_cutoff=(
+                raw_execution_context_history_cutoff
+                if isinstance(raw_execution_context_history_cutoff, int)
+                and raw_execution_context_history_cutoff >= 0
+                else 0
+            ),
             position=NodePosition.from_mapping(
                 raw_position if isinstance(raw_position, dict) else None
             ),

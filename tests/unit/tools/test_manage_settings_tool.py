@@ -43,12 +43,16 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
         "model": {
             "active_provider_id": "provider-1",
             "active_model": "gpt-4o",
+            "capabilities": None,
+            "context_window_tokens": None,
             "timeout_ms": 10000,
             "retry_policy": "limited",
             "max_retries": 5,
             "retry_initial_delay_seconds": 0.5,
             "retry_max_delay_seconds": 8.0,
             "retry_backoff_cap_retries": 5,
+            "auto_compact": True,
+            "auto_compact_threshold": 0.75,
             "params": {
                 "reasoning_effort": None,
                 "verbosity": None,
@@ -92,12 +96,16 @@ def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
     assert result["model"] == {
         "active_provider_id": "provider-2",
         "active_model": "gpt-4.1",
+        "capabilities": None,
+        "context_window_tokens": None,
         "timeout_ms": 10000,
         "retry_policy": "limited",
         "max_retries": 5,
         "retry_initial_delay_seconds": 0.5,
         "retry_max_delay_seconds": 8.0,
         "retry_backoff_cap_retries": 5,
+        "auto_compact": True,
+        "auto_compact_threshold": 0.75,
         "params": {
             "reasoning_effort": None,
             "verbosity": None,

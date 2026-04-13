@@ -16,6 +16,8 @@ from app.settings import (
     build_assistant_allow_network,
     build_assistant_write_dirs,
     build_default_model_params,
+    build_model_auto_compact,
+    build_model_auto_compact_threshold,
     build_model_max_retries,
     build_model_params_from_mapping,
     build_model_retry_backoff_cap_retries,
@@ -138,6 +140,8 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         retry_initial_delay_seconds = current.model.retry_initial_delay_seconds
         retry_max_delay_seconds = current.model.retry_max_delay_seconds
         retry_backoff_cap_retries = current.model.retry_backoff_cap_retries
+        auto_compact = current.model.auto_compact
+        auto_compact_threshold = current.model.auto_compact_threshold
         if "params" in req.model:
             try:
                 parsed_params = build_model_params_from_mapping(req.model.get("params"))
@@ -180,6 +184,18 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "auto_compact" in req.model:
+            try:
+                auto_compact = build_model_auto_compact(req.model.get("auto_compact"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "auto_compact_threshold" in req.model:
+            try:
+                auto_compact_threshold = build_model_auto_compact_threshold(
+                    req.model.get("auto_compact_threshold")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
         try:
             validate_model_retry_backoff_settings(
                 retry_initial_delay_seconds=retry_initial_delay_seconds,
@@ -201,6 +217,8 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             retry_initial_delay_seconds=retry_initial_delay_seconds,
             retry_max_delay_seconds=retry_max_delay_seconds,
             retry_backoff_cap_retries=retry_backoff_cap_retries,
+            auto_compact=auto_compact,
+            auto_compact_threshold=auto_compact_threshold,
         )
 
     save_settings(current)

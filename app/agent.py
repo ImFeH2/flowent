@@ -28,6 +28,7 @@ from app.models import (
     ImagePart,
     LLMResponse,
     Message,
+    ModelInfo,
     NodeConfig,
     NodeType,
     ReceivedMessage,
@@ -75,10 +76,27 @@ class StreamingContentState:
     emitted_human_content: bool = False
 
 
+@dataclass(frozen=True)
+class ContextPreflight:
+    estimated_input_tokens: int
+    context_window_tokens: int | None = None
+    auto_compact_enabled: bool = False
+    trigger_threshold_tokens: int | None = None
+    safe_input_tokens: int | None = None
+
+
 class InterruptRequestedError(Exception):
     def __init__(self, stream_state: StreamingContentState | None = None) -> None:
         super().__init__("interrupt requested")
         self.stream_state = stream_state
+
+
+class ContextPreflightError(RuntimeError):
+    pass
+
+
+DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS = 1024
+DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024
 
 
 def build_error_context(content: str) -> str:
@@ -119,6 +137,9 @@ class Agent:
         self._history_lock = threading.Lock()
         self._todos_lock = threading.Lock()
         self._runtime_notice_lock = threading.Lock()
+        self._execution_context_lock = threading.Lock()
+        self._execution_context_summary: str = ""
+        self._execution_context_history_cutoff: int = 0
         self._pending_runtime_notices: list[str] = []
         self._pending_input_turn = False
         self._turn_started_with_pending_input = False
@@ -140,6 +161,8 @@ class Agent:
             state=self.state,
             todos=self.get_todos_snapshot(),
             history=self.get_history_snapshot(),
+            execution_context_summary=self.get_execution_context_summary(),
+            execution_context_history_cutoff=self.get_execution_context_history_cutoff(),
             position=existing.position if existing is not None else None,
             created_at=existing.created_at if existing is not None else _time.time(),
             updated_at=_time.time(),
@@ -171,6 +194,27 @@ class Agent:
     def get_todos_snapshot(self) -> list[TodoItem]:
         with self._todos_lock:
             return [TodoItem(text=t.text) for t in self.todos]
+
+    def get_execution_context_summary(self) -> str:
+        with self._execution_context_lock:
+            return self._execution_context_summary
+
+    def get_execution_context_history_cutoff(self) -> int:
+        with self._execution_context_lock:
+            return self._execution_context_history_cutoff
+
+    def _set_execution_context(
+        self,
+        *,
+        summary: str,
+        history_cutoff: int,
+    ) -> None:
+        with self._execution_context_lock:
+            self._execution_context_summary = summary
+            self._execution_context_history_cutoff = max(history_cutoff, 0)
+
+    def _reset_execution_context(self) -> None:
+        self._set_execution_context(summary="", history_cutoff=0)
 
     def prime_runtime_state(self, state: AgentState) -> None:
         self.state = state
@@ -448,6 +492,7 @@ class Agent:
                 self._pending_input_turn = False
                 self._turn_started_with_pending_input = False
                 self._turn_made_progress = False
+            self._reset_execution_context()
 
             event_bus.emit(
                 Event(
@@ -474,36 +519,18 @@ class Agent:
             timeout=interrupt_timeout
         )
         try:
-            summary = self._generate_compacted_history_summary(focus=focus)
-            content = "Compacted the current Assistant chat into a durable summary."
+            self._compact_execution_context(focus=focus)
+            content = "Compacted the current Assistant execution context."
             if focus and focus.strip():
                 content += f"\n\nFocus: {focus.strip()}"
-            content += f"\n\n## Compacted Summary\n{summary}"
 
             with self._runtime_notice_lock:
                 self._pending_runtime_notices.clear()
-            with self._history_lock:
-                self.history = [
-                    entry
-                    for entry in self.history
-                    if isinstance(entry, (SystemEntry, StateEntry))
-                ]
-                self._pending_input_turn = False
-                self._turn_started_with_pending_input = False
-                self._turn_made_progress = False
-
-            event_bus.emit(
-                Event(
-                    type=EventType.HISTORY_CLEARED,
-                    agent_id=self.uuid,
-                    data={"scope": "assistant_chat"},
-                )
-            )
 
             return CommandResultEntry(
                 command_name="/compact",
                 content=content,
-                include_in_context=True,
+                include_in_context=False,
             )
         finally:
             if paused_for_command:
@@ -582,7 +609,7 @@ class Agent:
                     self._turn_made_progress = False
 
                     tools_schema = _get_tool_registry().get_tools_schema(self)
-                    messages = self._build_messages()
+                    messages = self._prepare_messages_for_llm()
 
                     self._log.debug(
                         "LLM request: messages={}, tools={}, history_len={}",
@@ -675,6 +702,17 @@ class Agent:
                     self._interrupt_requested.clear()
                     self.set_interrupt_callback(None)
                     self._log.warning("Agent LLM provider error: {}", exc)
+                    error_summary = str(exc)
+                    self._append_history(ErrorEntry(content=error_summary))
+                    self.set_state(AgentState.ERROR, error_summary)
+                    self._wait_for_input()
+                    if self._terminate.is_set():
+                        break
+
+                except ContextPreflightError as exc:
+                    self._interrupt_requested.clear()
+                    self.set_interrupt_callback(None)
+                    self._log.warning("Agent context preflight failed: {}", exc)
                     error_summary = str(exc)
                     self._append_history(ErrorEntry(content=error_summary))
                     self.set_state(AgentState.ERROR, error_summary)
@@ -1052,7 +1090,10 @@ class Agent:
         return target
 
     def supports_input_image(self) -> bool:
-        return False
+        _, model_info = self._get_effective_model_info()
+        if model_info is None:
+            return False
+        return model_info.capabilities.input_image
 
     def send_message(
         self,
@@ -1238,17 +1279,18 @@ class Agent:
             self._resume_after_command.clear()
         self._wait_for_input()
 
-    def _generate_compacted_history_summary(self, *, focus: str | None = None) -> str:
-        with self._history_lock:
-            history_snapshot = list(self.history)
-
-        history_messages = self._build_history_messages(history_snapshot)
-        if not history_messages:
-            return "- No prior conversation details were available to compact."
+    def _generate_compacted_history_summary(
+        self,
+        *,
+        focus: str | None = None,
+        context_messages: list[dict[str, Any]],
+    ) -> str:
+        if not context_messages:
+            return "- No prior execution context was available to compact."
 
         focus_text = focus.strip() if focus else ""
         request_lines = [
-            "Compact this Assistant conversation into a durable markdown summary.",
+            "Compact this agent execution context into a durable markdown summary.",
             "Preserve only confirmed information.",
             "Keep the summary concise and directly reusable as future context.",
             "Use these sections in order:",
@@ -1274,7 +1316,7 @@ class Agent:
                         "future turns need."
                     ),
                 },
-                *history_messages,
+                *context_messages,
                 {"role": "user", "content": "\n".join(request_lines)},
             ],
             tools=None,
@@ -1293,8 +1335,29 @@ class Agent:
         with self._history_lock:
             history_snapshot = list(self.history)
 
-        messages.extend(self._build_history_messages(history_snapshot))
+        messages.extend(self._build_execution_context_messages(history_snapshot))
         messages.extend(self._build_runtime_tail_messages())
+        return messages
+
+    def _build_execution_context_messages(
+        self,
+        history_snapshot: list[HistoryEntry],
+    ) -> list[dict[str, Any]]:
+        with self._execution_context_lock:
+            summary = self._execution_context_summary.strip()
+            history_cutoff = min(
+                self._execution_context_history_cutoff,
+                len(history_snapshot),
+            )
+
+        messages: list[dict[str, Any]] = []
+        if summary:
+            messages.append(
+                self._build_runtime_system_message(
+                    f"Compacted execution context:\n{summary}"
+                )
+            )
+        messages.extend(self._build_history_messages(history_snapshot[history_cutoff:]))
         return messages
 
     @staticmethod
@@ -1388,16 +1451,186 @@ class Agent:
                 )
 
             elif isinstance(entry, CommandResultEntry):
-                if not entry.include_in_context:
+                if not entry.include_in_context or entry.command_name == "/compact":
                     continue
                 self._flush_tool_calls(messages, pending_tool_calls)
-                messages.append(
-                    self._build_runtime_system_message(
-                        f"Compacted conversation summary:\n{entry.content}"
-                    )
-                )
+                messages.append(self._build_runtime_system_message(entry.content))
 
         self._flush_tool_calls(messages, pending_tool_calls)
+        return messages
+
+    @staticmethod
+    def _estimate_text_tokens(text: str) -> int:
+        stripped = text.strip()
+        if not stripped:
+            return 0
+        return max(1, (len(stripped) + 3) // 4)
+
+    @classmethod
+    def _estimate_message_tokens(cls, message: dict[str, Any]) -> int:
+        total = cls._estimate_text_tokens(str(message.get("role", "")))
+        content = message.get("content")
+        if isinstance(content, str):
+            total += cls._estimate_text_tokens(content)
+        elif content is not None:
+            total += cls._estimate_text_tokens(json.dumps(content, ensure_ascii=False))
+        tool_calls = message.get("tool_calls")
+        if isinstance(tool_calls, list):
+            for tool_call in tool_calls:
+                if not isinstance(tool_call, dict):
+                    continue
+                function = tool_call.get("function")
+                if not isinstance(function, dict):
+                    continue
+                total += cls._estimate_text_tokens(str(function.get("name", "")))
+                total += cls._estimate_text_tokens(str(function.get("arguments", "")))
+        return total
+
+    @classmethod
+    def _estimate_input_tokens(cls, messages: list[dict[str, Any]]) -> int:
+        return sum(cls._estimate_message_tokens(message) for message in messages)
+
+    def _get_effective_model_info(self) -> tuple[str | None, ModelInfo | None]:
+        from app.model_metadata import build_model_info
+        from app.settings import find_provider, find_role
+
+        settings = get_settings()
+        provider_id = settings.model.active_provider_id
+        model_id = settings.model.active_model
+        role_cfg = (
+            find_role(settings, self.config.role_name)
+            if self.config.role_name
+            else None
+        )
+        if (
+            role_cfg is not None
+            and role_cfg.model is not None
+            and role_cfg.model.provider_id
+            and role_cfg.model.model
+        ):
+            provider_id = role_cfg.model.provider_id
+            model_id = role_cfg.model.model
+        if not provider_id or not model_id:
+            return None, None
+        provider = find_provider(settings, provider_id)
+        if provider is None:
+            return None, None
+        return (
+            provider.type,
+            build_model_info(provider_type=provider.type, model_id=model_id),
+        )
+
+    def _get_effective_output_budget_tokens(self) -> int:
+        from app.settings import find_role, merge_model_params
+
+        settings = get_settings()
+        role_cfg = (
+            find_role(settings, self.config.role_name)
+            if self.config.role_name
+            else None
+        )
+        model_params = merge_model_params(
+            settings.model.params,
+            role_cfg.model_params if role_cfg is not None else None,
+        )
+        if model_params is not None and model_params.max_output_tokens is not None:
+            return max(1, model_params.max_output_tokens)
+        return DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS
+
+    def _compute_context_preflight(
+        self,
+        messages: list[dict[str, Any]],
+    ) -> ContextPreflight:
+        settings = get_settings()
+        _, model_info = self._get_effective_model_info()
+        estimated_input_tokens = self._estimate_input_tokens(messages)
+        if model_info is None or model_info.context_window_tokens is None:
+            return ContextPreflight(
+                estimated_input_tokens=estimated_input_tokens,
+                auto_compact_enabled=settings.model.auto_compact,
+            )
+
+        output_budget_tokens = self._get_effective_output_budget_tokens()
+        safe_input_tokens = max(
+            1,
+            model_info.context_window_tokens
+            - output_budget_tokens
+            - DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS,
+        )
+        trigger_threshold_tokens = max(
+            1,
+            int(safe_input_tokens * settings.model.auto_compact_threshold),
+        )
+        return ContextPreflight(
+            estimated_input_tokens=estimated_input_tokens,
+            context_window_tokens=model_info.context_window_tokens,
+            auto_compact_enabled=settings.model.auto_compact,
+            trigger_threshold_tokens=trigger_threshold_tokens,
+            safe_input_tokens=safe_input_tokens,
+        )
+
+    def _compact_execution_context(self, *, focus: str | None = None) -> str:
+        with self._history_lock:
+            history_snapshot = list(self.history)
+        context_messages = self._build_execution_context_messages(history_snapshot)
+        if not context_messages:
+            self._set_execution_context(
+                summary="",
+                history_cutoff=len(history_snapshot),
+            )
+            self._persist_workspace_node()
+            return ""
+        summary = self._generate_compacted_history_summary(
+            focus=focus,
+            context_messages=context_messages,
+        )
+        self._set_execution_context(
+            summary=summary,
+            history_cutoff=len(history_snapshot),
+        )
+        self._persist_workspace_node()
+        return summary
+
+    def _prepare_messages_for_llm(self) -> list[dict[str, Any]]:
+        messages = self._build_messages()
+        preflight = self._compute_context_preflight(messages)
+        if (
+            not preflight.auto_compact_enabled
+            or preflight.trigger_threshold_tokens is None
+            or preflight.context_window_tokens is None
+            or preflight.estimated_input_tokens < preflight.trigger_threshold_tokens
+        ):
+            return messages
+
+        self._log.debug(
+            "Automatic compact preflight: estimated={}, threshold={}, safe={}, context_window={}",
+            preflight.estimated_input_tokens,
+            preflight.trigger_threshold_tokens,
+            preflight.safe_input_tokens,
+            preflight.context_window_tokens,
+        )
+        try:
+            self._compact_execution_context()
+        except Exception as exc:
+            if (
+                preflight.safe_input_tokens is not None
+                and preflight.estimated_input_tokens > preflight.safe_input_tokens
+            ):
+                raise ContextPreflightError(
+                    "Automatic compact failed and the current execution context exceeds the safe model window."
+                ) from exc
+            self._log.warning("Automatic compact failed below safe window: {}", exc)
+            return messages
+
+        messages = self._build_messages()
+        post_compact = self._compute_context_preflight(messages)
+        if (
+            post_compact.safe_input_tokens is not None
+            and post_compact.estimated_input_tokens > post_compact.safe_input_tokens
+        ):
+            raise ContextPreflightError(
+                "Automatic compact completed but the current execution context still exceeds the safe model window."
+            )
         return messages
 
     @staticmethod

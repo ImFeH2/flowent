@@ -427,7 +427,24 @@ def test_manage_providers_list_models_streams_model_ids(monkeypatch):
         )
     )
 
-    assert result == ["provider-1-a", "provider-1-b"]
+    assert result == [
+        {
+            "id": "provider-1-a",
+            "capabilities": {
+                "input_image": False,
+                "output_image": False,
+            },
+            "context_window_tokens": None,
+        },
+        {
+            "id": "provider-1-b",
+            "capabilities": {
+                "input_image": False,
+                "output_image": False,
+            },
+            "context_window_tokens": None,
+        },
+    ]
     assert "".join(chunks) == (
         "Listing models for provider-1\nprovider-1-a\nprovider-1-b\n"
     )

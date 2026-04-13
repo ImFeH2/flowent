@@ -8,6 +8,7 @@ from typing import Any
 
 from loguru import logger
 
+from app.model_metadata import build_model_info
 from app.models import LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.network import (
@@ -364,7 +365,13 @@ class AnthropicProvider(LLMProvider):
             resp.raise_for_status()
             data = resp.json()
             models = data.get("data", [])
-            return [ModelInfo(id=m["id"]) for m in models]
+            return [
+                build_model_info(
+                    provider_type="anthropic",
+                    model_id=m["id"],
+                )
+                for m in models
+            ]
         except Exception as e:
             logger.error(
                 "Failed to list models [provider={}, type=anthropic]: {}",

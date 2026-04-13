@@ -1,12 +1,20 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
+
+
+@dataclass
+class ModelCapabilities:
+    input_image: bool = False
+    output_image: bool = False
 
 
 @dataclass
 class ModelInfo:
     id: str
+    capabilities: ModelCapabilities = field(default_factory=ModelCapabilities)
+    context_window_tokens: int | None = None
 
 
 @dataclass

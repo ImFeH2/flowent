@@ -31,7 +31,7 @@ from app.models.history import (
     SystemEntry,
     ToolCall,
 )
-from app.models.llm import LLMResponse, ModelInfo, ToolCallResult
+from app.models.llm import LLMResponse, ModelCapabilities, ModelInfo, ToolCallResult
 from app.models.message import Message
 from app.models.tab import Tab
 from app.models.todo import TodoItem
@@ -53,6 +53,7 @@ __all__ = [
     "ImagePart",
     "LLMResponse",
     "Message",
+    "ModelCapabilities",
     "ModelInfo",
     "NodeConfig",
     "NodePosition",

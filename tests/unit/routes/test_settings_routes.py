@@ -86,12 +86,16 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
             "model": {
                 "active_provider_id": "",
                 "active_model": "",
+                "capabilities": None,
+                "context_window_tokens": None,
                 "timeout_ms": 10000,
                 "retry_policy": "limited",
                 "max_retries": 5,
                 "retry_initial_delay_seconds": 0.5,
                 "retry_max_delay_seconds": 8.0,
                 "retry_backoff_cap_retries": 5,
+                "auto_compact": True,
+                "auto_compact_threshold": 0.75,
                 "params": {
                     "reasoning_effort": None,
                     "verbosity": None,

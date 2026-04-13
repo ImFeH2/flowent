@@ -169,6 +169,11 @@ export interface ModelParams {
   top_p: number | null;
 }
 
+export interface ModelCapabilities {
+  input_image: boolean;
+  output_image: boolean;
+}
+
 export type StreamingDelta =
   | { type: "ContentDelta"; text: string }
   | { type: "ThinkingDelta"; text: string }
@@ -205,6 +210,12 @@ export interface Provider {
   api_key: string;
   headers: Record<string, string>;
   retry_429_delay_seconds: number;
+}
+
+export interface ModelOption {
+  id: string;
+  capabilities?: ModelCapabilities | null;
+  context_window_tokens?: number | null;
 }
 
 export type RetryPolicy = "no_retry" | "limited" | "unlimited";

@@ -11,6 +11,17 @@ from app.tools import Tool
 
 
 def _serialize_settings(settings: Settings) -> dict[str, object]:
+    from app.model_metadata import build_model_info
+    from app.settings import find_provider
+
+    provider = find_provider(settings, settings.model.active_provider_id)
+    if provider is None or not settings.model.active_model.strip():
+        model_info = None
+    else:
+        model_info = build_model_info(
+            provider_type=provider.type,
+            model_id=settings.model.active_model,
+        )
     return {
         "assistant": {
             "role_name": settings.assistant.role_name,
@@ -29,6 +40,19 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
             "retry_initial_delay_seconds": settings.model.retry_initial_delay_seconds,
             "retry_max_delay_seconds": settings.model.retry_max_delay_seconds,
             "retry_backoff_cap_retries": settings.model.retry_backoff_cap_retries,
+            "auto_compact": settings.model.auto_compact,
+            "auto_compact_threshold": settings.model.auto_compact_threshold,
+            "capabilities": (
+                {
+                    "input_image": model_info.capabilities.input_image,
+                    "output_image": model_info.capabilities.output_image,
+                }
+                if model_info is not None
+                else None
+            ),
+            "context_window_tokens": (
+                model_info.context_window_tokens if model_info is not None else None
+            ),
             "params": {
                 "reasoning_effort": settings.model.params.reasoning_effort,
                 "verbosity": settings.model.params.verbosity,
@@ -99,6 +123,14 @@ class ManageSettingsTool(Tool):
                 "type": "integer",
                 "description": "Retry count where exponential growth stops doubling",
             },
+            "auto_compact": {
+                "type": "boolean",
+                "description": "Whether the runtime may automatically compact execution context before LLM calls",
+            },
+            "auto_compact_threshold": {
+                "type": "number",
+                "description": "Trigger ratio for automatic compaction within the safe input budget",
+            },
             "retry_policy": {
                 "type": "string",
                 "enum": ["no_retry", "limited", "unlimited"],
@@ -141,6 +173,8 @@ class ManageSettingsTool(Tool):
             build_assistant_allow_network,
             build_assistant_write_dirs,
             build_default_model_params,
+            build_model_auto_compact,
+            build_model_auto_compact_threshold,
             build_model_max_retries,
             build_model_params_from_mapping,
             build_model_retry_backoff_cap_retries,
@@ -167,6 +201,8 @@ class ManageSettingsTool(Tool):
         retry_initial_delay_seconds = args.get("retry_initial_delay_seconds")
         retry_max_delay_seconds = args.get("retry_max_delay_seconds")
         retry_backoff_cap_retries = args.get("retry_backoff_cap_retries")
+        auto_compact = args.get("auto_compact")
+        auto_compact_threshold = args.get("auto_compact_threshold")
         model_params = args.get("model_params")
         timestamp_format = args.get("timestamp_format")
 
@@ -227,6 +263,19 @@ class ManageSettingsTool(Tool):
                 build_model_retry_backoff_cap_retries(
                     retry_backoff_cap_retries,
                     field_name="retry_backoff_cap_retries",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+        if auto_compact is not None:
+            try:
+                build_model_auto_compact(auto_compact, field_name="auto_compact")
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+        if auto_compact_threshold is not None:
+            try:
+                build_model_auto_compact_threshold(
+                    auto_compact_threshold,
+                    field_name="auto_compact_threshold",
                 )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
@@ -330,6 +379,18 @@ class ManageSettingsTool(Tool):
                 retry_backoff_cap_retries,
                 field_name="retry_backoff_cap_retries",
             )
+        next_auto_compact = settings.model.auto_compact
+        if auto_compact is not None:
+            next_auto_compact = build_model_auto_compact(
+                auto_compact,
+                field_name="auto_compact",
+            )
+        next_auto_compact_threshold = settings.model.auto_compact_threshold
+        if auto_compact_threshold is not None:
+            next_auto_compact_threshold = build_model_auto_compact_threshold(
+                auto_compact_threshold,
+                field_name="auto_compact_threshold",
+            )
         try:
             validate_model_retry_backoff_settings(
                 retry_initial_delay_seconds=next_retry_initial_delay_seconds,
@@ -364,6 +425,8 @@ class ManageSettingsTool(Tool):
         settings.model.retry_initial_delay_seconds = next_retry_initial_delay_seconds
         settings.model.retry_max_delay_seconds = next_retry_max_delay_seconds
         settings.model.retry_backoff_cap_retries = next_retry_backoff_cap_retries
+        settings.model.auto_compact = next_auto_compact
+        settings.model.auto_compact_threshold = next_auto_compact_threshold
         settings.model.params = next_model_params
         settings.event_log.timestamp_format = next_timestamp_format
 

@@ -223,17 +223,26 @@ class ManageProvidersTool(Tool):
             try:
                 if on_output is not None:
                     on_output(f"Listing models for {provider_id}\n")
-                model_ids = [
-                    model.id
-                    for model in gateway.list_models_for(
-                        provider_id,
-                        register_interrupt=agent.set_interrupt_callback,
-                    )
-                ]
+                models = gateway.list_models_for(
+                    provider_id,
+                    register_interrupt=agent.set_interrupt_callback,
+                )
                 if on_output is not None:
-                    for model_id in model_ids:
-                        on_output(f"{model_id}\n")
-                return json.dumps(model_ids)
+                    for model in models:
+                        on_output(f"{model.id}\n")
+                return json.dumps(
+                    [
+                        {
+                            "id": model.id,
+                            "capabilities": {
+                                "input_image": model.capabilities.input_image,
+                                "output_image": model.capabilities.output_image,
+                            },
+                            "context_window_tokens": model.context_window_tokens,
+                        }
+                        for model in models
+                    ]
+                )
             except Exception as exc:
                 re_raise_interrupt(agent, exc)
                 logger.error(

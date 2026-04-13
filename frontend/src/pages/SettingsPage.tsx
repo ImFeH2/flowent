@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
-import type { ModelParams, RetryPolicy } from "@/types";
+import type { ModelCapabilities, ModelParams, RetryPolicy } from "@/types";
 
 const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
   { value: "no_retry", label: "No retry" },
@@ -45,12 +45,16 @@ interface UserSettings {
   model: {
     active_provider_id: string;
     active_model: string;
+    capabilities: ModelCapabilities | null;
+    context_window_tokens: number | null;
     timeout_ms: number;
     retry_policy: RetryPolicy;
     max_retries: number;
     retry_initial_delay_seconds: number;
     retry_max_delay_seconds: number;
     retry_backoff_cap_retries: number;
+    auto_compact: boolean;
+    auto_compact_threshold: number;
     params: ModelParams;
   };
 }
@@ -116,6 +120,21 @@ export function SettingsPage() {
       roles.find((role) => role.name === settings.assistant.role_name) ?? null
     );
   }, [roles, settings]);
+
+  const selectedModel = useMemo(() => {
+    if (!settings?.model.active_model) {
+      return null;
+    }
+    return (
+      models.find((model) => model.id === settings.model.active_model) ?? null
+    );
+  }, [models, settings?.model.active_model]);
+  const effectiveModelCapabilities =
+    selectedModel?.capabilities ?? settings?.model.capabilities ?? null;
+  const effectiveContextWindowTokens =
+    selectedModel?.context_window_tokens ??
+    settings?.model.context_window_tokens ??
+    null;
   const leaderRole = useMemo(() => {
     if (!settings) return null;
     return (
@@ -494,6 +513,26 @@ export function SettingsPage() {
                     className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                   />
                 )}
+                {settings.model.active_model ? (
+                  <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-white/40">
+                    <p>
+                      Context window:{" "}
+                      {effectiveContextWindowTokens
+                        ? effectiveContextWindowTokens.toLocaleString()
+                        : "Not resolved"}
+                    </p>
+                    <p>
+                      Capabilities: input_image=
+                      {effectiveModelCapabilities?.input_image
+                        ? "true"
+                        : "false"}
+                      , output_image=
+                      {effectiveModelCapabilities?.output_image
+                        ? "true"
+                        : "false"}
+                    </p>
+                  </div>
+                ) : null}
               </SettingsRow>
 
               <SettingsRow
@@ -765,6 +804,92 @@ export function SettingsPage() {
                   <p className="text-[11px] text-white/40 leading-relaxed">
                     Retries use exponential backoff from Initial Delay, stop
                     doubling after Cap Retries, and never exceed Max Delay.
+                  </p>
+                </div>
+              </SettingsRow>
+
+              <SettingsRow
+                label="Automatic Compact"
+                description="Preflight execution-context compaction"
+              >
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={settings.model.auto_compact}
+                    aria-label="Automatic Compact"
+                    onClick={() =>
+                      setLocalSettings({
+                        ...settings,
+                        model: {
+                          ...settings.model,
+                          auto_compact: !settings.model.auto_compact,
+                        },
+                      })
+                    }
+                    className={cn(
+                      "inline-flex h-8 w-[72px] items-center rounded-full border px-1 transition-colors",
+                      settings.model.auto_compact
+                        ? "border-emerald-400/30 bg-emerald-400/15"
+                        : "border-white/[0.08] bg-white/[0.04]",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold transition-all",
+                        settings.model.auto_compact
+                          ? "translate-x-[40px] bg-emerald-300 text-black"
+                          : "translate-x-0 bg-white/90 text-black",
+                      )}
+                    >
+                      {settings.model.auto_compact ? "ON" : "OFF"}
+                    </span>
+                  </button>
+
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="auto-compact-threshold"
+                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                    >
+                      Threshold
+                    </label>
+                    <input
+                      id="auto-compact-threshold"
+                      aria-label="Automatic Compact Threshold"
+                      type="text"
+                      inputMode="decimal"
+                      value={String(settings.model.auto_compact_threshold)}
+                      onChange={(e) => {
+                        const nextValue = e.target.value.trim();
+                        if (!/^\d+(\.\d+)?$/.test(nextValue)) {
+                          return;
+                        }
+                        const parsed = Number.parseFloat(nextValue);
+                        if (
+                          !Number.isFinite(parsed) ||
+                          parsed <= 0 ||
+                          parsed >= 1
+                        ) {
+                          return;
+                        }
+                        setLocalSettings({
+                          ...settings,
+                          model: {
+                            ...settings.model,
+                            auto_compact_threshold: parsed,
+                          },
+                        });
+                      }}
+                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    When enabled, the runtime compacts execution context before
+                    the estimated input reaches the configured fraction of the
+                    safe model window. If the context window is not resolved for
+                    the current model, only manual <code>/compact</code> is
+                    used.
                   </p>
                 </div>
               </SettingsRow>

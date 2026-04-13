@@ -602,23 +602,29 @@ def test_execute_compact_command_replaces_history_with_summary(monkeypatch):
     history = assistant.get_history_snapshot()
 
     assert isinstance(entry, CommandResultEntry)
-    assert entry.include_in_context is True
+    assert entry.include_in_context is False
     assert history[-1] == entry
-    assert all(
-        isinstance(item, (SystemEntry, StateEntry, CommandResultEntry))
-        for item in history
-    )
-    assert not any(
+    assert any(
         isinstance(item, ReceivedMessage) and item.content == "Summarize the rollout"
         for item in history
+    )
+    assert any(
+        isinstance(item, AssistantText)
+        and item.content == "Working through the changes."
+        for item in history
+    )
+    assert (
+        assistant.get_execution_context_summary().startswith("## Current Goal\n")
+        is True
     )
 
     messages = assistant._build_messages()
     serialized = json.dumps(messages)
 
     assert "Summarize the rollout" not in serialized
-    assert "Compacted conversation summary" in serialized
+    assert "Compacted execution context" in serialized
     assert "Ship the command layer." in serialized
+    assert "Compacted the current Assistant execution context." not in serialized
 
 
 def test_compact_command_excludes_queued_messages_from_summary(monkeypatch):

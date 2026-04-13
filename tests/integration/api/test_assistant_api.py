@@ -104,12 +104,12 @@ def test_compact_command_replaces_history_with_summary(monkeypatch, client):
 
     detail = client.get(f"/api/nodes/{assistant_id}").json()
 
-    assert not any(
+    assert any(
         entry["type"] == "ReceivedMessage"
         and entry.get("content") == "Need a concise recap"
         for entry in detail["history"]
     )
-    assert not any(
+    assert any(
         entry["type"] == "AssistantText"
         and entry.get("content") == "I will summarize the open work."
         for entry in detail["history"]
@@ -117,8 +117,9 @@ def test_compact_command_replaces_history_with_summary(monkeypatch, client):
     assert any(
         entry["type"] == "CommandResultEntry"
         and entry["command_name"] == "/compact"
-        and entry.get("include_in_context") is True
+        and entry.get("include_in_context") is False
+        and "Compacted the current Assistant execution context." in entry["content"]
         and "Focus: slash command rollout" in entry["content"]
-        and "Ship the slash commands." in entry["content"]
+        and "Ship the slash commands." not in entry["content"]
         for entry in detail["history"]
     )

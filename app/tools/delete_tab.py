@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class DeleteTabTool(Tool):
     name = "delete_tab"
-    description = "Delete a task tab and clean up its Agent Graph."
+    description = "Delete a task tab and clean up its Agent Route."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {

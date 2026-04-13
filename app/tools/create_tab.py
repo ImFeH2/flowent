@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 class CreateTabTool(Tool):
     name = "create_tab"
-    description = "Create a new task tab with its bound Leader and Agent Graph."
+    description = "Create a new task tab with its bound Leader and Agent Route."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {

@@ -32,7 +32,7 @@ TODO_TOOL_GUIDANCE = """\
 CREATE_TAB_TOOL_GUIDANCE = """\
 ## Create Tab Tool Rules
 
-- Use `create_tab` to open a persistent task workspace before building an Agent Graph for that task.
+- Use `create_tab` to open a persistent task workspace before building an Agent Route for that task.
 - A tab is the user-visible home for one task. Keep the title concrete and easy to recognize later.
 """
 
@@ -40,7 +40,7 @@ DELETE_TAB_TOOL_GUIDANCE = """\
 ## Delete Tab Tool Rules
 
 - Use `delete_tab` only when the Human explicitly asks to remove a tab or when you are intentionally cleaning up a task workspace that should no longer exist.
-- Deleting a tab permanently removes the tab and its persisted Agent Graph after active nodes are terminated.
+- Deleting a tab permanently removes the tab and its persisted Agent Route after active nodes are terminated.
 """
 
 SET_PERMISSIONS_TOOL_GUIDANCE = """\
@@ -55,7 +55,7 @@ SET_PERMISSIONS_TOOL_GUIDANCE = """\
 CREATE_AGENT_TOOL_GUIDANCE = """\
 ## Create Agent Tool Rules
 
-- Use `create_agent` to add a new node to a tab's Agent Graph.
+- Use `create_agent` to add a new node to a tab's Agent Route.
 - Prefer creating the right set of peer agents up front. If you also have `connect`, wire them as needed.
 - `create_agent` always creates the new peer in your current tab. It does not take `tab_id` or any other cross-tab target parameter.
 - Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them.

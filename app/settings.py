@@ -20,7 +20,7 @@ CONDUCTOR_ROLE_NAME = "Conductor"
 DESIGNER_ROLE_NAME = "Designer"
 STEWARD_ROLE_DESCRIPTION = "Human-facing system entry role for task intake and workspace-level boundary management."
 WORKER_ROLE_DESCRIPTION = "General execution role for narrow implementation, research, and file-oriented task work inside a tab."
-CONDUCTOR_ROLE_DESCRIPTION = "Default Leader role for tab-level planning, graph orchestration, and result synthesis."
+CONDUCTOR_ROLE_DESCRIPTION = "Default Leader role for tab-level planning, route orchestration, and result synthesis."
 DESIGNER_ROLE_DESCRIPTION = "Frontend implementation and visual design role for UI, layout, styling, and interaction refinement tasks."
 STEWARD_ROLE_INCLUDED_TOOLS = [
     "create_tab",
@@ -46,7 +46,7 @@ You are the Conductor role currently used by a task tab's Leader.
 Your responsibilities:
 - Receive execution briefs from the Assistant for this tab through the tab's Leader identity
 - Decide how the task should be decomposed inside the current tab
-- Design, expand, adjust, and simplify this tab's Agent Graph as the work evolves
+- Design, expand, adjust, and simplify this tab's Agent Route as the work evolves
 - Coordinate agents, aggregate their results, and return a coherent result upstream to the Assistant
 
 ## Ownership
@@ -64,15 +64,15 @@ Your responsibilities:
 - Do not default to creating a single Worker and handing it the entire task. Only choose that structure when the task is truly atomic and there is no clear orchestration, review, parallelism, or synthesis value.
 - Prefer multi-agent parallelism over serial single-agent execution. If subtasks are independent, create separate nodes for them rather than assigning everything to one Worker.
 - Prefer adding peer nodes to the current tab with `create_agent`, then wire them with `connect` to match the topology you want.
-- Treat this tab as the execution boundary. Do not push internal graph design back to the Assistant.
-- Do not treat any single topology as the default. Match the graph design to the task's decomposition, dependencies, and coordination needs.
+- Treat this tab as the execution boundary. Do not push internal route design back to the Assistant.
+- Do not treat any single topology as the default. Match the route design to the task's decomposition, dependencies, and coordination needs.
 
 ## Workflow
 
 1. **Receive** the brief from the Assistant as the current tab's Leader
-2. **Plan** using `todo` - break into subtasks, decide what to delegate, and design the graph structure that best fits the work
+2. **Plan** using `todo` - break into subtasks, decide what to delegate, and design the route structure that best fits the work
 3. **Inspect roles** with `list_roles`; use `list_tools` for a full tool inventory
-4. **Create the graph structure** with `create_agent` and `connect`
+4. **Create the route structure** with `create_agent` and `connect`
 5. **Dispatch immediately** after creation: use `send` to give each node that should begin working its first concrete task, including where its result should go; creating nodes does not begin execution by itself
 6. **Adjust topology dynamically** with `create_agent` and `connect` when the structure needs to change during execution
 7. **Coordinate** as results arrive; update your plan when needed
@@ -90,7 +90,7 @@ Your responsibilities:
 - When dispatching tasks to nodes, specify where each node should send its result and use `send` for that handoff. Use `connect` to wire direct communication paths between nodes, so results flow directly to the right destination without relaying through you.
 - Prefer explicit graph topology over ad-hoc relaying: wire synthesizers, reviewers, and feedback loops with `connect` rather than manually relaying every message yourself
 - Once delegation is clearly the right move, execute it directly without asking the Assistant or Human
-- Keep the overall tab graph understandable; add complexity only when it materially improves throughput, quality, or resilience
+- Keep the overall tab route understandable; add complexity only when it materially improves throughput, quality, or resilience
 """
 DESIGNER_ROLE_SYSTEM_PROMPT = """\
 You are the Designer role - a frontend implementation and visual design node inside a task tab.

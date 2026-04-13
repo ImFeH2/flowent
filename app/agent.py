@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import threading
 import time as _time
 import traceback
@@ -26,20 +25,24 @@ from app.models import (
     Event,
     EventType,
     HistoryEntry,
+    ImagePart,
     LLMResponse,
     Message,
     NodeConfig,
     NodeType,
     ReceivedMessage,
-    ReceivedMessageDelta,
     SentMessage,
-    SentMessageDelta,
     StateEntry,
     SystemEntry,
+    TextPart,
     ThinkingDelta,
     TodoItem,
     ToolCall,
     ToolResultDelta,
+    content_parts_to_text,
+    deserialize_content_parts,
+    has_image_parts,
+    parse_content_parts_payload,
 )
 from app.prompts import get_system_prompt
 from app.providers.errors import LLMProviderError
@@ -65,126 +68,17 @@ class WakeSignal:
 
 @dataclass
 class StreamingContentState:
-    mode: str = "pending"
-    pending_chunks: list[str] = field(default_factory=list)
     content_buffer: str = ""
     thinking_buffer: str = ""
     saw_content_chunks: bool = False
     think_parser: ThinkTagParser = field(default_factory=ThinkTagParser)
     emitted_human_content: bool = False
-    streaming_message_id: str | None = None
-    streamed_message_body: str = ""
-
-
-@dataclass
-class RoutedContentResult:
-    sent_messages: list[SentMessage] = field(default_factory=list)
-    had_routed_header: bool = False
-    route_errors: list[str] = field(default_factory=list)
-    had_additional_routed_headers: bool = False
 
 
 class InterruptRequestedError(Exception):
     def __init__(self, stream_state: StreamingContentState | None = None) -> None:
         super().__init__("interrupt requested")
         self.stream_state = stream_state
-
-
-_HEADER_RE = re.compile(r"^@([^:\n]+):[ \t]*(.*)$", re.DOTALL)
-_LINE_HEADER_RE = re.compile(r"^@[^:\n]+:[ \t]*", re.MULTILINE)
-
-
-def extract_routed_content(content: str) -> tuple[str, list[tuple[list[str], str]]]:
-    first_line_end = content.find("\n")
-    first_line = content[:first_line_end] if first_line_end != -1 else content
-    rest = content[first_line_end + 1 :] if first_line_end != -1 else ""
-
-    match = _HEADER_RE.match(first_line)
-    if not match:
-        return content, []
-
-    target_ref = match.group(1).strip()
-    body_first_line = match.group(2).strip()
-    body = (body_first_line + ("\n" + rest if rest else "")).strip()
-
-    if not target_ref or not body:
-        return content, []
-
-    return "", [([target_ref], body)]
-
-
-def extract_routed_header(content: str) -> tuple[list[str], str] | None:
-    first_line_end = content.find("\n")
-    first_line = content[:first_line_end] if first_line_end != -1 else content
-    rest = content[first_line_end + 1 :] if first_line_end != -1 else ""
-
-    match = _HEADER_RE.match(first_line)
-    if not match:
-        return None
-
-    target_ref = match.group(1).strip()
-    if not target_ref:
-        return None
-
-    body_first_line = match.group(2)
-    body = body_first_line + ("\n" + rest if rest else "")
-    return [target_ref], body
-
-
-def has_additional_routed_headers(content: str) -> bool:
-    first_line_end = content.find("\n")
-    first_line = content[:first_line_end] if first_line_end != -1 else content
-    if not _HEADER_RE.match(first_line):
-        return False
-    if first_line_end == -1:
-        return False
-    rest = content[first_line_end + 1 :]
-    return bool(_LINE_HEADER_RE.search(rest))
-
-
-def split_plain_content_before_later_routed_header(
-    content: str,
-) -> tuple[str, str | None]:
-    first_line_end = content.find("\n")
-    if first_line_end == -1:
-        return content, None
-    first_line = content[:first_line_end]
-    if _HEADER_RE.match(first_line):
-        return content, None
-    rest = content[first_line_end + 1 :]
-    match = _LINE_HEADER_RE.search(rest)
-    if match is None:
-        return content, None
-    header_start = first_line_end + 1 + match.start()
-    return content[:header_start].rstrip(), content[header_start:].strip()
-
-
-def classify_streaming_content(content: str) -> str:
-    if not content:
-        return "pending"
-
-    if not content.startswith("@"):
-        return "plain"
-
-    first_line_end = content.find("\n")
-    first_line = content[:first_line_end] if first_line_end != -1 else content
-
-    if ":" in first_line:
-        return "routed"
-
-    if first_line_end != -1:
-        return "plain"
-
-    return "pending"
-
-
-def build_routed_content(target_refs: list[str], body: str) -> str:
-    targets = ", ".join(target_refs)
-    first_line, separator, rest = body.partition("\n")
-    header = f"@{targets}: {first_line}"
-    if not separator:
-        return header
-    return f"{header}\n{rest}"
 
 
 def build_error_context(content: str) -> str:
@@ -739,13 +633,22 @@ class Agent:
                                 self._record_content_output(
                                     final_content,
                                     emitted_human_content=stream_state.emitted_human_content,
-                                    message_id=stream_state.streaming_message_id,
                                 )
                                 stream_state.content_buffer = ""
-                                stream_state.pending_chunks.clear()
                             self._raise_if_interrupt_requested()
+                            stop_future_send_calls = False
                             for tc in response.tool_calls:
-                                self._handle_tool_call(tc.name, tc.arguments, tc.id)
+                                if stop_future_send_calls and tc.name == "send":
+                                    continue
+                                tool_result = self._handle_tool_call(
+                                    tc.name,
+                                    tc.arguments,
+                                    tc.id,
+                                )
+                                if tc.name == "send" and self._tool_result_has_error(
+                                    tool_result
+                                ):
+                                    stop_future_send_calls = True
                                 self._raise_if_interrupt_requested()
                                 if self._terminate.is_set():
                                     break
@@ -753,10 +656,8 @@ class Agent:
                             self._record_content_output(
                                 final_content,
                                 emitted_human_content=stream_state.emitted_human_content,
-                                message_id=stream_state.streaming_message_id,
                             )
                             stream_state.content_buffer = ""
-                            stream_state.pending_chunks.clear()
                             self._log.debug(
                                 "No tool calls, continuing execution after text response"
                             )
@@ -917,8 +818,7 @@ class Agent:
                 continue
 
             if isinstance(entry, SentMessage):
-                for target_id in entry.to_ids:
-                    pending.pop(target_id, None)
+                pending.pop(entry.to_id, None)
 
         return list(pending.values())
 
@@ -930,10 +830,10 @@ class Agent:
     ) -> dict[str, str]:
         lines = [
             "Runtime post prompt:",
-            "- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.",
-            "- Plain content is not delivered to other agents.",
-            "- Do not combine a Human-facing reply and a routed `@target` message in the same content block.",
-            "- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.",
+            "- Plain content is never delivered to other agents.",
+            "- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.",
+            "- Use `contacts` to inspect the node ids and names you can currently message directly.",
+            "- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.",
         ]
         if pending_agent_dispatches:
             targets = ", ".join(pending_agent_dispatches)
@@ -944,7 +844,7 @@ class Agent:
                 "- `create_agent` only creates a new graph node. It does not start work by itself."
             )
             lines.append(
-                "- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`. If several agents are waiting, route to one agent per response until all of them have been dispatched."
+                "- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`."
             )
         elif has_todos:
             lines.append(
@@ -957,31 +857,10 @@ class Agent:
         return self._build_runtime_system_message("\n".join(lines))
 
     @staticmethod
-    def _build_multi_routed_header_notice() -> str:
-        return (
-            "Routing reminder: each response can route to only one node. Only "
-            "the first `@target:` header in this content block was routed. Any "
-            "later `@...:` lines were delivered as plain body text to the first "
-            "target. If that was not intentional, send a correction to the "
-            "first recipient and then send the remaining node messages in later "
-            "responses, one target at a time."
-        )
-
-    @staticmethod
-    def _build_plain_then_routed_notice() -> str:
-        return (
-            "Routing reminder: this response mixed plain text with a later "
-            "`@target:` line. Only the leading plain text was kept as plain "
-            "output. The later routed-looking lines were not delivered. If you "
-            "intended to message a node, send that `@target:` message in a "
-            "later response."
-        )
-
-    @staticmethod
     def _build_idle_without_progress_notice() -> str:
         return (
             "Idle reminder: you received a new message this turn, but this "
-            "response did not send a reply, route a message, or use any "
+            "response did not send a reply, call `send`, or use any "
             "non-idle tool. Do not call `idle` yet. First reply to the Human, "
             "dispatch/delegate work, or take another concrete step."
         )
@@ -1018,44 +897,6 @@ class Agent:
             self._pending_runtime_notices.clear()
         return notices
 
-    def _emit_routed_message_preview(
-        self,
-        state: StreamingContentState,
-        full_content: str,
-    ) -> None:
-        routed_header = extract_routed_header(full_content)
-        if routed_header is None:
-            return
-
-        target_refs, raw_body = routed_header
-        targets, _ = self._resolve_routed_targets(
-            target_refs,
-            log_failures=False,
-        )
-        if not targets:
-            return
-
-        preview_body = (
-            raw_body.lstrip() if not state.streamed_message_body else raw_body
-        )
-        if preview_body.startswith(state.streamed_message_body):
-            delta_text = preview_body[len(state.streamed_message_body) :]
-        else:
-            delta_text = preview_body
-
-        if not delta_text:
-            return
-
-        if state.streaming_message_id is None:
-            state.streaming_message_id = str(_uuid.uuid4())
-
-        state.streamed_message_body = preview_body
-        self._emit_message_stream_deltas(
-            message_id=state.streaming_message_id,
-            target_ids=[target.uuid for target in targets],
-            text=delta_text,
-        )
-
     def _handle_llm_chunk(
         self,
         state: StreamingContentState,
@@ -1083,48 +924,7 @@ class Agent:
         if not text:
             return
         state.content_buffer += text
-        if state.mode == "plain":
-            delta = ContentDelta(text=text)
-            event_bus.emit(
-                Event(
-                    type=EventType.HISTORY_ENTRY_DELTA,
-                    agent_id=self.uuid,
-                    data=delta.serialize(),
-                ),
-            )
-            if self.node_type == NodeType.ASSISTANT:
-                state.emitted_human_content = True
-                event_bus.emit(
-                    Event(
-                        type=EventType.ASSISTANT_CONTENT,
-                        agent_id=self.uuid,
-                        data={"content": text},
-                    ),
-                )
-            return
-
-        if state.mode == "routed":
-            state.pending_chunks.append(text)
-            self._emit_routed_message_preview(
-                state,
-                "".join(state.pending_chunks),
-            )
-            return
-
-        state.pending_chunks.append(text)
-        state.mode = classify_streaming_content("".join(state.pending_chunks))
-        if state.mode == "routed":
-            self._emit_routed_message_preview(
-                state,
-                "".join(state.pending_chunks),
-            )
-            return
-        if state.mode != "plain":
-            return
-
-        buffered_text = "".join(state.pending_chunks)
-        state.pending_chunks.clear()
-        delta = ContentDelta(text=buffered_text)
+        delta = ContentDelta(text=text)
         event_bus.emit(
             Event(
                 type=EventType.HISTORY_ENTRY_DELTA,
@@ -1138,7 +938,7 @@ class Agent:
                 Event(
                     type=EventType.ASSISTANT_CONTENT,
                     agent_id=self.uuid,
-                    data={"content": buffered_text},
+                    data={"content": text},
                 ),
             )
 
@@ -1166,20 +966,34 @@ class Agent:
             else:
                 self._handle_streaming_content_chunk(state, normalized_text)
 
-    def _deliver_message(self, target: Agent, content: str, message_id: str) -> None:
+    def _deliver_message(
+        self,
+        target: Agent,
+        parts: list[TextPart | ImagePart],
+        message_id: str,
+    ) -> None:
+        content_preview = content_parts_to_text(parts)
+        target._append_history(
+            ReceivedMessage(
+                from_id=self.uuid,
+                parts=parts,
+                message_id=message_id,
+            )
+        )
         target.enqueue_message(
             Message(
                 from_id=self.uuid,
                 to_id=target.uuid,
-                content=content,
+                parts=parts,
                 message_id=message_id,
+                history_recorded=True,
             )
         )
         self._log.debug(
-            "Message routed: {} -> {} ({} chars)",
+            "Message sent: {} -> {} ({} chars)",
             self.uuid[:8],
             target.uuid[:8],
-            len(content),
+            len(content_preview),
         )
         event_bus.emit(
             Event(
@@ -1187,53 +1001,17 @@ class Agent:
                 agent_id=self.uuid,
                 data={
                     "to_id": target.uuid,
-                    "content": content,
+                    "content": content_preview,
                     "message_id": message_id,
                 },
             ),
         )
-
-    def _emit_message_stream_deltas(
-        self,
-        *,
-        message_id: str,
-        target_ids: list[str],
-        text: str,
-    ) -> None:
-        if not target_ids or not text:
-            return
-
-        event_bus.emit(
-            Event(
-                type=EventType.HISTORY_ENTRY_DELTA,
-                agent_id=self.uuid,
-                data=SentMessageDelta(
-                    message_id=message_id,
-                    to_ids=target_ids,
-                    text=text,
-                ).serialize(),
-            ),
-        )
-
-        for target_id in target_ids:
-            event_bus.emit(
-                Event(
-                    type=EventType.HISTORY_ENTRY_DELTA,
-                    agent_id=target_id,
-                    data=ReceivedMessageDelta(
-                        message_id=message_id,
-                        from_id=self.uuid,
-                        text=text,
-                    ).serialize(),
-                ),
-            )
 
     def _record_content_output(
         self,
         content: str,
         *,
         emitted_human_content: bool,
-        message_id: str | None = None,
     ) -> None:
         normalized_content, normalized_thinking = split_thinking_content(content)
 
@@ -1241,30 +1019,7 @@ class Agent:
             self._mark_turn_progress()
             self._append_history(AssistantThinking(content=normalized_thinking))
 
-        content = normalized_content
-        plain_content, mixed_routed_suffix = (
-            split_plain_content_before_later_routed_header(content)
-        )
-        if mixed_routed_suffix is not None:
-            self._queue_runtime_notice(self._build_plain_then_routed_notice())
-
-        routed_result = self._route_content_output(content, message_id=message_id)
-        if routed_result.had_additional_routed_headers and routed_result.sent_messages:
-            self._queue_runtime_notice(self._build_multi_routed_header_notice())
-
-        if routed_result.route_errors:
-            for error in routed_result.route_errors:
-                self._append_history(ErrorEntry(content=error))
-
-        if routed_result.sent_messages:
-            self._mark_turn_progress()
-            for entry in routed_result.sent_messages:
-                self._append_history(entry)
-            return
-
-        if routed_result.had_routed_header:
-            return
-
+        plain_content = normalized_content
         if not plain_content.strip():
             return
 
@@ -1279,78 +1034,49 @@ class Agent:
                 ),
             )
 
-        self._append_history(AssistantText(content=plain_content))
-
-    def _route_content_output(
-        self,
-        content: str,
-        *,
-        message_id: str | None = None,
-    ) -> RoutedContentResult:
-        _, routed_messages = extract_routed_content(content)
-        if not routed_messages:
-            return RoutedContentResult()
-
-        result = RoutedContentResult(
-            had_routed_header=True,
-            had_additional_routed_headers=has_additional_routed_headers(content),
+        self._append_history(
+            AssistantText(
+                parts=[TextPart(text=plain_content)],
+                content=plain_content,
+            )
         )
 
-        for target_refs, body in routed_messages:
-            resolved_targets, route_errors = self._resolve_routed_targets(
-                target_refs,
-                log_failures=True,
-            )
-            result.route_errors.extend(route_errors)
-            delivered_to: list[str] = []
-            current_message_id = message_id or str(_uuid.uuid4())
-            for target in resolved_targets:
-                self._deliver_message(target, body, current_message_id)
-                delivered_to.append(target.uuid)
-
-            if delivered_to:
-                result.sent_messages.append(
-                    SentMessage(
-                        content=body,
-                        to_ids=delivered_to,
-                        message_id=current_message_id,
-                    ),
-                )
-
-        return result
-
-    def _resolve_routed_targets(
-        self,
-        target_refs: list[str],
-        *,
-        log_failures: bool,
-    ) -> tuple[list[Agent], list[str]]:
+    def _resolve_contact_target(self, target_ref: str) -> Agent:
         from app.graph_runtime import resolve_node_ref
 
-        resolved_targets: list[Agent] = []
-        seen_target_ids: set[str] = set()
-        route_errors: list[str] = []
-        for target_ref in target_refs:
-            target = resolve_node_ref(target_ref)
-            if target is None:
-                if log_failures:
-                    self._log.warning("@target routing failed: {}", target_ref)
-                route_errors.append(
-                    f"Routing failed: target `{target_ref}` was not found."
-                )
-                continue
-            if not self.can_contact(target.uuid):
-                if log_failures:
-                    self._log.warning("@target routing failed: {}", target_ref)
-                route_errors.append(
-                    f"Routing failed: target `{target_ref}` is not in contacts."
-                )
-                continue
-            if target.uuid in seen_target_ids:
-                continue
-            resolved_targets.append(target)
-            seen_target_ids.add(target.uuid)
-        return resolved_targets, route_errors
+        target = resolve_node_ref(target_ref)
+        if target is None:
+            raise ValueError(f"Send failed: target `{target_ref}` was not found.")
+        if not self.can_contact(target.uuid):
+            raise ValueError(f"Send failed: target `{target_ref}` is not in contacts.")
+        return target
+
+    def supports_input_image(self) -> bool:
+        return False
+
+    def send_message(
+        self,
+        *,
+        target_ref: str,
+        raw_parts: Any,
+    ) -> str:
+        parts = parse_content_parts_payload(raw_parts)
+        target = self._resolve_contact_target(target_ref)
+        if has_image_parts(parts) and not target.supports_input_image():
+            raise ValueError(
+                f"Send failed: target `{target_ref}` does not support `input_image`."
+            )
+        message_id = str(_uuid.uuid4())
+        self._deliver_message(target, parts, message_id)
+        self._mark_turn_progress()
+        self._append_history(
+            SentMessage(
+                to_id=target.uuid,
+                parts=parts,
+                message_id=message_id,
+            )
+        )
+        return json.dumps({"status": "sent", "target_id": target.uuid})
 
     def _mark_turn_progress(self) -> None:
         self._turn_made_progress = True
@@ -1500,7 +1226,6 @@ class Agent:
                 self._record_content_output(
                     stream_state.content_buffer,
                     emitted_human_content=stream_state.emitted_human_content,
-                    message_id=stream_state.streaming_message_id,
                 )
         self._interrupt_requested.clear()
         self.set_interrupt_callback(None)
@@ -1572,6 +1297,17 @@ class Agent:
         messages.extend(self._build_runtime_tail_messages())
         return messages
 
+    @staticmethod
+    def _content_parts_to_context_content(
+        parts: list[TextPart | ImagePart],
+    ) -> str:
+        if all(isinstance(part, TextPart) for part in parts):
+            return content_parts_to_text(parts)
+        return json.dumps(
+            {"parts": [part.serialize() for part in parts]},
+            ensure_ascii=False,
+        )
+
     def _build_history_messages(
         self,
         history_snapshot: list[HistoryEntry],
@@ -1585,22 +1321,32 @@ class Agent:
 
             elif isinstance(entry, ReceivedMessage):
                 self._flush_tool_calls(messages, pending_tool_calls)
-                payload = f'<message from="{entry.from_id}">{entry.content}</message>'
+                payload = (
+                    f'<message from="{entry.from_id}">'
+                    f"{self._content_parts_to_context_content(entry.parts)}</message>"
+                )
                 messages.append({"role": "user", "content": payload})
 
             elif isinstance(entry, AssistantText):
                 self._flush_tool_calls(messages, pending_tool_calls)
-                messages.append({"role": "assistant", "content": entry.content})
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": self._content_parts_to_context_content(entry.parts),
+                    }
+                )
 
             elif isinstance(entry, SentMessage):
                 self._flush_tool_calls(messages, pending_tool_calls)
-                for target_id in entry.to_ids:
-                    messages.append(
-                        {
-                            "role": "assistant",
-                            "content": build_routed_content([target_id], entry.content),
-                        }
-                    )
+                messages.append(
+                    {
+                        "role": "assistant",
+                        "content": (
+                            f'<message to="{entry.to_id}">'
+                            f"{self._content_parts_to_context_content(entry.parts)}</message>"
+                        ),
+                    }
+                )
 
             elif isinstance(entry, AssistantThinking):
                 pass
@@ -1668,6 +1414,16 @@ class Agent:
             messages.append({"role": "assistant", "tool_calls": list(pending)})
         pending.clear()
 
+    @staticmethod
+    def _tool_result_has_error(result: str | None) -> bool:
+        if not isinstance(result, str):
+            return False
+        try:
+            payload = json.loads(result)
+        except json.JSONDecodeError:
+            return False
+        return isinstance(payload, dict) and isinstance(payload.get("error"), str)
+
     def _drain_messages(self) -> None:
         drained: list[WakeSignal] = []
         while True:
@@ -1688,8 +1444,13 @@ class Agent:
         for signal in drained:
             message = signal.payload.get("message", {})
             content = message.get("content", "")
+            parts = deserialize_content_parts(
+                message.get("parts"),
+                fallback_text=content if isinstance(content, str) else None,
+            )
             from_id = message.get("from", "")
             message_id = message.get("message_id")
+            history_recorded = bool(message.get("history_recorded", False))
             if (
                 not isinstance(content, str)
                 or not isinstance(from_id, str)
@@ -1701,13 +1462,15 @@ class Agent:
                 from_id,
                 (content[:100] + "...") if len(content) > 100 else content,
             )
-            self._append_history(
-                ReceivedMessage(
-                    content=content,
-                    from_id=from_id,
-                    message_id=message_id,
-                ),
-            )
+            if not history_recorded:
+                self._append_history(
+                    ReceivedMessage(
+                        from_id=from_id,
+                        parts=parts,
+                        content=content,
+                        message_id=message_id,
+                    ),
+                )
 
     def _wait_for_input(self) -> None:
         signal = self._wait_for_wakeup()
@@ -1718,17 +1481,24 @@ class Agent:
             message = signal.payload.get("message")
             if isinstance(message, dict):
                 content = message.get("content")
+                parts = deserialize_content_parts(
+                    message.get("parts"),
+                    fallback_text=content if isinstance(content, str) else None,
+                )
                 from_id = message.get("from")
                 message_id = message.get("message_id")
+                history_recorded = bool(message.get("history_recorded", False))
                 if (
                     isinstance(content, str)
                     and isinstance(from_id, str)
                     and (message_id is None or isinstance(message_id, str))
+                    and not history_recorded
                 ):
                     self._append_history(
                         ReceivedMessage(
-                            content=content,
                             from_id=from_id,
+                            parts=parts,
+                            content=content,
                             message_id=message_id,
                         )
                     )
@@ -1806,6 +1576,36 @@ class Agent:
                 data={"tool": name, "arguments": arguments},
             ),
         )
+
+        if name == "send":
+            t0 = _time.perf_counter()
+            try:
+                self._raise_if_interrupt_requested()
+                result = tool.execute(
+                    self,
+                    arguments,
+                    on_output=None,
+                    tool_call_id=call_id,
+                )
+                self._raise_if_interrupt_requested()
+                elapsed = _time.perf_counter() - t0
+                self._log.debug(
+                    "Tool {} completed in {:.2f}s, result_len={}",
+                    name,
+                    elapsed,
+                    len(result) if result else 0,
+                )
+                return result
+            except InterruptRequestedError:
+                raise
+            except Exception as exc:
+                elapsed = _time.perf_counter() - t0
+                self._log.warning(
+                    "Tool {} failed after {:.2f}s: {}", name, elapsed, exc
+                )
+                error_text = str(exc)
+                self._append_history(ErrorEntry(content=error_text))
+                return json.dumps({"error": error_text})
 
         streaming_entry = ToolCall(
             tool_name=name,
@@ -1899,6 +1699,8 @@ class Agent:
         payload = {
             "from": msg.from_id,
             "content": msg.content,
+            "parts": [part.serialize() for part in msg.parts],
+            "history_recorded": msg.history_recorded,
         }
         if msg.message_id is not None:
             payload["message_id"] = msg.message_id

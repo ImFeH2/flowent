@@ -10,6 +10,7 @@ import {
   Bot,
   AlertCircle,
   Workflow,
+  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, Node } from "@/types";
@@ -17,6 +18,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { getNodeLabel } from "@/lib/nodeLabel";
 import { formatJsonOutput } from "@/lib/formatJsonOutput";
+import { contentPartsToText, normalizeContentParts } from "@/lib/contentParts";
 
 interface HistoryViewProps {
   agentLabel?: string;
@@ -105,6 +107,64 @@ function StreamingText({
   );
 }
 
+function MessageContent({
+  entry,
+  markdownClassName,
+  preClassName,
+}: {
+  entry: HistoryEntry;
+  markdownClassName?: string;
+  preClassName?: string;
+}) {
+  const parts = normalizeContentParts(entry.parts, entry.content);
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  if (parts.every((part) => part.type === "text")) {
+    return (
+      <MarkdownOrJsonBlock
+        content={contentPartsToText(parts)}
+        streaming={entry.streaming}
+        markdownClassName={markdownClassName}
+        preClassName={preClassName}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {parts.map((part, index) =>
+        part.type === "text" ? (
+          <MarkdownOrJsonBlock
+            key={`${index}-${part.type}`}
+            content={part.text}
+            markdownClassName={markdownClassName}
+            preClassName={preClassName}
+          />
+        ) : (
+          <div
+            key={`${index}-${part.type}-${part.asset_id}`}
+            className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-foreground/82"
+          >
+            <div className="flex items-center gap-2 font-medium text-foreground/88">
+              <ImageIcon className="size-3.5 text-foreground/70" />
+              <span>{part.alt || "Image"}</span>
+            </div>
+            <div className="mt-1 text-muted-foreground">
+              {part.mime_type || "image asset"}
+              {part.width && part.height
+                ? ` · ${part.width}x${part.height}`
+                : ""}
+            </div>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
 const HistoryItem = memo(function HistoryItem({
   agentLabel,
   entry,
@@ -138,12 +198,13 @@ const HistoryItem = memo(function HistoryItem({
           icon={<MessageSquare className="size-3 text-foreground/70" />}
           className="border-white/10 bg-white/[0.024]"
           labelClassName="text-foreground/70"
-          actions={<CopyButton text={entry.content ?? ""} />}
+          actions={
+            <CopyButton text={contentPartsToText(entry.parts, entry.content)} />
+          }
           defaultOpen={entry.streaming ?? false}
         >
-          <MarkdownOrJsonBlock
-            content={entry.content ?? ""}
-            streaming={entry.streaming}
+          <MessageContent
+            entry={entry}
             markdownClassName="text-foreground/90"
             preClassName="text-foreground/90 leading-relaxed"
           />
@@ -189,19 +250,24 @@ const HistoryItem = memo(function HistoryItem({
       );
 
     case "SentMessage": {
-      const targets = (entry.to_ids ?? []).map((id) => getNodeLabel(id, nodes));
+      const targetIds =
+        entry.to_id != null
+          ? [entry.to_id]
+          : (entry.to_ids ?? []).filter((id): id is string => Boolean(id));
+      const targets = targetIds.map((id) => getNodeLabel(id, nodes));
       return (
         <CollapsibleBlock
           label={`To ${targets.join(", ") || "Unknown"}`}
           icon={<Send className="size-3 text-foreground/58" />}
           className="border-white/8 bg-white/[0.016]"
           labelClassName="text-foreground/72"
-          actions={<CopyButton text={entry.content ?? ""} />}
+          actions={
+            <CopyButton text={contentPartsToText(entry.parts, entry.content)} />
+          }
           defaultOpen={entry.streaming ?? false}
         >
-          <MarkdownOrJsonBlock
-            content={entry.content ?? ""}
-            streaming={entry.streaming}
+          <MessageContent
+            entry={entry}
             markdownClassName="text-foreground/86"
             preClassName="text-foreground/86 leading-relaxed"
           />
@@ -219,9 +285,8 @@ const HistoryItem = memo(function HistoryItem({
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
         >
-          <MarkdownOrJsonBlock
-            content={entry.content ?? ""}
-            streaming={entry.streaming}
+          <MessageContent
+            entry={entry}
             markdownClassName="text-foreground/88"
             preClassName="text-foreground/88 leading-relaxed"
           />

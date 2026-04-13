@@ -13,6 +13,7 @@ def test_empty_tools_list_grants_minimum_tools():
         "sleep",
         "todo",
         "contacts",
+        "send",
     ]
 
 
@@ -26,6 +27,7 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
         "sleep",
         "todo",
         "contacts",
+        "send",
     ]
 
 
@@ -37,6 +39,7 @@ def test_tool_registry_registers_connect_and_removes_create_root():
     assert "set_permissions" in tool_names
     assert "create_agent" in tool_names
     assert "connect" in tool_names
+    assert "send" in tool_names
     assert "list_tabs" in tool_names
     assert "create_root" not in tool_names
     assert "manage_providers" in tool_names
@@ -66,6 +69,7 @@ def test_tool_registry_grants_tab_graph_tools_when_explicitly_allowed():
         "sleep",
         "todo",
         "contacts",
+        "send",
         "create_tab",
         "delete_tab",
         "create_agent",
@@ -84,3 +88,4 @@ def test_tool_registry_shows_management_tools_in_agent_visible_list():
     assert "manage_settings" in visible_tool_names
     assert "manage_prompts" in visible_tool_names
     assert "set_permissions" in visible_tool_names
+    assert "send" in visible_tool_names

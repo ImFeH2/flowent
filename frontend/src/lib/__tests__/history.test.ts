@@ -162,7 +162,7 @@ describe("history utilities", () => {
   it("dedupes sent messages using targets and content", () => {
     const sent: HistoryEntry = {
       type: "SentMessage",
-      to_ids: ["worker-1"],
+      to_id: "worker-1",
       content: "Continue the task.",
       timestamp: 40,
     };
@@ -204,13 +204,13 @@ describe("history utilities", () => {
       {
         type: "SentMessageDelta",
         message_id: "msg-1",
-        to_ids: ["worker-1"],
+        to_id: "worker-1",
         text: "Continue ",
       },
       {
         type: "SentMessageDelta",
         message_id: "msg-1",
-        to_ids: ["worker-1"],
+        to_id: "worker-1",
         text: "the task.",
       },
       {
@@ -237,8 +237,9 @@ describe("history utilities", () => {
       {
         type: "SentMessage",
         message_id: "msg-1",
-        to_ids: ["worker-1"],
+        to_id: "worker-1",
         content: "Continue the task.",
+        parts: [{ type: "text", text: "Continue the task." }],
         timestamp: 50,
         streaming: true,
       },
@@ -247,6 +248,7 @@ describe("history utilities", () => {
         message_id: "msg-2",
         from_id: "worker-1",
         content: "Working on it.",
+        parts: [{ type: "text", text: "Working on it." }],
         timestamp: 50,
         streaming: true,
       },

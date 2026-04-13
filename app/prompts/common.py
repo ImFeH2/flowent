@@ -60,9 +60,8 @@ CREATE_AGENT_TOOL_GUIDANCE = """\
 - `create_agent` always creates the new peer in your current tab. It does not take `tab_id` or any other cross-tab target parameter.
 - Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them.
 - `connect_to_creator` defaults to `true`; set it to `false` only when you intentionally want a disconnected node and will wire explicit edges yourself.
-- Creating an agent does not start work by itself; explicitly send it its first task.
+- Creating an agent does not start work by itself; explicitly dispatch its first task with `send`.
 - After creating multiple agents, dispatch tasks to all of them before calling `idle`.
-- Each response can route to only one node. When multiple agents need first-task dispatches, send one node-specific `@target:` task, continue to the next response, and keep going until every planned node has been dispatched.
 - Do not insert unrelated tool calls or Human-facing text while some planned nodes are still waiting for their first task.
 - When naming an agent via `create_agent`, use title case with spaces (e.g. "Web Researcher", "Code Reviewer", "Data Analyst"). Avoid snake_case, camelCase, or all-lowercase names.
 """
@@ -98,6 +97,17 @@ CONTACTS_TOOL_GUIDANCE = """\
 - Use `contacts` to inspect the agents you can currently message directly.
 """
 
+SEND_TOOL_GUIDANCE = """\
+## Send Tool Rules
+
+- Use `send` for every formal node-to-node message.
+- `send` takes exactly one `target` and one ordered `parts` array.
+- Use `contacts` before `send` when you need to inspect reachable target ids or names.
+- `send.parts` preserves order. Keep text and image parts in the sequence you intend the receiver to see.
+- `@target:` and similar text prefixes inside normal content do not send anything.
+- If multiple nodes need messages in the same turn, call `send` multiple times in sequence.
+"""
+
 LIST_ROLES_TOOL_GUIDANCE = """\
 ## List Roles Tool Rules
 
@@ -130,16 +140,15 @@ MANAGE_TOOLS_GUIDANCE = """\
 COMMUNICATION_USAGE_GUIDANCE = """\
 ## Communication Rules
 
-- To send a message to another node, the first line of your content must start with `@<name-or-uuid>: message body`, where `<name-or-uuid>` is the actual node name or UUID (e.g. `@Researcher: start the task` or `@a1b2c3d4: here is the result`).
-- Only one target ref is supported in each routed header. Do not use commas in the target field.
-- Each response can produce only one content block. If you need to message multiple nodes, do it across multiple consecutive responses with one `@target:` header each time.
-- Prefer using node names rather than UUIDs for `@target:` routing. Names are more readable and less error-prone. Short UUID prefixes are also supported when unambiguous.
-- A single content block is either plain output or a `@target:` routed message, never both. A content block supports only one routed header; later `@...:` lines are treated as body text for the first target. Plain content that does not start with `@target:` will not be seen by any other node.
+- Use plain content only for your own direct output. Plain content is never delivered to another node.
+- Use `send` for every formal node-to-node message. Target selection belongs in `send.target`, not in the text body.
+- `send` takes one target at a time. If multiple nodes need messages, call `send` multiple times in sequence.
 - Use `contacts` to discover current contact names and ids before sending.
-- When you finish your assigned task, route the result to the appropriate destination using `@<name-or-uuid>: result`. The destination is the node specified in your task instructions; if no specific destination was given, route back to the node that assigned you the task. Plain content without `@target:` will not reach any other node. If you are unsure where to send results, use `contacts` to inspect your current contacts.
-- Do not call `idle` after completing a task without first routing the result to its destination.
+- When you finish your assigned task, use `send` to deliver the result to the correct destination before calling `idle`.
+- `@target:` and similar `@name:` text inside normal content are just text. They do not send anything.
 - Do NOT output content just to "think out loud" between tool calls. Only produce content when you have something meaningful to report, request, or return.
 - You receive messages as: <message from="uuid">content</message>
+- Your previously sent messages appear in context as: <message to="uuid">content</message>
 - System context is injected as: <system>content</system>
 """
 
@@ -154,9 +163,8 @@ ASSISTANT_ONLY_PROMPT = """\
 ## Assistant-Only Communication Rules
 
 - Your content is pushed directly to the frontend chat panel as your reply to the Human.
-- You do not need `@target:` when replying to the Human.
-- Plain content that does not start with `@target:` is a reply to the Human.
-- If you need to send a message to a connected node instead of the Human, start the content with a single routed header `@<name-or-uuid>: message body` (e.g. `@Worker-1: please start the task`). If you need to message multiple nodes, do it across multiple consecutive responses, one node per response.
+- Plain content is your reply to the Human.
+- If you need to send a message to a connected node instead of the Human, use `send`.
 - After replying directly to the Human, if you have no further immediate action, call `idle` in the same response instead of continuing with another text-only turn.
 - Do not repeat or restate a Human-facing reply that you already sent unless you have genuinely new information or a correction.
 - Entering a waiting state still requires an explicit `idle` tool call.
@@ -205,6 +213,8 @@ def _build_conditional_tool_guidance(tools: list[str]) -> list[str]:
         parts.append(CONNECT_TOOL_GUIDANCE.strip())
     if "contacts" in tool_names:
         parts.append(CONTACTS_TOOL_GUIDANCE.strip())
+    if "send" in tool_names:
+        parts.append(SEND_TOOL_GUIDANCE.strip())
     if "list_roles" in tool_names:
         parts.append(LIST_ROLES_TOOL_GUIDANCE.strip())
     if "list_tabs" in tool_names:

@@ -15,6 +15,7 @@ from app.prompts.common import (
     LIST_TABS_TOOL_GUIDANCE,
     LIST_TOOLS_TOOL_GUIDANCE,
     MANAGE_TOOLS_GUIDANCE,
+    SEND_TOOL_GUIDANCE,
     SET_PERMISSIONS_TOOL_GUIDANCE,
     SLEEP_TOOL_GUIDANCE,
     compose_system_prompt,
@@ -114,7 +115,7 @@ def test_compose_system_prompt_injects_create_agent_guidance_when_tool_present()
         in CREATE_AGENT_TOOL_GUIDANCE
     )
     assert "dispatch tasks to all of them before calling `idle`" in result
-    assert "Each response can route to only one node." in result
+    assert "explicitly dispatch its first task with `send`" in result
     assert "Do not insert unrelated tool calls or Human-facing text" in result
     assert "title case with spaces" in CREATE_AGENT_TOOL_GUIDANCE
 
@@ -175,34 +176,21 @@ def test_compose_system_prompt_injects_set_permissions_guidance_when_tool_presen
 
 def test_common_communication_guidance_requires_explicit_target_routing():
     assert (
-        "must start with `@<name-or-uuid>: message body`"
-        in COMMUNICATION_USAGE_GUIDANCE
-    )
-    assert "Only one target ref is supported" in COMMUNICATION_USAGE_GUIDANCE
-    assert "Do not use commas in the target field." in COMMUNICATION_USAGE_GUIDANCE
-    assert (
-        "Each response can produce only one content block"
-        in COMMUNICATION_USAGE_GUIDANCE
-    )
-    assert "Prefer using node names" in COMMUNICATION_USAGE_GUIDANCE
-    assert (
-        "A single content block is either plain output or a `@target:` routed message"
+        "Use plain content only for your own direct output."
         in COMMUNICATION_USAGE_GUIDANCE
     )
     assert (
-        "later `@...:` lines are treated as body text for the first target"
+        "Use `send` for every formal node-to-node message."
         in COMMUNICATION_USAGE_GUIDANCE
     )
+    assert "`send` takes one target at a time." in COMMUNICATION_USAGE_GUIDANCE
     assert (
-        "Plain content that does not start with `@target:` will not be seen by any other node."
+        "Use `contacts` to discover current contact names and ids before sending."
         in COMMUNICATION_USAGE_GUIDANCE
     )
+    assert "use `send` to deliver the result" in COMMUNICATION_USAGE_GUIDANCE
     assert (
-        "route the result to the appropriate destination"
-        in COMMUNICATION_USAGE_GUIDANCE
-    )
-    assert (
-        "Do not call `idle` after completing a task without first routing the result"
+        "`@target:` and similar `@name:` text inside normal content are just text."
         in COMMUNICATION_USAGE_GUIDANCE
     )
     assert "automatically delivered to your parent" not in COMMUNICATION_USAGE_GUIDANCE
@@ -223,12 +211,19 @@ def test_compose_system_prompt_always_includes_file_path_guidance():
 
 def test_assistant_only_prompt_keeps_frontend_semantics_without_repeating_block_rule():
     assert "frontend chat panel" in ASSISTANT_ONLY_PROMPT
-    assert (
-        "Plain content that does not start with `@target:` is a reply to the Human."
-        in ASSISTANT_ONLY_PROMPT
-    )
-    assert "one node per response" in ASSISTANT_ONLY_PROMPT
+    assert "Plain content is your reply to the Human." in ASSISTANT_ONLY_PROMPT
+    assert "use `send`" in ASSISTANT_ONLY_PROMPT
     assert "A single content block is either" not in ASSISTANT_ONLY_PROMPT
+
+
+def test_compose_system_prompt_injects_send_guidance_when_tool_present():
+    result = compose_system_prompt(
+        "Role-specific instructions.",
+        tools=["send"],
+    )
+
+    assert SEND_TOOL_GUIDANCE in result
+    assert "formal node-to-node message" in SEND_TOOL_GUIDANCE
 
 
 def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
@@ -510,9 +505,13 @@ def test_steward_included_tools_contains_list_roles_and_list_tools():
 
 
 def test_steward_prompt_requires_same_response_dispatch_and_no_rebroadcast():
-    assert "Each response can route to only one node." in STEWARD_ROLE_SYSTEM_PROMPT
     assert (
-        "keep sending one `@target:` brief per response" in STEWARD_ROLE_SYSTEM_PROMPT
+        "dispatch the first task brief to its Leader with `send`"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
+    assert (
+        "keep using `send` until every intended Leader has been dispatched"
+        in STEWARD_ROLE_SYSTEM_PROMPT
     )
     assert "Do not re-send a task to a node" in STEWARD_ROLE_SYSTEM_PROMPT
     assert (

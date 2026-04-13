@@ -263,7 +263,8 @@ describe("AssistantChatMessages", () => {
     );
 
     const workspaceBubble =
-      screen.getByText("Workspace message").parentElement?.parentElement;
+      screen.getByText("Workspace message").parentElement?.parentElement
+        ?.parentElement?.parentElement;
     expect(workspaceBubble).not.toBeNull();
     expect(workspaceBubble).toHaveClass(
       "bg-white/[0.1]",
@@ -281,7 +282,8 @@ describe("AssistantChatMessages", () => {
     );
 
     const panelBubble =
-      screen.getByText("Panel message").parentElement?.parentElement;
+      screen.getByText("Panel message").parentElement?.parentElement
+        ?.parentElement?.parentElement;
     expect(panelBubble).not.toBeNull();
     expect(panelBubble).toHaveClass(
       "bg-white/[0.08]",

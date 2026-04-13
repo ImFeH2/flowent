@@ -1,4 +1,5 @@
 import type { HistoryEntry, StreamingDelta } from "@/types";
+import { contentPartsToText } from "@/lib/contentParts";
 
 export function clearConversationHistory(
   history: HistoryEntry[],
@@ -18,7 +19,7 @@ export function reduceDeltas(deltas: StreamingDelta[]) {
   let content = "";
   let thinking = "";
   const toolResults = new Map<string, string>();
-  const sentMessages = new Map<string, { toIds: string[]; text: string }>();
+  const sentMessages = new Map<string, { toId: string; text: string }>();
   const receivedMessages = new Map<string, { fromId: string; text: string }>();
   const messageOrder: Array<{ kind: "sent" | "received"; messageId: string }> =
     [];
@@ -42,7 +43,7 @@ export function reduceDeltas(deltas: StreamingDelta[]) {
           messageOrder.push({ kind: "sent", messageId: delta.message_id });
         }
         sentMessages.set(delta.message_id, {
-          toIds: delta.to_ids,
+          toId: delta.to_id,
           text: (sentMessages.get(delta.message_id)?.text ?? "") + delta.text,
         });
         break;
@@ -97,7 +98,7 @@ function getHistoryEntryDedupKey(entry: HistoryEntry): string {
         entry.type,
         timestamp,
         entry.from_id ?? "",
-        entry.content ?? "",
+        contentPartsToText(entry.parts, entry.content),
       ].join(":");
     case "SentMessage":
       if (entry.message_id) {
@@ -106,8 +107,8 @@ function getHistoryEntryDedupKey(entry: HistoryEntry): string {
       return [
         entry.type,
         timestamp,
-        (entry.to_ids ?? []).join(","),
-        entry.content ?? "",
+        entry.to_id ?? entry.to_ids?.[0] ?? "",
+        contentPartsToText(entry.parts, entry.content),
       ].join(":");
     case "ToolCall":
       if (entry.tool_call_id) {
@@ -253,8 +254,9 @@ export function mergeHistoryWithDeltas({
       base.push({
         type: "SentMessage",
         message_id: item.messageId,
-        to_ids: sent.toIds,
+        to_id: sent.toId,
         content: sent.text,
+        parts: [{ type: "text", text: sent.text }],
         timestamp: now,
         streaming: true,
       } satisfies HistoryEntry);
@@ -279,6 +281,7 @@ export function mergeHistoryWithDeltas({
       message_id: item.messageId,
       from_id: received.fromId,
       content: received.text,
+      parts: [{ type: "text", text: received.text }],
       timestamp: now,
       streaming: true,
     } satisfies HistoryEntry);

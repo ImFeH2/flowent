@@ -59,11 +59,17 @@ function buildTickerItem(
         tone: "active",
       };
     case "SentMessage": {
-      const targetLabels = (entry.to_ids ?? []).map((toId) =>
+      const targetIds =
+        entry.to_id != null
+          ? [entry.to_id]
+          : (entry.to_ids ?? []).filter((toId): toId is string =>
+              Boolean(toId),
+            );
+      const targetLabels = targetIds.map((toId) =>
         getNodeLabel(toId, agents, labelMaxLength),
       );
       return {
-        id: `${agentId}-${entry.timestamp}-sent-${(entry.to_ids ?? []).join(",")}`,
+        id: `${agentId}-${entry.timestamp}-sent-${targetIds.join(",")}`,
         text: `${agentLabel} -> ${targetLabels.join(", ") || "unknown"}`,
         tone: "active",
       };

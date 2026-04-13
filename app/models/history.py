@@ -5,6 +5,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.models.base import Serializable
+from app.models.content import (
+    ContentPart,
+    content_parts_to_text,
+    deserialize_content_parts,
+)
 
 
 @dataclass
@@ -15,24 +20,45 @@ class SystemEntry(Serializable):
 
 @dataclass
 class ReceivedMessage(Serializable):
-    content: str
     from_id: str
+    parts: list[ContentPart] = field(default_factory=list)
+    content: str = ""
     message_id: str | None = None
     timestamp: float = field(default_factory=time.time)
+
+    def __post_init__(self) -> None:
+        if self.parts and not self.content:
+            self.content = content_parts_to_text(self.parts)
+        elif self.content and not self.parts:
+            self.parts = deserialize_content_parts(None, fallback_text=self.content)
 
 
 @dataclass
 class AssistantText(Serializable):
-    content: str
+    parts: list[ContentPart] = field(default_factory=list)
+    content: str = ""
     timestamp: float = field(default_factory=time.time)
+
+    def __post_init__(self) -> None:
+        if self.parts and not self.content:
+            self.content = content_parts_to_text(self.parts)
+        elif self.content and not self.parts:
+            self.parts = deserialize_content_parts(None, fallback_text=self.content)
 
 
 @dataclass
 class SentMessage(Serializable):
-    content: str
-    to_ids: list[str]
+    to_id: str
+    parts: list[ContentPart] = field(default_factory=list)
+    content: str = ""
     message_id: str | None = None
     timestamp: float = field(default_factory=time.time)
+
+    def __post_init__(self) -> None:
+        if self.parts and not self.content:
+            self.content = content_parts_to_text(self.parts)
+        elif self.content and not self.parts:
+            self.parts = deserialize_content_parts(None, fallback_text=self.content)
 
 
 @dataclass
@@ -96,9 +122,14 @@ def deserialize_history_entry(data: dict[str, Any]) -> HistoryEntry:
             timestamp=timestamp_value,
         )
     if entry_type == "ReceivedMessage":
+        parts = deserialize_content_parts(
+            data.get("parts"),
+            fallback_text=str(data.get("content", "")),
+        )
         return ReceivedMessage(
-            content=str(data.get("content", "")),
             from_id=str(data.get("from_id", "")),
+            parts=parts,
+            content=content_parts_to_text(parts),
             message_id=(
                 str(data["message_id"])
                 if isinstance(data.get("message_id"), str)
@@ -107,20 +138,35 @@ def deserialize_history_entry(data: dict[str, Any]) -> HistoryEntry:
             timestamp=timestamp_value,
         )
     if entry_type == "AssistantText":
+        parts = deserialize_content_parts(
+            data.get("parts"),
+            fallback_text=str(data.get("content", "")),
+        )
         return AssistantText(
-            content=str(data.get("content", "")),
+            parts=parts,
+            content=content_parts_to_text(parts),
             timestamp=timestamp_value,
         )
     if entry_type == "SentMessage":
-        raw_to_ids = data.get("to_ids")
-        to_ids = (
-            [str(item) for item in raw_to_ids if isinstance(item, str)]
-            if isinstance(raw_to_ids, list)
-            else []
+        parts = deserialize_content_parts(
+            data.get("parts"),
+            fallback_text=str(data.get("content", "")),
+        )
+        to_id = (
+            str(data["to_id"])
+            if isinstance(data.get("to_id"), str)
+            else (
+                str(data["to_ids"][0])
+                if isinstance(data.get("to_ids"), list)
+                and data["to_ids"]
+                and isinstance(data["to_ids"][0], str)
+                else ""
+            )
         )
         return SentMessage(
-            content=str(data.get("content", "")),
-            to_ids=to_ids,
+            to_id=to_id,
+            parts=parts,
+            content=content_parts_to_text(parts),
             message_id=(
                 str(data["message_id"])
                 if isinstance(data.get("message_id"), str)

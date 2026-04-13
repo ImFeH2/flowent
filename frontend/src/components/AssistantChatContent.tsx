@@ -19,6 +19,7 @@ import {
   Square,
   Sparkles,
   Wrench,
+  ImageIcon,
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { MarkdownContent } from "@/components/MarkdownContent";
@@ -30,10 +31,16 @@ import {
   stepAssistantCommandSelection,
   type AssistantCommandSpec,
 } from "@/lib/assistantCommands";
+import { contentPartsToText, normalizeContentParts } from "@/lib/contentParts";
 import { formatJsonOutput } from "@/lib/formatJsonOutput";
 import { getNodeLabel } from "@/lib/nodeLabel";
 import { cn } from "@/lib/utils";
-import type { AssistantChatItem, HistoryEntry, Node } from "@/types";
+import type {
+  AssistantChatItem,
+  ContentPart,
+  HistoryEntry,
+  Node,
+} from "@/types";
 
 export type AssistantChatVariant = "panel" | "floating" | "workspace";
 
@@ -432,15 +439,22 @@ const TimelineItem = memo(function TimelineItem({
 
   switch (item.type) {
     case "ReceivedMessage":
-      if (!item.content) {
+      if (normalizeContentParts(item.parts, item.content).length === 0) {
         return null;
       }
       if (item.from_id === "human") {
-        return <HumanBubble content={item.content} variant={variant} />;
+        return (
+          <HumanBubble
+            content={contentPartsToText(item.parts, item.content)}
+            parts={item.parts}
+            variant={variant}
+          />
+        );
       }
       return (
         <MessageActivityCard
-          content={item.content}
+          content={contentPartsToText(item.parts, item.content)}
+          parts={item.parts}
           icon={<MessageSquare className="size-3.5 text-foreground/68" />}
           label={`From ${getNodeLabel(item.from_id ?? "", nodes)}`}
           tone="received"
@@ -449,22 +463,30 @@ const TimelineItem = memo(function TimelineItem({
         />
       );
     case "AssistantText":
-      if (!item.content) {
+      if (normalizeContentParts(item.parts, item.content).length === 0) {
         return null;
       }
       return (
-        <AssistantBubble content={item.content} streaming={item.streaming} />
+        <AssistantBubble
+          content={contentPartsToText(item.parts, item.content)}
+          parts={item.parts}
+          streaming={item.streaming}
+        />
       );
     case "SentMessage":
-      if (!item.content) {
+      if (normalizeContentParts(item.parts, item.content).length === 0) {
         return null;
       }
       return (
         <MessageActivityCard
-          content={item.content}
+          content={contentPartsToText(item.parts, item.content)}
+          parts={item.parts}
           icon={<Send className="size-3.5 text-foreground/58" />}
           label={`To ${
-            (item.to_ids ?? [])
+            (item.to_id
+              ? [item.to_id]
+              : (item.to_ids ?? []).filter((id): id is string => Boolean(id))
+            )
               .map((id) => getNodeLabel(id, nodes))
               .join(", ") || "Unknown"
           }`}
@@ -503,10 +525,12 @@ const TimelineItem = memo(function TimelineItem({
 
 function HumanBubble({
   content,
+  parts,
   variant,
   pending = false,
 }: {
   content: string;
+  parts?: ContentPart[] | null;
   variant: AssistantChatVariant;
   pending?: boolean;
 }) {
@@ -523,14 +547,19 @@ function HumanBubble({
           pending && "opacity-80",
         )}
       >
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1">{content}</span>
-          {pending && (
+        <div className="flex min-w-0 flex-col gap-2">
+          <RichContentBlock
+            content={content}
+            parts={parts}
+            markdownClassName="text-sm text-white"
+            preClassName="text-white/90"
+          />
+          {pending ? (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/80">
               <LoaderCircle className="size-3 animate-spin" />
               Sending
             </span>
-          )}
+          ) : null}
         </div>
       </div>
       <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -542,15 +571,18 @@ function HumanBubble({
 
 function AssistantBubble({
   content,
+  parts,
   streaming,
 }: {
   content: string;
+  parts?: ContentPart[] | null;
   streaming?: boolean;
 }) {
   return (
     <div className="group min-w-0 w-full">
       <RichContentBlock
         content={content}
+        parts={parts}
         streaming={streaming}
         markdownClassName="text-sm text-foreground"
         preClassName="text-foreground/90"
@@ -564,6 +596,7 @@ function AssistantBubble({
 
 function MessageActivityCard({
   content,
+  parts,
   icon,
   label,
   tone,
@@ -571,6 +604,7 @@ function MessageActivityCard({
   variant,
 }: {
   content: string;
+  parts?: ContentPart[] | null;
   icon: ReactNode;
   label: string;
   tone: "received" | "sent";
@@ -633,6 +667,7 @@ function MessageActivityCard({
         <div className="mt-2 min-w-0">
           <RichContentBlock
             content={content}
+            parts={parts}
             streaming={streaming}
             markdownClassName="text-[12px] text-foreground/78"
             preClassName="text-foreground/74"
@@ -876,16 +911,20 @@ function ActivityDisclosure({
 
 function RichContentBlock({
   content,
+  parts,
   streaming,
   markdownClassName,
   preClassName,
 }: {
   content: string | null | undefined;
+  parts?: ContentPart[] | null;
   streaming?: boolean;
   markdownClassName?: string;
   preClassName?: string;
 }) {
-  const formattedJson = formatJsonOutput(content);
+  const normalizedParts = normalizeContentParts(parts, content);
+  const textContent = contentPartsToText(normalizedParts, content);
+  const formattedJson = formatJsonOutput(textContent);
 
   if (formattedJson) {
     return (
@@ -900,6 +939,42 @@ function RichContentBlock({
     );
   }
 
+  if (
+    normalizedParts.length > 0 &&
+    normalizedParts.some((part) => part.type === "image")
+  ) {
+    return (
+      <div className="space-y-3">
+        {normalizedParts.map((part, index) =>
+          part.type === "text" ? (
+            <RichContentBlock
+              key={`${index}-text`}
+              content={part.text}
+              markdownClassName={markdownClassName}
+              preClassName={preClassName}
+            />
+          ) : (
+            <div
+              key={`${index}-image-${part.asset_id}`}
+              className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-[12px] text-white/78"
+            >
+              <div className="flex items-center gap-2 font-medium text-white/88">
+                <ImageIcon className="size-4 text-white/70" />
+                <span>{part.alt || "Image"}</span>
+              </div>
+              <div className="mt-1 text-[11px] text-white/52">
+                {part.mime_type || "image asset"}
+                {part.width && part.height
+                  ? ` · ${part.width}x${part.height}`
+                  : ""}
+              </div>
+            </div>
+          ),
+        )}
+      </div>
+    );
+  }
+
   if (streaming) {
     return (
       <div
@@ -908,14 +983,14 @@ function RichContentBlock({
           markdownClassName,
         )}
       >
-        <StreamingText text={content ?? ""} streaming />
+        <StreamingText text={textContent} streaming />
       </div>
     );
   }
 
   return (
     <div className="min-w-0">
-      <MarkdownContent content={content ?? ""} className={markdownClassName} />
+      <MarkdownContent content={textContent} className={markdownClassName} />
     </div>
   );
 }

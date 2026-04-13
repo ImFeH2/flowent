@@ -21,6 +21,7 @@ import {
   clearConversationHistory,
   mergeHistoryWithDeltas,
 } from "@/lib/history";
+import { normalizeContentParts } from "@/lib/contentParts";
 import type { AssistantChatItem, HistoryEntry, NodeDetail } from "@/types";
 
 const SCROLL_BOTTOM_EPSILON = 10;
@@ -152,14 +153,16 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
           ? true
           : item.type === "ReceivedMessage" &&
             item.from_id === "human" &&
-            Boolean(item.content),
+            normalizeContentParts(item.parts, item.content).length > 0,
       )?.index;
     const turnItems =
       lastHumanIndex === undefined
         ? []
         : timelineItems.slice(lastHumanIndex + 1);
     const hasAssistantText = turnItems.some(
-      (item) => item.type === "AssistantText" && Boolean(item.content?.trim()),
+      (item) =>
+        item.type === "AssistantText" &&
+        normalizeContentParts(item.parts, item.content).length > 0,
     );
     const runningToolCall = [...turnItems]
       .reverse()

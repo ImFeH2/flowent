@@ -1,5 +1,14 @@
 from app.models.agent import AgentState, NodeConfig, NodeType
 from app.models.base import Serializable
+from app.models.content import (
+    ContentPart,
+    ImagePart,
+    TextPart,
+    content_parts_to_text,
+    deserialize_content_parts,
+    has_image_parts,
+    parse_content_parts_payload,
+)
 from app.models.delta import (
     ContentDelta,
     ReceivedMessageDelta,
@@ -34,12 +43,14 @@ __all__ = [
     "AssistantThinking",
     "CommandResultEntry",
     "ContentDelta",
+    "ContentPart",
     "ErrorEntry",
     "Event",
     "EventType",
     "GraphEdge",
     "GraphNodeRecord",
     "HistoryEntry",
+    "ImagePart",
     "LLMResponse",
     "Message",
     "ModelInfo",
@@ -55,9 +66,14 @@ __all__ = [
     "StreamingDelta",
     "SystemEntry",
     "Tab",
+    "TextPart",
     "ThinkingDelta",
     "TodoItem",
     "ToolCall",
     "ToolCallResult",
     "ToolResultDelta",
+    "content_parts_to_text",
+    "deserialize_content_parts",
+    "has_image_parts",
+    "parse_content_parts_payload",
 ]

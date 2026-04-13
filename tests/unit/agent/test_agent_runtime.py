@@ -5,7 +5,7 @@ import time
 import pytest
 from loguru import logger
 
-from app.agent import Agent, InterruptRequestedError, WakeSignal, extract_routed_content
+from app.agent import Agent, InterruptRequestedError, WakeSignal
 from app.events import event_bus
 from app.models import (
     AgentState,
@@ -1220,43 +1220,7 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
     assert [event.data for event in assistant_events] == [{"content": "Working on it"}]
 
 
-def test_extract_routed_content_parses_single_target_block():
-    parent_content, routed = extract_routed_content("@worker: review the diff")
-
-    assert parent_content == ""
-    assert routed == [(["worker"], "review the diff")]
-
-
-def test_extract_routed_content_treats_comma_target_as_single_literal_target():
-    parent_content, routed = extract_routed_content(
-        "@alice, bob: check the latest output\nand confirm",
-    )
-
-    assert parent_content == ""
-    assert routed == [(["alice, bob"], "check the latest output\nand confirm")]
-
-
-def test_extract_routed_content_returns_plain_content_without_target_header():
-    parent_content, routed = extract_routed_content(
-        "Need a quick follow-up.\nStill investigating.",
-    )
-
-    assert parent_content == "Need a quick follow-up.\nStill investigating."
-    assert routed == []
-
-
-def test_extract_routed_content_treats_non_header_target_as_plain_content():
-    parent_content, routed = extract_routed_content(
-        "Need a quick follow-up.\n@alice: check the latest output",
-    )
-
-    assert parent_content == "Need a quick follow-up.\n@alice: check the latest output"
-    assert routed == []
-
-
-def test_route_content_output_delivers_to_single_target_when_header_present(
-    monkeypatch,
-):
+def test_send_message_delivers_to_single_contact_and_records_histories(monkeypatch):
     registry.reset()
     _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
@@ -1269,79 +1233,52 @@ def test_route_content_output_delivers_to_single_target_when_header_present(
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
-        routed_result = child._route_content_output(
-            "@peer: investigate the error\nwith the latest logs",
+        result = json.loads(
+            child.send_message(
+                target_ref="peer",
+                raw_parts=[{"type": "text", "text": "investigate the error"}],
+            )
         )
     finally:
         registry.reset()
 
-    peer_signal = peer._wake_queue.get_nowait()
-    message_id = routed_result.sent_messages[0].message_id
-
-    assert peer_signal.payload == {
-        "message": {
-            "from": "child",
-            "content": "investigate the error\nwith the latest logs",
-            "message_id": message_id,
-        }
-    }
-    assert len(routed_result.sent_messages) == 1
-    assert (
-        routed_result.sent_messages[0].content
-        == "investigate the error\nwith the latest logs"
+    sent_entry = next(
+        entry
+        for entry in child.get_history_snapshot()
+        if isinstance(entry, SentMessage)
     )
-    assert routed_result.sent_messages[0].to_ids == ["peer"]
-    assert routed_result.route_errors == []
-    assert routed_result.had_additional_routed_headers is False
-    assert message_id is not None
-    assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
-        {
-            "to_id": "peer",
-            "content": "investigate the error\nwith the latest logs",
-            "message_id": message_id,
-        },
-    ]
+    received_entry = next(
+        entry
+        for entry in peer.get_history_snapshot()
+        if isinstance(entry, ReceivedMessage)
+    )
+    signal = peer._wake_queue.get_nowait()
 
-
-def test_route_content_output_delivers_to_contact_from_incoming_edge(monkeypatch):
-    registry.reset()
-    _register_tab_leader()
-    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
-    registry.register(child)
-    registry.register(peer)
-    peer.add_connection(child.uuid)
-    events = []
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
-
-    try:
-        routed_result = child._route_content_output("@peer: reply with the findings")
-    finally:
-        registry.reset()
-
-    peer_signal = peer._wake_queue.get_nowait()
-    message_id = routed_result.sent_messages[0].message_id
-
-    assert peer_signal.payload == {
+    assert result == {"status": "sent", "target_id": "peer"}
+    assert sent_entry.to_id == "peer"
+    assert sent_entry.content == "investigate the error"
+    assert received_entry.from_id == "child"
+    assert received_entry.content == "investigate the error"
+    assert sent_entry.message_id == received_entry.message_id
+    assert signal.payload == {
         "message": {
             "from": "child",
-            "content": "reply with the findings",
-            "message_id": message_id,
+            "content": "investigate the error",
+            "parts": [{"type": "text", "text": "investigate the error"}],
+            "history_recorded": True,
+            "message_id": sent_entry.message_id,
         }
     }
-    assert routed_result.route_errors == []
-    assert routed_result.sent_messages[0].to_ids == ["peer"]
     assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
         {
             "to_id": "peer",
-            "content": "reply with the findings",
-            "message_id": message_id,
-        },
+            "content": "investigate the error",
+            "message_id": sent_entry.message_id,
+        }
     ]
 
 
-def test_route_content_output_reports_error_when_target_is_not_in_contacts():
+def test_send_message_reports_error_when_target_is_not_in_contacts():
     registry.reset()
     _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
@@ -1350,110 +1287,62 @@ def test_route_content_output_reports_error_when_target_is_not_in_contacts():
     registry.register(peer)
 
     try:
-        routed_result = child._route_content_output("@peer: reply with the findings")
+        with pytest.raises(
+            ValueError,
+            match=r"Send failed: target `peer` is not in contacts\.",
+        ):
+            child.send_message(
+                target_ref="peer",
+                raw_parts=[{"type": "text", "text": "reply with the findings"}],
+            )
     finally:
         registry.reset()
 
-    assert routed_result.sent_messages == []
-    assert routed_result.route_errors == [
-        "Routing failed: target `peer` is not in contacts."
-    ]
 
-
-def test_route_content_output_reports_error_when_leader_lacks_explicit_edge():
+def test_send_message_validates_target_before_image_capability():
     registry.reset()
-    leader = _register_tab_leader()
+    _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
+    registry.register(peer)
 
     try:
-        routed_result = leader._route_content_output("@child: reply with the findings")
+        with pytest.raises(
+            ValueError,
+            match=r"Send failed: target `peer` is not in contacts\.",
+        ):
+            child.send_message(
+                target_ref="peer",
+                raw_parts=[{"type": "image", "asset_id": "asset-1"}],
+            )
     finally:
         registry.reset()
 
-    assert routed_result.sent_messages == []
-    assert routed_result.route_errors == [
-        "Routing failed: target `child` is not in contacts."
-    ]
 
-
-def test_route_content_output_does_not_deliver_plain_content(monkeypatch):
+def test_send_message_reports_error_when_target_lacks_input_image_support():
     registry.reset()
-    parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
-    events = []
-    registry.register(parent)
-    registry.register(agent)
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
+    _register_tab_leader()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
+    registry.register(child)
+    registry.register(peer)
+    child.add_connection(peer.uuid)
 
     try:
-        routed_result = agent._route_content_output("Status update.")
+        with pytest.raises(
+            ValueError,
+            match=r"Send failed: target `peer` does not support `input_image`\.",
+        ):
+            child.send_message(
+                target_ref="peer",
+                raw_parts=[{"type": "image", "asset_id": "asset-1"}],
+            )
     finally:
         registry.reset()
 
-    assert routed_result.sent_messages == []
-    assert routed_result.had_routed_header is False
-    assert parent._wake_queue.empty()
-    assert not any(event.type == EventType.NODE_MESSAGE for event in events)
 
-
-def test_route_content_output_treats_non_header_target_text_as_plain_content(
-    monkeypatch,
-):
-    registry.reset()
-    parent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="parent")
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="child")
-    events = []
-    registry.register(parent)
-    registry.register(agent)
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
-
-    try:
-        routed_result = agent._route_content_output(
-            "Status update.\n@peer: investigate the error"
-        )
-    finally:
-        registry.reset()
-
-    assert routed_result.sent_messages == []
-    assert routed_result.had_routed_header is False
-    assert parent._wake_queue.empty()
-    assert not any(event.type == EventType.NODE_MESSAGE for event in events)
-
-
-def test_record_content_output_appends_error_entry_for_unmatched_target(monkeypatch):
-    registry.reset()
-    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
-    registry.register(agent)
-    events = []
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
-
-    try:
-        agent._record_content_output(
-            "@alice, bob: review the diff",
-            emitted_human_content=False,
-        )
-    finally:
-        registry.reset()
-
-    history = agent.get_history_snapshot()
-
-    assert any(
-        isinstance(entry, ErrorEntry)
-        and entry.content == "Routing failed: target `alice, bob` was not found."
-        for entry in history
-    )
-    assert not any(isinstance(entry, AssistantText) for entry in history)
-    assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
-
-
-def test_record_content_output_keeps_plain_prefix_and_drops_later_routed_text(
-    monkeypatch,
-):
-    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+def test_record_content_output_treats_target_like_text_as_plain_output(monkeypatch):
     registry.reset()
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     registry.register(assistant)
@@ -1463,95 +1352,200 @@ def test_record_content_output_keeps_plain_prefix_and_drops_later_routed_text(
 
     try:
         assistant._record_content_output(
-            "OK\n\n@worker: do the follow-up task",
+            "@worker: do the follow-up task",
             emitted_human_content=False,
         )
-        messages = assistant._build_messages()
     finally:
         registry.reset()
-
-    reminder = (
-        "<system>Routing reminder: this response mixed plain text with a later "
-        "`@target:` line. Only the leading plain text was kept as plain output. "
-        "The later routed-looking lines were not delivered. If you intended to "
-        "message a node, send that `@target:` message in a later response.</system>"
-    )
 
     history = assistant.get_history_snapshot()
     assert isinstance(history[-1], AssistantText)
-    assert history[-1].content == "OK"
+    assert history[-1].content == "@worker: do the follow-up task"
+    assert not any(isinstance(entry, SentMessage) for entry in history)
     assert any(
-        event.type == EventType.ASSISTANT_CONTENT and event.data == {"content": "OK"}
+        event.type == EventType.ASSISTANT_CONTENT
+        and event.data == {"content": "@worker: do the follow-up task"}
         for event in events
     )
-    assert any(msg.get("content") == reminder for msg in messages)
 
 
-def test_build_messages_adds_one_shot_notice_for_multiple_routed_headers(monkeypatch):
-    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
-    registry.reset()
-    leader = _register_tab_leader()
-    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
-    registry.register(assistant)
-
-    try:
-        assistant._record_content_output(
-            "@leader: first task\n@other: second task",
-            emitted_human_content=False,
-        )
-
-        first_messages = assistant._build_messages()
-        second_messages = assistant._build_messages()
-    finally:
-        registry.reset()
-
-    reminder = (
-        "<system>Routing reminder: each response can route to only one node. Only "
-        "the first `@target:` header in this content block was routed. Any later "
-        "`@...:` lines were delivered as plain body text to the first target. If "
-        "that was not intentional, send a correction to the first recipient and "
-        "then send the remaining node messages in later responses, one target at "
-        "a time.</system>"
-    )
-
-    assert any(msg.get("content") == reminder for msg in first_messages)
-    assert not any(msg.get("content") == reminder for msg in second_messages)
-    leader_signal = leader._wake_queue.get_nowait()
-    assert (
-        leader_signal.payload["message"]["content"] == "first task\n@other: second task"
-    )
-
-
-def test_multiple_routed_headers_prevent_idle_until_notice_is_seen(monkeypatch):
-    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+def test_handle_tool_call_send_success_omits_toolcall_history(monkeypatch):
     registry.reset()
     _register_tab_leader()
-    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
-    registry.register(assistant)
-    assistant.set_state(AgentState.RUNNING, "processing")
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
+    registry.register(child)
+    registry.register(peer)
+    child.add_connection(peer.uuid)
 
     try:
-        assistant._record_content_output(
-            "@leader: first task\n@other: second task",
-            emitted_human_content=False,
+        result = child._handle_tool_call(
+            "send",
+            {
+                "target": "peer",
+                "parts": [{"type": "text", "text": "reply with the findings"}],
+            },
+            "call-send",
         )
-        idle_result = assistant.request_idle()
-        first_messages = assistant._build_messages()
     finally:
         registry.reset()
 
-    reminder = (
-        "<system>Routing reminder: each response can route to only one node. Only "
-        "the first `@target:` header in this content block was routed. Any later "
-        "`@...:` lines were delivered as plain body text to the first target. If "
-        "that was not intentional, send a correction to the first recipient and "
-        "then send the remaining node messages in later responses, one target at "
-        "a time.</system>"
+    assert json.loads(result) == {"status": "sent", "target_id": "peer"}
+    assert not any(
+        isinstance(entry, ToolCall) and entry.tool_call_id == "call-send"
+        for entry in child.get_history_snapshot()
+    )
+    assert any(isinstance(entry, SentMessage) for entry in child.get_history_snapshot())
+
+
+def test_handle_tool_call_send_failure_records_error_without_toolcall():
+    registry.reset()
+    _register_tab_leader()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
+    registry.register(child)
+    registry.register(peer)
+
+    try:
+        result = child._handle_tool_call(
+            "send",
+            {
+                "target": "peer",
+                "parts": [{"type": "text", "text": "reply with the findings"}],
+            },
+            "call-send",
+        )
+    finally:
+        registry.reset()
+
+    assert json.loads(result) == {
+        "error": "Send failed: target `peer` is not in contacts."
+    }
+    assert not any(
+        isinstance(entry, ToolCall) and entry.tool_call_id == "call-send"
+        for entry in child.get_history_snapshot()
+    )
+    assert any(
+        isinstance(entry, ErrorEntry)
+        and entry.content == "Send failed: target `peer` is not in contacts."
+        for entry in child.get_history_snapshot()
     )
 
-    assert idle_result == ""
-    assert assistant.state == AgentState.RUNNING
-    assert any(msg.get("content") == reminder for msg in first_messages)
+
+def test_multiple_send_tool_calls_stop_after_first_failure(monkeypatch):
+    registry.reset()
+    _register_tab_leader()
+    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
+    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
+    helper = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="helper")
+    registry.register(child)
+    registry.register(peer)
+    registry.register(helper)
+    child.add_connection(peer.uuid)
+
+    wait_calls = 0
+    chat_calls = 0
+
+    def fake_wait_for_input() -> None:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            child._append_history(ReceivedMessage(content="begin", from_id="human"))
+            child.set_state(AgentState.RUNNING, "received message from human")
+            return
+        child.request_termination("done")
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal chat_calls
+        chat_calls += 1
+        if chat_calls == 1:
+            return LLMResponse(
+                tool_calls=[
+                    ToolCallResult(
+                        id="call-send-1",
+                        name="send",
+                        arguments={
+                            "target": "peer",
+                            "parts": [{"type": "text", "text": "first"}],
+                        },
+                    ),
+                    ToolCallResult(
+                        id="call-send-2",
+                        name="send",
+                        arguments={
+                            "target": "helper",
+                            "parts": [{"type": "text", "text": "second"}],
+                        },
+                    ),
+                    ToolCallResult(
+                        id="call-send-3",
+                        name="send",
+                        arguments={
+                            "target": "peer",
+                            "parts": [{"type": "text", "text": "third"}],
+                        },
+                    ),
+                ]
+            )
+        child.request_termination("done")
+        return LLMResponse()
+
+    monkeypatch.setattr(child, "_wait_for_input", fake_wait_for_input)
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    try:
+        child._run()
+    finally:
+        registry.reset()
+
+    sent_entries = [
+        entry
+        for entry in child.get_history_snapshot()
+        if isinstance(entry, SentMessage)
+    ]
+    error_entries = [
+        entry for entry in child.get_history_snapshot() if isinstance(entry, ErrorEntry)
+    ]
+
+    assert [entry.content for entry in sent_entries] == ["first"]
+    assert [
+        entry.content
+        for entry in peer.get_history_snapshot()
+        if isinstance(entry, ReceivedMessage)
+    ] == ["first"]
+    assert helper._wake_queue.empty()
+    assert any(
+        entry.content == "Send failed: target `helper` is not in contacts."
+        for entry in error_entries
+    )
+
+
+def test_build_messages_replays_sent_messages_as_message_to_context(monkeypatch):
+    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
+
+    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
+    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
+    agent._append_history(SentMessage(content="to peer", to_id="peer"))
+    agent._append_history(AssistantText(content="final answer"))
+
+    messages = agent._build_messages()
+
+    assert messages == [
+        {"role": "system", "content": messages[0]["content"]},
+        {"role": "user", "content": '<message from="human">begin</message>'},
+        {"role": "assistant", "content": '<message to="peer">to peer</message>'},
+        {"role": "assistant", "content": "final answer"},
+        {
+            "role": "user",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+        },
+    ]
 
 
 def test_idle_is_blocked_when_fresh_input_has_no_progress(monkeypatch):
@@ -1566,7 +1560,7 @@ def test_idle_is_blocked_when_fresh_input_has_no_progress(monkeypatch):
 
     reminder = (
         "<system>Idle reminder: you received a new message this turn, but this "
-        "response did not send a reply, route a message, or use any non-idle "
+        "response did not send a reply, call `send`, or use any non-idle "
         "tool. Do not call `idle` yet. First reply to the Human, dispatch/"
         "delegate work, or take another concrete step.</system>"
     )
@@ -1602,183 +1596,6 @@ def test_idle_is_blocked_when_first_todo_is_actionable(monkeypatch):
     assert any(msg.get("content") == reminder for msg in messages)
 
 
-def test_record_content_output_records_sent_message_in_history(monkeypatch):
-    registry.reset()
-    _register_tab_leader()
-    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
-    registry.register(child)
-    registry.register(peer)
-    child.add_connection(peer.uuid)
-    events = []
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
-
-    try:
-        child._record_content_output(
-            "@peer: investigate the error",
-            emitted_human_content=False,
-        )
-    finally:
-        registry.reset()
-
-    history = child.get_history_snapshot()
-    sent_entries = [entry for entry in history if isinstance(entry, SentMessage)]
-    assert len(sent_entries) == 1
-    assert sent_entries[0].content == "investigate the error"
-    assert sent_entries[0].to_ids == ["peer"]
-    assert sent_entries[0].message_id is not None
-    assert not any(isinstance(entry, AssistantText) for entry in history)
-    assert peer._wake_queue.get_nowait().payload == {
-        "message": {
-            "from": "child",
-            "content": "investigate the error",
-            "message_id": sent_entries[0].message_id,
-        }
-    }
-    assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
-
-
-def test_routed_message_emits_streaming_preview_for_sender_and_receiver(monkeypatch):
-    registry.reset()
-    _register_tab_leader()
-    child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
-    registry.register(child)
-    registry.register(peer)
-    child.add_connection(peer.uuid)
-    events = []
-    responses = iter(
-        [
-            LLMResponse(content="@peer: investigate the error"),
-            LLMResponse(),
-        ]
-    )
-
-    def fake_wait_for_input() -> None:
-        child._append_history(ReceivedMessage(content="start", from_id="human"))
-        child.set_state(AgentState.RUNNING, "received message from human")
-
-    def fake_chat(
-        messages,
-        tools=None,
-        on_chunk=None,
-        register_interrupt=None,
-        role_name=None,
-    ):
-        response = next(responses)
-        if response.content and on_chunk is not None:
-            for chunk in ["@peer: inv", "estigate", " the error"]:
-                on_chunk("content", chunk)
-        if response.content is None:
-            child.request_termination("done")
-        return response
-
-    monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
-    monkeypatch.setattr(child, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
-
-    try:
-        child._run()
-    finally:
-        registry.reset()
-
-    sent_deltas = [
-        event.data
-        for event in events
-        if event.type == EventType.HISTORY_ENTRY_DELTA
-        and event.agent_id == "child"
-        and event.data.get("type") == "SentMessageDelta"
-    ]
-    received_deltas = [
-        event.data
-        for event in events
-        if event.type == EventType.HISTORY_ENTRY_DELTA
-        and event.agent_id == "peer"
-        and event.data.get("type") == "ReceivedMessageDelta"
-    ]
-
-    assert "".join(delta["text"] for delta in sent_deltas) == "investigate the error"
-    assert (
-        "".join(delta["text"] for delta in received_deltas) == "investigate the error"
-    )
-    assert len({delta["message_id"] for delta in sent_deltas}) == 1
-    assert len({delta["message_id"] for delta in received_deltas}) == 1
-    assert sent_deltas[0]["message_id"] == received_deltas[0]["message_id"]
-
-    final_sent = next(
-        entry
-        for entry in child.get_history_snapshot()
-        if isinstance(entry, SentMessage)
-    )
-    assert final_sent.message_id == sent_deltas[0]["message_id"]
-    assert peer._wake_queue.get_nowait().payload == {
-        "message": {
-            "from": "child",
-            "content": "investigate the error",
-            "message_id": final_sent.message_id,
-        }
-    }
-
-
-def test_build_messages_replays_sent_messages_as_routed_assistant_content(
-    monkeypatch,
-):
-    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
-
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
-    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
-    agent._append_history(SentMessage(content="to peer", to_ids=["peer"]))
-    agent._append_history(AssistantText(content="final answer"))
-
-    messages = agent._build_messages()
-
-    assert messages == [
-        {"role": "system", "content": messages[0]["content"]},
-        {"role": "user", "content": '<message from="human">begin</message>'},
-        {"role": "assistant", "content": "@peer: to peer"},
-        {"role": "assistant", "content": "final answer"},
-        {
-            "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
-        },
-    ]
-
-
-def test_build_messages_replays_each_sent_target_as_separate_routed_content(
-    monkeypatch,
-):
-    monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
-
-    agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
-    agent._append_history(ReceivedMessage(content="begin", from_id="human"))
-    agent._append_history(
-        SentMessage(
-            content="investigate the error\nwith the latest logs",
-            to_ids=["peer", "helper"],
-        )
-    )
-
-    messages = agent._build_messages()
-
-    assert messages == [
-        {"role": "system", "content": messages[0]["content"]},
-        {"role": "user", "content": '<message from="human">begin</message>'},
-        {
-            "role": "assistant",
-            "content": "@peer: investigate the error\nwith the latest logs",
-        },
-        {
-            "role": "assistant",
-            "content": "@helper: investigate the error\nwith the latest logs",
-        },
-        {
-            "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
-        },
-    ]
-
-
 def test_build_messages_appends_runtime_todo_context_without_history_entry(monkeypatch):
     monkeypatch.setattr("app.agent.get_settings", lambda: Settings())
 
@@ -1802,7 +1619,7 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry(monke
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- If the TODO list is not complete yet, use `todo` to replace it with the latest remaining items.</system>",
         },
     ]
 
@@ -1830,7 +1647,7 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
         {"role": "user", "content": '<message from="human">begin</message>'},
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
         {
             "role": "user",
@@ -1902,7 +1719,7 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- Newly created agents still waiting for their first task: Directory Worker (`12345678`).\n- `create_agent` only creates a new graph node. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`. If several agents are waiting, route to one agent per response until all of them have been dispatched.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Directory Worker (`12345678`).\n- `create_agent` only creates a new graph node. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
         },
     ]
 
@@ -1967,7 +1784,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- Newly created agents still waiting for their first task: Worker (`12345678`).\n- `create_agent` only creates a new graph node. It does not start work by itself.\n- Before calling `idle`, send each waiting agent a concrete first task with `@<name-or-uuid>: ...`. If several agents are waiting, route to one agent per response until all of them have been dispatched.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Worker (`12345678`).\n- `create_agent` only creates a new graph node. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
         },
     ]
 
@@ -2010,7 +1827,7 @@ def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkey
     agent._append_history(
         SentMessage(
             content="inspect the current directory",
-            to_ids=["12345678-aaaa-bbbb-cccc-ddddeeeeffff"],
+            to_id="12345678-aaaa-bbbb-cccc-ddddeeeeffff",
         )
     )
 
@@ -2039,11 +1856,11 @@ def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkey
         },
         {
             "role": "assistant",
-            "content": "@12345678-aaaa-bbbb-cccc-ddddeeeeffff: inspect the current directory",
+            "content": '<message to="12345678-aaaa-bbbb-cccc-ddddeeeeffff">inspect the current directory</message>',
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Only content whose first line starts with `@<name-or-uuid>:` is delivered to other agents.\n- Plain content is not delivered to other agents.\n- Do not combine a Human-facing reply and a routed `@target` message in the same content block.\n- Each response can route to only one node. A content block supports only one routed `@target:` header. If you need to message multiple nodes, send one routed message now and continue with another routed message on the next response.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
 
@@ -2145,7 +1962,9 @@ def test_build_messages_keeps_error_entries_in_context(monkeypatch):
     )
 
 
-def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
+def test_assistant_emits_human_content_for_plain_text_with_target_like_prefix(
+    monkeypatch,
+):
     registry.reset()
     _register_tab_leader()
     assistant = Agent(
@@ -2155,10 +1974,7 @@ def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
     registry.register(assistant)
     events = []
     responses = iter(
-        [
-            LLMResponse(content="@leader: investigate the error"),
-            LLMResponse(),
-        ]
+        [LLMResponse(content="@leader: investigate the error"), LLMResponse()]
     )
 
     def fake_wait_for_input() -> None:
@@ -2190,14 +2006,11 @@ def test_assistant_does_not_emit_human_content_for_routed_message(monkeypatch):
     finally:
         registry.reset()
 
-    assert not any(event.type == EventType.ASSISTANT_CONTENT for event in events)
-    assert any(
-        isinstance(entry, SentMessage)
-        and entry.content == "investigate the error"
-        and entry.to_ids == ["leader"]
-        for entry in assistant.get_history_snapshot()
-    )
+    assert any(event.type == EventType.ASSISTANT_CONTENT for event in events)
     assert not any(
+        isinstance(entry, SentMessage) for entry in assistant.get_history_snapshot()
+    )
+    assert any(
         isinstance(entry, AssistantText)
         and entry.content == "@leader: investigate the error"
         for entry in assistant.get_history_snapshot()

@@ -80,12 +80,28 @@ export type HistoryEntryType =
   | "ErrorEntry"
   | "CommandResultEntry";
 
+export type ContentPart =
+  | {
+      type: "text";
+      text: string;
+    }
+  | {
+      type: "image";
+      asset_id: string;
+      mime_type?: string | null;
+      width?: number | null;
+      height?: number | null;
+      alt?: string | null;
+    };
+
 export interface HistoryEntry {
   type: HistoryEntryType;
   content?: string | null;
+  parts?: ContentPart[] | null;
   state?: AgentState | null;
   reason?: string | null;
   from_id?: string | null;
+  to_id?: string | null;
   to_ids?: string[] | null;
   message_id?: string | null;
   tool_name?: string | null;
@@ -160,7 +176,7 @@ export type StreamingDelta =
   | {
       type: "SentMessageDelta";
       message_id: string;
-      to_ids: string[];
+      to_id: string;
       text: string;
     }
   | {

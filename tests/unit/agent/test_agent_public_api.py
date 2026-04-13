@@ -126,7 +126,12 @@ def test_enqueue_message_enqueues_wake_signal_immediately():
 
     assert signal.reason == "message"
     assert signal.payload == {
-        "message": {"from": "tester", "content": "hello from queue"}
+        "message": {
+            "from": "tester",
+            "content": "hello from queue",
+            "parts": [{"type": "text", "text": "hello from queue"}],
+            "history_recorded": False,
+        }
     }
     assert signal.resume_reason == "received message from tester"
 
@@ -545,6 +550,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "sleep",
                 "todo",
                 "contacts",
+                "send",
                 "read",
                 "exec",
             ],
@@ -574,6 +580,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "sleep",
                 "todo",
                 "contacts",
+                "send",
             ],
             "optional_tools": [
                 "create_tab",
@@ -612,6 +619,7 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "sleep",
         "todo",
         "contacts",
+        "send",
         "read",
         "edit",
         "exec",

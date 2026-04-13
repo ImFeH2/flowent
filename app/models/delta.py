@@ -24,7 +24,7 @@ class ToolResultDelta(Serializable):
 @dataclass
 class SentMessageDelta(Serializable):
     message_id: str
-    to_ids: list[str]
+    to_id: str
     text: str
 
 

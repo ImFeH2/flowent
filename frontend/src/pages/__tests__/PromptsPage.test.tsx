@@ -38,8 +38,10 @@ describe("PromptsPage", () => {
     const customPrompt = await screen.findByLabelText("Custom Prompt");
     const customPostPrompt = screen.getByLabelText("Custom Post Prompt");
 
-    expect(customPrompt).toHaveValue("Be concise.");
-    expect(customPostPrompt).toHaveValue("Use @target: for routed messages.");
+    await waitFor(() => {
+      expect(customPrompt).toHaveValue("Be concise.");
+      expect(customPostPrompt).toHaveValue("Use @target: for routed messages.");
+    });
 
     fireEvent.change(customPrompt, { target: { value: "Stay precise." } });
     fireEvent.change(customPostPrompt, {

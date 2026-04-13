@@ -88,7 +88,7 @@ DELEGATION_GENERAL_GUIDANCE = """\
 CONNECT_TOOL_GUIDANCE = """\
 ## Connect Tool Rules
 
-- Use `connect` to establish additional directed message edges inside a task tab when the current graph topology needs them.
+- Use `connect` to establish additional directed message edges inside a task tab when the current route topology needs them.
 """
 
 CONTACTS_TOOL_GUIDANCE = """\

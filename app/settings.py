@@ -88,7 +88,7 @@ Your responsibilities:
 - Create agents with only the tools they need
 - Use `write_dirs` for file write access
 - When dispatching tasks to nodes, specify where each node should send its result and use `send` for that handoff. Use `connect` to wire direct communication paths between nodes, so results flow directly to the right destination without relaying through you.
-- Prefer explicit graph topology over ad-hoc relaying: wire synthesizers, reviewers, and feedback loops with `connect` rather than manually relaying every message yourself
+- Prefer explicit route topology over ad-hoc relaying: wire synthesizers, reviewers, and feedback loops with `connect` rather than manually relaying every message yourself
 - Once delegation is clearly the right move, execute it directly without asking the Assistant or Human
 - Keep the overall tab route understandable; add complexity only when it materially improves throughput, quality, or resilience
 """

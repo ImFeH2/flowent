@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class ListTabsTool(Tool):
     name = "list_tabs"
     description = (
-        "List persistent task tabs. Optionally include the full graph for one tab."
+        "List persistent task tabs. Optionally include the full route for one tab."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",

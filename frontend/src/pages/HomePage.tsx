@@ -1075,7 +1075,7 @@ export function HomePage() {
                   <span className="font-semibold text-white">
                     {deleteTabTarget.title}
                   </span>{" "}
-                  and clean up its persisted graph.
+                  and clean up its persisted route.
                   {typeof deleteTabTarget.nodeCount === "number"
                     ? ` ${deleteTabTarget.nodeCount} node${deleteTabTarget.nodeCount === 1 ? "" : "s"} will be removed with it.`
                     : ""}
@@ -1404,9 +1404,9 @@ function AgentDetailPanel({
             )}
           </DetailSection>
 
-          <DetailSection title="Graph Connections">
+          <DetailSection title="Route Connections">
             {connectionItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No graph edges</p>
+              <p className="text-sm text-muted-foreground">No route edges</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {connectionItems.map((connection) => (

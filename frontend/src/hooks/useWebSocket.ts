@@ -22,6 +22,7 @@ function createSocketChannel(
 ) {
   let retryDelay = INITIAL_DELAY;
   let retryTimer: number | null = null;
+  let connectTimer: number | null = null;
   let wasConnected = false;
   let ws: WebSocket | null = null;
 
@@ -30,6 +31,21 @@ function createSocketChannel(
       window.clearTimeout(retryTimer);
       retryTimer = null;
     }
+  };
+
+  const clearConnectTimer = () => {
+    if (connectTimer !== null) {
+      window.clearTimeout(connectTimer);
+      connectTimer = null;
+    }
+  };
+
+  const scheduleConnect = (delay = 0) => {
+    clearConnectTimer();
+    connectTimer = window.setTimeout(() => {
+      connectTimer = null;
+      connect();
+    }, delay);
   };
 
   const connect = () => {
@@ -66,7 +82,10 @@ function createSocketChannel(
       }
       const delay = retryDelay;
       retryDelay = Math.min(delay * 2, MAX_DELAY);
-      retryTimer = window.setTimeout(connect, delay);
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        scheduleConnect();
+      }, delay);
     };
 
     ws.onerror = () => {
@@ -74,9 +93,10 @@ function createSocketChannel(
     };
   };
 
-  connect();
+  scheduleConnect();
 
   return () => {
+    clearConnectTimer();
     clearRetryTimer();
     setConnected(false);
     ws?.close();

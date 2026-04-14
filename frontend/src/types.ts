@@ -45,6 +45,7 @@ export interface Node {
   name: string | null;
   todos: TodoItem[];
   role_name: string | null;
+  capabilities?: ModelCapabilities | null;
   position?: {
     x: number;
     y: number;
@@ -61,6 +62,8 @@ export interface AgentEvent {
 export interface AssistantChatMessage {
   id: string;
   content: string;
+  parts?: ContentPart[] | null;
+  message_id?: string | null;
   timestamp: number;
   from: "human" | "assistant";
 }
@@ -127,6 +130,7 @@ export interface NodeDetail {
   connections: string[];
   role_name: string | null;
   todos: TodoItem[];
+  capabilities?: ModelCapabilities | null;
   tools: string[];
   write_dirs: string[];
   allow_network: boolean;

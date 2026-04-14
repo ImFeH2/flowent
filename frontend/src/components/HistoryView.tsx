@@ -10,11 +10,11 @@ import {
   Bot,
   AlertCircle,
   Workflow,
-  ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HistoryEntry, Node } from "@/types";
 import { CopyButton } from "@/components/CopyButton";
+import { ImageAssetPreview } from "@/components/ImageAssetPreview";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { getNodeLabel } from "@/lib/nodeLabel";
 import { formatJsonOutput } from "@/lib/formatJsonOutput";
@@ -144,21 +144,15 @@ function MessageContent({
             preClassName={preClassName}
           />
         ) : (
-          <div
+          <ImageAssetPreview
             key={`${index}-${part.type}-${part.asset_id}`}
-            className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-foreground/82"
-          >
-            <div className="flex items-center gap-2 font-medium text-foreground/88">
-              <ImageIcon className="size-3.5 text-foreground/70" />
-              <span>{part.alt || "Image"}</span>
-            </div>
-            <div className="mt-1 text-muted-foreground">
-              {part.mime_type || "image asset"}
-              {part.width && part.height
-                ? ` · ${part.width}x${part.height}`
-                : ""}
-            </div>
-          </div>
+            alt={part.alt}
+            assetId={part.asset_id}
+            compact
+            height={part.height}
+            mimeType={part.mime_type}
+            width={part.width}
+          />
         ),
       )}
     </div>

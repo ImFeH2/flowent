@@ -1802,17 +1802,22 @@ function AssistantChatPanel({
   const { height: composerHeight, ref: composerRef } =
     useMeasuredHeight<HTMLDivElement>();
   const {
+    addImages = async () => {},
     assistantActivity,
     clearChat,
     clearing,
     connected,
+    draftImages = [],
     handleKeyDown,
+    hasUploadingImages = false,
     input,
     onMessagesScroll,
+    removeImage = () => {},
     scrollRef,
     sending,
     sendMessage,
     setInput,
+    supportsInputImage = false,
     timelineItems,
   } = useAssistantChat({ bottomInset: composerHeight });
   const assistantRoleName = getAssistantNode(agents)?.role_name ?? null;
@@ -1873,10 +1878,18 @@ function AssistantChatPanel({
         >
           <AssistantChatComposer
             busy={assistantActivity.running}
-            disabled={!input.trim() || sending}
+            disabled={
+              (!input.trim() && draftImages.length === 0) ||
+              hasUploadingImages ||
+              sending
+            }
+            images={draftImages}
+            imageInputEnabled={supportsInputImage}
             input={input}
+            onAddImages={(files) => void addImages(files)}
             onChange={setInput}
             onKeyDown={handleKeyDown}
+            onRemoveImage={removeImage}
             onSend={() => void sendMessage()}
             onStop={onInterrupt}
             overlay

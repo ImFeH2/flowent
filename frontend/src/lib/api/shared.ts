@@ -43,7 +43,7 @@ function buildHeaders(
   body: unknown,
   headers?: HeadersInit,
 ): HeadersInit | undefined {
-  if (body === undefined) return headers;
+  if (body === undefined || body instanceof FormData) return headers;
 
   const next = new Headers(headers);
   if (!next.has("Content-Type")) {
@@ -69,7 +69,12 @@ export async function requestJson<TResponse, TResult = TResponse>(
   const response = await fetch(url, {
     ...init,
     headers: buildHeaders(body, headers),
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined
+        ? undefined
+        : body instanceof FormData
+          ? body
+          : JSON.stringify(body),
   });
 
   const data = await parseJson<TResponse>(response);

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import time
 import uuid
@@ -9,7 +10,7 @@ from typing import Any
 from loguru import logger
 
 from app.model_metadata import build_model_info
-from app.models import LLMResponse, ModelInfo
+from app.models import LLMOutputImagePart, LLMOutputTextPart, LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.network import (
     RequestException,
@@ -19,6 +20,7 @@ from app.network import (
     truncate_text,
 )
 from app.providers import LLMProvider
+from app.providers.content import collapse_parts_to_text, to_gemini_parts
 from app.providers.errors import (
     build_access_blocked_error,
     build_network_error,
@@ -66,18 +68,16 @@ class GeminiProvider(LLMProvider):
             content = msg.get("content")
 
             if role == "system":
-                if isinstance(content, str):
-                    if content:
-                        system_parts.append(content)
-                elif content is not None:
-                    system_parts.append(str(content))
+                system_text = collapse_parts_to_text(content)
+                if system_text:
+                    system_parts.append(system_text)
                 continue
 
             if role == "user":
                 contents.append(
                     {
                         "role": "user",
-                        "parts": [{"text": content or ""}],
+                        "parts": to_gemini_parts(content, allow_images=True),
                     },
                 )
                 continue
@@ -85,8 +85,9 @@ class GeminiProvider(LLMProvider):
             if role == "assistant":
                 parts: list[dict[str, Any]] = []
 
-                if content:
-                    parts.append({"text": content})
+                assistant_text = collapse_parts_to_text(content)
+                if assistant_text:
+                    parts.append({"text": assistant_text})
 
                 for tc in msg.get("tool_calls", []) or []:
                     fn = tc.get("function", {})
@@ -206,6 +207,7 @@ class GeminiProvider(LLMProvider):
         t0 = time.perf_counter()
 
         content_parts: list[str] = []
+        output_parts: list[LLMOutputTextPart | LLMOutputImagePart] = []
         tool_calls_list: list[ToolCall] = []
         chunk_count = 0
         client = self._client
@@ -261,8 +263,28 @@ class GeminiProvider(LLMProvider):
                         if "text" in part:
                             text = part["text"]
                             content_parts.append(text)
+                            output_parts.append(LLMOutputTextPart(text=text))
                             if on_chunk:
                                 on_chunk("content", text)
+                        elif "inlineData" in part:
+                            inline_data = part["inlineData"]
+                            mime_type = inline_data.get("mimeType")
+                            encoded_data = inline_data.get("data")
+                            if (
+                                isinstance(mime_type, str)
+                                and mime_type.startswith("image/")
+                                and isinstance(encoded_data, str)
+                            ):
+                                try:
+                                    image_data = base64.b64decode(encoded_data)
+                                except ValueError:
+                                    continue
+                                output_parts.append(
+                                    LLMOutputImagePart(
+                                        data=image_data,
+                                        mime_type=mime_type,
+                                    )
+                                )
                         elif "functionCall" in part:
                             fc = part["functionCall"]
                             tool_calls_list.append(
@@ -309,9 +331,13 @@ class GeminiProvider(LLMProvider):
         )
 
         if tool_calls_list:
-            return LLMResponse(content=content, tool_calls=tool_calls_list)
+            return LLMResponse(
+                content=content,
+                parts=output_parts or None,
+                tool_calls=tool_calls_list,
+            )
 
-        return LLMResponse(content=content or "")
+        return LLMResponse(content=content or "", parts=output_parts or None)
 
     def list_models(
         self,

@@ -4,7 +4,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.graph_service import is_tab_leader
+from app.model_metadata import build_model_info
 from app.registry import registry
+from app.settings import find_provider, find_role, get_settings
 from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
@@ -14,6 +16,31 @@ router = APIRouter()
 class DispatchNodeMessageRequest(BaseModel):
     content: str
     from_id: str = "human"
+
+
+def _serialize_model_capabilities(role_name: str | None) -> dict[str, bool] | None:
+    settings = get_settings()
+    provider_id = settings.model.active_provider_id
+    model_id = settings.model.active_model
+    role_cfg = find_role(settings, role_name) if role_name else None
+    if (
+        role_cfg is not None
+        and role_cfg.model is not None
+        and role_cfg.model.provider_id
+        and role_cfg.model.model
+    ):
+        provider_id = role_cfg.model.provider_id
+        model_id = role_cfg.model.model
+    if not provider_id or not model_id:
+        return None
+    provider = find_provider(settings, provider_id)
+    if provider is None:
+        return None
+    model_info = build_model_info(provider_type=provider.type, model_id=model_id)
+    return {
+        "input_image": model_info.capabilities.input_image,
+        "output_image": model_info.capabilities.output_image,
+    }
 
 
 @router.get("/api/nodes")
@@ -32,6 +59,7 @@ async def list_nodes() -> dict:
             "name": assistant.config.name,
             "is_leader": False,
             "todos": [t.serialize() for t in assistant.todos],
+            "capabilities": _serialize_model_capabilities(assistant.config.role_name),
             "position": None,
         }
 
@@ -59,6 +87,7 @@ async def list_nodes() -> dict:
                     live.get_todos_snapshot() if live is not None else record.todos
                 )
             ],
+            "capabilities": _serialize_model_capabilities(record.config.role_name),
             "position": record.position.serialize()
             if record.position is not None
             else None,
@@ -77,6 +106,7 @@ async def list_nodes() -> dict:
             "connections": node.get_connections_snapshot(),
             "name": node.config.name,
             "todos": [t.serialize() for t in node.todos],
+            "capabilities": _serialize_model_capabilities(node.config.role_name),
             "position": None,
         }
 
@@ -131,6 +161,7 @@ async def get_node(node_id: str) -> dict:
         ),
         "name": target_config.name,
         "todos": [t.serialize() for t in todos],
+        "capabilities": _serialize_model_capabilities(target_config.role_name),
         "tools": sorted(set(target_config.tools) | set(MINIMUM_TOOLS)),
         "write_dirs": list(target_config.write_dirs),
         "allow_network": target_config.allow_network,

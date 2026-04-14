@@ -18,6 +18,7 @@ from app.network import (
     truncate_text,
 )
 from app.providers import LLMProvider
+from app.providers.content import to_openai_chat_content
 from app.providers.errors import (
     build_access_blocked_error,
     build_network_error,
@@ -83,6 +84,35 @@ class OpenAIProvider(LLMProvider):
             headers["Authorization"] = f"Bearer {self._api_key}"
         return merge_headers(headers, self._header_overrides)
 
+    def _convert_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        converted: list[dict[str, Any]] = []
+        for message in messages:
+            role = message.get("role")
+            if role == "user":
+                converted.append(
+                    {
+                        **message,
+                        "content": to_openai_chat_content(
+                            message.get("content"),
+                            allow_images=True,
+                        ),
+                    }
+                )
+                continue
+            if role == "assistant":
+                converted.append(
+                    {
+                        **message,
+                        "content": to_openai_chat_content(
+                            message.get("content"),
+                            allow_images=False,
+                        ),
+                    }
+                )
+                continue
+            converted.append(message)
+        return converted
+
     def chat(
         self,
         messages: list[dict[str, Any]],
@@ -92,9 +122,10 @@ class OpenAIProvider(LLMProvider):
         model_params: ModelParams | None = None,
     ) -> LLMResponse:
         url = f"{self._api_base_url}/chat/completions"
+        converted_messages = self._convert_messages(messages)
         payload: dict[str, Any] = {
             "model": self._model,
-            "messages": messages,
+            "messages": converted_messages,
             "stream": True,
         }
         if model_params is not None:
@@ -112,7 +143,7 @@ class OpenAIProvider(LLMProvider):
             "[{}] OpenAI chat request: model={}, messages={}, tools={}",
             self._provider_name,
             self._model,
-            len(messages),
+            len(converted_messages),
             len(tools) if tools else 0,
         )
 

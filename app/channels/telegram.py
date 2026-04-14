@@ -31,6 +31,10 @@ TELEGRAM_EDIT_THRESHOLD_CHARS = 100
 TELEGRAM_TYPING_INTERVAL_SECONDS = 4.0
 TELEGRAM_MAX_TEXT_LENGTH = 4000
 PRIVATE_ONLY_MESSAGE = "🔒 Telegram channel currently supports private chats only."
+IMAGE_INPUT_UNSUPPORTED_MESSAGE = "Telegram currently does not support image input yet."
+IMAGE_OUTPUT_UNSUPPORTED_MESSAGE = (
+    "Telegram currently does not support image output yet."
+)
 
 
 class TelegramChannel:
@@ -165,6 +169,9 @@ class TelegramChannel:
         chat_id = chat_data.get("id") if isinstance(chat_data, dict) else None
         chat_type = chat_data.get("type") if isinstance(chat_data, dict) else None
         text = message.get("text")
+        caption = message.get("caption")
+        photo = message.get("photo")
+        document = message.get("document")
         username = from_data.get("username") if isinstance(from_data, dict) else None
         first_name = (
             from_data.get("first_name") if isinstance(from_data, dict) else None
@@ -181,8 +188,26 @@ class TelegramChannel:
 
         settings = get_settings()
         if any(chat.chat_id == chat_id for chat in settings.telegram.approved_chats):
-            if not isinstance(text, str) or not text.strip():
+            document_is_image = isinstance(document, dict) and str(
+                document.get("mime_type", "")
+            ).startswith("image/")
+            has_image_input = (
+                isinstance(photo, list) and len(photo) > 0
+            ) or document_is_image
+            if has_image_input:
+                await self._send_message(
+                    chat_id,
+                    IMAGE_INPUT_UNSUPPORTED_MESSAGE,
+                    markdown=False,
+                )
                 return
+
+            incoming_text = text if isinstance(text, str) else caption
+            if not isinstance(incoming_text, str) or not incoming_text.strip():
+                return
+
+            if not isinstance(text, str) or not text.strip():
+                text = incoming_text
 
             assistant = registry.get_assistant()
             if assistant is None:
@@ -220,6 +245,7 @@ class TelegramChannel:
     def _on_event(self, event: Event) -> None:
         if event.type not in {
             EventType.ASSISTANT_CONTENT,
+            EventType.HISTORY_ENTRY_ADDED,
             EventType.NODE_STATE_CHANGED,
         }:
             return
@@ -255,6 +281,26 @@ class TelegramChannel:
                     await self._handle_assistant_content(content)
                 return
 
+            if event.type == EventType.HISTORY_ENTRY_ADDED:
+                entry_type = event.data.get("type")
+                if entry_type != "AssistantText":
+                    return
+                parts = event.data.get("parts")
+                if not isinstance(parts, list):
+                    return
+                if not any(
+                    isinstance(part, dict) and part.get("type") == "image"
+                    for part in parts
+                ):
+                    return
+                for chat_id in self._get_approved_chat_ids():
+                    await self._send_message(
+                        chat_id,
+                        IMAGE_OUTPUT_UNSUPPORTED_MESSAGE,
+                        markdown=False,
+                    )
+                return
+
             if event.type != EventType.NODE_STATE_CHANGED:
                 return
 
@@ -264,6 +310,11 @@ class TelegramChannel:
                 return
 
             await self._end_running_feedback()
+
+    @staticmethod
+    def _get_approved_chat_ids() -> list[int]:
+        settings = get_settings()
+        return [chat.chat_id for chat in settings.telegram.approved_chats]
 
     async def _handle_assistant_content(self, chunk: str) -> None:
         self._stream_buffer += chunk

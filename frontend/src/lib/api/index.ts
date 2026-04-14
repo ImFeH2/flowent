@@ -51,3 +51,8 @@ export {
 } from "./channels";
 export { fetchAppMeta, fetchTools, type ToolInfo } from "./meta";
 export { sendAssistantMessageRequest } from "./assistant";
+export {
+  getImageAssetUrl,
+  uploadImageAssetRequest,
+  type UploadedImageAsset,
+} from "./imageAssets";

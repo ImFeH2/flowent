@@ -1,7 +1,12 @@
+import base64
 from uuid import UUID
 
 from app.models import AssistantText, LLMResponse, ReceivedMessage
 from app.registry import registry
+
+_ONE_PIXEL_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII="
+)
 
 
 def _get_assistant_id(client) -> str:
@@ -122,4 +127,103 @@ def test_compact_command_replaces_history_with_summary(monkeypatch, client):
         and "Focus: slash command rollout" in entry["content"]
         and "Ship the slash commands." not in entry["content"]
         for entry in detail["history"]
+    )
+
+
+def test_upload_image_asset_returns_metadata_and_serves_bytes(client):
+    response = client.post(
+        "/api/image-assets",
+        files={"file": ("pixel.png", _ONE_PIXEL_PNG, "image/png")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mime_type"] == "image/png"
+    assert payload["width"] == 1
+    assert payload["height"] == 1
+
+    image_response = client.get(f"/api/image-assets/{payload['id']}")
+
+    assert image_response.status_code == 200
+    assert image_response.headers["content-type"].startswith("image/png")
+    assert image_response.content == _ONE_PIXEL_PNG
+
+
+def test_image_message_bypasses_assistant_commands(monkeypatch, client):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+    queued_messages = []
+
+    upload_response = client.post(
+        "/api/image-assets",
+        files={"file": ("pixel.png", _ONE_PIXEL_PNG, "image/png")},
+    )
+    assert upload_response.status_code == 200
+    asset_id = upload_response.json()["id"]
+
+    monkeypatch.setattr(assistant, "supports_input_image", lambda: True)
+    monkeypatch.setattr(
+        assistant, "enqueue_message", lambda message: queued_messages.append(message)
+    )
+
+    response = client.post(
+        "/api/assistant/message",
+        json={
+            "parts": [
+                {"type": "text", "text": "/help"},
+                {
+                    "type": "image",
+                    "asset_id": asset_id,
+                    "mime_type": "image/png",
+                    "width": 1,
+                    "height": 1,
+                    "alt": "Pixel",
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "sent"
+    assert len(queued_messages) == 1
+    assert queued_messages[0].parts[0].text == "/help"
+    assert queued_messages[0].parts[1].asset_id == asset_id
+
+
+def test_image_message_is_rejected_when_assistant_lacks_input_image_support(
+    monkeypatch, client
+):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+
+    upload_response = client.post(
+        "/api/image-assets",
+        files={"file": ("pixel.png", _ONE_PIXEL_PNG, "image/png")},
+    )
+    assert upload_response.status_code == 200
+    asset_id = upload_response.json()["id"]
+
+    monkeypatch.setattr(assistant, "supports_input_image", lambda: False)
+
+    response = client.post(
+        "/api/assistant/message",
+        json={
+            "parts": [
+                {
+                    "type": "image",
+                    "asset_id": asset_id,
+                    "mime_type": "image/png",
+                    "width": 1,
+                    "height": 1,
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "Assistant current model does not support `input_image`."
     )

@@ -373,7 +373,7 @@ describe("AssistantChatComposer", () => {
       "Message Assistant or type / for commands",
     );
     const sendButton = screen.getByRole("button", { name: "Send message" });
-    const composerShell = textarea.parentElement;
+    const composerShell = textarea.parentElement?.parentElement;
 
     expect(composerShell).not.toBeNull();
     expect(composerShell).toContainElement(sendButton);

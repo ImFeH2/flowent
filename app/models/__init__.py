@@ -37,7 +37,15 @@ from app.models.history import (
     SystemEntry,
     ToolCall,
 )
-from app.models.llm import LLMResponse, ModelCapabilities, ModelInfo, ToolCallResult
+from app.models.llm import (
+    LLMOutputImagePart,
+    LLMOutputPart,
+    LLMOutputTextPart,
+    LLMResponse,
+    ModelCapabilities,
+    ModelInfo,
+    ToolCallResult,
+)
 from app.models.message import Message
 from app.models.tab import Tab
 from app.models.todo import TodoItem
@@ -60,6 +68,9 @@ __all__ = [
     "GraphNodeRecord",
     "HistoryEntry",
     "ImagePart",
+    "LLMOutputImagePart",
+    "LLMOutputPart",
+    "LLMOutputTextPart",
     "LLMResponse",
     "Message",
     "ModelCapabilities",

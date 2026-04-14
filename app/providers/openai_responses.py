@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import time
 from collections.abc import Callable
@@ -8,7 +9,7 @@ from typing import Any
 from loguru import logger
 
 from app.model_metadata import build_model_info
-from app.models import LLMResponse, ModelInfo
+from app.models import LLMOutputImagePart, LLMOutputTextPart, LLMResponse, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.network import (
     RequestException,
@@ -19,6 +20,7 @@ from app.network import (
     truncate_text,
 )
 from app.providers import LLMProvider
+from app.providers.content import collapse_parts_to_text, to_openai_responses_content
 from app.providers.errors import (
     build_access_blocked_error,
     build_network_error,
@@ -131,6 +133,50 @@ def _extract_reasoning_tokens(response: dict[str, Any]) -> int:
     return tokens if isinstance(tokens, int) and tokens > 0 else 0
 
 
+def _decode_output_image(item: dict[str, Any]) -> LLMOutputImagePart | None:
+    encoded_data = (
+        item.get("result") or item.get("image_base64") or item.get("b64_json")
+    )
+    if not isinstance(encoded_data, str) or not encoded_data:
+        return None
+    try:
+        image_data = base64.b64decode(encoded_data)
+    except ValueError:
+        return None
+    mime_type = item.get("mime_type")
+    return LLMOutputImagePart(
+        data=image_data,
+        mime_type=mime_type if isinstance(mime_type, str) else "image/png",
+    )
+
+
+def _extract_output_parts(output: Any) -> list[LLMOutputTextPart | LLMOutputImagePart]:
+    if not isinstance(output, list):
+        return []
+
+    parts: list[LLMOutputTextPart | LLMOutputImagePart] = []
+    for item in output:
+        if not isinstance(item, dict):
+            continue
+        item_type = item.get("type")
+        if item_type == "message":
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            for entry in content:
+                if not isinstance(entry, dict):
+                    continue
+                entry_type = entry.get("type")
+                text = entry.get("text")
+                if entry_type in {"output_text", "text"} and isinstance(text, str):
+                    parts.append(LLMOutputTextPart(text=text))
+        elif item_type == "image_generation_call":
+            image_part = _decode_output_image(item)
+            if image_part is not None:
+                parts.append(image_part)
+    return parts
+
+
 def _format_reasoning_fallback(reasoning_tokens: int) -> str:
     if reasoning_tokens > 0:
         return f"Internal reasoning · {reasoning_tokens}"
@@ -191,7 +237,15 @@ class OpenAIResponsesProvider(LLMProvider):
                 continue
 
             if role == "user":
-                input_items.append({"role": "user", "content": content})
+                input_items.append(
+                    {
+                        "role": "user",
+                        "content": to_openai_responses_content(
+                            content,
+                            allow_images=True,
+                        ),
+                    }
+                )
             elif role == "assistant":
                 tool_calls = msg.get("tool_calls")
                 if tool_calls:
@@ -206,7 +260,12 @@ class OpenAIResponsesProvider(LLMProvider):
                             }
                         )
                 else:
-                    input_items.append({"role": "assistant", "content": content or ""})
+                    input_items.append(
+                        {
+                            "role": "assistant",
+                            "content": collapse_parts_to_text(content),
+                        }
+                    )
             elif role == "tool":
                 input_items.append(
                     {
@@ -217,6 +276,13 @@ class OpenAIResponsesProvider(LLMProvider):
                 )
 
         return system_prompt, input_items
+
+    def _supports_output_image(self) -> bool:
+        model_info = build_model_info(
+            provider_type="openai_responses",
+            model_id=self._model,
+        )
+        return model_info.capabilities.output_image
 
     def chat(
         self,
@@ -250,8 +316,13 @@ class OpenAIResponsesProvider(LLMProvider):
                     payload["top_p"] = model_params.top_p
         if system_prompt:
             payload["instructions"] = system_prompt
+        payload_tools = []
         if tools:
-            payload["tools"] = self._convert_tools(tools)
+            payload_tools.extend(self._convert_tools(tools))
+        if self._supports_output_image():
+            payload_tools.append({"type": "image_generation"})
+        if payload_tools:
+            payload["tools"] = payload_tools
             payload["tool_choice"] = "auto"
 
         logger.debug(
@@ -265,6 +336,7 @@ class OpenAIResponsesProvider(LLMProvider):
         t0 = time.perf_counter()
         content_parts: list[str] = []
         thinking_parts: list[str] = []
+        response_parts: list[LLMOutputTextPart | LLMOutputImagePart] | None = None
         tool_calls: list[ToolCall] = []
         chunk_count = 0
         saw_reasoning_item = False
@@ -401,6 +473,11 @@ class OpenAIResponsesProvider(LLMProvider):
                                     thinking_parts.append(reasoning_text)
                                     if on_chunk:
                                         on_chunk("thinking", reasoning_text)
+                            output_parts = _extract_output_parts(
+                                response_data.get("output")
+                            )
+                            if output_parts:
+                                response_parts = output_parts
         except RequestException as exc:
             elapsed = time.perf_counter() - t0
             logger.warning(
@@ -443,10 +520,17 @@ class OpenAIResponsesProvider(LLMProvider):
 
         if tool_calls:
             return LLMResponse(
-                content=content, tool_calls=tool_calls, thinking=thinking
+                content=content,
+                parts=response_parts,
+                tool_calls=tool_calls,
+                thinking=thinking,
             )
 
-        return LLMResponse(content=content or "", thinking=thinking)
+        return LLMResponse(
+            content=content or "",
+            parts=response_parts,
+            thinking=thinking,
+        )
 
     def list_models(
         self,

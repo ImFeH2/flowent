@@ -25,7 +25,24 @@ class ToolCallResult:
 
 
 @dataclass
+class LLMOutputTextPart:
+    text: str
+
+
+@dataclass
+class LLMOutputImagePart:
+    data: bytes
+    mime_type: str
+    width: int | None = None
+    height: int | None = None
+
+
+LLMOutputPart = LLMOutputTextPart | LLMOutputImagePart
+
+
+@dataclass
 class LLMResponse:
     content: str | None = None
+    parts: list[LLMOutputPart] | None = None
     tool_calls: list[ToolCallResult] | None = None
     thinking: str | None = None

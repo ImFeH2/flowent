@@ -16,15 +16,35 @@ function withoutFirstMatchingItem<T>(
 
 export function removePendingAssistantMessage(
   messages: PendingAssistantChatMessage[],
-  content: string,
+  matcher:
+    | string
+    | {
+        content?: string;
+        timestamp?: number;
+        messageId?: string | null;
+      },
   timestamp?: number,
 ): PendingAssistantChatMessage[] {
-  return withoutFirstMatchingItem(
-    messages,
-    (message) =>
-      message.content === content &&
-      (timestamp === undefined || message.timestamp === timestamp),
-  );
+  const normalizedMatcher =
+    typeof matcher === "string"
+      ? {
+          content: matcher,
+          timestamp,
+        }
+      : matcher;
+  return withoutFirstMatchingItem(messages, (message) => {
+    if (
+      normalizedMatcher.messageId &&
+      message.message_id === normalizedMatcher.messageId
+    ) {
+      return true;
+    }
+    return (
+      normalizedMatcher.content === message.content &&
+      (normalizedMatcher.timestamp === undefined ||
+        message.timestamp === normalizedMatcher.timestamp)
+    );
+  });
 }
 
 export function deleteMapEntries<K, V>(

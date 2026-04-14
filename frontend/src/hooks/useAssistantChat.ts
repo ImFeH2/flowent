@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -8,7 +9,11 @@ import {
   type UIEvent,
 } from "react";
 import { toast } from "sonner";
-import { clearAssistantChatRequest, fetchNodeDetail } from "@/lib/api";
+import {
+  clearAssistantChatRequest,
+  fetchNodeDetail,
+  uploadImageAssetRequest,
+} from "@/lib/api";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -21,8 +26,13 @@ import {
   clearConversationHistory,
   mergeHistoryWithDeltas,
 } from "@/lib/history";
-import { normalizeContentParts } from "@/lib/contentParts";
-import type { AssistantChatItem, HistoryEntry, NodeDetail } from "@/types";
+import { contentPartsToText, normalizeContentParts } from "@/lib/contentParts";
+import type {
+  AssistantChatItem,
+  ContentPart,
+  HistoryEntry,
+  NodeDetail,
+} from "@/types";
 
 const SCROLL_BOTTOM_EPSILON = 10;
 
@@ -33,6 +43,62 @@ function isScrolledToBottom(element: HTMLDivElement) {
 
 interface UseAssistantChatOptions {
   bottomInset?: number;
+}
+
+interface DraftAssistantImage {
+  id: string;
+  assetId: string | null;
+  previewUrl: string;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  name: string;
+  status: "uploading" | "ready";
+}
+
+function createDraftImageId() {
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `draft-${Date.now()}-${Math.random()}`
+  );
+}
+
+function revokeDraftImageUrl(image: DraftAssistantImage) {
+  if (image.previewUrl.startsWith("blob:")) {
+    URL.revokeObjectURL(image.previewUrl);
+  }
+}
+
+function revokeDraftImageUrls(images: DraftAssistantImage[]) {
+  for (const image of images) {
+    revokeDraftImageUrl(image);
+  }
+}
+
+function readImageSize(
+  file: File,
+): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const previewUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const width = image.naturalWidth;
+      const height = image.naturalHeight;
+      URL.revokeObjectURL(previewUrl);
+      resolve(
+        width > 0 && height > 0
+          ? {
+              width,
+              height,
+            }
+          : null,
+      );
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(previewUrl);
+      resolve(null);
+    };
+    image.src = previewUrl;
+  });
 }
 
 export function useAssistantChat(options: UseAssistantChatOptions = {}) {
@@ -50,18 +116,39 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [input, setInput] = useState("");
+  const [draftImages, setDraftImages] = useState<DraftAssistantImage[]>([]);
   const [clearing, setClearing] = useState(false);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
+  const draftImagesRef = useRef<DraftAssistantImage[]>([]);
   const assistantId = useMemo(() => getAssistantNodeId(agents), [agents]);
   const assistantNode = useMemo(
     () => (assistantId ? (agents.get(assistantId) ?? null) : null),
     [agents, assistantId],
   );
+  const supportsInputImage = assistantNode?.capabilities?.input_image ?? false;
   const assistantHistoryClearedAt = assistantId
     ? (historyClearedAt.get(assistantId) ?? 0)
     : 0;
+  const hasUploadingImages = draftImages.some(
+    (image) => image.status === "uploading",
+  );
+  const readyImages = draftImages.filter(
+    (image): image is DraftAssistantImage & { assetId: string } =>
+      image.status === "ready" && Boolean(image.assetId),
+  );
+
+  useEffect(() => {
+    draftImagesRef.current = draftImages;
+  }, [draftImages]);
+
+  useEffect(
+    () => () => {
+      revokeDraftImageUrls(draftImagesRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!assistantHistoryClearedAt) {
@@ -233,14 +320,44 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
 
   const sendMessage = async () => {
     const content = input.trim();
-    if (!content || sending) return;
+    if (
+      (!content && readyImages.length === 0) ||
+      hasUploadingImages ||
+      sending
+    ) {
+      return;
+    }
 
+    const parts: ContentPart[] = [];
+    if (content) {
+      parts.push({ type: "text", text: content });
+    }
+    for (const image of readyImages) {
+      parts.push({
+        type: "image",
+        asset_id: image.assetId,
+        mime_type: image.mimeType,
+        width: image.width,
+        height: image.height,
+        alt: image.name,
+      });
+    }
+
+    const previousInput = input;
+    const previousDraftImages = draftImages;
     setSending(true);
     setInput("");
+    setDraftImages([]);
 
     try {
-      await sendAssistantMessage(content);
+      await sendAssistantMessage({
+        content: content || contentPartsToText(parts),
+        parts,
+      });
+      revokeDraftImageUrls(previousDraftImages);
     } catch (error) {
+      setInput(previousInput);
+      setDraftImages(previousDraftImages);
       toast.error(
         error instanceof Error ? error.message : "Failed to send message",
       );
@@ -248,6 +365,90 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       setSending(false);
     }
   };
+
+  const addImages = useCallback(
+    async (files: FileList | File[]) => {
+      if (!supportsInputImage) {
+        toast.error("Current model does not support image input");
+        return;
+      }
+      const selectedFiles = Array.from(files).filter((file) =>
+        file.type.startsWith("image/"),
+      );
+      if (selectedFiles.length === 0) {
+        return;
+      }
+
+      const drafts = await Promise.all(
+        selectedFiles.map(async (file) => {
+          const size = await readImageSize(file);
+          return {
+            id: createDraftImageId(),
+            assetId: null,
+            previewUrl: URL.createObjectURL(file),
+            mimeType: file.type || null,
+            width: size?.width ?? null,
+            height: size?.height ?? null,
+            name: file.name,
+            status: "uploading" as const,
+          };
+        }),
+      );
+
+      setDraftImages((current) => [...current, ...drafts]);
+
+      await Promise.all(
+        drafts.map(async (draft, index) => {
+          const file = selectedFiles[index];
+          if (!file) {
+            return;
+          }
+          try {
+            const asset = await uploadImageAssetRequest(file);
+            setDraftImages((current) =>
+              current.map((image) =>
+                image.id === draft.id
+                  ? {
+                      ...image,
+                      assetId: asset.id,
+                      mimeType: asset.mime_type,
+                      width:
+                        typeof asset.width === "number"
+                          ? asset.width
+                          : image.width,
+                      height:
+                        typeof asset.height === "number"
+                          ? asset.height
+                          : image.height,
+                      status: "ready",
+                    }
+                  : image,
+              ),
+            );
+          } catch (error) {
+            revokeDraftImageUrl(draft);
+            setDraftImages((current) =>
+              current.filter((image) => image.id !== draft.id),
+            );
+            toast.error(
+              error instanceof Error ? error.message : "Failed to upload image",
+            );
+          }
+        }),
+      );
+    },
+    [supportsInputImage],
+  );
+
+  const removeImage = useCallback((imageId: string) => {
+    setDraftImages((current) => {
+      const image = current.find((item) => item.id === imageId);
+      if (image) {
+        revokeDraftImageUrl(image);
+      }
+      return current.filter((item) => item.id !== imageId);
+    });
+  }, []);
 
   const clearChat = async () => {
     if (!assistantId || clearing) {
@@ -280,16 +481,21 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   };
 
   return {
+    addImages,
     connected,
+    draftImages,
     handleKeyDown,
+    hasUploadingImages,
     input,
     onMessagesScroll,
+    removeImage,
     scrollRef,
     clearing,
     sending,
     clearChat,
     sendMessage,
     setInput,
+    supportsInputImage,
     timelineItems,
     assistantActivity,
   };

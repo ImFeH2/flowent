@@ -16,15 +16,20 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
   const { height: composerHeight, ref: composerRef } =
     useMeasuredHeight<HTMLDivElement>();
   const {
+    addImages = async () => {},
     assistantActivity = { running: false },
     connected,
+    draftImages = [],
     handleKeyDown,
+    hasUploadingImages = false,
     input,
     onMessagesScroll,
+    removeImage = () => {},
     scrollRef,
     sending,
     sendMessage,
     setInput,
+    supportsInputImage = false,
     timelineItems,
   } = useAssistantChat({ bottomInset: composerHeight });
   const isFloating = variant === "floating";
@@ -71,10 +76,18 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
           )}
         >
           <AssistantChatComposer
-            disabled={!input.trim() || sending}
+            disabled={
+              (!input.trim() && draftImages.length === 0) ||
+              hasUploadingImages ||
+              sending
+            }
+            images={draftImages}
+            imageInputEnabled={supportsInputImage}
             input={input}
+            onAddImages={(files) => void addImages(files)}
             onChange={setInput}
             onKeyDown={handleKeyDown}
+            onRemoveImage={removeImage}
             onSend={() => void sendMessage()}
             overlay
             variant={chatVariant}

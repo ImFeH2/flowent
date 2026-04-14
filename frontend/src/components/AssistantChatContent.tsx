@@ -19,9 +19,11 @@ import {
   Square,
   Sparkles,
   Wrench,
-  ImageIcon,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
+import { ImageAssetPreview } from "@/components/ImageAssetPreview";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import {
   insertAssistantCommand,
@@ -60,9 +62,20 @@ interface AssistantChatMessagesProps {
 interface AssistantChatComposerProps {
   busy?: boolean;
   disabled: boolean;
+  images?: Array<{
+    id: string;
+    previewUrl: string;
+    name: string;
+    width: number | null;
+    height: number | null;
+    status: "uploading" | "ready";
+  }>;
+  imageInputEnabled?: boolean;
   input: string;
+  onAddImages?: (files: FileList) => void;
   onChange: (value: string) => void;
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>;
+  onRemoveImage?: (imageId: string) => void;
   onSend: () => void;
   onStop?: () => void;
   overlay?: boolean;
@@ -130,9 +143,13 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
 export function AssistantChatComposer({
   busy = false,
   disabled,
+  images = [],
+  imageInputEnabled = true,
   input,
+  onAddImages = () => {},
   onChange,
   onKeyDown,
+  onRemoveImage = () => {},
   onSend,
   onStop,
   overlay = false,
@@ -141,6 +158,7 @@ export function AssistantChatComposer({
 }: AssistantChatComposerProps) {
   const isWorkspace = variant === "workspace";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const actionLabel = busy ? (stopping ? "Stopping..." : "Stop") : "Send";
   const actionDisabled = busy ? stopping || !onStop : disabled;
   const {
@@ -156,7 +174,9 @@ export function AssistantChatComposer({
     string | null
   >(null);
   const commandPanelVisible =
-    isCommandInput && dismissedCommandToken !== commandToken;
+    images.length === 0 &&
+    isCommandInput &&
+    dismissedCommandToken !== commandToken;
   const { selectedCommand, selectedCommandIndex } =
     resolveAssistantCommandSelection(
       commandOptions,
@@ -215,6 +235,11 @@ export function AssistantChatComposer({
     setSelectedCommandState({ index: 0, token: command.name });
     setDismissedCommandToken(null);
     textareaRef.current?.focus();
+  };
+
+  const resetCommandState = () => {
+    setDismissedCommandToken(null);
+    setSelectedCommandState({ index: 0, token: "" });
   };
 
   const handleComposerKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (
@@ -339,52 +364,125 @@ export function AssistantChatComposer({
       ) : null}
       <div
         className={cn(
-          "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 rounded-[0.8rem] border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
+          "rounded-[0.8rem] border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
           isWorkspace
             ? "border-white/14 bg-black/[0.18] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_14px_30px_-22px_rgba(0,0,0,0.82),0_8px_16px_-14px_rgba(255,255,255,0.06)] hover:border-white/22 focus-within:border-white/28 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_38px_-24px_rgba(0,0,0,0.88),0_10px_20px_-16px_rgba(255,255,255,0.08)]"
             : "border-white/12 bg-surface-2/90 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_16px_32px_-24px_rgba(0,0,0,0.72),0_8px_16px_-14px_rgba(255,255,255,0.05)] backdrop-blur-xl hover:border-white/18 focus-within:border-white/24 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_36px_-24px_rgba(0,0,0,0.78),0_9px_18px_-14px_rgba(255,255,255,0.08)]",
         )}
       >
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(event) => handleInputChange(event.target.value)}
-          onKeyDown={handleComposerKeyDown}
-          placeholder="Message Assistant or type / for commands"
-          rows={1}
-          className={cn(
-            "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
-            isWorkspace ? "rounded-[0.55rem]" : "rounded-[0.6rem]",
-          )}
-        />
-        <button
-          type="button"
-          onClick={busy ? onStop : onSend}
-          disabled={actionDisabled}
-          aria-label={busy ? "Stop assistant" : "Send message"}
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-full transition-all duration-300 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-30",
-            isWorkspace
-              ? "h-8 gap-1.5 px-3.5 bg-white text-black hover:opacity-90"
-              : "size-8 bg-white/[0.1] text-white hover:bg-white/[0.15]",
-            busy && isWorkspace
-              ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-              : "",
-            busy && !isWorkspace
-              ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-              : "",
-          )}
-        >
-          {busy ? (
-            <Square className="size-3.5 fill-current" strokeWidth={2.4} />
-          ) : (
-            <ArrowUp className="size-4" strokeWidth={2.5} />
-          )}
-          {isWorkspace ? (
-            <span className="text-[11px] font-medium">{actionLabel}</span>
-          ) : null}
-        </button>
+        {images.length > 0 ? (
+          <div className="flex flex-wrap gap-2 border-b border-white/8 px-0.5 py-2">
+            {images.map((image) => (
+              <div
+                key={image.id}
+                className="relative overflow-hidden rounded-lg border border-white/10 bg-black/25"
+              >
+                <img
+                  alt={image.name}
+                  className="h-20 w-20 object-cover"
+                  src={image.previewUrl}
+                />
+                <button
+                  aria-label={`Remove ${image.name}`}
+                  className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-black/60 text-white/74 transition-colors hover:bg-black/80 hover:text-white"
+                  onClick={() => onRemoveImage(image.id)}
+                  type="button"
+                >
+                  <X className="size-3.5" />
+                </button>
+                <div className="absolute inset-x-0 bottom-0 bg-black/72 px-2 py-1 text-[10px] text-white/84">
+                  <div className="truncate">{image.name}</div>
+                  <div className="text-white/56">
+                    {image.status === "uploading"
+                      ? "Uploading..."
+                      : image.width && image.height
+                        ? `${image.width}x${image.height}`
+                        : "Ready"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
+          <input
+            ref={fileInputRef}
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="hidden"
+            multiple
+            onChange={(event) => {
+              if (event.target.files && event.target.files.length > 0) {
+                resetCommandState();
+                onAddImages(event.target.files);
+              }
+              event.currentTarget.value = "";
+            }}
+            type="file"
+          />
+          <button
+            type="button"
+            aria-label={
+              imageInputEnabled
+                ? "Add images"
+                : "Current model does not support image input"
+            }
+            disabled={!imageInputEnabled}
+            onClick={() => fileInputRef.current?.click()}
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-full text-white transition-colors disabled:cursor-not-allowed disabled:opacity-35",
+              imageInputEnabled
+                ? "bg-white/[0.08] hover:bg-white/[0.14]"
+                : "bg-white/[0.04]",
+            )}
+          >
+            <ImagePlus className="size-4" />
+          </button>
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(event) => handleInputChange(event.target.value)}
+            onKeyDown={handleComposerKeyDown}
+            placeholder="Message Assistant or type / for commands"
+            rows={1}
+            className={cn(
+              "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
+              isWorkspace ? "rounded-[0.55rem]" : "rounded-[0.6rem]",
+            )}
+          />
+          <button
+            type="button"
+            onClick={busy ? onStop : onSend}
+            disabled={actionDisabled}
+            aria-label={busy ? "Stop assistant" : "Send message"}
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-full transition-all duration-300 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-30",
+              isWorkspace
+                ? "h-8 gap-1.5 px-3.5 bg-white text-black hover:opacity-90"
+                : "size-8 bg-white/[0.1] text-white hover:bg-white/[0.15]",
+              busy && isWorkspace
+                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                : "",
+              busy && !isWorkspace
+                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                : "",
+            )}
+          >
+            {busy ? (
+              <Square className="size-3.5 fill-current" strokeWidth={2.4} />
+            ) : (
+              <ArrowUp className="size-4" strokeWidth={2.5} />
+            )}
+            {isWorkspace ? (
+              <span className="text-[11px] font-medium">{actionLabel}</span>
+            ) : null}
+          </button>
+        </div>
       </div>
+      {!imageInputEnabled ? (
+        <div className="px-1.5 pt-2 text-[11px] text-white/42">
+          Current model does not support image input.
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -440,7 +538,14 @@ const TimelineItem = memo(function TimelineItem({
   variant: AssistantChatVariant;
 }) {
   if (item.type === "PendingHumanMessage") {
-    return <HumanBubble content={item.content} variant={variant} pending />;
+    return (
+      <HumanBubble
+        content={item.content}
+        parts={item.parts}
+        variant={variant}
+        pending
+      />
+    );
   }
 
   switch (item.type) {
@@ -960,21 +1065,14 @@ function RichContentBlock({
               preClassName={preClassName}
             />
           ) : (
-            <div
+            <ImageAssetPreview
               key={`${index}-image-${part.asset_id}`}
-              className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-[12px] text-white/78"
-            >
-              <div className="flex items-center gap-2 font-medium text-white/88">
-                <ImageIcon className="size-4 text-white/70" />
-                <span>{part.alt || "Image"}</span>
-              </div>
-              <div className="mt-1 text-[11px] text-white/52">
-                {part.mime_type || "image asset"}
-                {part.width && part.height
-                  ? ` · ${part.width}x${part.height}`
-                  : ""}
-              </div>
-            </div>
+              alt={part.alt}
+              assetId={part.asset_id}
+              height={part.height}
+              mimeType={part.mime_type}
+              width={part.width}
+            />
           ),
         )}
       </div>

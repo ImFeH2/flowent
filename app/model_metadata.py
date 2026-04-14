@@ -17,6 +17,11 @@ _STATIC_INPUT_IMAGE_PREFIXES: tuple[str, ...] = (
     "gemini-2.5",
     "gemini-2.0",
 )
+_STATIC_OPENAI_RESPONSES_OUTPUT_IMAGE_PREFIXES: tuple[str, ...] = (
+    "gpt-5",
+    "gpt-4.1",
+    "gpt-4o",
+)
 
 
 def _normalize_model_id(model_id: str) -> str:
@@ -37,9 +42,17 @@ def infer_model_capabilities(
     )
     if provider_type == "gemini":
         inferred_input_image = True
+    inferred_output_image = False
+    if provider_type == "openai_responses":
+        inferred_output_image = any(
+            normalized_model_id.startswith(prefix)
+            for prefix in _STATIC_OPENAI_RESPONSES_OUTPUT_IMAGE_PREFIXES
+        )
+    elif provider_type == "gemini":
+        inferred_output_image = "image" in normalized_model_id
     return ModelCapabilities(
         input_image=inferred_input_image if input_image is None else input_image,
-        output_image=False if output_image is None else output_image,
+        output_image=(inferred_output_image if output_image is None else output_image),
     )
 
 

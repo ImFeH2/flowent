@@ -19,6 +19,7 @@ from app.network import (
     truncate_text,
 )
 from app.providers import LLMProvider
+from app.providers.content import collapse_parts_to_text, to_anthropic_content
 from app.providers.errors import (
     build_access_blocked_error,
     build_network_error,
@@ -110,8 +111,9 @@ class AnthropicProvider(LLMProvider):
             if role == "assistant" and msg.get("tool_calls"):
                 content_blocks: list[dict[str, Any]] = []
                 content = msg.get("content")
-                if isinstance(content, str) and content:
-                    content_blocks.append({"type": "text", "text": content})
+                assistant_text = collapse_parts_to_text(content)
+                if assistant_text:
+                    content_blocks.append({"type": "text", "text": assistant_text})
 
                 for tool_call in msg.get("tool_calls", []):
                     fn = tool_call.get("function", {})
@@ -144,7 +146,21 @@ class AnthropicProvider(LLMProvider):
                 converted.append({"role": "assistant", "content": content_blocks})
                 continue
 
-            converted.append({"role": role, "content": msg.get("content")})
+            if role == "user":
+                converted.append(
+                    {
+                        "role": "user",
+                        "content": to_anthropic_content(
+                            msg.get("content"),
+                            allow_images=True,
+                        ),
+                    }
+                )
+                continue
+
+            converted.append(
+                {"role": role, "content": collapse_parts_to_text(msg.get("content"))}
+            )
 
         flush_tool_results()
 

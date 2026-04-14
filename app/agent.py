@@ -15,6 +15,7 @@ from loguru import logger
 
 from app.assistant_commands import build_assistant_help_text
 from app.events import event_bus
+from app.image_assets import create_image_asset, require_image_asset
 from app.models import (
     AgentState,
     AssistantText,
@@ -26,6 +27,8 @@ from app.models import (
     EventType,
     HistoryEntry,
     ImagePart,
+    LLMOutputImagePart,
+    LLMOutputTextPart,
     LLMResponse,
     Message,
     ModelInfo,
@@ -626,8 +629,9 @@ class Agent:
                         self._flush_streaming_think_parser(stream_state)
 
                         self._log.debug(
-                            "LLM response: content_len={}, thinking_len={}, tool_calls={}",
+                            "LLM response: content_len={}, parts_len={}, thinking_len={}, tool_calls={}",
                             len(response.content) if response.content else 0,
+                            len(response.parts) if response.parts else 0,
                             len(response.thinking) if response.thinking else 0,
                             [tc.name for tc in response.tool_calls]
                             if response.tool_calls
@@ -642,6 +646,7 @@ class Agent:
                             if stream_state.saw_content_chunks
                             else response.content
                         )
+                        final_parts = response.parts
                         if final_content and final_thinking:
                             final_content, _ = split_thinking_content(final_content)
 
@@ -656,8 +661,14 @@ class Agent:
                                 "Processing {} tool call(s)",
                                 len(response.tool_calls),
                             )
-                            if final_content:
-                                self._record_content_output(
+                            if final_parts:
+                                self._record_content_parts_output(
+                                    self._normalize_llm_output_parts(final_parts),
+                                    emitted_human_content=stream_state.emitted_human_content,
+                                )
+                                stream_state.content_buffer = ""
+                            elif final_content:
+                                self._record_text_output(
                                     final_content,
                                     emitted_human_content=stream_state.emitted_human_content,
                                 )
@@ -679,8 +690,17 @@ class Agent:
                                 self._raise_if_interrupt_requested()
                                 if self._terminate.is_set():
                                     break
+                        elif final_parts:
+                            self._record_content_parts_output(
+                                self._normalize_llm_output_parts(final_parts),
+                                emitted_human_content=stream_state.emitted_human_content,
+                            )
+                            stream_state.content_buffer = ""
+                            self._log.debug(
+                                "No tool calls, continuing execution after structured response"
+                            )
                         elif final_content:
-                            self._record_content_output(
+                            self._record_text_output(
                                 final_content,
                                 emitted_human_content=stream_state.emitted_human_content,
                             )
@@ -1045,7 +1065,7 @@ class Agent:
             ),
         )
 
-    def _record_content_output(
+    def _record_text_output(
         self,
         content: str,
         *,
@@ -1061,21 +1081,87 @@ class Agent:
         if not plain_content.strip():
             return
 
+        self._record_content_parts_output(
+            [TextPart(text=plain_content)],
+            emitted_human_content=emitted_human_content,
+        )
+
+    def _record_content_output(
+        self,
+        content: str,
+        *,
+        emitted_human_content: bool,
+    ) -> None:
+        self._record_text_output(
+            content,
+            emitted_human_content=emitted_human_content,
+        )
+
+    def _normalize_llm_output_parts(
+        self,
+        parts: list[LLMOutputTextPart | LLMOutputImagePart],
+    ) -> list[TextPart | ImagePart]:
+        normalized: list[TextPart | ImagePart] = []
+        for part in parts:
+            if isinstance(part, LLMOutputTextPart):
+                normalized_content, normalized_thinking = split_thinking_content(
+                    part.text
+                )
+                if normalized_thinking.strip():
+                    self._append_history(AssistantThinking(content=normalized_thinking))
+                if normalized_content:
+                    normalized.append(TextPart(text=normalized_content))
+                continue
+            if not self.supports_output_image():
+                raise ContextPreflightError(
+                    "Current model does not support `output_image`."
+                )
+            asset = create_image_asset(part.data, mime_type=part.mime_type)
+            normalized.append(
+                ImagePart(
+                    asset_id=asset.id,
+                    mime_type=asset.mime_type,
+                    width=part.width or asset.width,
+                    height=part.height or asset.height,
+                )
+            )
+        return normalized
+
+    def _record_content_parts_output(
+        self,
+        parts: list[TextPart | ImagePart],
+        *,
+        emitted_human_content: bool,
+    ) -> None:
+        normalized_parts = [
+            part for part in parts if not isinstance(part, TextPart) or part.text
+        ]
+        if not normalized_parts:
+            return
+
+        visible_text = "".join(
+            part.text for part in normalized_parts if isinstance(part, TextPart)
+        )
+        content_preview = content_parts_to_text(normalized_parts)
         self._mark_turn_progress()
 
-        if self.node_type == NodeType.ASSISTANT and not emitted_human_content:
+        if (
+            self.node_type == NodeType.ASSISTANT
+            and not emitted_human_content
+            and visible_text.strip()
+        ):
             event_bus.emit(
                 Event(
                     type=EventType.ASSISTANT_CONTENT,
                     agent_id=self.uuid,
-                    data={"content": plain_content},
+                    data={"content": visible_text},
                 ),
             )
 
         self._append_history(
             AssistantText(
-                parts=[TextPart(text=plain_content)],
-                content=plain_content,
+                parts=normalized_parts,
+                content=content_preview,
             )
         )
 
@@ -1095,6 +1181,12 @@ class Agent:
             return False
         return model_info.capabilities.input_image
 
+    def supports_output_image(self) -> bool:
+        _, model_info = self._get_effective_model_info()
+        if model_info is None:
+            return False
+        return model_info.capabilities.output_image
+
     def send_message(
         self,
         *,
@@ -1107,6 +1199,10 @@ class Agent:
             raise ValueError(
                 f"Send failed: target `{target_ref}` does not support `input_image`."
             )
+        for part in parts:
+            asset_id = getattr(part, "asset_id", None)
+            if isinstance(asset_id, str):
+                require_image_asset(asset_id)
         message_id = str(_uuid.uuid4())
         self._deliver_message(target, parts, message_id)
         self._mark_turn_progress()
@@ -1264,7 +1360,7 @@ class Agent:
                     AssistantThinking(content=stream_state.thinking_buffer),
                 )
             if stream_state.content_buffer:
-                self._record_content_output(
+                self._record_text_output(
                     stream_state.content_buffer,
                     emitted_human_content=stream_state.emitted_human_content,
                 )
@@ -1361,15 +1457,29 @@ class Agent:
         return messages
 
     @staticmethod
-    def _content_parts_to_context_content(
+    def _serialize_context_parts(
         parts: list[TextPart | ImagePart],
-    ) -> str:
+    ) -> str | list[dict[str, Any]]:
         if all(isinstance(part, TextPart) for part in parts):
-            return content_parts_to_text(parts)
-        return json.dumps(
-            {"parts": [part.serialize() for part in parts]},
-            ensure_ascii=False,
-        )
+            text_parts = [part for part in parts if isinstance(part, TextPart)]
+            return "".join(part.text for part in text_parts)
+        return [part.serialize() for part in parts]
+
+    @classmethod
+    def _wrap_context_parts(
+        cls,
+        parts: list[TextPart | ImagePart],
+        *,
+        prefix: str,
+        suffix: str = "",
+    ) -> str | list[dict[str, Any]]:
+        if all(isinstance(part, TextPart) for part in parts):
+            text_parts = [part for part in parts if isinstance(part, TextPart)]
+            return prefix + "".join(part.text for part in text_parts) + suffix
+        wrapped: list[TextPart | ImagePart] = [TextPart(text=prefix), *parts]
+        if suffix:
+            wrapped.append(TextPart(text=suffix))
+        return cls._serialize_context_parts(wrapped)
 
     def _build_history_messages(
         self,
@@ -1384,18 +1494,23 @@ class Agent:
 
             elif isinstance(entry, ReceivedMessage):
                 self._flush_tool_calls(messages, pending_tool_calls)
-                payload = (
-                    f'<message from="{entry.from_id}">'
-                    f"{self._content_parts_to_context_content(entry.parts)}</message>"
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": self._wrap_context_parts(
+                            entry.parts,
+                            prefix=f'<message from="{entry.from_id}">',
+                            suffix="</message>",
+                        ),
+                    }
                 )
-                messages.append({"role": "user", "content": payload})
 
             elif isinstance(entry, AssistantText):
                 self._flush_tool_calls(messages, pending_tool_calls)
                 messages.append(
                     {
                         "role": "assistant",
-                        "content": self._content_parts_to_context_content(entry.parts),
+                        "content": self._serialize_context_parts(entry.parts),
                     }
                 )
 
@@ -1404,9 +1519,10 @@ class Agent:
                 messages.append(
                     {
                         "role": "assistant",
-                        "content": (
-                            f'<message to="{entry.to_id}">'
-                            f"{self._content_parts_to_context_content(entry.parts)}</message>"
+                        "content": self._wrap_context_parts(
+                            entry.parts,
+                            prefix=f'<message to="{entry.to_id}">',
+                            suffix="</message>",
                         ),
                     }
                 )

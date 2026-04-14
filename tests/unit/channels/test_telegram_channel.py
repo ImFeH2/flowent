@@ -2,7 +2,12 @@ import asyncio
 
 import pytest
 
-from app.channels.telegram import PRIVATE_ONLY_MESSAGE, TelegramChannel
+from app.channels.telegram import (
+    IMAGE_INPUT_UNSUPPORTED_MESSAGE,
+    IMAGE_OUTPUT_UNSUPPORTED_MESSAGE,
+    PRIVATE_ONLY_MESSAGE,
+    TelegramChannel,
+)
 from app.models import Event, EventType
 from app.settings import (
     Settings,
@@ -19,6 +24,9 @@ class DummyAssistant:
 
     def enqueue_message(self, message) -> None:
         self.messages.append(message)
+
+    def supports_input_image(self) -> bool:
+        return True
 
 
 class _FakeTelegramResponse:
@@ -175,6 +183,54 @@ def test_telegram_channel_delivers_messages_from_approved_private_chat(monkeypat
     assert assistant.messages[0].content == "check status"
 
 
+def test_telegram_channel_rejects_image_input_from_approved_private_chat(monkeypatch):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="123456:ABCDE",
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=4004,
+                    username="alice",
+                    display_name="Alice",
+                    approved_at=1.0,
+                )
+            ],
+        )
+    )
+    assistant = DummyAssistant()
+    sent_messages: list[tuple[int, str, bool]] = []
+
+    monkeypatch.setattr("app.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.channels.telegram.registry.get_assistant",
+        lambda: assistant,
+    )
+
+    channel = TelegramChannel()
+
+    async def fake_send_message(chat_id: int, text: str, *, markdown: bool) -> int:
+        sent_messages.append((chat_id, text, markdown))
+        return 1
+
+    monkeypatch.setattr(channel, "_send_message", fake_send_message)
+
+    asyncio.run(
+        channel._process_update(
+            {
+                "message": {
+                    "from": {"id": 1001},
+                    "chat": {"id": 4004, "type": "private"},
+                    "caption": "look at this",
+                    "photo": [{"file_id": "photo-1"}],
+                }
+            }
+        )
+    )
+
+    assert assistant.messages == []
+    assert sent_messages == [(4004, IMAGE_INPUT_UNSUPPORTED_MESSAGE, False)]
+
+
 def test_telegram_channel_sends_typing_while_running_before_first_visible_text(
     monkeypatch,
 ):
@@ -268,6 +324,53 @@ def test_telegram_channel_stops_typing_after_first_visible_text(monkeypatch):
     assert sent_messages == [(4004, "hello", False)]
     assert sent_actions == []
     assert channel._stream_message_ids == {4004: 7}
+
+
+def test_telegram_channel_sends_explicit_notice_for_image_output(monkeypatch):
+    settings = Settings(
+        telegram=TelegramSettings(
+            bot_token="123456:ABCDE",
+            approved_chats=[
+                TelegramApprovedChat(
+                    chat_id=4004,
+                    username="alice",
+                    display_name="Alice",
+                    approved_at=1.0,
+                )
+            ],
+        )
+    )
+    assistant = DummyAssistant()
+    sent_messages: list[tuple[int, str, bool]] = []
+
+    monkeypatch.setattr("app.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.channels.telegram.registry.get_assistant",
+        lambda: assistant,
+    )
+
+    channel = TelegramChannel()
+
+    async def fake_send_message(chat_id: int, text: str, *, markdown: bool) -> int:
+        sent_messages.append((chat_id, text, markdown))
+        return 1
+
+    monkeypatch.setattr(channel, "_send_message", fake_send_message)
+
+    asyncio.run(
+        channel._process_event(
+            Event(
+                type=EventType.HISTORY_ENTRY_ADDED,
+                agent_id=assistant.uuid,
+                data={
+                    "type": "AssistantText",
+                    "parts": [{"type": "image", "asset_id": "asset-1"}],
+                },
+            )
+        )
+    )
+
+    assert sent_messages == [(4004, IMAGE_OUTPUT_UNSUPPORTED_MESSAGE, False)]
 
 
 def test_telegram_channel_ignores_tool_progress_events(monkeypatch):

@@ -24,12 +24,14 @@ import {
   filterStreamingDeltas,
   removePendingAssistantMessage,
 } from "@/context/agentRuntimeState";
+import { contentPartsToText } from "@/lib/contentParts";
 import type {
   AgentEvent,
   AssistantChatMessage,
   HistoryEntry,
   Node,
   PendingAssistantChatMessage,
+  ContentPart,
   TaskTab,
   StreamingDelta,
 } from "@/types";
@@ -93,7 +95,10 @@ interface AgentUIContextValue {
   hoveredAgentId: string | null;
   setHoveredAgentId: (id: string | null) => void;
   pendingAssistantMessages: PendingAssistantChatMessage[];
-  sendAssistantMessage: (content: string) => Promise<void>;
+  sendAssistantMessage: (input: {
+    content: string;
+    parts?: ContentPart[];
+  }) => Promise<void>;
   activeTabId: string | null;
   setActiveTabId: (id: string | null) => void;
   currentPage: PageId;
@@ -181,36 +186,49 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       from: AssistantChatMessage["from"],
       content: string,
       timestamp: number,
+      parts?: ContentPart[],
     ): AssistantChatMessage => ({
       id: nextAssistantMessageId(from, timestamp),
       from,
       content,
+      parts,
       timestamp,
     }),
     [nextAssistantMessageId],
   );
 
   const sendAssistantMessage = useCallback(
-    async (content: string) => {
+    async (input: { content: string; parts?: ContentPart[] }) => {
       const timestamp = Date.now();
+      const content = input.content;
       setPendingAssistantMessages((prev) => [
         ...prev,
         {
-          ...createAssistantMessage("human", content, timestamp),
+          ...createAssistantMessage("human", content, timestamp, input.parts),
           type: "PendingHumanMessage",
         },
       ]);
 
       try {
-        const response = await sendAssistantMessageRequest(content);
+        const response = await sendAssistantMessageRequest(input);
         if (response.status === "command_executed") {
           setPendingAssistantMessages((prev) =>
-            removePendingAssistantMessage(prev, content, timestamp),
+            removePendingAssistantMessage(prev, { content, timestamp }),
+          );
+          return;
+        }
+        if (response.message_id) {
+          setPendingAssistantMessages((prev) =>
+            prev.map((message) =>
+              message.timestamp === timestamp && message.content === content
+                ? { ...message, message_id: response.message_id }
+                : message,
+            ),
           );
         }
       } catch (error) {
         setPendingAssistantMessages((prev) =>
-          removePendingAssistantMessage(prev, content, timestamp),
+          removePendingAssistantMessage(prev, { content, timestamp }),
         );
         throw error;
       }
@@ -400,11 +418,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         if (
           entry.type === "ReceivedMessage" &&
           entry.from_id === "human" &&
-          entry.content
+          (entry.content || entry.message_id)
         ) {
-          const pendingContent = entry.content;
           setPendingAssistantMessages((prev) =>
-            removePendingAssistantMessage(prev, pendingContent),
+            removePendingAssistantMessage(prev, {
+              content:
+                entry.content ?? contentPartsToText(entry.parts, entry.content),
+              messageId: entry.message_id,
+            }),
           );
         }
 

@@ -56,7 +56,7 @@ describe("ImageViewer", () => {
     ).toHaveLength(0);
   });
 
-  it("zooms around the cursor and supports drag panning when enlarged", () => {
+  it("zooms from both backdrop and image targets with a stable cursor anchor", () => {
     render(
       <ImageViewerProvider>
         <Harness />
@@ -65,9 +65,11 @@ describe("ImageViewer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open preview" }));
 
+    const backdrop = screen.getByTestId("global-image-viewer-backdrop");
     const image = screen.getByTestId("global-image-viewer-image");
+    const viewport = screen.getByTestId("global-image-viewer-viewport");
     const stage = screen.getByTestId("global-image-viewer-stage");
-    Object.defineProperty(stage, "getBoundingClientRect", {
+    Object.defineProperty(viewport, "getBoundingClientRect", {
       configurable: true,
       value: () => ({
         left: 0,
@@ -82,7 +84,7 @@ describe("ImageViewer", () => {
       }),
     });
 
-    fireEvent.wheel(stage, {
+    fireEvent.wheel(backdrop, {
       deltaY: -100,
       clientX: 280,
       clientY: 190,
@@ -94,21 +96,34 @@ describe("ImageViewer", () => {
     });
 
     fireEvent.mouseDown(stage, { button: 0, clientX: 100, clientY: 100 });
-    fireEvent.mouseMove(window, { clientX: 140, clientY: 155 });
+    fireEvent.mouseMove(window, { clientX: 160, clientY: 160 });
     fireEvent.mouseUp(window);
 
     expect(stage).toHaveStyle({
-      transform: "translate3d(20px, 45px, 0px)",
+      transform: "translate3d(40px, 50px, 0px)",
     });
 
-    fireEvent.wheel(stage, {
+    fireEvent.wheel(image, {
+      deltaY: -100,
+      clientX: 280,
+      clientY: 190,
+    });
+
+    expect(image).toHaveStyle({ transform: "scale(1.5)" });
+    expect(stage).toHaveStyle({
+      transform: "translate3d(32px, 52px, 0px)",
+    });
+
+    fireEvent.wheel(backdrop, {
       deltaY: 100,
       clientX: 280,
       clientY: 190,
     });
 
-    expect(image).toHaveStyle({ transform: "scale(1)" });
-    expect(stage).toHaveStyle({ transform: "translate3d(0px, 0px, 0px)" });
+    expect(image).toHaveStyle({ transform: "scale(1.25)" });
+    expect(stage).toHaveStyle({
+      transform: "translate3d(40px, 50px, 0px)",
+    });
   });
 
   it("closes on visible background click without treating image content or drags as backdrop", () => {
@@ -120,7 +135,8 @@ describe("ImageViewer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open preview" }));
     const stage = screen.getByTestId("global-image-viewer-stage");
-    Object.defineProperty(stage, "getBoundingClientRect", {
+    const viewport = screen.getByTestId("global-image-viewer-viewport");
+    Object.defineProperty(viewport, "getBoundingClientRect", {
       configurable: true,
       value: () => ({
         left: 0,

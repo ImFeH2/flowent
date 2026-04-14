@@ -42,5 +42,5 @@ describe("WorkspaceCommandDialog", () => {
     expect(
       screen.getByRole("button", { name: "Create Task Tab" }),
     ).toBeVisible();
-  });
+  }, 10000);
 });

@@ -6,6 +6,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -27,6 +28,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
   const [scale, setScale] = useState(MIN_SCALE);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const dragMovedRef = useRef(false);
   const dragStateRef = useRef<{
@@ -66,11 +68,11 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
           if (nextScale === MIN_SCALE) {
             return { x: 0, y: 0 };
           }
-          if (nextScale === currentScale || !anchor || !stageRef.current) {
+          if (nextScale === currentScale || !anchor || !viewportRef.current) {
             return currentOffset;
           }
 
-          const rect = stageRef.current.getBoundingClientRect();
+          const rect = viewportRef.current.getBoundingClientRect();
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
           const scaleRatio = nextScale / currentScale;
@@ -172,6 +174,17 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     [closeImage],
   );
 
+  const handleWheelZoom = useCallback(
+    (event: ReactWheelEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      adjustScale(event.deltaY < 0 ? SCALE_STEP : -SCALE_STEP, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    [adjustScale],
+  );
+
   const value = useMemo(() => ({ openImage }), [openImage]);
 
   return (
@@ -188,8 +201,13 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                 className="absolute inset-0 flex items-center justify-center p-4 sm:p-6"
                 data-testid="global-image-viewer-backdrop"
                 onClick={handleDirectBackgroundClick}
+                onWheelCapture={handleWheelZoom}
               >
-                <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
+                <div
+                  ref={viewportRef}
+                  className="relative flex h-full w-full items-center justify-center overflow-hidden"
+                  data-testid="global-image-viewer-viewport"
+                >
                   <div className="absolute right-0 top-0 z-20">
                     <ViewerControlButton
                       ariaLabel="Close image preview"
@@ -213,7 +231,10 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                   <div
                     ref={stageRef}
                     className={cn(
-                      "relative flex h-full w-full items-center justify-center",
+                      "relative flex h-full w-full items-center justify-center will-change-transform",
+                      dragging
+                        ? "transition-none"
+                        : "transition-transform duration-150 ease-out",
                       scale > MIN_SCALE
                         ? dragging
                           ? "cursor-grabbing"
@@ -236,20 +257,18 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                       };
                       setDragging(true);
                     }}
-                    onWheel={(event) => {
-                      event.preventDefault();
-                      adjustScale(event.deltaY < 0 ? SCALE_STEP : -SCALE_STEP, {
-                        x: event.clientX,
-                        y: event.clientY,
-                      });
-                    }}
                     style={{
                       transform: `translate3d(${offset.x}px, ${offset.y}px, 0px)`,
                     }}
                   >
                     <img
                       alt={payload.alt || "Image"}
-                      className="max-h-[78vh] max-w-[88vw] select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)]"
+                      className={cn(
+                        "max-h-[78vh] max-w-[88vw] select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)] will-change-transform",
+                        dragging
+                          ? "transition-none"
+                          : "transition-transform duration-150 ease-out",
+                      )}
                       data-testid="global-image-viewer-image"
                       draggable={false}
                       src={payload.src}

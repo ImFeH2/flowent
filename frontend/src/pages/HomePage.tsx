@@ -1028,7 +1028,7 @@ export function HomePage() {
             value={createTabWriteDirs}
             aria-label="Write directories"
             onChange={(event) => setCreateTabWriteDirs(event.target.value)}
-            placeholder="/project/autopoe/frontend&#10;/project/autopoe/app"
+            placeholder="/workspace/output&#10;/workspace/cache"
             className="min-h-[80px] rounded-[1rem] border-white/10 bg-black/14 font-mono text-[13px] text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
           />
         </WorkspaceDialogField>

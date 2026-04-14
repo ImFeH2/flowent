@@ -350,7 +350,7 @@ export function SettingsPage() {
                     }
                     rows={4}
                     spellCheck={false}
-                    placeholder="/project/autopoe"
+                    placeholder="/workspace/output"
                     className="min-h-[108px] w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
                   />
                   <p className="text-[11px] text-white/40 leading-relaxed">

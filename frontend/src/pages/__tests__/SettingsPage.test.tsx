@@ -36,7 +36,7 @@ describe("SettingsPage", () => {
         assistant: {
           role_name: "Steward",
           allow_network: true,
-          write_dirs: ["/project/autopoe"],
+          write_dirs: ["/workspace/project"],
         },
         leader: { role_name: "Conductor" },
         model: {
@@ -90,7 +90,7 @@ describe("SettingsPage", () => {
       assistant: {
         role_name: "Steward",
         allow_network: false,
-        write_dirs: ["/project/autopoe/tmp"],
+        write_dirs: ["/workspace/tmp"],
       },
       leader: { role_name: "Conductor" },
       model: {
@@ -128,7 +128,7 @@ describe("SettingsPage", () => {
     expect(timeoutInput).toHaveValue("10000");
     expect(screen.getByText("ms")).toBeInTheDocument();
     expect(initialDelayInput).toHaveValue("0.5");
-    expect(writeDirsTextarea).toHaveValue("/project/autopoe");
+    expect(writeDirsTextarea).toHaveValue("/workspace/project");
     expect(
       screen.getAllByText("Human-facing assistant role").length,
     ).toBeGreaterThan(0);

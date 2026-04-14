@@ -38,7 +38,7 @@ describe("ImageViewer", () => {
 
     expect(
       screen.getAllByRole("button", { name: "Close image preview" }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(
       screen.queryByRole("button", { name: "Zoom In" }),
     ).not.toBeInTheDocument();
@@ -111,7 +111,7 @@ describe("ImageViewer", () => {
     expect(stage).toHaveStyle({ transform: "translate3d(0px, 0px, 0px)" });
   });
 
-  it("closes on backdrop click without treating image content or drags as backdrop", () => {
+  it("closes on visible background click without treating image content or drags as backdrop", () => {
     render(
       <ImageViewerProvider>
         <Harness />
@@ -144,12 +144,16 @@ describe("ImageViewer", () => {
     fireEvent.mouseDown(stage, { button: 0, clientX: 120, clientY: 120 });
     fireEvent.mouseMove(window, { clientX: 150, clientY: 145 });
     fireEvent.mouseUp(window);
+    const visibleBackdrop = screen.getByRole("dialog")
+      .lastElementChild as HTMLElement;
+
+    fireEvent.click(stage);
 
     expect(
       screen.getAllByRole("button", { name: "Close image preview" }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
 
-    fireEvent.click(screen.getByTestId("global-image-viewer-backdrop"));
+    fireEvent.click(visibleBackdrop);
 
     expect(
       screen.queryAllByRole("button", { name: "Close image preview" }),

@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -27,6 +28,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
+  const dragMovedRef = useRef(false);
   const dragStateRef = useRef<{
     startX: number;
     startY: number;
@@ -38,6 +40,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     setScale(MIN_SCALE);
     setOffset({ x: 0, y: 0 });
     setDragging(false);
+    dragMovedRef.current = false;
     dragStateRef.current = null;
   }, []);
 
@@ -128,6 +131,13 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (
+        event.clientX !== dragState.startX ||
+        event.clientY !== dragState.startY
+      ) {
+        dragMovedRef.current = true;
+      }
+
       setOffset({
         x: dragState.originX + event.clientX - dragState.startX,
         y: dragState.originY + event.clientY - dragState.startY,
@@ -148,6 +158,20 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     };
   }, [dragging]);
 
+  const handleDirectBackgroundClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.target !== event.currentTarget) {
+        return;
+      }
+      if (dragMovedRef.current) {
+        dragMovedRef.current = false;
+        return;
+      }
+      closeImage();
+    },
+    [closeImage],
+  );
+
   const value = useMemo(() => ({ openImage }), [openImage]);
 
   return (
@@ -160,18 +184,12 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
               className="fixed inset-0 z-[120] bg-black/92 backdrop-blur-md"
               role="dialog"
             >
-              <button
-                aria-label="Close image preview"
-                className="absolute inset-0"
+              <div
+                className="absolute inset-0 flex items-center justify-center p-4 sm:p-6"
                 data-testid="global-image-viewer-backdrop"
-                onClick={closeImage}
-                type="button"
-              />
-              <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6">
-                <div
-                  className="relative flex h-full w-full items-center justify-center overflow-hidden"
-                  onClick={(event) => event.stopPropagation()}
-                >
+                onClick={handleDirectBackgroundClick}
+              >
+                <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
                   <div className="absolute right-0 top-0 z-20">
                     <ViewerControlButton
                       ariaLabel="Close image preview"
@@ -203,11 +221,13 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                         : "cursor-default",
                     )}
                     data-testid="global-image-viewer-stage"
+                    onClick={handleDirectBackgroundClick}
                     onMouseDown={(event) => {
                       if (event.button !== 0 || scale <= MIN_SCALE) {
                         return;
                       }
                       event.preventDefault();
+                      dragMovedRef.current = false;
                       dragStateRef.current = {
                         startX: event.clientX,
                         startY: event.clientY,

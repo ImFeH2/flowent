@@ -1,15 +1,6 @@
-import { useState } from "react";
-import { X } from "lucide-react";
 import { getImageAssetUrl } from "@/lib/api";
+import { useImageViewer } from "@/context/imageViewer";
 import { cn } from "@/lib/utils";
-
-interface ImagePreviewDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  src: string;
-  alt?: string | null;
-  meta?: string | null;
-}
 
 interface ImageAssetPreviewProps {
   assetId: string;
@@ -20,50 +11,6 @@ interface ImageAssetPreviewProps {
   compact?: boolean;
 }
 
-export function ImagePreviewDialog({
-  open,
-  onOpenChange,
-  src,
-  alt,
-  meta,
-}: ImagePreviewDialogProps) {
-  if (!open) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/86 p-4 backdrop-blur-md">
-      <button
-        aria-label="Close image preview"
-        className="absolute right-4 top-4 z-20 flex size-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/78 transition-colors hover:bg-white/16 hover:text-white"
-        onClick={() => onOpenChange(false)}
-        type="button"
-      >
-        <X className="size-4" />
-      </button>
-      <button
-        aria-label="Close image preview"
-        className="absolute inset-0 z-0"
-        onClick={() => onOpenChange(false)}
-        type="button"
-      />
-      <div className="relative z-10 max-h-[88vh] max-w-[88vw] overflow-hidden rounded-2xl border border-white/10 bg-black/55 shadow-[0_30px_80px_-24px_rgba(0,0,0,0.9)]">
-        <img
-          alt={alt || "Image"}
-          className="max-h-[78vh] max-w-[88vw] object-contain"
-          src={src}
-        />
-        <div className="space-y-1 border-t border-white/8 px-4 py-3 text-left">
-          <div className="text-sm font-medium text-white/92">
-            {alt || "Image"}
-          </div>
-          {meta ? <div className="text-xs text-white/55">{meta}</div> : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function ImageAssetPreview({
   assetId,
   alt,
@@ -72,7 +19,7 @@ export function ImageAssetPreview({
   height,
   compact = false,
 }: ImageAssetPreviewProps) {
-  const [open, setOpen] = useState(false);
+  const { openImage } = useImageViewer();
   const src = getImageAssetUrl(assetId);
   const aspectRatio =
     typeof width === "number" &&
@@ -89,7 +36,13 @@ export function ImageAssetPreview({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() =>
+          openImage({
+            src,
+            alt,
+            meta,
+          })
+        }
         className={cn(
           "group block w-full overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:border-white/[0.16]",
           compact ? "max-w-[240px]" : "max-w-[360px]",
@@ -116,13 +69,6 @@ export function ImageAssetPreview({
           <div className="text-[11px] text-white/52">{meta}</div>
         </div>
       </button>
-      <ImagePreviewDialog
-        alt={alt}
-        meta={meta}
-        onOpenChange={setOpen}
-        open={open}
-        src={src}
-      />
     </>
   );
 }

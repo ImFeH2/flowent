@@ -1,4 +1,9 @@
-import { createRef, type KeyboardEventHandler, useState } from "react";
+import {
+  createRef,
+  type KeyboardEventHandler,
+  type ReactElement,
+  useState,
+} from "react";
 import {
   cleanup,
   fireEvent,
@@ -11,11 +16,16 @@ import {
   AssistantChatComposer,
   AssistantChatMessages,
 } from "@/components/AssistantChatContent";
+import { ImageViewerProvider } from "@/components/ImageViewer";
 import type { AssistantChatItem, Node } from "@/types";
 
 afterEach(() => {
   cleanup();
 });
+
+function renderWithImageViewer(ui: ReactElement) {
+  return render(<ImageViewerProvider>{ui}</ImageViewerProvider>);
+}
 
 describe("AssistantChatMessages", () => {
   it("renders idle tool calls before and after the result is available", () => {
@@ -184,7 +194,7 @@ describe("AssistantChatMessages", () => {
   it("renders an inline running hint at the end of the timeline", () => {
     const scrollRef = createRef<HTMLDivElement>();
 
-    render(
+    renderWithImageViewer(
       <AssistantChatMessages
         items={[
           {
@@ -212,7 +222,7 @@ describe("AssistantChatMessages", () => {
   it("shows the empty state when only state entries remain after a chat clear", () => {
     const scrollRef = createRef<HTMLDivElement>();
 
-    render(
+    renderWithImageViewer(
       <AssistantChatMessages
         items={[
           {
@@ -357,7 +367,7 @@ describe("AssistantChatMessages", () => {
   it("opens sent image parts in the shared preview surface", () => {
     const scrollRef = createRef<HTMLDivElement>();
 
-    render(
+    renderWithImageViewer(
       <AssistantChatMessages
         items={[
           {
@@ -656,7 +666,7 @@ describe("AssistantChatComposer", () => {
   });
 
   it("adds pasted clipboard images into the same pending image list and hides commands", () => {
-    render(<PastedImageHarness />);
+    renderWithImageViewer(<PastedImageHarness />);
 
     const textarea = screen.getByPlaceholderText(
       "Message Assistant or type / for commands",
@@ -686,7 +696,7 @@ describe("AssistantChatComposer", () => {
   });
 
   it("ignores pasted clipboard images when image input is disabled", () => {
-    render(<PastedImageHarness imageInputEnabled={false} />);
+    renderWithImageViewer(<PastedImageHarness imageInputEnabled={false} />);
 
     const textarea = screen.getByPlaceholderText(
       "Message Assistant or type / for commands",
@@ -714,7 +724,7 @@ describe("AssistantChatComposer", () => {
   it("opens pending image thumbnails in the same preview surface and keeps remove available", () => {
     const onRemoveImage = vi.fn();
 
-    render(
+    renderWithImageViewer(
       <AssistantChatComposer
         disabled={false}
         images={[

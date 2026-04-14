@@ -24,10 +24,8 @@ import {
   X,
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
-import {
-  ImageAssetPreview,
-  ImagePreviewDialog,
-} from "@/components/ImageAssetPreview";
+import { ImageAssetPreview } from "@/components/ImageAssetPreview";
+import { useImageViewer } from "@/context/imageViewer";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import {
   insertAssistantCommand,
@@ -545,7 +543,7 @@ function PendingImagePreviewTile({
   image: NonNullable<AssistantChatComposerProps["images"]>[number];
   onRemove: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const { openImage } = useImageViewer();
   const meta =
     image.status === "uploading"
       ? "Uploading..."
@@ -559,7 +557,13 @@ function PendingImagePreviewTile({
         <button
           aria-label={`Preview ${image.name}`}
           className="block text-left"
-          onClick={() => setOpen(true)}
+          onClick={() =>
+            openImage({
+              src: image.previewUrl,
+              alt: image.name,
+              meta,
+            })
+          }
           type="button"
         >
           <img
@@ -581,13 +585,6 @@ function PendingImagePreviewTile({
           <X className="size-3.5" />
         </button>
       </div>
-      <ImagePreviewDialog
-        alt={image.name}
-        meta={meta}
-        onOpenChange={setOpen}
-        open={open}
-        src={image.previewUrl}
-      />
     </>
   );
 }

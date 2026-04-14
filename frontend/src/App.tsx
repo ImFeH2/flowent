@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Suspense, lazy, useState, type ComponentType } from "react";
 import { Toaster } from "sonner";
+import { ImageViewerProvider } from "@/components/ImageViewer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -197,9 +198,11 @@ function App() {
   return (
     <ThemeProvider>
       <AgentProvider>
-        <TooltipProvider delayDuration={300}>
-          <AppContent />
-        </TooltipProvider>
+        <ImageViewerProvider>
+          <TooltipProvider delayDuration={300}>
+            <AppContent />
+          </TooltipProvider>
+        </ImageViewerProvider>
       </AgentProvider>
     </ThemeProvider>
   );

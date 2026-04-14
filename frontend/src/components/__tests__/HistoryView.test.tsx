@@ -1,11 +1,17 @@
+import type { ReactElement } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { HistoryView } from "@/components/HistoryView";
+import { ImageViewerProvider } from "@/components/ImageViewer";
 import type { HistoryEntry, Node } from "@/types";
 
 afterEach(() => {
   cleanup();
 });
+
+function renderWithImageViewer(ui: ReactElement) {
+  return render(<ImageViewerProvider>{ui}</ImageViewerProvider>);
+}
 
 describe("HistoryView", () => {
   it("renders message and assistant entries collapsed by default and expands on demand", () => {
@@ -187,5 +193,36 @@ describe("HistoryView", () => {
     expect(
       screen.getAllByText((_, element) => element?.textContent === expected),
     ).toHaveLength(2);
+  });
+
+  it("opens history image previews in the global viewer", () => {
+    renderWithImageViewer(
+      <HistoryView
+        history={[
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            parts: [
+              {
+                type: "image",
+                asset_id: "asset-1",
+                alt: "History preview",
+                mime_type: "image/png",
+                width: 640,
+                height: 480,
+              },
+            ],
+            timestamp: 1,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /From Human/i }));
+    fireEvent.click(screen.getByRole("button", { name: /History preview/i }));
+
+    expect(
+      screen.getAllByRole("button", { name: "Close image preview" }).length,
+    ).toBeGreaterThan(0);
   });
 });

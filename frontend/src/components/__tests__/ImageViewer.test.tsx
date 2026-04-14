@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ImageViewerProvider } from "@/components/ImageViewer";
 import { useImageViewer } from "@/context/imageViewer";
@@ -172,6 +178,28 @@ describe("ImageViewer", () => {
     });
     expect(afterZoomOut.x).toBeCloseTo(beforeZoom.x, 4);
     expect(afterZoomOut.y).toBeCloseTo(beforeZoom.y, 4);
+
+    act(() => {
+      fireEvent.wheel(image, {
+        deltaY: -60,
+        clientX: imageAnchor.x,
+        clientY: imageAnchor.y,
+      });
+      fireEvent.wheel(image, {
+        deltaY: -60,
+        clientX: imageAnchor.x,
+        clientY: imageAnchor.y,
+      });
+    });
+
+    const afterRapidZoom = getLocalImagePoint({
+      anchor: imageAnchor,
+      image,
+      stage,
+      viewportRect,
+    });
+    expect(afterRapidZoom.x).toBeCloseTo(beforeZoom.x, 3);
+    expect(afterRapidZoom.y).toBeCloseTo(beforeZoom.y, 3);
   });
 
   it("closes on visible background click without treating image content or drags as backdrop", () => {

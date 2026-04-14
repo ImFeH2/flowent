@@ -66,10 +66,10 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     [resetView],
   );
 
-  const zoomToScale = useCallback(
-    (nextScale: number, anchor?: { x: number; y: number }) => {
+  const zoomByFactor = useCallback(
+    (factor: number, anchor?: { x: number; y: number }) => {
       setScale((currentScale) => {
-        const clampedScale = clampScale(nextScale);
+        const clampedScale = clampScale(currentScale * factor);
 
         setOffset((currentOffset) => {
           if (clampedScale === MIN_SCALE) {
@@ -186,12 +186,12 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     (event: ReactWheelEvent<HTMLDivElement>) => {
       event.preventDefault();
       const zoomFactor = Math.exp(-event.deltaY * WHEEL_ZOOM_SENSITIVITY);
-      zoomToScale(scale * zoomFactor, {
+      zoomByFactor(zoomFactor, {
         x: event.clientX,
         y: event.clientY,
       });
     },
-    [scale, zoomToScale],
+    [zoomByFactor],
   );
 
   const value = useMemo(() => ({ openImage }), [openImage]);

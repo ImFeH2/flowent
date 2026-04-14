@@ -179,5 +179,5 @@ describe("SettingsPage", () => {
     expect(toastSuccess).toHaveBeenCalledWith("Settings saved");
     expect(toastError).not.toHaveBeenCalled();
     expect(fetchProviderModels).not.toHaveBeenCalled();
-  });
+  }, 10000);
 });

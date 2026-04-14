@@ -600,7 +600,7 @@ export function HomePage() {
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
       <div className="relative flex min-w-0 flex-1 flex-col">
         <div className="relative z-30 border-b border-white/[0.06] bg-black/40 backdrop-blur-md">
-          <div className="pointer-events-auto relative z-10 flex items-center gap-1.5 overflow-x-auto px-3 py-2 pr-14 scrollbar-none">
+          <div className="pointer-events-auto relative z-10 flex items-center gap-1.5 overflow-x-auto px-3 py-2.5 pr-14 scrollbar-none">
             {Array.from(tabs.values()).map((tab) => (
               <div
                 key={tab.id}
@@ -617,21 +617,12 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "relative flex h-8 w-full items-center rounded-md px-3 pr-8 text-left text-[13px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                    "relative flex h-9 w-full items-center rounded-[0.7rem] px-3 pr-8 text-left text-[13px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
                     activeTabId === tab.id
-                      ? "bg-white/[0.06] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02)]"
+                      ? "bg-white/[0.06] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02),inset_0_-1px_0_0_rgba(255,255,255,0.9)]"
                       : "bg-transparent text-white/50 hover:bg-white/[0.03] hover:text-white/80",
                   )}
                 >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "absolute inset-x-3 -bottom-2 h-[2px] transition-all duration-200",
-                      activeTabId === tab.id
-                        ? "bg-white opacity-100 shadow-[0_-1px_6px_0_rgba(255,255,255,0.4)] rounded-t-sm"
-                        : "bg-white/20 opacity-0 group-hover:opacity-100 rounded-t-sm",
-                    )}
-                  />
                   <div className="truncate leading-tight">{tab.title}</div>
                 </button>
                 <button

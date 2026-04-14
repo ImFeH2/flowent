@@ -158,6 +158,11 @@ export interface BlueprintEdge {
   to_slot_id: string;
 }
 
+export interface BlueprintVersionSummary {
+  version: number;
+  updated_at: number;
+}
+
 export interface RouteBlueprint {
   id: string;
   name: string;
@@ -169,6 +174,7 @@ export interface RouteBlueprint {
   updated_at: number;
   node_count: number;
   edge_count: number;
+  version_history?: BlueprintVersionSummary[];
 }
 
 export interface TaskTab {

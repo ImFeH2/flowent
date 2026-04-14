@@ -63,6 +63,31 @@ class BlueprintEdge:
 
 
 @dataclass
+class BlueprintVersionSummary:
+    version: int
+    updated_at: float
+
+    def serialize(self) -> dict[str, object]:
+        return {
+            "version": self.version,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_mapping(
+        cls,
+        data: dict[str, object],
+    ) -> BlueprintVersionSummary | None:
+        version = data.get("version")
+        updated_at = data.get("updated_at")
+        if not isinstance(version, int) or version <= 0:
+            return None
+        if not isinstance(updated_at, (int, float)):
+            return None
+        return cls(version=version, updated_at=updated_at)
+
+
+@dataclass
 class RouteBlueprint:
     id: str
     name: str
@@ -72,6 +97,7 @@ class RouteBlueprint:
     edges: list[BlueprintEdge] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
+    version_history: list[BlueprintVersionSummary] = field(default_factory=list)
 
     def serialize(self) -> dict[str, object]:
         return {
@@ -83,6 +109,7 @@ class RouteBlueprint:
             "edges": [edge.serialize() for edge in self.edges],
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "version_history": [item.serialize() for item in self.version_history],
         }
 
     @classmethod
@@ -91,6 +118,7 @@ class RouteBlueprint:
         updated_at = data.get("updated_at")
         raw_slots = data.get("slots")
         raw_edges = data.get("edges")
+        raw_version_history = data.get("version_history")
         slots = [
             slot
             for slot in (
@@ -110,19 +138,39 @@ class RouteBlueprint:
             if edge is not None
         ]
         raw_version = data.get("version")
+        normalized_created_at = (
+            created_at if isinstance(created_at, (int, float)) else time.time()
+        )
+        normalized_updated_at = (
+            updated_at if isinstance(updated_at, (int, float)) else time.time()
+        )
+        version = raw_version if isinstance(raw_version, int) and raw_version > 0 else 1
+        version_history = [
+            item
+            for item in (
+                BlueprintVersionSummary.from_mapping(entry)
+                for entry in (
+                    raw_version_history if isinstance(raw_version_history, list) else []
+                )
+                if isinstance(entry, dict)
+            )
+            if item is not None
+        ]
+        if not version_history:
+            version_history = [
+                BlueprintVersionSummary(
+                    version=version,
+                    updated_at=normalized_updated_at,
+                )
+            ]
         return cls(
             id=str(data.get("id", "")),
             name=str(data.get("name", "")),
             description=str(data.get("description", "")),
-            version=raw_version
-            if isinstance(raw_version, int) and raw_version > 0
-            else 1,
+            version=version,
             slots=slots,
             edges=edges,
-            created_at=created_at
-            if isinstance(created_at, (int, float))
-            else time.time(),
-            updated_at=updated_at
-            if isinstance(updated_at, (int, float))
-            else time.time(),
+            created_at=normalized_created_at,
+            updated_at=normalized_updated_at,
+            version_history=version_history,
         )

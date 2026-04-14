@@ -7,7 +7,13 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.models import GraphEdge, GraphNodeRecord, RouteBlueprint, Tab
+from app.models import (
+    BlueprintVersionSummary,
+    GraphEdge,
+    GraphNodeRecord,
+    RouteBlueprint,
+    Tab,
+)
 
 
 def _get_workspace_file() -> Path:
@@ -229,7 +235,24 @@ class WorkspaceStore:
     def upsert_blueprint(self, blueprint: RouteBlueprint) -> None:
         with self._lock:
             snapshot = self._load_snapshot()
-            blueprint.updated_at = time.time()
+            updated_at = time.time()
+            blueprint.updated_at = updated_at
+            if not blueprint.version_history:
+                blueprint.version_history.append(
+                    BlueprintVersionSummary(
+                        version=blueprint.version,
+                        updated_at=updated_at,
+                    )
+                )
+            elif blueprint.version_history[-1].version == blueprint.version:
+                blueprint.version_history[-1].updated_at = updated_at
+            else:
+                blueprint.version_history.append(
+                    BlueprintVersionSummary(
+                        version=blueprint.version,
+                        updated_at=updated_at,
+                    )
+                )
             snapshot.blueprints[blueprint.id] = blueprint
             self._persist_snapshot(snapshot)
 

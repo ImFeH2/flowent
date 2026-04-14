@@ -1,6 +1,11 @@
 from app.models.agent import AgentState, NodeConfig, NodeType
 from app.models.base import Serializable
-from app.models.blueprint import BlueprintEdge, BlueprintSlot, RouteBlueprint
+from app.models.blueprint import (
+    BlueprintEdge,
+    BlueprintSlot,
+    BlueprintVersionSummary,
+    RouteBlueprint,
+)
 from app.models.content import (
     ContentPart,
     ImagePart,
@@ -44,6 +49,7 @@ __all__ = [
     "AssistantThinking",
     "BlueprintEdge",
     "BlueprintSlot",
+    "BlueprintVersionSummary",
     "CommandResultEntry",
     "ContentDelta",
     "ContentPart",

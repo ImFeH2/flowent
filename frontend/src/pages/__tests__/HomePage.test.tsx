@@ -24,6 +24,7 @@ const {
   interruptNodeMock,
   saveTabAsBlueprintRequestMock,
   toastErrorMock,
+  toastSuccessMock,
   updateBlueprintRequestMock,
 } = vi.hoisted(() => ({
   clearChatMock: vi.fn(),
@@ -39,6 +40,7 @@ const {
   interruptNodeMock: vi.fn(),
   saveTabAsBlueprintRequestMock: vi.fn(),
   toastErrorMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
   updateBlueprintRequestMock: vi.fn(),
 }));
 
@@ -155,6 +157,7 @@ vi.mock("@/components/ui/badge", () => ({
 vi.mock("sonner", () => ({
   toast: {
     error: (...args: unknown[]) => toastErrorMock(...args),
+    success: (...args: unknown[]) => toastSuccessMock(...args),
   },
 }));
 
@@ -225,6 +228,7 @@ describe("HomePage", () => {
     interruptNodeMock.mockReset();
     saveTabAsBlueprintRequestMock.mockReset();
     toastErrorMock.mockReset();
+    toastSuccessMock.mockReset();
     updateBlueprintRequestMock.mockReset();
 
     const assistant = buildNode({
@@ -331,7 +335,7 @@ describe("HomePage", () => {
     expect(setActiveTabId).toHaveBeenCalledWith("tab-2");
   });
 
-  it("opens the blueprint library and saves the current route as a blueprint", async () => {
+  it("saves the current route as a blueprint from the workspace toolbar", async () => {
     fetchBlueprintsMock.mockResolvedValue([
       {
         id: "blueprint-1",
@@ -374,13 +378,17 @@ describe("HomePage", () => {
 
     render(<HomePage />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Blueprints" })[0]);
-    expect(screen.getByText("Current Route")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Save Current Route" }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Save as Blueprint" })[0],
+    );
     fireEvent.change(screen.getByLabelText("Blueprint name"), {
       target: { value: "Saved Route" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save as Blueprint" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Save as Blueprint",
+      }),
+    );
 
     await waitFor(() =>
       expect(saveTabAsBlueprintRequestMock).toHaveBeenCalledWith(
@@ -389,6 +397,7 @@ describe("HomePage", () => {
         "",
       ),
     );
+    expect(toastSuccessMock).toHaveBeenCalledWith("Blueprint saved to library");
   });
 
   it("adds an agent through the custom dialog", async () => {
@@ -475,13 +484,16 @@ describe("HomePage", () => {
       within(view.container).queryByRole("button", { name: "Interrupt" }),
     ).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Assistant Details" }));
+    const assistantDetailButtons = screen.getAllByRole("button", {
+      name: "Assistant Details",
+    });
+    fireEvent.click(assistantDetailButtons[assistantDetailButtons.length - 1]);
 
     expect(screen.getAllByText("Status").length).toBeGreaterThan(0);
     expect(screen.getAllByText("State Timeline").length).toBeGreaterThan(0);
     expect(screen.getByText("processing")).toBeInTheDocument();
 
-    const interruptButton = within(view.container).getByRole("button", {
+    const interruptButton = await screen.findByRole("button", {
       name: "Interrupt",
     });
     expect(interruptButton).toHaveAttribute("data-variant", "destructive");
@@ -504,7 +516,7 @@ describe("HomePage", () => {
 
     render(<HomePage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear Chat" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Clear Chat" })[0]);
 
     await waitFor(() => {
       expect(clearChatMock).toHaveBeenCalledTimes(1);

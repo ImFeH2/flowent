@@ -8,6 +8,7 @@ import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
 import {
+  BookCopy,
   LayoutDashboard,
   Server,
   Users,
@@ -20,6 +21,7 @@ import type { LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: Array<{ id: PageId; label: string; icon: LucideIcon }> = [
   { id: "workspace", label: "Workspace", icon: LayoutDashboard },
+  { id: "blueprints", label: "Blueprints", icon: BookCopy },
   { id: "providers", label: "Providers", icon: Server },
   { id: "roles", label: "Roles", icon: Users },
   { id: "prompts", label: "Prompts", icon: MessageSquareQuote },

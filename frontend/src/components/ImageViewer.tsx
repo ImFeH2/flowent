@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,39 +16,127 @@ import {
   type ImageViewerPayload,
 } from "@/context/imageViewer";
 import { cn } from "@/lib/utils";
-const MIN_SCALE = 1;
-const MAX_SCALE = 4;
-const SCALE_EPSILON = 0.001;
-const WHEEL_ZOOM_SENSITIVITY = 0.0018;
 
-function clampScale(value: number) {
-  if (value <= MIN_SCALE + SCALE_EPSILON) {
-    return MIN_SCALE;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
+const ZOOM_EPSILON = 0.0001;
+const WHEEL_ZOOM_SENSITIVITY = 0.0018;
+const IMAGE_MAX_WIDTH_RATIO = 0.88;
+const IMAGE_MAX_HEIGHT_RATIO = 0.78;
+
+interface Size {
+  width: number;
+  height: number;
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface ViewState {
+  panX: number;
+  panY: number;
+  zoom: number;
+}
+
+function clampZoom(value: number) {
+  if (value <= MIN_ZOOM + ZOOM_EPSILON) {
+    return MIN_ZOOM;
   }
-  if (value >= MAX_SCALE - SCALE_EPSILON) {
-    return MAX_SCALE;
+  if (value >= MAX_ZOOM - ZOOM_EPSILON) {
+    return MAX_ZOOM;
   }
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number(value.toFixed(4))));
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(6))));
+}
+
+function isPositiveNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function getPayloadSize(payload: ImageViewerPayload | null): Size | null {
+  if (!payload) {
+    return null;
+  }
+  if (!isPositiveNumber(payload.width) || !isPositiveNumber(payload.height)) {
+    return null;
+  }
+  return { width: payload.width, height: payload.height };
+}
+
+function getViewportPoint(
+  viewportElement: HTMLDivElement | null,
+  clientX: number,
+  clientY: number,
+): Point | null {
+  if (!viewportElement) {
+    return null;
+  }
+  const rect = viewportElement.getBoundingClientRect();
+  return {
+    x: clientX - rect.left,
+    y: clientY - rect.top,
+  };
+}
+
+function toLocalImagePoint(
+  anchor: Point,
+  view: ViewState,
+  baseSize: Size,
+  viewportSize: Size,
+): Point {
+  return {
+    x:
+      (anchor.x - viewportSize.width / 2 - view.panX) / view.zoom +
+      baseSize.width / 2,
+    y:
+      (anchor.y - viewportSize.height / 2 - view.panY) / view.zoom +
+      baseSize.height / 2,
+  };
+}
+
+function panForLocalImagePoint(
+  localPoint: Point,
+  anchor: Point,
+  zoom: number,
+  baseSize: Size,
+  viewportSize: Size,
+): Point {
+  return {
+    x:
+      anchor.x -
+      viewportSize.width / 2 -
+      (localPoint.x - baseSize.width / 2) * zoom,
+    y:
+      anchor.y -
+      viewportSize.height / 2 -
+      (localPoint.y - baseSize.height / 2) * zoom,
+  };
 }
 
 export function ImageViewerProvider({ children }: { children: ReactNode }) {
   const [payload, setPayload] = useState<ImageViewerPayload | null>(null);
-  const [scale, setScale] = useState(MIN_SCALE);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [imageSize, setImageSize] = useState<Size | null>(null);
+  const [viewportSize, setViewportSize] = useState<Size>({
+    width: 0,
+    height: 0,
+  });
+  const [view, setView] = useState<ViewState>({
+    panX: 0,
+    panY: 0,
+    zoom: MIN_ZOOM,
+  });
   const [dragging, setDragging] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
   const dragMovedRef = useRef(false);
   const dragStateRef = useRef<{
-    startX: number;
-    startY: number;
-    originX: number;
-    originY: number;
+    originPanX: number;
+    originPanY: number;
+    startPoint: Point;
   } | null>(null);
 
   const resetView = useCallback(() => {
-    setScale(MIN_SCALE);
-    setOffset({ x: 0, y: 0 });
+    setView({ panX: 0, panY: 0, zoom: MIN_ZOOM });
     setDragging(false);
     dragMovedRef.current = false;
     dragStateRef.current = null;
@@ -56,56 +145,83 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
   const closeImage = useCallback(() => {
     resetView();
     setPayload(null);
+    setImageSize(null);
   }, [resetView]);
 
   const openImage = useCallback(
     (nextPayload: ImageViewerPayload) => {
       resetView();
+      setImageSize(getPayloadSize(nextPayload));
       setPayload(nextPayload);
     },
     [resetView],
   );
 
-  const zoomByFactor = useCallback(
-    (factor: number, anchor?: { x: number; y: number }) => {
-      setScale((currentScale) => {
-        const clampedScale = clampScale(currentScale * factor);
+  useEffect(() => {
+    if (!payload) {
+      return;
+    }
 
-        setOffset((currentOffset) => {
-          if (clampedScale === MIN_SCALE) {
-            return { x: 0, y: 0 };
-          }
-          if (
-            Math.abs(clampedScale - currentScale) <= SCALE_EPSILON ||
-            !anchor ||
-            !viewportRef.current
-          ) {
-            return currentOffset;
-          }
+    if (getPayloadSize(payload)) {
+      return;
+    }
 
-          const rect = viewportRef.current.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-          const anchorLocalX =
-            (anchor.x - centerX - currentOffset.x) / currentScale;
-          const anchorLocalY =
-            (anchor.y - centerY - currentOffset.y) / currentScale;
+    let active = true;
+    const image = new Image();
 
-          return {
-            x: Number(
-              (anchor.x - centerX - anchorLocalX * clampedScale).toFixed(4),
-            ),
-            y: Number(
-              (anchor.y - centerY - anchorLocalY * clampedScale).toFixed(4),
-            ),
-          };
+    const handleLoad = () => {
+      if (!active) {
+        return;
+      }
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+        setImageSize({
+          width: image.naturalWidth,
+          height: image.naturalHeight,
         });
+      }
+    };
 
-        return clampedScale;
+    image.addEventListener("load", handleLoad);
+    image.src = payload.src;
+    if (image.complete) {
+      handleLoad();
+    }
+
+    return () => {
+      active = false;
+      image.removeEventListener("load", handleLoad);
+    };
+  }, [payload]);
+
+  useLayoutEffect(() => {
+    if (!payload || !viewportRef.current) {
+      return;
+    }
+
+    const element = viewportRef.current;
+    const syncViewportSize = () => {
+      const rect = element.getBoundingClientRect();
+      setViewportSize({
+        width: element.clientWidth || rect.width || window.innerWidth,
+        height: element.clientHeight || rect.height || window.innerHeight,
       });
-    },
-    [],
-  );
+    };
+
+    syncViewportSize();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      syncViewportSize();
+    });
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [payload]);
 
   useEffect(() => {
     if (!payload) {
@@ -140,18 +256,27 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
       if (!dragState) {
         return;
       }
+      const pointer = getViewportPoint(
+        viewportRef.current,
+        event.clientX,
+        event.clientY,
+      );
+      if (!pointer) {
+        return;
+      }
 
       if (
-        event.clientX !== dragState.startX ||
-        event.clientY !== dragState.startY
+        pointer.x !== dragState.startPoint.x ||
+        pointer.y !== dragState.startPoint.y
       ) {
         dragMovedRef.current = true;
       }
 
-      setOffset({
-        x: dragState.originX + event.clientX - dragState.startX,
-        y: dragState.originY + event.clientY - dragState.startY,
-      });
+      setView((current) => ({
+        ...current,
+        panX: dragState.originPanX + pointer.x - dragState.startPoint.x,
+        panY: dragState.originPanY + pointer.y - dragState.startPoint.y,
+      }));
     };
 
     const handleMouseUp = () => {
@@ -168,30 +293,134 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     };
   }, [dragging]);
 
-  const handleDirectBackgroundClick = useCallback(
-    (event: ReactMouseEvent<HTMLDivElement>) => {
-      if (event.target !== event.currentTarget) {
+  const baseImageSize = useMemo(() => {
+    if (
+      !imageSize ||
+      viewportSize.width <= 0 ||
+      viewportSize.height <= 0 ||
+      imageSize.width <= 0 ||
+      imageSize.height <= 0
+    ) {
+      return null;
+    }
+
+    const fitScale = Math.min(
+      (viewportSize.width * IMAGE_MAX_WIDTH_RATIO) / imageSize.width,
+      (viewportSize.height * IMAGE_MAX_HEIGHT_RATIO) / imageSize.height,
+      1,
+    );
+
+    return {
+      width: imageSize.width * fitScale,
+      height: imageSize.height * fitScale,
+    };
+  }, [imageSize, viewportSize]);
+
+  const zoomByFactor = useCallback(
+    (factor: number, anchor?: Point) => {
+      setView((current) => {
+        const nextZoom = clampZoom(current.zoom * factor);
+
+        if (nextZoom === MIN_ZOOM) {
+          return { panX: 0, panY: 0, zoom: MIN_ZOOM };
+        }
+
+        if (
+          !anchor ||
+          !baseImageSize ||
+          viewportSize.width <= 0 ||
+          viewportSize.height <= 0 ||
+          Math.abs(nextZoom - current.zoom) <= ZOOM_EPSILON
+        ) {
+          return nextZoom === current.zoom
+            ? current
+            : { ...current, zoom: nextZoom };
+        }
+
+        const localPoint = toLocalImagePoint(
+          anchor,
+          current,
+          baseImageSize,
+          viewportSize,
+        );
+        const nextPan = panForLocalImagePoint(
+          localPoint,
+          anchor,
+          nextZoom,
+          baseImageSize,
+          viewportSize,
+        );
+
+        return {
+          panX: nextPan.x,
+          panY: nextPan.y,
+          zoom: nextZoom,
+        };
+      });
+    },
+    [baseImageSize, viewportSize],
+  );
+
+  const handleWheelZoom = useCallback(
+    (event: ReactWheelEvent<HTMLDivElement>) => {
+      const anchor = getViewportPoint(
+        viewportRef.current,
+        event.clientX,
+        event.clientY,
+      );
+      if (!anchor) {
         return;
       }
+
+      event.preventDefault();
+      zoomByFactor(Math.exp(-event.deltaY * WHEEL_ZOOM_SENSITIVITY), anchor);
+    },
+    [zoomByFactor],
+  );
+
+  const handleViewportMouseDown = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.button !== 0 || view.zoom <= MIN_ZOOM) {
+        return;
+      }
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-pan-exempt="true"]')) {
+        return;
+      }
+
+      const startPoint = getViewportPoint(
+        viewportRef.current,
+        event.clientX,
+        event.clientY,
+      );
+      if (!startPoint) {
+        return;
+      }
+
+      event.preventDefault();
+      dragMovedRef.current = false;
+      dragStateRef.current = {
+        originPanX: view.panX,
+        originPanY: view.panY,
+        startPoint,
+      };
+      setDragging(true);
+    },
+    [view.panX, view.panY, view.zoom],
+  );
+
+  const handleViewportClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
       if (dragMovedRef.current) {
         dragMovedRef.current = false;
+        return;
+      }
+      if (event.target !== event.currentTarget) {
         return;
       }
       closeImage();
     },
     [closeImage],
-  );
-
-  const handleWheelZoom = useCallback(
-    (event: ReactWheelEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const zoomFactor = Math.exp(-event.deltaY * WHEEL_ZOOM_SENSITIVITY);
-      zoomByFactor(zoomFactor, {
-        x: event.clientX,
-        y: event.clientY,
-      });
-    },
-    [zoomByFactor],
   );
 
   const value = useMemo(() => ({ openImage }), [openImage]);
@@ -207,87 +436,82 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
               role="dialog"
             >
               <div
+                ref={viewportRef}
                 className="absolute inset-0 flex items-center justify-center p-4 sm:p-6"
                 data-testid="global-image-viewer-backdrop"
-                onClick={handleDirectBackgroundClick}
+                onClick={handleViewportClick}
+                onMouseDown={handleViewportMouseDown}
                 onWheelCapture={handleWheelZoom}
               >
                 <div
-                  ref={viewportRef}
-                  className="relative flex h-full w-full items-center justify-center overflow-hidden"
-                  data-testid="global-image-viewer-viewport"
+                  className="absolute right-4 top-4 z-20"
+                  data-pan-exempt="true"
                 >
-                  <div className="absolute right-0 top-0 z-20">
-                    <ViewerControlButton
-                      ariaLabel="Close image preview"
-                      onClick={closeImage}
-                    >
-                      <X className="size-4" />
-                    </ViewerControlButton>
-                  </div>
-                  <div className="absolute bottom-0 left-1/2 z-20 w-full max-w-3xl -translate-x-1/2 px-2">
-                    <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-3 text-center shadow-[0_28px_72px_-34px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-                      <div className="text-sm font-medium text-white/92">
-                        {payload.alt || "Image"}
-                      </div>
-                      {payload.meta ? (
-                        <div className="mt-1 text-xs text-white/55">
-                          {payload.meta}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div
-                    ref={stageRef}
-                    className={cn(
-                      "relative flex h-full w-full items-center justify-center will-change-transform",
-                      dragging
-                        ? "transition-none"
-                        : "transition-transform duration-150 ease-out",
-                      scale > MIN_SCALE
-                        ? dragging
-                          ? "cursor-grabbing"
-                          : "cursor-grab"
-                        : "cursor-default",
-                    )}
-                    data-testid="global-image-viewer-stage"
-                    onClick={handleDirectBackgroundClick}
-                    onMouseDown={(event) => {
-                      if (event.button !== 0 || scale <= MIN_SCALE) {
-                        return;
-                      }
-                      event.preventDefault();
-                      dragMovedRef.current = false;
-                      dragStateRef.current = {
-                        startX: event.clientX,
-                        startY: event.clientY,
-                        originX: offset.x,
-                        originY: offset.y,
-                      };
-                      setDragging(true);
-                    }}
-                    style={{
-                      transform: `translate3d(${offset.x}px, ${offset.y}px, 0px)`,
-                    }}
+                  <ViewerControlButton
+                    ariaLabel="Close image preview"
+                    onClick={closeImage}
                   >
-                    <img
-                      alt={payload.alt || "Image"}
+                    <X className="size-4" />
+                  </ViewerControlButton>
+                </div>
+                <div
+                  className="absolute bottom-4 left-1/2 z-20 w-full max-w-3xl -translate-x-1/2 px-2"
+                  data-pan-exempt="true"
+                >
+                  <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-3 text-center shadow-[0_28px_72px_-34px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+                    <div className="text-sm font-medium text-white/92">
+                      {payload.alt || "Image"}
+                    </div>
+                    {payload.meta ? (
+                      <div className="mt-1 text-xs text-white/55">
+                        {payload.meta}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                {baseImageSize ? (
+                  <div
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                    data-testid="global-image-viewer-viewport"
+                  >
+                    <div
                       className={cn(
-                        "max-h-[78vh] max-w-[88vw] select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)] will-change-transform",
+                        "relative will-change-transform",
                         dragging
                           ? "transition-none"
                           : "transition-transform duration-150 ease-out",
+                        view.zoom > MIN_ZOOM
+                          ? dragging
+                            ? "cursor-grabbing"
+                            : "cursor-grab"
+                          : "cursor-default",
                       )}
-                      data-testid="global-image-viewer-image"
-                      draggable={false}
-                      src={payload.src}
+                      data-testid="global-image-viewer-stage"
                       style={{
-                        transform: `scale(${scale})`,
+                        height: `${baseImageSize.height}px`,
+                        transform: `translate3d(${view.panX}px, ${view.panY}px, 0px) scale(${view.zoom})`,
                         transformOrigin: "center center",
+                        width: `${baseImageSize.width}px`,
                       }}
-                    />
+                    >
+                      <img
+                        alt={payload.alt || "Image"}
+                        className="block h-full w-full select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)]"
+                        data-testid="global-image-viewer-image"
+                        draggable={false}
+                        src={payload.src}
+                      />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <img
+                    alt={payload.alt || "Image"}
+                    className="max-h-[78vh] max-w-[88vw] select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)]"
+                    data-testid="global-image-viewer-image"
+                    draggable={false}
+                    src={payload.src}
+                  />
+                )}
               </div>
             </div>,
             document.body,
@@ -310,6 +534,7 @@ function ViewerControlButton({
     <button
       aria-label={ariaLabel}
       className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/82 shadow-[0_22px_48px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl transition-colors hover:bg-white/14 hover:text-white"
+      data-pan-exempt="true"
       onClick={onClick}
       type="button"
     >

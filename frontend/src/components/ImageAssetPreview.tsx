@@ -41,6 +41,8 @@ export function ImageAssetPreview({
             src,
             alt,
             meta,
+            width,
+            height,
           })
         }
         className={cn(

@@ -13,6 +13,17 @@ afterEach(() => {
   cleanup();
 });
 
+function setViewportSize(width: number, height: number) {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: width,
+  });
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    value: height,
+  });
+}
+
 function Harness() {
   const { openImage } = useImageViewer();
 
@@ -23,6 +34,8 @@ function Harness() {
           src: "https://example.com/preview.png",
           alt: "Viewer image",
           meta: "image/png · 640x480",
+          width: 640,
+          height: 480,
         })
       }
       type="button"
@@ -49,7 +62,6 @@ function readTranslate(element: HTMLElement) {
 
 function getLocalImagePoint(options: {
   anchor: { x: number; y: number };
-  image: HTMLElement;
   stage: HTMLElement;
   viewportRect: {
     left: number;
@@ -58,7 +70,7 @@ function getLocalImagePoint(options: {
     height: number;
   };
 }) {
-  const scale = readScale(options.image);
+  const scale = readScale(options.stage);
   const offset = readTranslate(options.stage);
   const centerX = options.viewportRect.left + options.viewportRect.width / 2;
   const centerY = options.viewportRect.top + options.viewportRect.height / 2;
@@ -100,6 +112,7 @@ describe("ImageViewer", () => {
   });
 
   it("zooms from both backdrop and image targets while preserving the pixel under the cursor", () => {
+    setViewportSize(400, 300);
     render(
       <ImageViewerProvider>
         <Harness />
@@ -123,6 +136,10 @@ describe("ImageViewer", () => {
       y: 0,
       toJSON: () => ({}),
     };
+    Object.defineProperty(backdrop, "getBoundingClientRect", {
+      configurable: true,
+      value: () => viewportRect,
+    });
     Object.defineProperty(viewport, "getBoundingClientRect", {
       configurable: true,
       value: () => viewportRect,
@@ -136,7 +153,7 @@ describe("ImageViewer", () => {
       clientY: backgroundAnchor.y,
     });
 
-    expect(readScale(image)).toBeGreaterThan(1);
+    expect(readScale(stage)).toBeGreaterThan(1);
 
     fireEvent.mouseDown(stage, { button: 0, clientX: 100, clientY: 100 });
     fireEvent.mouseMove(window, { clientX: 160, clientY: 160 });
@@ -144,7 +161,6 @@ describe("ImageViewer", () => {
 
     const beforeZoom = getLocalImagePoint({
       anchor: imageAnchor,
-      image,
       stage,
       viewportRect,
     });
@@ -157,7 +173,6 @@ describe("ImageViewer", () => {
 
     const afterZoomIn = getLocalImagePoint({
       anchor: imageAnchor,
-      image,
       stage,
       viewportRect,
     });
@@ -172,7 +187,6 @@ describe("ImageViewer", () => {
 
     const afterZoomOut = getLocalImagePoint({
       anchor: imageAnchor,
-      image,
       stage,
       viewportRect,
     });
@@ -194,7 +208,6 @@ describe("ImageViewer", () => {
 
     const afterRapidZoom = getLocalImagePoint({
       anchor: imageAnchor,
-      image,
       stage,
       viewportRect,
     });
@@ -203,6 +216,7 @@ describe("ImageViewer", () => {
   });
 
   it("closes on visible background click without treating image content or drags as backdrop", () => {
+    setViewportSize(400, 300);
     render(
       <ImageViewerProvider>
         <Harness />
@@ -210,9 +224,9 @@ describe("ImageViewer", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Open preview" }));
+    const backdrop = screen.getByTestId("global-image-viewer-backdrop");
     const stage = screen.getByTestId("global-image-viewer-stage");
-    const viewport = screen.getByTestId("global-image-viewer-viewport");
-    Object.defineProperty(viewport, "getBoundingClientRect", {
+    Object.defineProperty(backdrop, "getBoundingClientRect", {
       configurable: true,
       value: () => ({
         left: 0,
@@ -228,7 +242,7 @@ describe("ImageViewer", () => {
     });
 
     fireEvent.click(screen.getByTestId("global-image-viewer-image"));
-    fireEvent.wheel(stage, {
+    fireEvent.wheel(backdrop, {
       deltaY: -100,
       clientX: 260,
       clientY: 170,

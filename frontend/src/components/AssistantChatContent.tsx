@@ -562,6 +562,8 @@ function PendingImagePreviewTile({
               src: image.previewUrl,
               alt: image.name,
               meta,
+              width: image.width,
+              height: image.height,
             })
           }
           type="button"

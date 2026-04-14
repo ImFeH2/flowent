@@ -4,6 +4,8 @@ export interface ImageViewerPayload {
   src: string;
   alt?: string | null;
   meta?: string | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 export interface ImageViewerContextValue {

@@ -7,7 +7,6 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -358,7 +357,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
   );
 
   const handleWheelZoom = useCallback(
-    (event: ReactWheelEvent<HTMLDivElement>) => {
+    (event: WheelEvent) => {
       const anchor = getViewportPoint(
         viewportRef.current,
         event.clientX,
@@ -373,6 +372,23 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     },
     [zoomByFactor],
   );
+
+  useEffect(() => {
+    if (!payload || !viewportRef.current) {
+      return;
+    }
+
+    const element = viewportRef.current;
+    const handleWheel = (event: WheelEvent) => {
+      handleWheelZoom(event);
+    };
+
+    element.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      element.removeEventListener("wheel", handleWheel);
+    };
+  }, [handleWheelZoom, payload]);
 
   const handleViewportMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -450,7 +466,6 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                 data-testid="global-image-viewer-backdrop"
                 onClick={handleViewportClick}
                 onMouseDown={handleViewportMouseDown}
-                onWheelCapture={handleWheelZoom}
               >
                 <div
                   className="absolute right-4 top-4 z-20"

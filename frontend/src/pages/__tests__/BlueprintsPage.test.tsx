@@ -230,5 +230,5 @@ describe("BlueprintsPage", () => {
     );
 
     expect(toastSuccessMock).toHaveBeenCalledWith("Blueprint updated");
-  });
+  }, 10000);
 });

@@ -30,8 +30,10 @@ export function WorkspaceCommandDialog({
 }: WorkspaceCommandDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("p-0", className)}>
-        <div className="relative overflow-hidden p-6">
+      <DialogContent
+        className={cn("flex max-h-[calc(100svh-2rem)] flex-col p-0", className)}
+      >
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-6">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent opacity-50" />
           <DialogClose asChild>
             <button
@@ -43,16 +45,21 @@ export function WorkspaceCommandDialog({
             </button>
           </DialogClose>
 
-          <DialogHeader className="relative z-10 pr-8">
+          <DialogHeader className="relative z-10 shrink-0 pr-8">
             <DialogTitle className="text-[1.1rem] font-medium text-white/90">
               {title}
             </DialogTitle>
             <DialogDescription className="sr-only">{title}</DialogDescription>
           </DialogHeader>
 
-          <div className="relative z-10 mt-6 space-y-4">{children}</div>
+          <div
+            className="relative z-10 mt-6 min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 scrollbar-none"
+            data-testid="workspace-command-dialog-body"
+          >
+            {children}
+          </div>
 
-          <DialogFooter className="relative z-10 mt-6 border-t border-white/[0.06] pt-4">
+          <DialogFooter className="relative z-10 mt-6 shrink-0 border-t border-white/[0.06] pt-4">
             {footer}
           </DialogFooter>
         </div>

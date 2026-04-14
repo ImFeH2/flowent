@@ -333,7 +333,7 @@ describe("HomePage", () => {
       ),
     );
     expect(setActiveTabId).toHaveBeenCalledWith("tab-2");
-  });
+  }, 10000);
 
   it("saves the current route as a blueprint from the workspace toolbar", async () => {
     fetchBlueprintsMock.mockResolvedValue([

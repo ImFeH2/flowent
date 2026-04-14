@@ -2,7 +2,6 @@ export interface AssistantCommandSpec {
   name: string;
   description: string;
   usage: string;
-  acceptsArgument?: boolean;
 }
 
 export interface AssistantCommandSelectionState {
@@ -20,7 +19,6 @@ export const ASSISTANT_COMMANDS: AssistantCommandSpec[] = [
     name: "/compact",
     description: "Compact the current execution context.",
     usage: "/compact [focus]",
-    acceptsArgument: true,
   },
   {
     name: "/help",
@@ -162,10 +160,6 @@ export function insertAssistantCommand(
   command: AssistantCommandSpec,
 ): string {
   const { leadingWhitespace, suffix } = normalizeAssistantCommandInput(input);
-
-  if (!command.acceptsArgument) {
-    return `${leadingWhitespace}${command.name}`;
-  }
 
   if (!suffix) {
     return `${leadingWhitespace}${command.name} `;

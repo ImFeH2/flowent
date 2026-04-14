@@ -88,13 +88,11 @@ describe("assistantCommands", () => {
     expect(isAssistantCommandReadyToSend("/co", "/compact")).toBe(false);
   });
 
-  it("inserts commands without arguments by replacing the token", () => {
+  it("inserts completed commands with a space after the command token", () => {
+    expect(insertAssistantCommand("/", ASSISTANT_COMMANDS[0]!)).toBe("/clear ");
     expect(insertAssistantCommand("  /he extra", ASSISTANT_COMMANDS[2]!)).toBe(
-      "  /help",
+      "  /help extra",
     );
-  });
-
-  it("inserts commands with arguments while preserving or adding spacing", () => {
     expect(insertAssistantCommand("/", ASSISTANT_COMMANDS[1]!)).toBe(
       "/compact ",
     );

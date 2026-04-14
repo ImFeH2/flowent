@@ -496,6 +496,31 @@ describe("AssistantChatComposer", () => {
     expect(onKeyDown).not.toHaveBeenCalled();
   });
 
+  it("inserts help with a trailing space when completing a non-argument command", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/he"
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    expect(onChange).toHaveBeenCalledWith("/help ");
+    expect(onKeyDown).not.toHaveBeenCalled();
+  });
+
   it("completes the selected command with Tab and keeps focus in the composer", () => {
     const onChange = vi.fn();
     const onKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = vi.fn(

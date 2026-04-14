@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { Minus, RotateCcw, Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   ImageViewerContext,
   type ImageViewerPayload,
@@ -26,6 +26,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
   const [scale, setScale] = useState(MIN_SCALE);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{
     startX: number;
     startY: number;
@@ -53,15 +54,45 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     [resetView],
   );
 
-  const adjustScale = useCallback((delta: number) => {
-    setScale((current) => {
-      const next = clampScale(current + delta);
-      if (next === MIN_SCALE) {
-        setOffset({ x: 0, y: 0 });
-      }
-      return next;
-    });
-  }, []);
+  const adjustScale = useCallback(
+    (delta: number, anchor?: { x: number; y: number }) => {
+      setScale((currentScale) => {
+        const nextScale = clampScale(currentScale + delta);
+
+        setOffset((currentOffset) => {
+          if (nextScale === MIN_SCALE) {
+            return { x: 0, y: 0 };
+          }
+          if (nextScale === currentScale || !anchor || !stageRef.current) {
+            return currentOffset;
+          }
+
+          const rect = stageRef.current.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          const scaleRatio = nextScale / currentScale;
+
+          return {
+            x: Number(
+              (
+                currentOffset.x +
+                (1 - scaleRatio) * (anchor.x - centerX - currentOffset.x)
+              ).toFixed(2),
+            ),
+            y: Number(
+              (
+                currentOffset.y +
+                (1 - scaleRatio) * (anchor.y - centerY - currentOffset.y)
+              ).toFixed(2),
+            ),
+          };
+        });
+
+        return nextScale;
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!payload) {
@@ -141,37 +172,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                   className="relative flex h-full w-full items-center justify-center overflow-hidden"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="absolute right-0 top-0 z-20 flex items-center gap-2">
-                    <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/45 p-1 shadow-[0_22px_48px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-                      <ViewerControlButton
-                        ariaLabel="Zoom Out"
-                        disabled={scale <= MIN_SCALE}
-                        label="Zoom Out"
-                        onClick={() => adjustScale(-SCALE_STEP)}
-                      >
-                        <Minus className="size-3.5" />
-                      </ViewerControlButton>
-                      <ViewerControlButton
-                        ariaLabel="Zoom In"
-                        disabled={scale >= MAX_SCALE}
-                        label="Zoom In"
-                        onClick={() => adjustScale(SCALE_STEP)}
-                      >
-                        <Plus className="size-3.5" />
-                      </ViewerControlButton>
-                      <ViewerControlButton
-                        ariaLabel="Reset"
-                        disabled={
-                          scale === MIN_SCALE &&
-                          offset.x === 0 &&
-                          offset.y === 0
-                        }
-                        label="Reset"
-                        onClick={resetView}
-                      >
-                        <RotateCcw className="size-3.5" />
-                      </ViewerControlButton>
-                    </div>
+                  <div className="absolute right-0 top-0 z-20">
                     <ViewerControlButton
                       ariaLabel="Close image preview"
                       onClick={closeImage}
@@ -192,6 +193,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                     </div>
                   </div>
                   <div
+                    ref={stageRef}
                     className={cn(
                       "relative flex h-full w-full items-center justify-center",
                       scale > MIN_SCALE
@@ -216,7 +218,10 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                     }}
                     onWheel={(event) => {
                       event.preventDefault();
-                      adjustScale(event.deltaY < 0 ? SCALE_STEP : -SCALE_STEP);
+                      adjustScale(event.deltaY < 0 ? SCALE_STEP : -SCALE_STEP, {
+                        x: event.clientX,
+                        y: event.clientY,
+                      });
                     }}
                     style={{
                       transform: `translate3d(${offset.x}px, ${offset.y}px, 0px)`,
@@ -247,26 +252,20 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
 function ViewerControlButton({
   ariaLabel,
   children,
-  disabled = false,
-  label,
   onClick,
 }: {
   ariaLabel: string;
   children: ReactNode;
-  disabled?: boolean;
-  label?: string;
   onClick: () => void;
 }) {
   return (
     <button
       aria-label={ariaLabel}
-      className="flex h-10 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 text-[11px] font-medium tracking-[0.02em] text-white/82 transition-colors hover:bg-white/14 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
-      disabled={disabled}
+      className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/82 shadow-[0_22px_48px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl transition-colors hover:bg-white/14 hover:text-white"
       onClick={onClick}
       type="button"
     >
       {children}
-      {label ? <span>{label}</span> : null}
     </button>
   );
 }

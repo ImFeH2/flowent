@@ -17,10 +17,17 @@ import {
 import { cn } from "@/lib/utils";
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
-const SCALE_STEP = 0.25;
+const SCALE_EPSILON = 0.001;
+const WHEEL_ZOOM_SENSITIVITY = 0.0018;
 
 function clampScale(value: number) {
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number(value.toFixed(2))));
+  if (value <= MIN_SCALE + SCALE_EPSILON) {
+    return MIN_SCALE;
+  }
+  if (value >= MAX_SCALE - SCALE_EPSILON) {
+    return MAX_SCALE;
+  }
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number(value.toFixed(4))));
 }
 
 export function ImageViewerProvider({ children }: { children: ReactNode }) {
@@ -59,41 +66,42 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     [resetView],
   );
 
-  const adjustScale = useCallback(
-    (delta: number, anchor?: { x: number; y: number }) => {
+  const zoomToScale = useCallback(
+    (nextScale: number, anchor?: { x: number; y: number }) => {
       setScale((currentScale) => {
-        const nextScale = clampScale(currentScale + delta);
+        const clampedScale = clampScale(nextScale);
 
         setOffset((currentOffset) => {
-          if (nextScale === MIN_SCALE) {
+          if (clampedScale === MIN_SCALE) {
             return { x: 0, y: 0 };
           }
-          if (nextScale === currentScale || !anchor || !viewportRef.current) {
+          if (
+            Math.abs(clampedScale - currentScale) <= SCALE_EPSILON ||
+            !anchor ||
+            !viewportRef.current
+          ) {
             return currentOffset;
           }
 
           const rect = viewportRef.current.getBoundingClientRect();
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
-          const scaleRatio = nextScale / currentScale;
+          const anchorLocalX =
+            (anchor.x - centerX - currentOffset.x) / currentScale;
+          const anchorLocalY =
+            (anchor.y - centerY - currentOffset.y) / currentScale;
 
           return {
             x: Number(
-              (
-                currentOffset.x +
-                (1 - scaleRatio) * (anchor.x - centerX - currentOffset.x)
-              ).toFixed(2),
+              (anchor.x - centerX - anchorLocalX * clampedScale).toFixed(4),
             ),
             y: Number(
-              (
-                currentOffset.y +
-                (1 - scaleRatio) * (anchor.y - centerY - currentOffset.y)
-              ).toFixed(2),
+              (anchor.y - centerY - anchorLocalY * clampedScale).toFixed(4),
             ),
           };
         });
 
-        return nextScale;
+        return clampedScale;
       });
     },
     [],
@@ -177,12 +185,13 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
   const handleWheelZoom = useCallback(
     (event: ReactWheelEvent<HTMLDivElement>) => {
       event.preventDefault();
-      adjustScale(event.deltaY < 0 ? SCALE_STEP : -SCALE_STEP, {
+      const zoomFactor = Math.exp(-event.deltaY * WHEEL_ZOOM_SENSITIVITY);
+      zoomToScale(scale * zoomFactor, {
         x: event.clientX,
         y: event.clientY,
       });
     },
-    [adjustScale],
+    [scale, zoomToScale],
   );
 
   const value = useMemo(() => ({ openImage }), [openImage]);

@@ -26,6 +26,43 @@ function Harness() {
   );
 }
 
+function readScale(element: HTMLElement) {
+  const match = element.style.transform.match(/scale\(([-\d.]+)\)/);
+  return Number(match?.[1] ?? "1");
+}
+
+function readTranslate(element: HTMLElement) {
+  const match = element.style.transform.match(
+    /translate3d\(([-\d.]+)px,\s*([-\d.]+)px,\s*0px\)/,
+  );
+  return {
+    x: Number(match?.[1] ?? "0"),
+    y: Number(match?.[2] ?? "0"),
+  };
+}
+
+function getLocalImagePoint(options: {
+  anchor: { x: number; y: number };
+  image: HTMLElement;
+  stage: HTMLElement;
+  viewportRect: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+}) {
+  const scale = readScale(options.image);
+  const offset = readTranslate(options.stage);
+  const centerX = options.viewportRect.left + options.viewportRect.width / 2;
+  const centerY = options.viewportRect.top + options.viewportRect.height / 2;
+
+  return {
+    x: (options.anchor.x - centerX - offset.x) / scale,
+    y: (options.anchor.y - centerY - offset.y) / scale,
+  };
+}
+
 describe("ImageViewer", () => {
   it("uses gesture-first zooming and closes on Escape", () => {
     render(
@@ -56,7 +93,7 @@ describe("ImageViewer", () => {
     ).toHaveLength(0);
   });
 
-  it("zooms from both backdrop and image targets with a stable cursor anchor", () => {
+  it("zooms from both backdrop and image targets while preserving the pixel under the cursor", () => {
     render(
       <ImageViewerProvider>
         <Harness />
@@ -69,61 +106,72 @@ describe("ImageViewer", () => {
     const image = screen.getByTestId("global-image-viewer-image");
     const viewport = screen.getByTestId("global-image-viewer-viewport");
     const stage = screen.getByTestId("global-image-viewer-stage");
+    const viewportRect = {
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 300,
+      right: 400,
+      bottom: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    };
     Object.defineProperty(viewport, "getBoundingClientRect", {
       configurable: true,
-      value: () => ({
-        left: 0,
-        top: 0,
-        width: 400,
-        height: 300,
-        right: 400,
-        bottom: 300,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }),
+      value: () => viewportRect,
     });
+    const imageAnchor = { x: 280, y: 190 };
+    const backgroundAnchor = { x: 36, y: 32 };
 
     fireEvent.wheel(backdrop, {
       deltaY: -100,
-      clientX: 280,
-      clientY: 190,
+      clientX: backgroundAnchor.x,
+      clientY: backgroundAnchor.y,
     });
 
-    expect(image).toHaveStyle({ transform: "scale(1.25)" });
-    expect(stage).toHaveStyle({
-      transform: "translate3d(-20px, -10px, 0px)",
-    });
+    expect(readScale(image)).toBeGreaterThan(1);
 
     fireEvent.mouseDown(stage, { button: 0, clientX: 100, clientY: 100 });
     fireEvent.mouseMove(window, { clientX: 160, clientY: 160 });
     fireEvent.mouseUp(window);
 
-    expect(stage).toHaveStyle({
-      transform: "translate3d(40px, 50px, 0px)",
+    const beforeZoom = getLocalImagePoint({
+      anchor: imageAnchor,
+      image,
+      stage,
+      viewportRect,
     });
 
     fireEvent.wheel(image, {
       deltaY: -100,
-      clientX: 280,
-      clientY: 190,
+      clientX: imageAnchor.x,
+      clientY: imageAnchor.y,
     });
 
-    expect(image).toHaveStyle({ transform: "scale(1.5)" });
-    expect(stage).toHaveStyle({
-      transform: "translate3d(32px, 52px, 0px)",
+    const afterZoomIn = getLocalImagePoint({
+      anchor: imageAnchor,
+      image,
+      stage,
+      viewportRect,
     });
+    expect(afterZoomIn.x).toBeCloseTo(beforeZoom.x, 4);
+    expect(afterZoomIn.y).toBeCloseTo(beforeZoom.y, 4);
 
     fireEvent.wheel(backdrop, {
       deltaY: 100,
-      clientX: 280,
-      clientY: 190,
+      clientX: imageAnchor.x,
+      clientY: imageAnchor.y,
     });
 
-    expect(image).toHaveStyle({ transform: "scale(1.25)" });
-    expect(stage).toHaveStyle({
-      transform: "translate3d(40px, 50px, 0px)",
+    const afterZoomOut = getLocalImagePoint({
+      anchor: imageAnchor,
+      image,
+      stage,
+      viewportRect,
     });
+    expect(afterZoomOut.x).toBeCloseTo(beforeZoom.x, 4);
+    expect(afterZoomOut.y).toBeCloseTo(beforeZoom.y, 4);
   });
 
   it("closes on visible background click without treating image content or drags as backdrop", () => {

@@ -15,6 +15,7 @@ function buildPendingMessage(
     type: "PendingHumanMessage",
     from: "human",
     content: overrides.content ?? "hello",
+    parts: overrides.parts,
     timestamp: overrides.timestamp ?? 1,
   };
 }
@@ -40,6 +41,27 @@ describe("agentRuntimeState", () => {
     expect(removePendingAssistantMessage(messages, "same")).toEqual([
       messages[1]!,
     ]);
+  });
+
+  it("matches pending image messages by their normalized content text", () => {
+    const messages = [
+      buildPendingMessage({
+        id: "image-pending",
+        content: "hello",
+        parts: [
+          { type: "text", text: "hello" },
+          {
+            type: "image",
+            asset_id: "asset-1",
+            alt: "diagram.png",
+          },
+        ],
+      }),
+    ];
+
+    expect(
+      removePendingAssistantMessage(messages, "hello[image: diagram.png]"),
+    ).toEqual([]);
   });
 
   it("removes one or many map entries while preserving unrelated keys", () => {

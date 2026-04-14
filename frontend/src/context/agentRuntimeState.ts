@@ -1,4 +1,5 @@
 import type { PendingAssistantChatMessage, StreamingDelta } from "@/types";
+import { contentPartsToText } from "@/lib/contentParts";
 
 function withoutFirstMatchingItem<T>(
   items: T[],
@@ -33,6 +34,10 @@ export function removePendingAssistantMessage(
         }
       : matcher;
   return withoutFirstMatchingItem(messages, (message) => {
+    const normalizedContent = contentPartsToText(
+      message.parts,
+      message.content,
+    );
     if (
       normalizedMatcher.messageId &&
       message.message_id === normalizedMatcher.messageId
@@ -40,7 +45,8 @@ export function removePendingAssistantMessage(
       return true;
     }
     return (
-      normalizedMatcher.content === message.content &&
+      (normalizedMatcher.content === message.content ||
+        normalizedMatcher.content === normalizedContent) &&
       (normalizedMatcher.timestamp === undefined ||
         message.timestamp === normalizedMatcher.timestamp)
     );

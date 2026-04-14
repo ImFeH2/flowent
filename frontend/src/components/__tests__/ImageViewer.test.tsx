@@ -144,8 +144,24 @@ describe("ImageViewer", () => {
       configurable: true,
       value: () => viewportRect,
     });
+    Object.defineProperty(image, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 24,
+        top: 18,
+        width: 352,
+        height: 264,
+        right: 376,
+        bottom: 282,
+        x: 24,
+        y: 18,
+        toJSON: () => ({}),
+      }),
+    });
     const imageAnchor = { x: 280, y: 190 };
     const backgroundAnchor = { x: 36, y: 32 };
+
+    expect(image).toHaveClass("cursor-grab");
 
     fireEvent.wheel(backdrop, {
       deltaY: -100,
@@ -155,7 +171,7 @@ describe("ImageViewer", () => {
 
     expect(readScale(stage)).toBeGreaterThan(1);
 
-    fireEvent.mouseDown(stage, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.mouseDown(backdrop, { button: 0, clientX: 100, clientY: 100 });
     fireEvent.mouseMove(window, { clientX: 160, clientY: 160 });
     fireEvent.mouseUp(window);
 
@@ -225,6 +241,7 @@ describe("ImageViewer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open preview" }));
     const backdrop = screen.getByTestId("global-image-viewer-backdrop");
+    const image = screen.getByTestId("global-image-viewer-image");
     const stage = screen.getByTestId("global-image-viewer-stage");
     Object.defineProperty(backdrop, "getBoundingClientRect", {
       configurable: true,
@@ -240,8 +257,22 @@ describe("ImageViewer", () => {
         toJSON: () => ({}),
       }),
     });
+    Object.defineProperty(image, "getBoundingClientRect", {
+      configurable: true,
+      value: () => ({
+        left: 24,
+        top: 18,
+        width: 352,
+        height: 264,
+        right: 376,
+        bottom: 282,
+        x: 24,
+        y: 18,
+        toJSON: () => ({}),
+      }),
+    });
 
-    fireEvent.click(screen.getByTestId("global-image-viewer-image"));
+    fireEvent.click(image, { clientX: 120, clientY: 120 });
     fireEvent.wheel(backdrop, {
       deltaY: -100,
       clientX: 260,
@@ -259,7 +290,7 @@ describe("ImageViewer", () => {
       screen.getAllByRole("button", { name: "Close image preview" }),
     ).toHaveLength(1);
 
-    fireEvent.click(visibleBackdrop);
+    fireEvent.click(visibleBackdrop, { clientX: 8, clientY: 8 });
 
     expect(
       screen.queryAllByRole("button", { name: "Close image preview" }),

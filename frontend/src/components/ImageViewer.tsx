@@ -17,8 +17,8 @@ import {
 } from "@/context/imageViewer";
 import { cn } from "@/lib/utils";
 
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 4;
+const MIN_ZOOM = 0.05;
+const MAX_ZOOM = 64;
 const ZOOM_EPSILON = 0.0001;
 const WHEEL_ZOOM_SENSITIVITY = 0.0018;
 const IMAGE_MAX_WIDTH_RATIO = 0.88;
@@ -117,17 +117,18 @@ function panForLocalImagePoint(
 export function ImageViewerProvider({ children }: { children: ReactNode }) {
   const [payload, setPayload] = useState<ImageViewerPayload | null>(null);
   const [imageSize, setImageSize] = useState<Size | null>(null);
-  const [viewportSize, setViewportSize] = useState<Size>({
-    width: 0,
-    height: 0,
-  });
+  const [viewportSize, setViewportSize] = useState<Size>(() => ({
+    width: typeof window === "undefined" ? 0 : window.innerWidth,
+    height: typeof window === "undefined" ? 0 : window.innerHeight,
+  }));
   const [view, setView] = useState<ViewState>({
     panX: 0,
     panY: 0,
-    zoom: MIN_ZOOM,
+    zoom: 1,
   });
   const [dragging, setDragging] = useState(false);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
   const dragMovedRef = useRef(false);
   const dragStateRef = useRef<{
     originPanX: number;
@@ -136,7 +137,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
   } | null>(null);
 
   const resetView = useCallback(() => {
-    setView({ panX: 0, panY: 0, zoom: MIN_ZOOM });
+    setView({ panX: 0, panY: 0, zoom: 1 });
     setDragging(false);
     dragMovedRef.current = false;
     dragStateRef.current = null;
@@ -320,11 +321,6 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
     (factor: number, anchor?: Point) => {
       setView((current) => {
         const nextZoom = clampZoom(current.zoom * factor);
-
-        if (nextZoom === MIN_ZOOM) {
-          return { panX: 0, panY: 0, zoom: MIN_ZOOM };
-        }
-
         if (
           !anchor ||
           !baseImageSize ||
@@ -380,7 +376,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
 
   const handleViewportMouseDown = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      if (event.button !== 0 || view.zoom <= MIN_ZOOM) {
+      if (event.button !== 0) {
         return;
       }
       const target = event.target as HTMLElement;
@@ -406,7 +402,7 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
       };
       setDragging(true);
     },
-    [view.panX, view.panY, view.zoom],
+    [view.panX, view.panY],
   );
 
   const handleViewportClick = useCallback(
@@ -415,8 +411,21 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
         dragMovedRef.current = false;
         return;
       }
-      if (event.target !== event.currentTarget) {
+      const target = event.target as HTMLElement;
+      if (target.closest('[data-pan-exempt="true"]')) {
         return;
+      }
+      const imageElement = imageRef.current;
+      if (imageElement) {
+        const imageRect = imageElement.getBoundingClientRect();
+        if (
+          event.clientX >= imageRect.left &&
+          event.clientX <= imageRect.right &&
+          event.clientY >= imageRect.top &&
+          event.clientY <= imageRect.bottom
+        ) {
+          return;
+        }
       }
       closeImage();
     },
@@ -476,15 +485,10 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                   >
                     <div
                       className={cn(
-                        "relative will-change-transform",
+                        "relative transform-gpu will-change-transform",
                         dragging
                           ? "transition-none"
-                          : "transition-transform duration-150 ease-out",
-                        view.zoom > MIN_ZOOM
-                          ? dragging
-                            ? "cursor-grabbing"
-                            : "cursor-grab"
-                          : "cursor-default",
+                          : "transition-transform duration-120 ease-out",
                       )}
                       data-testid="global-image-viewer-stage"
                       style={{
@@ -496,9 +500,13 @@ export function ImageViewerProvider({ children }: { children: ReactNode }) {
                     >
                       <img
                         alt={payload.alt || "Image"}
-                        className="block h-full w-full select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)]"
+                        className={cn(
+                          "block h-full w-full select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)]",
+                          dragging ? "cursor-grabbing" : "cursor-grab",
+                        )}
                         data-testid="global-image-viewer-image"
                         draggable={false}
+                        ref={imageRef}
                         src={payload.src}
                       />
                     </div>

@@ -570,6 +570,29 @@ def test_clear_assistant_chat_history_drops_queued_messages_after_interrupt(
     assert interrupt_thread.is_alive() is False
 
 
+def test_execute_clear_command_does_not_append_visible_feedback():
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant.history.extend(
+        [
+            ReceivedMessage(content="hello", from_id="human"),
+            AssistantText(content="hi"),
+        ]
+    )
+
+    entry = assistant.execute_assistant_command(command_name="/clear")
+    history = assistant.get_history_snapshot()
+
+    assert isinstance(entry, CommandResultEntry)
+    assert entry.command_name == "/clear"
+    assert entry.include_in_context is False
+    assert not any(isinstance(item, ReceivedMessage) for item in history)
+    assert not any(isinstance(item, AssistantText) for item in history)
+    assert not any(
+        isinstance(item, CommandResultEntry) and item.command_name == "/clear"
+        for item in history
+    )
+
+
 def test_execute_compact_command_replaces_history_with_summary(monkeypatch):
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     assistant.history.extend(

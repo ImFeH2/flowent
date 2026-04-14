@@ -546,12 +546,15 @@ class Agent:
         argument: str = "",
         interrupt_timeout: float = 5.0,
     ) -> CommandResultEntry:
+        append_to_history = True
         if command_name == "/clear":
             self.clear_chat_history(interrupt_timeout=interrupt_timeout)
             entry = CommandResultEntry(
                 command_name=command_name,
                 content="Cleared the current Assistant chat history.",
+                include_in_context=False,
             )
+            append_to_history = False
         elif command_name == "/compact":
             entry = self.compact_chat_history(
                 focus=argument or None,
@@ -565,7 +568,8 @@ class Agent:
         else:
             raise RuntimeError(f"Unsupported Assistant command: {command_name}")
 
-        self._append_history(entry)
+        if append_to_history:
+            self._append_history(entry)
         return entry
 
     def _run(self) -> None:

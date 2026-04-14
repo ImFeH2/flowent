@@ -43,7 +43,7 @@ def test_help_command_returns_visible_command_feedback(client):
     )
 
 
-def test_clear_command_clears_history_and_appends_feedback(client):
+def test_clear_command_clears_history_back_to_empty_state(client):
     assistant_id = _get_assistant_id(client)
     assistant = registry.get(assistant_id)
     assert assistant is not None
@@ -65,7 +65,7 @@ def test_clear_command_clears_history_and_appends_feedback(client):
         and entry.get("content") in {"Old message", "Old reply"}
         for entry in detail["history"]
     )
-    assert any(
+    assert not any(
         entry["type"] == "CommandResultEntry" and entry["command_name"] == "/clear"
         for entry in detail["history"]
     )

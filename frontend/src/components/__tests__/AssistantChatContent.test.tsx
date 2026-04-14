@@ -1,4 +1,4 @@
-import { createRef, type KeyboardEventHandler } from "react";
+import { createRef, type KeyboardEventHandler, useState } from "react";
 import {
   cleanup,
   fireEvent,
@@ -356,6 +356,48 @@ describe("AssistantChatMessages", () => {
 });
 
 describe("AssistantChatComposer", () => {
+  function PastedImageHarness({
+    imageInputEnabled = true,
+  }: {
+    imageInputEnabled?: boolean;
+  }) {
+    const [images, setImages] = useState<
+      Array<{
+        id: string;
+        previewUrl: string;
+        name: string;
+        width: number | null;
+        height: number | null;
+        status: "uploading" | "ready";
+      }>
+    >([]);
+
+    return (
+      <AssistantChatComposer
+        disabled={false}
+        imageInputEnabled={imageInputEnabled}
+        images={images}
+        input="/"
+        onAddImages={(files) =>
+          setImages(
+            Array.from(files).map((file, index) => ({
+              id: `${index}`,
+              previewUrl: `blob:${file.name}`,
+              name: file.name,
+              width: null,
+              height: null,
+              status: "ready",
+            })),
+          )
+        }
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onSend={() => {}}
+        variant="workspace"
+      />
+    );
+  }
+
   it("keeps the send action inside the composer shell and grows with multiline input", () => {
     const onSend = vi.fn();
     const { rerender } = render(
@@ -575,6 +617,62 @@ describe("AssistantChatComposer", () => {
       screen.queryByRole("listbox", { name: "Assistant commands" }),
     ).not.toBeInTheDocument();
     expect(textarea.value).toBe("/");
+  });
+
+  it("adds pasted clipboard images into the same pending image list and hides commands", () => {
+    render(<PastedImageHarness />);
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+    const file = new File(["image"], "pasted.png", { type: "image/png" });
+
+    expect(
+      screen.getByRole("listbox", { name: "Assistant commands" }),
+    ).toBeInTheDocument();
+
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [
+          {
+            kind: "file",
+            type: "image/png",
+            getAsFile: () => file,
+          },
+        ],
+      },
+    });
+
+    expect(
+      screen.queryByRole("listbox", { name: "Assistant commands" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByAltText("pasted.png")).toBeInTheDocument();
+  });
+
+  it("ignores pasted clipboard images when image input is disabled", () => {
+    render(<PastedImageHarness imageInputEnabled={false} />);
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    );
+    const file = new File(["image"], "pasted.png", { type: "image/png" });
+
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [
+          {
+            kind: "file",
+            type: "image/png",
+            getAsFile: () => file,
+          },
+        ],
+      },
+    });
+
+    expect(
+      screen.getByRole("listbox", { name: "Assistant commands" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByAltText("pasted.png")).not.toBeInTheDocument();
   });
 
   it("keeps the command panel open with an empty state when no command matches", () => {

@@ -1,4 +1,5 @@
 import {
+  type ClipboardEventHandler,
   useLayoutEffect,
   useRef,
   useState,
@@ -72,7 +73,7 @@ interface AssistantChatComposerProps {
   }>;
   imageInputEnabled?: boolean;
   input: string;
-  onAddImages?: (files: FileList) => void;
+  onAddImages?: (files: FileList | File[]) => void;
   onChange: (value: string) => void;
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>;
   onRemoveImage?: (imageId: string) => void;
@@ -139,6 +140,21 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
     </div>
   );
 });
+
+function getClipboardImageFiles(
+  items: DataTransferItemList | null | undefined,
+): File[] {
+  if (!items) {
+    return [];
+  }
+
+  return Array.from(items)
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .flatMap((item) => {
+      const file = item.getAsFile();
+      return file ? [file] : [];
+    });
+}
 
 export function AssistantChatComposer({
   busy = false,
@@ -301,6 +317,19 @@ export function AssistantChatComposer({
     onKeyDown(event);
   };
 
+  const handleComposerPaste: ClipboardEventHandler<HTMLTextAreaElement> = (
+    event,
+  ) => {
+    const pastedImages = getClipboardImageFiles(event.clipboardData?.items);
+    if (pastedImages.length === 0 || !imageInputEnabled) {
+      return;
+    }
+
+    event.preventDefault();
+    resetCommandState();
+    onAddImages(pastedImages);
+  };
+
   return (
     <div
       className={cn(
@@ -442,6 +471,7 @@ export function AssistantChatComposer({
             value={input}
             onChange={(event) => handleInputChange(event.target.value)}
             onKeyDown={handleComposerKeyDown}
+            onPaste={handleComposerPaste}
             placeholder="Message Assistant or type / for commands"
             rows={1}
             className={cn(

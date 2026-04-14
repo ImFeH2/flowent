@@ -24,7 +24,10 @@ import {
   X,
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
-import { ImageAssetPreview } from "@/components/ImageAssetPreview";
+import {
+  ImageAssetPreview,
+  ImagePreviewDialog,
+} from "@/components/ImageAssetPreview";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import {
   insertAssistantCommand,
@@ -402,34 +405,11 @@ export function AssistantChatComposer({
         {images.length > 0 ? (
           <div className="flex flex-wrap gap-2 border-b border-white/8 px-0.5 py-2">
             {images.map((image) => (
-              <div
+              <PendingImagePreviewTile
                 key={image.id}
-                className="relative overflow-hidden rounded-lg border border-white/10 bg-black/25"
-              >
-                <img
-                  alt={image.name}
-                  className="h-20 w-20 object-cover"
-                  src={image.previewUrl}
-                />
-                <button
-                  aria-label={`Remove ${image.name}`}
-                  className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-black/60 text-white/74 transition-colors hover:bg-black/80 hover:text-white"
-                  onClick={() => onRemoveImage(image.id)}
-                  type="button"
-                >
-                  <X className="size-3.5" />
-                </button>
-                <div className="absolute inset-x-0 bottom-0 bg-black/72 px-2 py-1 text-[10px] text-white/84">
-                  <div className="truncate">{image.name}</div>
-                  <div className="text-white/56">
-                    {image.status === "uploading"
-                      ? "Uploading..."
-                      : image.width && image.height
-                        ? `${image.width}x${image.height}`
-                        : "Ready"}
-                  </div>
-                </div>
-              </div>
+                image={image}
+                onRemove={() => onRemoveImage(image.id)}
+              />
             ))}
           </div>
         ) : null}
@@ -555,6 +535,60 @@ function AssistantRunningHint({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function PendingImagePreviewTile({
+  image,
+  onRemove,
+}: {
+  image: NonNullable<AssistantChatComposerProps["images"]>[number];
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const meta =
+    image.status === "uploading"
+      ? "Uploading..."
+      : image.width && image.height
+        ? `${image.width}x${image.height}`
+        : "Ready";
+
+  return (
+    <>
+      <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/25 transition-colors hover:border-white/16">
+        <button
+          aria-label={`Preview ${image.name}`}
+          className="block text-left"
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          <img
+            alt={image.name}
+            className="h-20 w-20 object-cover"
+            src={image.previewUrl}
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-black/72 px-2 py-1 text-[10px] text-white/84">
+            <div className="truncate">{image.name}</div>
+            <div className="text-white/56">{meta}</div>
+          </div>
+        </button>
+        <button
+          aria-label={`Remove ${image.name}`}
+          className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded-full bg-black/60 text-white/74 transition-colors hover:bg-black/80 hover:text-white"
+          onClick={onRemove}
+          type="button"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+      <ImagePreviewDialog
+        alt={image.name}
+        meta={meta}
+        onOpenChange={setOpen}
+        open={open}
+        src={image.previewUrl}
+      />
+    </>
   );
 }
 

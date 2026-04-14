@@ -353,6 +353,42 @@ describe("AssistantChatMessages", () => {
 
     expect(writeText).toHaveBeenCalledWith("Copy this human message");
   });
+
+  it("opens sent image parts in the shared preview surface", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "AssistantText",
+            parts: [
+              {
+                type: "image",
+                asset_id: "asset-1",
+                alt: "Architecture diagram",
+                mime_type: "image/png",
+                width: 1600,
+                height: 900,
+              },
+            ],
+            timestamp: 1,
+          },
+        ]}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Architecture diagram/i }),
+    );
+
+    expect(
+      screen.getAllByRole("button", { name: "Close image preview" }).length,
+    ).toBeGreaterThan(0);
+  });
 });
 
 describe("AssistantChatComposer", () => {
@@ -673,6 +709,42 @@ describe("AssistantChatComposer", () => {
       screen.getByRole("listbox", { name: "Assistant commands" }),
     ).toBeInTheDocument();
     expect(screen.queryByAltText("pasted.png")).not.toBeInTheDocument();
+  });
+
+  it("opens pending image thumbnails in the same preview surface and keeps remove available", () => {
+    const onRemoveImage = vi.fn();
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        images={[
+          {
+            id: "draft-1",
+            previewUrl: "blob:draft-preview",
+            name: "draft.png",
+            width: 1200,
+            height: 800,
+            status: "ready",
+          },
+        ]}
+        input=""
+        onChange={() => {}}
+        onKeyDown={() => {}}
+        onRemoveImage={onRemoveImage}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview draft.png" }));
+
+    expect(
+      screen.getAllByRole("button", { name: "Close image preview" }).length,
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove draft.png" }));
+
+    expect(onRemoveImage).toHaveBeenCalledWith("draft-1");
   });
 
   it("keeps the command panel open with an empty state when no command matches", () => {

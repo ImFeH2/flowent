@@ -9,7 +9,7 @@ from typing import Any
 from loguru import logger
 
 from app.model_metadata import build_model_info
-from app.models import LLMResponse, ModelInfo
+from app.models import LLMResponse, LLMUsage, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.network import (
     RequestException,
@@ -92,6 +92,7 @@ class OllamaProvider(LLMProvider):
         thinking_parts: list[str] = []
         tool_calls_list: list[ToolCall] = []
         chunk_count = 0
+        usage: LLMUsage | None = None
         think_parser = ThinkTagParser()
         client = self._client
         if register_interrupt is not None:
@@ -169,6 +170,23 @@ class OllamaProvider(LLMProvider):
                         )
 
                     if chunk.get("done", False):
+                        prompt_eval_count = chunk.get("prompt_eval_count")
+                        if isinstance(prompt_eval_count, bool) or not isinstance(
+                            prompt_eval_count, int
+                        ):
+                            prompt_eval_count = None
+                        eval_count = chunk.get("eval_count")
+                        if isinstance(eval_count, bool) or not isinstance(
+                            eval_count, int
+                        ):
+                            eval_count = None
+                        if prompt_eval_count is not None or eval_count is not None:
+                            usage = LLMUsage(
+                                total_tokens=(prompt_eval_count or 0)
+                                + (eval_count or 0),
+                                input_tokens=prompt_eval_count,
+                                output_tokens=eval_count,
+                            )
                         break
         except RequestException as exc:
             elapsed = time.perf_counter() - t0
@@ -221,9 +239,10 @@ class OllamaProvider(LLMProvider):
                 content=content,
                 tool_calls=tool_calls_list,
                 thinking=thinking,
+                usage=usage,
             )
 
-        return LLMResponse(content=content or "", thinking=thinking)
+        return LLMResponse(content=content or "", thinking=thinking, usage=usage)
 
     def list_models(
         self,

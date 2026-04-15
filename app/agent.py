@@ -30,6 +30,7 @@ from app.models import (
     LLMOutputImagePart,
     LLMOutputTextPart,
     LLMResponse,
+    LLMUsage,
     Message,
     ModelInfo,
     NodeConfig,
@@ -81,10 +82,9 @@ class StreamingContentState:
 
 @dataclass(frozen=True)
 class ContextPreflight:
-    estimated_input_tokens: int
+    estimated_total_tokens: int
     context_window_tokens: int | None = None
-    auto_compact_enabled: bool = False
-    trigger_threshold_tokens: int | None = None
+    auto_compact_token_limit: int | None = None
     safe_input_tokens: int | None = None
 
 
@@ -100,6 +100,22 @@ class ContextPreflightError(RuntimeError):
 
 DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS = 1024
 DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024
+
+
+@dataclass(frozen=True)
+class PreparedLLMContext:
+    messages: list[dict[str, Any]]
+    system_messages: list[dict[str, Any]]
+    execution_context_messages: list[dict[str, Any]]
+    runtime_tail_messages: list[dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class ContextTokenUsageBaseline:
+    usage: LLMUsage
+    system_messages: list[dict[str, Any]]
+    execution_context_messages: list[dict[str, Any]]
+    runtime_tail_messages: list[dict[str, Any]]
 
 
 def build_error_context(content: str) -> str:
@@ -143,6 +159,7 @@ class Agent:
         self._execution_context_lock = threading.Lock()
         self._execution_context_summary: str = ""
         self._execution_context_history_cutoff: int = 0
+        self._context_token_usage_baseline: ContextTokenUsageBaseline | None = None
         self._pending_runtime_notices: list[str] = []
         self._pending_input_turn = False
         self._turn_started_with_pending_input = False
@@ -215,6 +232,7 @@ class Agent:
         with self._execution_context_lock:
             self._execution_context_summary = summary
             self._execution_context_history_cutoff = max(history_cutoff, 0)
+            self._context_token_usage_baseline = None
 
     def _reset_execution_context(self) -> None:
         self._set_execution_context(summary="", history_cutoff=0)
@@ -616,7 +634,8 @@ class Agent:
                     self._turn_made_progress = False
 
                     tools_schema = _get_tool_registry().get_tools_schema(self)
-                    messages = self._prepare_messages_for_llm()
+                    prepared_context = self._prepare_messages_for_llm()
+                    messages = prepared_context.messages
 
                     self._log.debug(
                         "LLM request: messages={}, tools={}, history_len={}",
@@ -627,7 +646,7 @@ class Agent:
                     stream_state: StreamingContentState | None = None
                     try:
                         response, stream_state = self._chat_with_retries(
-                            messages=messages,
+                            prepared_context=prepared_context,
                             tools_schema=tools_schema,
                         )
                         self._flush_streaming_think_parser(stream_state)
@@ -1308,7 +1327,7 @@ class Agent:
     def _chat_with_retries(
         self,
         *,
-        messages: list[dict[str, Any]],
+        prepared_context: PreparedLLMContext,
         tools_schema: list[dict[str, Any]] | None,
     ) -> tuple[LLMResponse, StreamingContentState]:
         retry_policy = self._get_llm_retry_policy()
@@ -1319,6 +1338,7 @@ class Agent:
             stream_state = StreamingContentState()
             try:
                 try:
+                    messages = prepared_context.messages
                     response = gateway.chat(
                         messages=messages,
                         tools=tools_schema or None,
@@ -1333,6 +1353,10 @@ class Agent:
                 finally:
                     self.set_interrupt_callback(None)
                 self._raise_if_interrupt_requested()
+                self._record_context_token_usage_baseline(
+                    prepared_context=prepared_context,
+                    usage=response.usage,
+                )
                 return response, stream_state
             except LLMProviderError as exc:
                 should_retry = False
@@ -1427,17 +1451,29 @@ class Agent:
             raise RuntimeError("Assistant compact did not produce a summary")
         return summary
 
-    def _build_messages(self) -> list[dict[str, Any]]:
-        messages: list[dict[str, Any]] = [
+    def _build_prepared_llm_context(self) -> PreparedLLMContext:
+        system_messages = [
             {"role": "system", "content": get_system_prompt(self.config)}
         ]
-
         with self._history_lock:
             history_snapshot = list(self.history)
+        execution_context_messages = self._build_execution_context_messages(
+            history_snapshot
+        )
+        runtime_tail_messages = self._build_runtime_tail_messages()
+        return PreparedLLMContext(
+            messages=[
+                *system_messages,
+                *execution_context_messages,
+                *runtime_tail_messages,
+            ],
+            system_messages=system_messages,
+            execution_context_messages=execution_context_messages,
+            runtime_tail_messages=runtime_tail_messages,
+        )
 
-        messages.extend(self._build_execution_context_messages(history_snapshot))
-        messages.extend(self._build_runtime_tail_messages())
-        return messages
+    def _build_messages(self) -> list[dict[str, Any]]:
+        return self._build_prepared_llm_context().messages
 
     def _build_execution_context_messages(
         self,
@@ -1610,6 +1646,52 @@ class Agent:
     def _estimate_input_tokens(cls, messages: list[dict[str, Any]]) -> int:
         return sum(cls._estimate_message_tokens(message) for message in messages)
 
+    def _estimate_tokens_from_usage_baseline(
+        self,
+        prepared_context: PreparedLLMContext,
+    ) -> int | None:
+        with self._execution_context_lock:
+            baseline = self._context_token_usage_baseline
+
+        if baseline is None:
+            return None
+        if baseline.system_messages != prepared_context.system_messages:
+            return None
+        if baseline.runtime_tail_messages != prepared_context.runtime_tail_messages:
+            return None
+
+        baseline_execution_messages = baseline.execution_context_messages
+        current_execution_messages = prepared_context.execution_context_messages
+        if len(current_execution_messages) < len(baseline_execution_messages):
+            return None
+        if (
+            current_execution_messages[: len(baseline_execution_messages)]
+            != baseline_execution_messages
+        ):
+            return None
+
+        tail_messages = current_execution_messages[len(baseline_execution_messages) :]
+        return baseline.usage.total_tokens + self._estimate_input_tokens(tail_messages)
+
+    def _record_context_token_usage_baseline(
+        self,
+        *,
+        prepared_context: PreparedLLMContext,
+        usage: LLMUsage | None,
+    ) -> None:
+        if usage is None:
+            return
+
+        with self._execution_context_lock:
+            self._context_token_usage_baseline = ContextTokenUsageBaseline(
+                usage=usage,
+                system_messages=list(prepared_context.system_messages),
+                execution_context_messages=list(
+                    prepared_context.execution_context_messages
+                ),
+                runtime_tail_messages=list(prepared_context.runtime_tail_messages),
+            )
+
     def _get_effective_model_info(self) -> tuple[str | None, ModelInfo | None]:
         from app.model_metadata import build_model_info
         from app.settings import find_provider, find_role
@@ -1617,6 +1699,7 @@ class Agent:
         settings = get_settings()
         provider_id = settings.model.active_provider_id
         model_id = settings.model.active_model
+        use_system_model_overrides = True
         role_cfg = (
             find_role(settings, self.config.role_name)
             if self.config.role_name
@@ -1630,6 +1713,7 @@ class Agent:
         ):
             provider_id = role_cfg.model.provider_id
             model_id = role_cfg.model.model
+            use_system_model_overrides = False
         if not provider_id or not model_id:
             return None, None
         provider = find_provider(settings, provider_id)
@@ -1637,7 +1721,21 @@ class Agent:
             return None, None
         return (
             provider.type,
-            build_model_info(provider_type=provider.type, model_id=model_id),
+            build_model_info(
+                provider_type=provider.type,
+                model_id=model_id,
+                input_image=(
+                    settings.model.input_image if use_system_model_overrides else None
+                ),
+                output_image=(
+                    settings.model.output_image if use_system_model_overrides else None
+                ),
+                context_window_tokens=(
+                    settings.model.context_window_tokens
+                    if use_system_model_overrides
+                    else None
+                ),
+            ),
         )
 
     def _get_effective_output_budget_tokens(self) -> int:
@@ -1659,15 +1757,23 @@ class Agent:
 
     def _compute_context_preflight(
         self,
-        messages: list[dict[str, Any]],
+        prepared_context: PreparedLLMContext,
     ) -> ContextPreflight:
         settings = get_settings()
         _, model_info = self._get_effective_model_info()
-        estimated_input_tokens = self._estimate_input_tokens(messages)
+        estimated_total_tokens = self._estimate_tokens_from_usage_baseline(
+            prepared_context
+        )
+        if estimated_total_tokens is None:
+            estimated_total_tokens = self._estimate_input_tokens(
+                prepared_context.messages
+            )
+
+        auto_compact_token_limit = settings.model.auto_compact_token_limit
         if model_info is None or model_info.context_window_tokens is None:
             return ContextPreflight(
-                estimated_input_tokens=estimated_input_tokens,
-                auto_compact_enabled=settings.model.auto_compact,
+                estimated_total_tokens=estimated_total_tokens,
+                auto_compact_token_limit=auto_compact_token_limit,
             )
 
         output_budget_tokens = self._get_effective_output_budget_tokens()
@@ -1677,15 +1783,10 @@ class Agent:
             - output_budget_tokens
             - DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS,
         )
-        trigger_threshold_tokens = max(
-            1,
-            int(safe_input_tokens * settings.model.auto_compact_threshold),
-        )
         return ContextPreflight(
-            estimated_input_tokens=estimated_input_tokens,
+            estimated_total_tokens=estimated_total_tokens,
             context_window_tokens=model_info.context_window_tokens,
-            auto_compact_enabled=settings.model.auto_compact,
-            trigger_threshold_tokens=trigger_threshold_tokens,
+            auto_compact_token_limit=auto_compact_token_limit,
             safe_input_tokens=safe_input_tokens,
         )
 
@@ -1711,21 +1812,19 @@ class Agent:
         self._persist_workspace_node()
         return summary
 
-    def _prepare_messages_for_llm(self) -> list[dict[str, Any]]:
-        messages = self._build_messages()
-        preflight = self._compute_context_preflight(messages)
+    def _prepare_messages_for_llm(self) -> PreparedLLMContext:
+        prepared_context = self._build_prepared_llm_context()
+        preflight = self._compute_context_preflight(prepared_context)
         if (
-            not preflight.auto_compact_enabled
-            or preflight.trigger_threshold_tokens is None
-            or preflight.context_window_tokens is None
-            or preflight.estimated_input_tokens < preflight.trigger_threshold_tokens
+            preflight.auto_compact_token_limit is None
+            or preflight.estimated_total_tokens < preflight.auto_compact_token_limit
         ):
-            return messages
+            return prepared_context
 
         self._log.debug(
-            "Automatic compact preflight: estimated={}, threshold={}, safe={}, context_window={}",
-            preflight.estimated_input_tokens,
-            preflight.trigger_threshold_tokens,
+            "Automatic compact preflight: estimated_total={}, token_limit={}, safe={}, context_window={}",
+            preflight.estimated_total_tokens,
+            preflight.auto_compact_token_limit,
             preflight.safe_input_tokens,
             preflight.context_window_tokens,
         )
@@ -1734,24 +1833,24 @@ class Agent:
         except Exception as exc:
             if (
                 preflight.safe_input_tokens is not None
-                and preflight.estimated_input_tokens > preflight.safe_input_tokens
+                and preflight.estimated_total_tokens > preflight.safe_input_tokens
             ):
                 raise ContextPreflightError(
                     "Automatic compact failed and the current execution context exceeds the safe model window."
                 ) from exc
             self._log.warning("Automatic compact failed below safe window: {}", exc)
-            return messages
+            return prepared_context
 
-        messages = self._build_messages()
-        post_compact = self._compute_context_preflight(messages)
+        prepared_context = self._build_prepared_llm_context()
+        post_compact = self._compute_context_preflight(prepared_context)
         if (
             post_compact.safe_input_tokens is not None
-            and post_compact.estimated_input_tokens > post_compact.safe_input_tokens
+            and post_compact.estimated_total_tokens > post_compact.safe_input_tokens
         ):
             raise ContextPreflightError(
                 "Automatic compact completed but the current execution context still exceeds the safe model window."
             )
-        return messages
+        return prepared_context
 
     @staticmethod
     def _flush_tool_calls(

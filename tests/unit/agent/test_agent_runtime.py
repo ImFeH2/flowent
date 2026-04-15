@@ -15,6 +15,7 @@ from app.models import (
     ErrorEntry,
     EventType,
     LLMResponse,
+    LLMUsage,
     Message,
     NodeConfig,
     NodeType,
@@ -1575,6 +1576,142 @@ def test_build_messages_replays_sent_messages_as_message_to_context(monkeypatch)
             "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- If there is no unfinished TODO and the task is finished with no immediate next action, call `idle`.</system>",
         },
     ]
+
+
+def test_context_preflight_prefers_usage_baseline_and_estimates_only_new_tail(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Primary",
+                    type="openai_responses",
+                    base_url="https://api.example.com/v1",
+                    api_key="secret",
+                )
+            ],
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-5.2",
+                auto_compact_token_limit=48_000,
+            ),
+        ),
+    )
+
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    agent._append_history(ReceivedMessage(content="first", from_id="human"))
+
+    baseline_context = agent._build_prepared_llm_context()
+    agent._record_context_token_usage_baseline(
+        prepared_context=baseline_context,
+        usage=LLMUsage(
+            total_tokens=4_200,
+            input_tokens=3_000,
+            output_tokens=1_200,
+        ),
+    )
+
+    agent._append_history(
+        ToolCall(
+            tool_name="read",
+            tool_call_id="call-read",
+            arguments={"path": "README.md"},
+            result="done",
+        )
+    )
+    next_context = agent._build_prepared_llm_context()
+    preflight = agent._compute_context_preflight(next_context)
+
+    expected_tail_tokens = agent._estimate_input_tokens(
+        next_context.execution_context_messages[
+            len(baseline_context.execution_context_messages) :
+        ]
+    )
+
+    assert preflight.estimated_total_tokens == 4_200 + expected_tail_tokens
+    assert preflight.auto_compact_token_limit == 48_000
+    assert preflight.context_window_tokens == 128_000
+
+
+def test_context_preflight_bootstraps_again_when_runtime_tail_changes(monkeypatch):
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Primary",
+                    type="openai_responses",
+                    base_url="https://api.example.com/v1",
+                    api_key="secret",
+                )
+            ],
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="gpt-5.2",
+                auto_compact_token_limit=48_000,
+            ),
+        ),
+    )
+
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    agent._append_history(ReceivedMessage(content="first", from_id="human"))
+
+    baseline_context = agent._build_prepared_llm_context()
+    agent._record_context_token_usage_baseline(
+        prepared_context=baseline_context,
+        usage=LLMUsage(total_tokens=4_200),
+    )
+
+    agent.set_todos([TodoItem(text="Inspect files")])
+    next_context = agent._build_prepared_llm_context()
+    preflight = agent._compute_context_preflight(next_context)
+
+    assert preflight.estimated_total_tokens == agent._estimate_input_tokens(
+        next_context.messages
+    )
+
+
+def test_prepare_messages_for_llm_uses_token_limit_even_without_context_window(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.agent.get_settings",
+        lambda: Settings(
+            providers=[
+                ProviderConfig(
+                    id="provider-1",
+                    name="Primary",
+                    type="openai_compatible",
+                    base_url="https://api.example.com/v1",
+                    api_key="secret",
+                )
+            ],
+            model=ModelSettings(
+                active_provider_id="provider-1",
+                active_model="custom-model",
+                auto_compact_token_limit=1,
+            ),
+        ),
+    )
+
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    agent._append_history(ReceivedMessage(content="hello", from_id="human"))
+    compact_calls: list[str] = []
+
+    monkeypatch.setattr(
+        agent,
+        "_compact_execution_context",
+        lambda focus=None: compact_calls.append("compact") or "",
+    )
+
+    prepared_context = agent._prepare_messages_for_llm()
+
+    assert compact_calls == ["compact"]
+    assert len(prepared_context.messages) > 0
 
 
 def test_idle_is_blocked_when_fresh_input_has_no_progress(monkeypatch):

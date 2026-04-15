@@ -21,6 +21,9 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
         model_info = build_model_info(
             provider_type=provider.type,
             model_id=settings.model.active_model,
+            input_image=settings.model.input_image,
+            output_image=settings.model.output_image,
+            context_window_tokens=settings.model.context_window_tokens,
         )
     return {
         "assistant": {
@@ -34,14 +37,16 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
         "model": {
             "active_provider_id": settings.model.active_provider_id,
             "active_model": settings.model.active_model,
+            "input_image": settings.model.input_image,
+            "output_image": settings.model.output_image,
+            "context_window_tokens": settings.model.context_window_tokens,
             "timeout_ms": settings.model.timeout_ms,
             "retry_policy": settings.model.retry_policy,
             "max_retries": settings.model.max_retries,
             "retry_initial_delay_seconds": settings.model.retry_initial_delay_seconds,
             "retry_max_delay_seconds": settings.model.retry_max_delay_seconds,
             "retry_backoff_cap_retries": settings.model.retry_backoff_cap_retries,
-            "auto_compact": settings.model.auto_compact,
-            "auto_compact_threshold": settings.model.auto_compact_threshold,
+            "auto_compact_token_limit": settings.model.auto_compact_token_limit,
             "capabilities": (
                 {
                     "input_image": model_info.capabilities.input_image,
@@ -50,7 +55,7 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
                 if model_info is not None
                 else None
             ),
-            "context_window_tokens": (
+            "resolved_context_window_tokens": (
                 model_info.context_window_tokens if model_info is not None else None
             ),
             "params": {
@@ -107,6 +112,18 @@ class ManageSettingsTool(Tool):
                 "type": "string",
                 "description": "Active model name for update",
             },
+            "context_window_tokens": {
+                "type": ["integer", "null"],
+                "description": "Explicit context window override for the active system model",
+            },
+            "input_image": {
+                "type": ["boolean", "null"],
+                "description": "Explicit input_image override for the active system model",
+            },
+            "output_image": {
+                "type": ["boolean", "null"],
+                "description": "Explicit output_image override for the active system model",
+            },
             "max_retries": {
                 "type": "integer",
                 "description": "Maximum retries for transient LLM call failures when retry_policy is limited",
@@ -123,13 +140,9 @@ class ManageSettingsTool(Tool):
                 "type": "integer",
                 "description": "Retry count where exponential growth stops doubling",
             },
-            "auto_compact": {
-                "type": "boolean",
-                "description": "Whether the runtime may automatically compact execution context before LLM calls",
-            },
-            "auto_compact_threshold": {
-                "type": "number",
-                "description": "Trigger ratio for automatic compaction within the safe input budget",
+            "auto_compact_token_limit": {
+                "type": ["integer", "null"],
+                "description": "Token-usage threshold where the runtime should auto compact before the next formal LLM call",
             },
             "retry_policy": {
                 "type": "string",
@@ -173,9 +186,11 @@ class ManageSettingsTool(Tool):
             build_assistant_allow_network,
             build_assistant_write_dirs,
             build_default_model_params,
-            build_model_auto_compact,
-            build_model_auto_compact_threshold,
+            build_model_auto_compact_token_limit,
+            build_model_context_window_tokens,
+            build_model_input_image,
             build_model_max_retries,
+            build_model_output_image,
             build_model_params_from_mapping,
             build_model_retry_backoff_cap_retries,
             build_model_retry_initial_delay_seconds,
@@ -201,8 +216,10 @@ class ManageSettingsTool(Tool):
         retry_initial_delay_seconds = args.get("retry_initial_delay_seconds")
         retry_max_delay_seconds = args.get("retry_max_delay_seconds")
         retry_backoff_cap_retries = args.get("retry_backoff_cap_retries")
-        auto_compact = args.get("auto_compact")
-        auto_compact_threshold = args.get("auto_compact_threshold")
+        context_window_tokens = args.get("context_window_tokens")
+        input_image = args.get("input_image")
+        output_image = args.get("output_image")
+        auto_compact_token_limit = args.get("auto_compact_token_limit")
         model_params = args.get("model_params")
         timestamp_format = args.get("timestamp_format")
 
@@ -266,16 +283,29 @@ class ManageSettingsTool(Tool):
                 )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
-        if auto_compact is not None:
+        if "input_image" in args:
             try:
-                build_model_auto_compact(auto_compact, field_name="auto_compact")
+                build_model_input_image(input_image, field_name="input_image")
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
-        if auto_compact_threshold is not None:
+        if "output_image" in args:
             try:
-                build_model_auto_compact_threshold(
-                    auto_compact_threshold,
-                    field_name="auto_compact_threshold",
+                build_model_output_image(output_image, field_name="output_image")
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+        if "context_window_tokens" in args:
+            try:
+                build_model_context_window_tokens(
+                    context_window_tokens,
+                    field_name="context_window_tokens",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+        if "auto_compact_token_limit" in args:
+            try:
+                build_model_auto_compact_token_limit(
+                    auto_compact_token_limit,
+                    field_name="auto_compact_token_limit",
                 )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
@@ -338,6 +368,27 @@ class ManageSettingsTool(Tool):
         if active_model is not None:
             next_active_model = active_model
 
+        next_context_window_tokens = settings.model.context_window_tokens
+        if "context_window_tokens" in args:
+            next_context_window_tokens = build_model_context_window_tokens(
+                context_window_tokens,
+                field_name="context_window_tokens",
+            )
+
+        next_input_image = settings.model.input_image
+        if "input_image" in args:
+            next_input_image = build_model_input_image(
+                input_image,
+                field_name="input_image",
+            )
+
+        next_output_image = settings.model.output_image
+        if "output_image" in args:
+            next_output_image = build_model_output_image(
+                output_image,
+                field_name="output_image",
+            )
+
         next_retry_policy = settings.model.retry_policy
         if retry_policy is not None:
             next_retry_policy = build_model_retry_policy(
@@ -379,17 +430,11 @@ class ManageSettingsTool(Tool):
                 retry_backoff_cap_retries,
                 field_name="retry_backoff_cap_retries",
             )
-        next_auto_compact = settings.model.auto_compact
-        if auto_compact is not None:
-            next_auto_compact = build_model_auto_compact(
-                auto_compact,
-                field_name="auto_compact",
-            )
-        next_auto_compact_threshold = settings.model.auto_compact_threshold
-        if auto_compact_threshold is not None:
-            next_auto_compact_threshold = build_model_auto_compact_threshold(
-                auto_compact_threshold,
-                field_name="auto_compact_threshold",
+        next_auto_compact_token_limit = settings.model.auto_compact_token_limit
+        if "auto_compact_token_limit" in args:
+            next_auto_compact_token_limit = build_model_auto_compact_token_limit(
+                auto_compact_token_limit,
+                field_name="auto_compact_token_limit",
             )
         try:
             validate_model_retry_backoff_settings(
@@ -419,14 +464,16 @@ class ManageSettingsTool(Tool):
         settings.leader.role_name = next_leader_role_name
         settings.model.active_provider_id = next_active_provider_id
         settings.model.active_model = next_active_model
+        settings.model.context_window_tokens = next_context_window_tokens
+        settings.model.input_image = next_input_image
+        settings.model.output_image = next_output_image
         settings.model.retry_policy = next_retry_policy
         settings.model.timeout_ms = next_timeout_ms
         settings.model.max_retries = next_max_retries
         settings.model.retry_initial_delay_seconds = next_retry_initial_delay_seconds
         settings.model.retry_max_delay_seconds = next_retry_max_delay_seconds
         settings.model.retry_backoff_cap_retries = next_retry_backoff_cap_retries
-        settings.model.auto_compact = next_auto_compact
-        settings.model.auto_compact_threshold = next_auto_compact_threshold
+        settings.model.auto_compact_token_limit = next_auto_compact_token_limit
         settings.model.params = next_model_params
         settings.event_log.timestamp_format = next_timestamp_format
 

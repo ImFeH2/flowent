@@ -33,6 +33,11 @@ const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
   { value: "unlimited", label: "Unlimited" },
 ];
 
+const DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS = 1024;
+const DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024;
+
+type TriStateCapability = "auto" | "enabled" | "disabled";
+
 interface UserSettings {
   assistant: {
     role_name: string;
@@ -45,18 +50,40 @@ interface UserSettings {
   model: {
     active_provider_id: string;
     active_model: string;
-    capabilities: ModelCapabilities | null;
+    input_image: boolean | null;
+    output_image: boolean | null;
     context_window_tokens: number | null;
+    capabilities: ModelCapabilities | null;
+    resolved_context_window_tokens: number | null;
     timeout_ms: number;
     retry_policy: RetryPolicy;
     max_retries: number;
     retry_initial_delay_seconds: number;
     retry_max_delay_seconds: number;
     retry_backoff_cap_retries: number;
-    auto_compact: boolean;
-    auto_compact_threshold: number;
+    auto_compact_token_limit: number | null;
     params: ModelParams;
   };
+}
+
+function triStateFromNullableBool(value: boolean | null): TriStateCapability {
+  if (value === true) {
+    return "enabled";
+  }
+  if (value === false) {
+    return "disabled";
+  }
+  return "auto";
+}
+
+function nullableBoolFromTriState(value: TriStateCapability): boolean | null {
+  if (value === "enabled") {
+    return true;
+  }
+  if (value === "disabled") {
+    return false;
+  }
+  return null;
 }
 
 function normalizeWriteDirs(writeDirs: string[]): string[] {
@@ -129,12 +156,47 @@ export function SettingsPage() {
       models.find((model) => model.id === settings.model.active_model) ?? null
     );
   }, [models, settings?.model.active_model]);
-  const effectiveModelCapabilities =
-    selectedModel?.capabilities ?? settings?.model.capabilities ?? null;
   const effectiveContextWindowTokens =
-    selectedModel?.context_window_tokens ??
     settings?.model.context_window_tokens ??
+    selectedModel?.context_window_tokens ??
+    settings?.model.resolved_context_window_tokens ??
     null;
+  const effectiveModelCapabilities = useMemo(
+    () => ({
+      input_image:
+        settings?.model.input_image ??
+        selectedModel?.capabilities?.input_image ??
+        settings?.model.capabilities?.input_image ??
+        false,
+      output_image:
+        settings?.model.output_image ??
+        selectedModel?.capabilities?.output_image ??
+        settings?.model.capabilities?.output_image ??
+        false,
+    }),
+    [
+      selectedModel?.capabilities?.input_image,
+      selectedModel?.capabilities?.output_image,
+      settings?.model.capabilities?.input_image,
+      settings?.model.capabilities?.output_image,
+      settings?.model.input_image,
+      settings?.model.output_image,
+    ],
+  );
+  const knownSafeInputTokens = useMemo(() => {
+    if (!effectiveContextWindowTokens) {
+      return null;
+    }
+    const outputBudget =
+      settings?.model.params.max_output_tokens ??
+      DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS;
+    return Math.max(
+      1,
+      effectiveContextWindowTokens -
+        outputBudget -
+        DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS,
+    );
+  }, [effectiveContextWindowTokens, settings?.model.params.max_output_tokens]);
   const leaderRole = useMemo(() => {
     if (!settings) return null;
     return (
@@ -192,15 +254,40 @@ export function SettingsPage() {
       toast.error("Max Delay must be greater than or equal to Initial Delay");
       return;
     }
+    if (
+      settings.model.auto_compact_token_limit !== null &&
+      knownSafeInputTokens !== null &&
+      settings.model.auto_compact_token_limit >= knownSafeInputTokens
+    ) {
+      toast.error(
+        "Automatic Compact token limit must stay below the known safe input window",
+      );
+      return;
+    }
     setSaving(true);
     try {
+      const modelPayload = {
+        active_provider_id: settings.model.active_provider_id,
+        active_model: settings.model.active_model,
+        input_image: settings.model.input_image,
+        output_image: settings.model.output_image,
+        context_window_tokens: settings.model.context_window_tokens,
+        timeout_ms: settings.model.timeout_ms,
+        retry_policy: settings.model.retry_policy,
+        max_retries: settings.model.max_retries,
+        retry_initial_delay_seconds: settings.model.retry_initial_delay_seconds,
+        retry_max_delay_seconds: settings.model.retry_max_delay_seconds,
+        retry_backoff_cap_retries: settings.model.retry_backoff_cap_retries,
+        auto_compact_token_limit: settings.model.auto_compact_token_limit,
+        params: settings.model.params,
+      };
       const payload = {
         assistant: {
           ...settings.assistant,
           write_dirs: normalizeWriteDirs(settings.assistant.write_dirs),
         },
         leader: settings.leader,
-        model: settings.model,
+        model: modelPayload,
       };
       const savedSettings = await saveSettings<UserSettings>(payload);
 
@@ -412,7 +499,7 @@ export function SettingsPage() {
           <section className="mt-8 border-t border-white/6 pt-8">
             <SectionHeader
               title="Model Configuration"
-              description="Set the default provider, model, and canonical parameters used when a role does not define its own override."
+              description="Set the active provider and model, explicit active-model metadata overrides, canonical parameters, and token-limit based automatic compact."
             />
             <div>
               <SettingsRow
@@ -523,16 +610,144 @@ export function SettingsPage() {
                     </p>
                     <p>
                       Capabilities: input_image=
-                      {effectiveModelCapabilities?.input_image
+                      {effectiveModelCapabilities.input_image
                         ? "true"
                         : "false"}
                       , output_image=
-                      {effectiveModelCapabilities?.output_image
+                      {effectiveModelCapabilities.output_image
                         ? "true"
                         : "false"}
                     </p>
                   </div>
                 ) : null}
+              </SettingsRow>
+
+              <SettingsRow
+                label="Model Metadata Overrides"
+                description="Explicit active-model capability and limit overrides"
+              >
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="model-context-window"
+                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                      >
+                        Context Window
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          id="model-context-window"
+                          aria-label="Context Window"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={
+                            settings.model.context_window_tokens === null
+                              ? ""
+                              : String(settings.model.context_window_tokens)
+                          }
+                          onChange={(e) => {
+                            const nextValue = e.target.value.trim();
+                            if (!/^\d*$/.test(nextValue)) {
+                              return;
+                            }
+                            if (
+                              nextValue &&
+                              Number.parseInt(nextValue, 10) <= 0
+                            ) {
+                              return;
+                            }
+                            setLocalSettings({
+                              ...settings,
+                              model: {
+                                ...settings.model,
+                                context_window_tokens: nextValue
+                                  ? Number.parseInt(nextValue, 10)
+                                  : null,
+                              },
+                            });
+                          }}
+                          placeholder="Auto"
+                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        />
+                        <span className="text-[13px] font-medium text-white/40">
+                          tokens
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">
+                        Input Image
+                      </label>
+                      <Select
+                        value={triStateFromNullableBool(
+                          settings.model.input_image,
+                        )}
+                        onValueChange={(value: TriStateCapability) =>
+                          setLocalSettings({
+                            ...settings,
+                            model: {
+                              ...settings.model,
+                              input_image: nullableBoolFromTriState(value),
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label="Input Image"
+                          className="w-full rounded-md border-white/8 bg-black/[0.22]"
+                        >
+                          <SelectValue placeholder="Auto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">Auto</SelectItem>
+                          <SelectItem value="enabled">Enabled</SelectItem>
+                          <SelectItem value="disabled">Disabled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">
+                        Output Image
+                      </label>
+                      <Select
+                        value={triStateFromNullableBool(
+                          settings.model.output_image,
+                        )}
+                        onValueChange={(value: TriStateCapability) =>
+                          setLocalSettings({
+                            ...settings,
+                            model: {
+                              ...settings.model,
+                              output_image: nullableBoolFromTriState(value),
+                            },
+                          })
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label="Output Image"
+                          className="w-full rounded-md border-white/8 bg-black/[0.22]"
+                        >
+                          <SelectValue placeholder="Auto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">Auto</SelectItem>
+                          <SelectItem value="enabled">Enabled</SelectItem>
+                          <SelectItem value="disabled">Disabled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-white/40 leading-relaxed">
+                    These fields override the resolved metadata for the current
+                    active model only. Auto keeps using the catalog result or
+                    other resolved metadata instead of forcing a value.
+                  </p>
+                </div>
               </SettingsRow>
 
               <SettingsRow
@@ -810,87 +1025,80 @@ export function SettingsPage() {
 
               <SettingsRow
                 label="Automatic Compact"
-                description="Preflight execution-context compaction"
+                description="Token-limit based preflight execution-context compaction"
               >
                 <div className="space-y-3">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={settings.model.auto_compact}
-                    aria-label="Automatic Compact"
-                    onClick={() =>
-                      setLocalSettings({
-                        ...settings,
-                        model: {
-                          ...settings.model,
-                          auto_compact: !settings.model.auto_compact,
-                        },
-                      })
-                    }
-                    className={cn(
-                      "inline-flex h-8 w-[72px] items-center rounded-full border px-1 transition-colors",
-                      settings.model.auto_compact
-                        ? "border-emerald-400/30 bg-emerald-400/15"
-                        : "border-white/[0.08] bg-white/[0.04]",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold transition-all",
-                        settings.model.auto_compact
-                          ? "translate-x-[40px] bg-emerald-300 text-black"
-                          : "translate-x-0 bg-white/90 text-black",
-                      )}
-                    >
-                      {settings.model.auto_compact ? "ON" : "OFF"}
-                    </span>
-                  </button>
-
                   <div className="space-y-1">
                     <label
-                      htmlFor="auto-compact-threshold"
+                      htmlFor="auto-compact-token-limit"
                       className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
                     >
-                      Threshold
+                      Token Limit
                     </label>
-                    <input
-                      id="auto-compact-threshold"
-                      aria-label="Automatic Compact Threshold"
-                      type="text"
-                      inputMode="decimal"
-                      value={String(settings.model.auto_compact_threshold)}
-                      onChange={(e) => {
-                        const nextValue = e.target.value.trim();
-                        if (!/^\d+(\.\d+)?$/.test(nextValue)) {
-                          return;
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="auto-compact-token-limit"
+                        aria-label="Automatic Compact Token Limit"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={
+                          settings.model.auto_compact_token_limit === null
+                            ? ""
+                            : String(settings.model.auto_compact_token_limit)
                         }
-                        const parsed = Number.parseFloat(nextValue);
-                        if (
-                          !Number.isFinite(parsed) ||
-                          parsed <= 0 ||
-                          parsed >= 1
-                        ) {
-                          return;
-                        }
-                        setLocalSettings({
-                          ...settings,
-                          model: {
-                            ...settings.model,
-                            auto_compact_threshold: parsed,
-                          },
-                        });
-                      }}
-                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
-                    />
+                        onChange={(e) => {
+                          const nextValue = e.target.value.trim();
+                          if (!/^\d*$/.test(nextValue)) {
+                            return;
+                          }
+                          if (
+                            nextValue &&
+                            Number.parseInt(nextValue, 10) <= 0
+                          ) {
+                            return;
+                          }
+                          setLocalSettings({
+                            ...settings,
+                            model: {
+                              ...settings.model,
+                              auto_compact_token_limit: nextValue
+                                ? Number.parseInt(nextValue, 10)
+                                : null,
+                            },
+                          });
+                        }}
+                        placeholder="Disabled"
+                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                      />
+                      <span className="text-[13px] font-medium text-white/40">
+                        tokens
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-[11px] text-white/40 leading-relaxed">
-                    When enabled, the runtime compacts execution context before
-                    the estimated input reaches the configured fraction of the
-                    safe model window. If the context window is not resolved for
-                    the current model, only manual <code>/compact</code> is
-                    used.
+                    Automatic compact is triggered by the latest successful API
+                    usage baseline plus any locally added tail context after
+                    that response. Leave this empty to disable automatic{" "}
+                    <code>/compact</code>.
                   </p>
+                  {knownSafeInputTokens !== null ? (
+                    <p className="text-[11px] text-white/40 leading-relaxed">
+                      Known safe input window:{" "}
+                      {knownSafeInputTokens.toLocaleString()} tokens.
+                      {settings.model.auto_compact_token_limit !== null &&
+                      settings.model.auto_compact_token_limit >=
+                        knownSafeInputTokens
+                        ? " Save is blocked until the token limit is lower than this window."
+                        : null}
+                    </p>
+                  ) : settings.model.auto_compact_token_limit !== null ? (
+                    <p className="text-[11px] text-amber-200/70 leading-relaxed">
+                      The current model window is not resolved, so this token
+                      limit can be saved but cannot be fully validated yet.
+                    </p>
+                  ) : null}
                 </div>
               </SettingsRow>
             </div>

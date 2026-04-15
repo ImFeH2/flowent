@@ -10,7 +10,13 @@ from typing import Any
 from loguru import logger
 
 from app.model_metadata import build_model_info
-from app.models import LLMOutputImagePart, LLMOutputTextPart, LLMResponse, ModelInfo
+from app.models import (
+    LLMOutputImagePart,
+    LLMOutputTextPart,
+    LLMResponse,
+    LLMUsage,
+    ModelInfo,
+)
 from app.models import ToolCallResult as ToolCall
 from app.network import (
     RequestException,
@@ -29,6 +35,16 @@ from app.providers.errors import (
 from app.providers.headers import merge_headers
 from app.providers.sse import iter_sse_json
 from app.settings import ModelParams
+
+
+def _extract_usage_metadata_value(
+    usage_metadata: dict[str, Any],
+    key: str,
+) -> int | None:
+    value = usage_metadata.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
 
 
 class GeminiProvider(LLMProvider):
@@ -210,6 +226,7 @@ class GeminiProvider(LLMProvider):
         output_parts: list[LLMOutputTextPart | LLMOutputImagePart] = []
         tool_calls_list: list[ToolCall] = []
         chunk_count = 0
+        usage: LLMUsage | None = None
         client = self._client
         if register_interrupt is not None:
             register_interrupt(client.close)
@@ -254,6 +271,41 @@ class GeminiProvider(LLMProvider):
 
                 for chunk in iter_sse_json(response):
                     chunk_count += 1
+                    usage_metadata = chunk.get("usageMetadata", {})
+                    if isinstance(usage_metadata, dict):
+                        input_tokens = _extract_usage_metadata_value(
+                            usage_metadata, "promptTokenCount"
+                        )
+                        output_tokens = _extract_usage_metadata_value(
+                            usage_metadata, "candidatesTokenCount"
+                        )
+                        total_tokens = _extract_usage_metadata_value(
+                            usage_metadata, "totalTokenCount"
+                        )
+                        cached_input_tokens = _extract_usage_metadata_value(
+                            usage_metadata, "cachedContentTokenCount"
+                        )
+                        details = {
+                            key: value
+                            for key in (
+                                "toolUsePromptTokenCount",
+                                "thoughtsTokenCount",
+                            )
+                            if (
+                                value := _extract_usage_metadata_value(
+                                    usage_metadata, key
+                                )
+                            )
+                            is not None
+                        }
+                        if total_tokens is not None:
+                            usage = LLMUsage(
+                                total_tokens=total_tokens,
+                                input_tokens=input_tokens,
+                                output_tokens=output_tokens,
+                                cached_input_tokens=cached_input_tokens,
+                                details=details,
+                            )
                     candidates = chunk.get("candidates", [])
                     if not candidates:
                         continue
@@ -335,9 +387,14 @@ class GeminiProvider(LLMProvider):
                 content=content,
                 parts=output_parts or None,
                 tool_calls=tool_calls_list,
+                usage=usage,
             )
 
-        return LLMResponse(content=content or "", parts=output_parts or None)
+        return LLMResponse(
+            content=content or "",
+            parts=output_parts or None,
+            usage=usage,
+        )
 
     def list_models(
         self,

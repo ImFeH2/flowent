@@ -9,7 +9,7 @@ from typing import Any
 from loguru import logger
 
 from app.model_metadata import build_model_info
-from app.models import LLMResponse, ModelInfo
+from app.models import LLMResponse, LLMUsage, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.network import (
     RequestException,
@@ -28,6 +28,13 @@ from app.providers.errors import (
 from app.providers.headers import merge_headers
 from app.providers.sse import iter_sse_json
 from app.settings import ModelParams
+
+
+def _extract_usage_value(usage: dict[str, Any], key: str) -> int | None:
+    value = usage.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
 
 
 class AnthropicProvider(LLMProvider):
@@ -227,6 +234,10 @@ class AnthropicProvider(LLMProvider):
         tool_calls_accum: dict[int, dict[str, Any]] = {}
         current_block_idx = -1
         event_count = 0
+        input_tokens: int | None = None
+        output_tokens: int | None = None
+        cached_input_tokens: int | None = None
+        usage_details: dict[str, int] = {}
         client = self._client
         if register_interrupt is not None:
             register_interrupt(client.close)
@@ -273,6 +284,27 @@ class AnthropicProvider(LLMProvider):
                     event_count += 1
                     event_type = event.get("type", "")
 
+                    if event_type == "message_start":
+                        message = event.get("message", {})
+                        usage = message.get("usage", {})
+                        if isinstance(usage, dict):
+                            input_tokens = _extract_usage_value(usage, "input_tokens")
+                            cached_input_tokens = _extract_usage_value(
+                                usage, "cache_read_input_tokens"
+                            )
+                            if cached_input_tokens is None:
+                                cached_input_tokens = _extract_usage_value(
+                                    usage, "cache_creation_input_tokens"
+                                )
+                            for key in (
+                                "cache_creation_input_tokens",
+                                "cache_read_input_tokens",
+                            ):
+                                value = _extract_usage_value(usage, key)
+                                if value is not None:
+                                    usage_details[key] = value
+                        continue
+
                     if event_type == "content_block_start":
                         current_block_idx += 1
                         block = event.get("content_block", {})
@@ -308,6 +340,15 @@ class AnthropicProvider(LLMProvider):
                                     partial
                                 )
 
+                    elif event_type == "message_delta":
+                        usage = event.get("usage", {})
+                        if isinstance(usage, dict):
+                            next_output_tokens = _extract_usage_value(
+                                usage, "output_tokens"
+                            )
+                            if next_output_tokens is not None:
+                                output_tokens = next_output_tokens
+
                     elif event_type == "message_stop":
                         break
         except RequestException as exc:
@@ -337,6 +378,15 @@ class AnthropicProvider(LLMProvider):
         elapsed = time.perf_counter() - t0
         content = "".join(content_parts) or None
         thinking = "".join(thinking_parts) or None
+        usage = None
+        if input_tokens is not None or output_tokens is not None:
+            usage = LLMUsage(
+                total_tokens=(input_tokens or 0) + (output_tokens or 0),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cached_input_tokens=cached_input_tokens,
+                details=usage_details,
+            )
 
         logger.debug(
             "[{}] Anthropic chat done: {:.2f}s, events={}, content_len={}, thinking_len={}, tool_calls={}",
@@ -363,9 +413,10 @@ class AnthropicProvider(LLMProvider):
                 content=content,
                 tool_calls=tool_calls,
                 thinking=thinking,
+                usage=usage,
             )
 
-        return LLMResponse(content=content or "", thinking=thinking)
+        return LLMResponse(content=content or "", thinking=thinking, usage=usage)
 
     def list_models(
         self,

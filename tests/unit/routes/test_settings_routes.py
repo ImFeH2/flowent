@@ -86,16 +86,18 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
             "model": {
                 "active_provider_id": "",
                 "active_model": "",
+                "input_image": None,
+                "output_image": None,
                 "capabilities": None,
                 "context_window_tokens": None,
+                "resolved_context_window_tokens": None,
                 "timeout_ms": 10000,
                 "retry_policy": "limited",
                 "max_retries": 5,
                 "retry_initial_delay_seconds": 0.5,
                 "retry_max_delay_seconds": 8.0,
                 "retry_backoff_cap_retries": 5,
-                "auto_compact": True,
-                "auto_compact_threshold": 0.75,
+                "auto_compact_token_limit": None,
                 "params": {
                     "reasoning_effort": None,
                     "verbosity": None,
@@ -491,6 +493,58 @@ def test_update_settings_accepts_model_max_retries(monkeypatch):
 
     assert settings.model.max_retries == 8
     assert result["settings"]["model"]["max_retries"] == 8
+    assert saved == [settings]
+
+
+def test_update_settings_accepts_model_metadata_overrides_and_token_limit(
+    monkeypatch,
+):
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_responses",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")],
+    )
+    settings.model.active_provider_id = "provider-1"
+    settings.model.active_model = "gpt-5.2"
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                model={
+                    "context_window_tokens": 64000,
+                    "input_image": True,
+                    "output_image": False,
+                    "auto_compact_token_limit": 48000,
+                },
+            )
+        )
+    )
+
+    assert settings.model.context_window_tokens == 64000
+    assert settings.model.input_image is True
+    assert settings.model.output_image is False
+    assert settings.model.auto_compact_token_limit == 48000
+    assert result["settings"]["model"]["context_window_tokens"] == 64000
+    assert result["settings"]["model"]["resolved_context_window_tokens"] == 64000
+    assert result["settings"]["model"]["capabilities"] == {
+        "input_image": True,
+        "output_image": False,
+    }
+    assert result["settings"]["model"]["auto_compact_token_limit"] == 48000
     assert saved == [settings]
 
 

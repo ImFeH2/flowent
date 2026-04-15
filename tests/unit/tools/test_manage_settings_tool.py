@@ -7,6 +7,7 @@ from app.settings import (
     EventLogSettings,
     LeaderSettings,
     ModelSettings,
+    ProviderConfig,
     RoleConfig,
     Settings,
     build_assistant_write_dirs,
@@ -43,16 +44,18 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
         "model": {
             "active_provider_id": "provider-1",
             "active_model": "gpt-4o",
-            "capabilities": None,
+            "input_image": None,
+            "output_image": None,
             "context_window_tokens": None,
+            "capabilities": None,
+            "resolved_context_window_tokens": None,
             "timeout_ms": 10000,
             "retry_policy": "limited",
             "max_retries": 5,
             "retry_initial_delay_seconds": 0.5,
             "retry_max_delay_seconds": 8.0,
             "retry_backoff_cap_retries": 5,
-            "auto_compact": True,
-            "auto_compact_threshold": 0.75,
+            "auto_compact_token_limit": None,
             "params": {
                 "reasoning_effort": None,
                 "verbosity": None,
@@ -96,16 +99,18 @@ def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
     assert result["model"] == {
         "active_provider_id": "provider-2",
         "active_model": "gpt-4.1",
-        "capabilities": None,
+        "input_image": None,
+        "output_image": None,
         "context_window_tokens": None,
+        "capabilities": None,
+        "resolved_context_window_tokens": None,
         "timeout_ms": 10000,
         "retry_policy": "limited",
         "max_retries": 5,
         "retry_initial_delay_seconds": 0.5,
         "retry_max_delay_seconds": 8.0,
         "retry_backoff_cap_retries": 5,
-        "auto_compact": True,
-        "auto_compact_threshold": 0.75,
+        "auto_compact_token_limit": None,
         "params": {
             "reasoning_effort": None,
             "verbosity": None,
@@ -308,6 +313,54 @@ def test_manage_settings_update_changes_retry_backoff(monkeypatch):
     assert settings.model.retry_initial_delay_seconds == 0.75
     assert settings.model.retry_max_delay_seconds == 12.0
     assert settings.model.retry_backoff_cap_retries == 3
+
+
+def test_manage_settings_update_changes_model_metadata_overrides_and_token_limit(
+    monkeypatch,
+):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings(
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_responses",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ]
+    )
+    settings.model.active_provider_id = "provider-1"
+    settings.model.active_model = "gpt-5.2"
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "context_window_tokens": 64000,
+                "input_image": True,
+                "output_image": False,
+                "auto_compact_token_limit": 48000,
+            },
+        )
+    )
+
+    assert result["model"]["context_window_tokens"] == 64000
+    assert result["model"]["resolved_context_window_tokens"] == 64000
+    assert result["model"]["capabilities"] == {
+        "input_image": True,
+        "output_image": False,
+    }
+    assert result["model"]["auto_compact_token_limit"] == 48000
+    assert settings.model.context_window_tokens == 64000
+    assert settings.model.input_image is True
+    assert settings.model.output_image is False
+    assert settings.model.auto_compact_token_limit == 48000
 
 
 def test_manage_settings_update_rejects_non_positive_timeout_ms(monkeypatch):

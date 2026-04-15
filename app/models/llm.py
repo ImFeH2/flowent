@@ -18,6 +18,15 @@ class ModelInfo:
 
 
 @dataclass
+class LLMUsage:
+    total_tokens: int
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_input_tokens: int | None = None
+    details: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass
 class ToolCallResult:
     id: str
     name: str
@@ -46,3 +55,4 @@ class LLMResponse:
     parts: list[LLMOutputPart] | None = None
     tool_calls: list[ToolCallResult] | None = None
     thinking: str | None = None
+    usage: LLMUsage | None = None

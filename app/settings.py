@@ -130,8 +130,7 @@ DEFAULT_LLM_RETRY_POLICY = "limited"
 DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS = 0.5
 DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS = 8.0
 DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES = 5
-DEFAULT_LLM_AUTO_COMPACT = True
-DEFAULT_LLM_AUTO_COMPACT_THRESHOLD = 0.75
+DEFAULT_LLM_AUTO_COMPACT_TOKEN_LIMIT: int | None = None
 DEFAULT_ASSISTANT_ALLOW_NETWORK = True
 
 
@@ -193,6 +192,9 @@ class RoleConfig:
 class ModelSettings:
     active_provider_id: str = ""
     active_model: str = ""
+    input_image: bool | None = None
+    output_image: bool | None = None
+    context_window_tokens: int | None = None
     params: ModelParams = field(default_factory=build_default_model_params)
     timeout_ms: int = DEFAULT_LLM_TIMEOUT_MS
     retry_policy: str = DEFAULT_LLM_RETRY_POLICY
@@ -200,8 +202,7 @@ class ModelSettings:
     retry_initial_delay_seconds: float = DEFAULT_LLM_RETRY_INITIAL_DELAY_SECONDS
     retry_max_delay_seconds: float = DEFAULT_LLM_RETRY_MAX_DELAY_SECONDS
     retry_backoff_cap_retries: int = DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES
-    auto_compact: bool = DEFAULT_LLM_AUTO_COMPACT
-    auto_compact_threshold: float = DEFAULT_LLM_AUTO_COMPACT_THRESHOLD
+    auto_compact_token_limit: int | None = DEFAULT_LLM_AUTO_COMPACT_TOKEN_LIMIT
 
 
 @dataclass
@@ -413,29 +414,60 @@ def build_model_max_retries(
     return raw_max_retries
 
 
-def build_model_auto_compact(
-    raw_auto_compact: object,
+def build_model_input_image(
+    raw_input_image: object,
     *,
-    field_name: str = "model.auto_compact",
-) -> bool:
-    if not isinstance(raw_auto_compact, bool):
-        raise ValueError(f"{field_name} must be a boolean")
-    return raw_auto_compact
+    field_name: str = "model.input_image",
+) -> bool | None:
+    if raw_input_image is None:
+        return None
+    if not isinstance(raw_input_image, bool):
+        raise ValueError(f"{field_name} must be a boolean or null")
+    return raw_input_image
 
 
-def build_model_auto_compact_threshold(
-    raw_auto_compact_threshold: object,
+def build_model_output_image(
+    raw_output_image: object,
     *,
-    field_name: str = "model.auto_compact_threshold",
-) -> float:
-    if isinstance(raw_auto_compact_threshold, bool) or not isinstance(
-        raw_auto_compact_threshold, (int, float)
+    field_name: str = "model.output_image",
+) -> bool | None:
+    if raw_output_image is None:
+        return None
+    if not isinstance(raw_output_image, bool):
+        raise ValueError(f"{field_name} must be a boolean or null")
+    return raw_output_image
+
+
+def build_model_context_window_tokens(
+    raw_context_window_tokens: object,
+    *,
+    field_name: str = "model.context_window_tokens",
+) -> int | None:
+    if raw_context_window_tokens is None:
+        return None
+    if isinstance(raw_context_window_tokens, bool) or not isinstance(
+        raw_context_window_tokens, int
     ):
-        raise ValueError(f"{field_name} must be a number")
-    threshold = float(raw_auto_compact_threshold)
-    if not isfinite(threshold) or threshold <= 0 or threshold >= 1:
-        raise ValueError(f"{field_name} must be greater than 0 and less than 1")
-    return threshold
+        raise ValueError(f"{field_name} must be an integer or null")
+    if raw_context_window_tokens <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return raw_context_window_tokens
+
+
+def build_model_auto_compact_token_limit(
+    raw_auto_compact_token_limit: object,
+    *,
+    field_name: str = "model.auto_compact_token_limit",
+) -> int | None:
+    if raw_auto_compact_token_limit is None:
+        return None
+    if isinstance(raw_auto_compact_token_limit, bool) or not isinstance(
+        raw_auto_compact_token_limit, int
+    ):
+        raise ValueError(f"{field_name} must be an integer or null")
+    if raw_auto_compact_token_limit <= 0:
+        raise ValueError(f"{field_name} must be greater than 0")
+    return raw_auto_compact_token_limit
 
 
 def build_assistant_allow_network(
@@ -684,11 +716,14 @@ def serialize_settings(
         model_info = build_model_info(
             provider_type=provider.type,
             model_id=settings.model.active_model,
+            input_image=settings.model.input_image,
+            output_image=settings.model.output_image,
+            context_window_tokens=settings.model.context_window_tokens,
         )
     data["model"]["capabilities"] = (
         asdict(model_info.capabilities) if model_info is not None else None
     )
-    data["model"]["context_window_tokens"] = (
+    data["model"]["resolved_context_window_tokens"] = (
         model_info.context_window_tokens if model_info is not None else None
     )
     data["telegram"] = serialize_telegram_settings(
@@ -758,6 +793,14 @@ def _normalize_positive_int(raw_value: object) -> tuple[int | None, bool]:
     if isinstance(raw_value, float) and raw_value.is_integer():
         value = int(raw_value)
         return (value, True) if value > 0 else (None, True)
+    return None, True
+
+
+def _normalize_nullable_bool(raw_value: object) -> tuple[bool | None, bool]:
+    if raw_value is None:
+        return None, False
+    if isinstance(raw_value, bool):
+        return raw_value, False
     return None, True
 
 
@@ -1206,28 +1249,20 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         except ValueError:
             retry_backoff_cap_retries = DEFAULT_LLM_RETRY_BACKOFF_CAP_RETRIES
             migrated = True
-    raw_auto_compact = model_data.get("auto_compact")
-    if raw_auto_compact is None:
-        auto_compact = DEFAULT_LLM_AUTO_COMPACT
+    input_image, migrated_input_image = _normalize_nullable_bool(
+        model_data.get("input_image")
+    )
+    output_image, migrated_output_image = _normalize_nullable_bool(
+        model_data.get("output_image")
+    )
+    context_window_tokens, migrated_context_window_tokens = _normalize_positive_int(
+        model_data.get("context_window_tokens")
+    )
+    auto_compact_token_limit, migrated_auto_compact_token_limit = (
+        _normalize_positive_int(model_data.get("auto_compact_token_limit"))
+    )
+    if "auto_compact" in model_data or "auto_compact_threshold" in model_data:
         migrated = True
-    else:
-        try:
-            auto_compact = build_model_auto_compact(raw_auto_compact)
-        except ValueError:
-            auto_compact = DEFAULT_LLM_AUTO_COMPACT
-            migrated = True
-    raw_auto_compact_threshold = model_data.get("auto_compact_threshold")
-    if raw_auto_compact_threshold is None:
-        auto_compact_threshold = DEFAULT_LLM_AUTO_COMPACT_THRESHOLD
-        migrated = True
-    else:
-        try:
-            auto_compact_threshold = build_model_auto_compact_threshold(
-                raw_auto_compact_threshold
-            )
-        except ValueError:
-            auto_compact_threshold = DEFAULT_LLM_AUTO_COMPACT_THRESHOLD
-            migrated = True
     try:
         validate_model_retry_backoff_settings(
             retry_initial_delay_seconds=retry_initial_delay_seconds,
@@ -1250,6 +1285,9 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     model_settings = ModelSettings(
         active_provider_id=str(model_data.get("active_provider_id", "")),
         active_model=str(model_data.get("active_model", "")),
+        input_image=input_image,
+        output_image=output_image,
+        context_window_tokens=context_window_tokens,
         params=model_params,
         timeout_ms=model_timeout_ms,
         retry_policy=model_retry_policy,
@@ -1257,8 +1295,14 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         retry_initial_delay_seconds=retry_initial_delay_seconds,
         retry_max_delay_seconds=retry_max_delay_seconds,
         retry_backoff_cap_retries=retry_backoff_cap_retries,
-        auto_compact=auto_compact,
-        auto_compact_threshold=auto_compact_threshold,
+        auto_compact_token_limit=auto_compact_token_limit,
+    )
+    migrated = (
+        migrated
+        or migrated_input_image
+        or migrated_output_image
+        or migrated_context_window_tokens
+        or migrated_auto_compact_token_limit
     )
     custom_prompt = str(data.get("custom_prompt", ""))
     if "custom_post_prompt" in data:

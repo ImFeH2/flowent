@@ -9,7 +9,13 @@ from typing import Any
 from loguru import logger
 
 from app.model_metadata import build_model_info
-from app.models import LLMOutputImagePart, LLMOutputTextPart, LLMResponse, ModelInfo
+from app.models import (
+    LLMOutputImagePart,
+    LLMOutputTextPart,
+    LLMResponse,
+    LLMUsage,
+    ModelInfo,
+)
 from app.models import ToolCallResult as ToolCall
 from app.network import (
     RequestException,
@@ -131,6 +137,73 @@ def _extract_reasoning_tokens(response: dict[str, Any]) -> int:
 
     tokens = output_tokens_details.get("reasoning_tokens")
     return tokens if isinstance(tokens, int) and tokens > 0 else 0
+
+
+def _collect_usage_details(
+    value: dict[str, Any],
+    *,
+    prefix: str = "",
+) -> dict[str, int]:
+    details: dict[str, int] = {}
+    for key, raw_item in value.items():
+        detail_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(raw_item, bool):
+            continue
+        if isinstance(raw_item, int) and raw_item >= 0:
+            details[detail_key] = raw_item
+            continue
+        if isinstance(raw_item, dict):
+            details.update(_collect_usage_details(raw_item, prefix=detail_key))
+    return details
+
+
+def _extract_usage(response: dict[str, Any]) -> LLMUsage | None:
+    usage = response.get("usage")
+    if not isinstance(usage, dict):
+        return None
+
+    total_tokens = usage.get("total_tokens")
+    if isinstance(total_tokens, bool) or not isinstance(total_tokens, int):
+        return None
+
+    input_tokens = usage.get("input_tokens")
+    if isinstance(input_tokens, bool) or not isinstance(input_tokens, int):
+        input_tokens = None
+
+    output_tokens = usage.get("output_tokens")
+    if isinstance(output_tokens, bool) or not isinstance(output_tokens, int):
+        output_tokens = None
+
+    cached_input_tokens = usage.get("cached_input_tokens")
+    if isinstance(cached_input_tokens, bool) or not isinstance(
+        cached_input_tokens, int
+    ):
+        cached_input_tokens = None
+    input_token_details = usage.get("input_tokens_details")
+    if (
+        cached_input_tokens is None
+        and isinstance(input_token_details, dict)
+        and isinstance(input_token_details.get("cached_tokens"), int)
+    ):
+        cached_input_tokens = input_token_details["cached_tokens"]
+
+    details = _collect_usage_details(usage)
+    for key in (
+        "total_tokens",
+        "input_tokens",
+        "output_tokens",
+        "cached_input_tokens",
+        "input_tokens_details.cached_tokens",
+    ):
+        details.pop(key, None)
+
+    return LLMUsage(
+        total_tokens=total_tokens,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_input_tokens=cached_input_tokens,
+        details=details,
+    )
 
 
 def _decode_output_image(item: dict[str, Any]) -> LLMOutputImagePart | None:
@@ -342,6 +415,7 @@ class OpenAIResponsesProvider(LLMProvider):
         saw_reasoning_item = False
         saw_reasoning_text = False
         reasoning_tokens = 0
+        response_usage: LLMUsage | None = None
 
         current_tool: dict[str, Any] = {}
         client = self._client
@@ -464,6 +538,7 @@ class OpenAIResponsesProvider(LLMProvider):
                         response_data = event.get("response", {})
                         if isinstance(response_data, dict):
                             reasoning_tokens = _extract_reasoning_tokens(response_data)
+                            response_usage = _extract_usage(response_data)
                             if not saw_reasoning_text:
                                 reasoning_text = _extract_reasoning_text_from_output(
                                     response_data.get("output")
@@ -524,12 +599,14 @@ class OpenAIResponsesProvider(LLMProvider):
                 parts=response_parts,
                 tool_calls=tool_calls,
                 thinking=thinking,
+                usage=response_usage,
             )
 
         return LLMResponse(
             content=content or "",
             parts=response_parts,
             thinking=thinking,
+            usage=response_usage,
         )
 
     def list_models(

@@ -16,9 +16,11 @@ from app.settings import (
     build_assistant_allow_network,
     build_assistant_write_dirs,
     build_default_model_params,
-    build_model_auto_compact,
-    build_model_auto_compact_threshold,
+    build_model_auto_compact_token_limit,
+    build_model_context_window_tokens,
+    build_model_input_image,
     build_model_max_retries,
+    build_model_output_image,
     build_model_params_from_mapping,
     build_model_retry_backoff_cap_retries,
     build_model_retry_initial_delay_seconds,
@@ -140,8 +142,10 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         retry_initial_delay_seconds = current.model.retry_initial_delay_seconds
         retry_max_delay_seconds = current.model.retry_max_delay_seconds
         retry_backoff_cap_retries = current.model.retry_backoff_cap_retries
-        auto_compact = current.model.auto_compact
-        auto_compact_threshold = current.model.auto_compact_threshold
+        input_image = current.model.input_image
+        output_image = current.model.output_image
+        context_window_tokens = current.model.context_window_tokens
+        auto_compact_token_limit = current.model.auto_compact_token_limit
         if "params" in req.model:
             try:
                 parsed_params = build_model_params_from_mapping(req.model.get("params"))
@@ -184,15 +188,27 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "auto_compact" in req.model:
+        if "input_image" in req.model:
             try:
-                auto_compact = build_model_auto_compact(req.model.get("auto_compact"))
+                input_image = build_model_input_image(req.model.get("input_image"))
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "auto_compact_threshold" in req.model:
+        if "output_image" in req.model:
             try:
-                auto_compact_threshold = build_model_auto_compact_threshold(
-                    req.model.get("auto_compact_threshold")
+                output_image = build_model_output_image(req.model.get("output_image"))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "context_window_tokens" in req.model:
+            try:
+                context_window_tokens = build_model_context_window_tokens(
+                    req.model.get("context_window_tokens")
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if "auto_compact_token_limit" in req.model:
+            try:
+                auto_compact_token_limit = build_model_auto_compact_token_limit(
+                    req.model.get("auto_compact_token_limit")
                 )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -210,6 +226,9 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             active_model=active_model
             if isinstance(active_model, str)
             else current.model.active_model,
+            input_image=input_image,
+            output_image=output_image,
+            context_window_tokens=context_window_tokens,
             params=params,
             timeout_ms=timeout_ms,
             retry_policy=retry_policy,
@@ -217,8 +236,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             retry_initial_delay_seconds=retry_initial_delay_seconds,
             retry_max_delay_seconds=retry_max_delay_seconds,
             retry_backoff_cap_retries=retry_backoff_cap_retries,
-            auto_compact=auto_compact,
-            auto_compact_threshold=auto_compact_threshold,
+            auto_compact_token_limit=auto_compact_token_limit,
         )
 
     save_settings(current)

@@ -8,7 +8,7 @@ from typing import Any
 from loguru import logger
 
 from app.model_metadata import build_model_info
-from app.models import LLMResponse, ModelInfo
+from app.models import LLMResponse, LLMUsage, ModelInfo
 from app.models import ToolCallResult as ToolCall
 from app.network import (
     RequestException,
@@ -20,6 +20,7 @@ from app.network import (
 from app.providers import LLMProvider
 from app.providers.content import to_openai_chat_content
 from app.providers.errors import (
+    LLMProviderError,
     build_access_blocked_error,
     build_network_error,
     build_status_error,
@@ -58,6 +59,58 @@ def _extract_delta_parts(delta: dict[str, Any]) -> tuple[str | None, str | None]
                 content_text = (content_text or "") + text
 
     return content_text, thinking_text
+
+
+def _extract_usage(chunk: dict[str, Any]) -> LLMUsage | None:
+    usage = chunk.get("usage")
+    if not isinstance(usage, dict):
+        return None
+
+    total_tokens = usage.get("total_tokens")
+    if isinstance(total_tokens, bool) or not isinstance(total_tokens, int):
+        return None
+
+    input_tokens = usage.get("prompt_tokens")
+    if isinstance(input_tokens, bool) or not isinstance(input_tokens, int):
+        input_tokens = None
+
+    output_tokens = usage.get("completion_tokens")
+    if isinstance(output_tokens, bool) or not isinstance(output_tokens, int):
+        output_tokens = None
+
+    cached_input_tokens = None
+    prompt_tokens_details = usage.get("prompt_tokens_details")
+    if isinstance(prompt_tokens_details, dict) and isinstance(
+        prompt_tokens_details.get("cached_tokens"), int
+    ):
+        cached_input_tokens = prompt_tokens_details["cached_tokens"]
+
+    details: dict[str, int] = {}
+    if isinstance(prompt_tokens_details, dict):
+        for key, value in prompt_tokens_details.items():
+            if key == "cached_tokens":
+                continue
+            if isinstance(value, int) and not isinstance(value, bool):
+                details[f"prompt_tokens_details.{key}"] = value
+
+    completion_tokens_details = usage.get("completion_tokens_details")
+    if isinstance(completion_tokens_details, dict):
+        for key, value in completion_tokens_details.items():
+            if isinstance(value, int) and not isinstance(value, bool):
+                details[f"completion_tokens_details.{key}"] = value
+
+    return LLMUsage(
+        total_tokens=total_tokens,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cached_input_tokens=cached_input_tokens,
+        details=details,
+    )
+
+
+def _supports_stream_usage_error(body: str) -> bool:
+    normalized = body.lower()
+    return "stream_options" in normalized or "include_usage" in normalized
 
 
 class OpenAIProvider(LLMProvider):
@@ -128,6 +181,7 @@ class OpenAIProvider(LLMProvider):
             "messages": converted_messages,
             "stream": True,
         }
+        payload["stream_options"] = {"include_usage": True}
         if model_params is not None:
             if model_params.max_output_tokens is not None:
                 payload["max_tokens"] = model_params.max_output_tokens
@@ -153,17 +207,19 @@ class OpenAIProvider(LLMProvider):
         thinking_parts: list[str] = []
         tool_calls_accum: dict[int, dict[str, Any]] = {}
         chunk_count = 0
+        response_usage: LLMUsage | None = None
         think_parser = ThinkTagParser()
         client = self._client
         if register_interrupt is not None:
             register_interrupt(client.close)
 
-        try:
+        def stream_request(request_payload: dict[str, Any]) -> None:
+            nonlocal chunk_count, response_usage
             with client.stream(
                 "POST",
                 url,
                 headers=self._headers(),
-                json=payload,
+                json=request_payload,
             ) as response:
                 if register_interrupt is not None:
                     register_interrupt(response.close)
@@ -178,15 +234,6 @@ class OpenAIProvider(LLMProvider):
                     )
                 if response.status_code != 200:
                     body = truncate_text(read_response_text(response))
-                    elapsed = time.perf_counter() - t0
-                    logger.error(
-                        "LLM API error [provider={}, model={}, type=openai]: {} - {} ({:.2f}s)",
-                        self._provider_name,
-                        self._model,
-                        response.status_code,
-                        body[:500],
-                        elapsed,
-                    )
                     raise build_status_error(
                         provider_name=self._provider_name,
                         provider_type="openai",
@@ -198,6 +245,8 @@ class OpenAIProvider(LLMProvider):
 
                 for chunk in iter_sse_json(response, done_token="[DONE]"):
                     chunk_count += 1
+                    if response_usage is None:
+                        response_usage = _extract_usage(chunk)
                     choices = chunk.get("choices")
                     if not choices:
                         continue
@@ -238,6 +287,29 @@ class OpenAIProvider(LLMProvider):
                                 acc["name"] = fn["name"]
                             if fn.get("arguments"):
                                 acc["arguments"] += fn["arguments"]
+
+        try:
+            try:
+                stream_request(payload)
+            except LLMProviderError as exc:
+                if exc.status_code in {400, 422} and _supports_stream_usage_error(
+                    str(exc)
+                ):
+                    payload_without_usage = dict(payload)
+                    payload_without_usage.pop("stream_options", None)
+                    response_usage = None
+                    chunk_count = 0
+                    stream_request(payload_without_usage)
+                else:
+                    elapsed = time.perf_counter() - t0
+                    logger.error(
+                        "LLM API error [provider={}, model={}, type=openai]: {} ({:.2f}s)",
+                        self._provider_name,
+                        self._model,
+                        exc,
+                        elapsed,
+                    )
+                    raise
         except RequestException as exc:
             elapsed = time.perf_counter() - t0
             logger.warning(
@@ -299,9 +371,14 @@ class OpenAIProvider(LLMProvider):
                 content=content,
                 tool_calls=tool_calls,
                 thinking=thinking,
+                usage=response_usage,
             )
 
-        return LLMResponse(content=content or "", thinking=thinking)
+        return LLMResponse(
+            content=content or "",
+            thinking=thinking,
+            usage=response_usage,
+        )
 
     def list_models(
         self,

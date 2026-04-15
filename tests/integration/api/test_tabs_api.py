@@ -126,6 +126,151 @@ def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     assert right_id not in node_ids
 
 
+def test_delete_tab_edge_removes_only_the_target_edge(client: TestClient):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Edge Delete", "goal": "Trim one connection"},
+    ).json()
+    tab_id = tab["id"]
+
+    left = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Left"},
+    ).json()
+    middle = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Middle"},
+    ).json()
+    right = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Right"},
+    ).json()
+
+    assert (
+        client.post(
+            f"/api/tabs/{tab_id}/edges",
+            json={"from_node_id": left["id"], "to_node_id": middle["id"]},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/tabs/{tab_id}/edges",
+            json={"from_node_id": middle["id"], "to_node_id": right["id"]},
+        ).status_code
+        == 200
+    )
+
+    delete_response = client.delete(
+        f"/api/tabs/{tab_id}/edges",
+        params={
+            "from_node_id": left["id"],
+            "to_node_id": middle["id"],
+        },
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["from_node_id"] == left["id"]
+    assert delete_response.json()["to_node_id"] == middle["id"]
+
+    detail = client.get(f"/api/tabs/{tab_id}").json()
+    remaining_edges = {
+        (edge["from_node_id"], edge["to_node_id"]) for edge in detail["edges"]
+    }
+    assert remaining_edges == {(middle["id"], right["id"])}
+    remaining_nodes = {node["id"] for node in detail["nodes"]}
+    assert {left["id"], middle["id"], right["id"]}.issubset(remaining_nodes)
+
+
+def test_delete_tab_node_removes_node_and_all_incident_edges(client: TestClient):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Node Delete", "goal": "Remove one worker"},
+    ).json()
+    tab_id = tab["id"]
+
+    left = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Left"},
+    ).json()
+    middle = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Middle"},
+    ).json()
+    right = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Right"},
+    ).json()
+
+    assert (
+        client.post(
+            f"/api/tabs/{tab_id}/edges",
+            json={"from_node_id": left["id"], "to_node_id": middle["id"]},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/tabs/{tab_id}/edges",
+            json={"from_node_id": middle["id"], "to_node_id": right["id"]},
+        ).status_code
+        == 200
+    )
+
+    delete_response = client.delete(f"/api/tabs/{tab_id}/nodes/{middle['id']}")
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["id"] == middle["id"]
+
+    detail = client.get(f"/api/tabs/{tab_id}").json()
+    remaining_nodes = {node["id"] for node in detail["nodes"]}
+    assert middle["id"] not in remaining_nodes
+    assert left["id"] in remaining_nodes
+    assert right["id"] in remaining_nodes
+    assert detail["edges"] == []
+
+
+def test_tab_edge_creation_rejects_self_loops_and_duplicate_direct_edges(
+    client: TestClient,
+):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Edge Validation", "goal": "Enforce graph rules"},
+    ).json()
+    tab_id = tab["id"]
+    worker = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Worker"},
+    ).json()
+    reviewer = client.post(
+        f"/api/tabs/{tab_id}/nodes",
+        json={"role_name": "Worker", "name": "Reviewer"},
+    ).json()
+
+    self_loop_response = client.post(
+        f"/api/tabs/{tab_id}/edges",
+        json={"from_node_id": worker["id"], "to_node_id": worker["id"]},
+    )
+    assert self_loop_response.status_code == 400
+    assert self_loop_response.json()["detail"] == "Self-loop edges are not allowed"
+
+    first_edge_response = client.post(
+        f"/api/tabs/{tab_id}/edges",
+        json={"from_node_id": worker["id"], "to_node_id": reviewer["id"]},
+    )
+    assert first_edge_response.status_code == 200
+
+    duplicate_edge_response = client.post(
+        f"/api/tabs/{tab_id}/edges",
+        json={"from_node_id": worker["id"], "to_node_id": reviewer["id"]},
+    )
+    assert duplicate_edge_response.status_code == 400
+    assert (
+        duplicate_edge_response.json()["detail"]
+        == "Duplicate directed edges are not allowed"
+    )
+
+
 def test_create_tab_rejects_reserved_conductor_role_for_regular_nodes(
     client: TestClient,
 ):

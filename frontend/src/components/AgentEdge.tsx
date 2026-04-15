@@ -27,6 +27,7 @@ export const AgentEdge = memo(function AgentEdge(props: EdgeProps) {
   const hasActiveMessage = !!edgeData.active;
   const leaving = !!edgeData.leaving;
   const flowDirection = edgeData.flowDirection === "reverse" ? -1 : 1;
+  const selected = edgeData.selected === true;
 
   // Calculate dash offsets based on direction for the continuous dotted stream
   const dashOffsetFrom = flowDirection === 1 ? "48" : "0";
@@ -45,12 +46,27 @@ export const AgentEdge = memo(function AgentEdge(props: EdgeProps) {
         style={{
           stroke: hasActiveMessage
             ? "var(--graph-edge-active)"
-            : "var(--graph-edge)",
-          strokeWidth: hasActiveMessage ? 2.5 : 1.5,
+            : selected
+              ? "var(--graph-selection)"
+              : "var(--graph-edge)",
+          strokeWidth: hasActiveMessage ? 2.5 : selected ? 2.4 : 1.5,
           transition:
             "stroke 300ms ease, stroke-width 300ms ease, opacity 300ms ease",
         }}
       />
+      {selected && !hasActiveMessage ? (
+        <motion.path
+          d={edgePath}
+          fill="none"
+          stroke="var(--graph-selection)"
+          strokeWidth="7"
+          strokeLinecap="round"
+          filter="url(#agent-graph-edge-glow)"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.16 }}
+          transition={{ duration: 0.18 }}
+        />
+      ) : null}
       {hasActiveMessage && (
         <>
           {/* Ambient Glow - Thick and subtly pulsing */}

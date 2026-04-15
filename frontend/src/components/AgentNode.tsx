@@ -27,6 +27,7 @@ interface AgentNodeData {
   leaving: boolean;
   showIncomingHandle: boolean;
   showOutgoingHandle: boolean;
+  connectionState?: "source" | "valid-target" | "invalid-target" | null;
   [key: string]: unknown;
 }
 
@@ -41,6 +42,7 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
     toolCall,
     showIncomingHandle,
     showOutgoingHandle,
+    connectionState,
   } = data as unknown as AgentNodeData;
   const leaving = Boolean((data as AgentNodeData).leaving);
   const Icon = nodeTypeIcon[node_type];
@@ -80,6 +82,14 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
   const borderClass = selected
     ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
     : cn(baseBorder, "hover:border-graph-node-border-hover");
+  const connectionClass =
+    connectionState === "source"
+      ? "ring-2 ring-graph-selection/35 border-graph-selection/90"
+      : connectionState === "valid-target"
+        ? "border-graph-selection/55 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
+        : connectionState === "invalid-target"
+          ? "opacity-45"
+          : "";
 
   return (
     <motion.div
@@ -106,6 +116,7 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
         "transition-[border-color] duration-300",
         leaving && "pointer-events-none",
         borderClass,
+        connectionClass,
       )}
       style={
         {
@@ -130,8 +141,10 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
         type="target"
         position={Position.Top}
         className={cn(
-          "!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg transition-opacity duration-150",
+          "!z-10 !size-4 !border !border-graph-handle-border !bg-graph-handle-bg transition-[opacity,transform,box-shadow] duration-150 after:absolute after:-inset-2.5 after:content-['']",
           !showIncomingHandle && "!opacity-0 !pointer-events-none",
+          connectionState === "valid-target" &&
+            "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
         )}
       />
 
@@ -191,8 +204,10 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
         type="source"
         position={Position.Bottom}
         className={cn(
-          "!z-10 !size-2 !border !border-graph-handle-border !bg-graph-handle-bg transition-opacity duration-150",
+          "!z-10 !size-4 !border !border-graph-handle-border !bg-graph-handle-bg transition-[opacity,transform,box-shadow] duration-150 after:absolute after:-inset-2.5 after:content-['']",
           !showOutgoingHandle && "!opacity-0 !pointer-events-none",
+          connectionState === "source" &&
+            "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
         )}
       />
     </motion.div>

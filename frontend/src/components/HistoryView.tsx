@@ -62,7 +62,7 @@ function MarkdownOrJsonBlock({
     return (
       <pre
         className={cn(
-          "text-[11px] whitespace-pre-wrap break-words leading-relaxed",
+          "select-text text-[11px] whitespace-pre-wrap break-words leading-relaxed",
           preClassName,
         )}
       >
@@ -75,7 +75,7 @@ function MarkdownOrJsonBlock({
     return (
       <pre
         className={cn(
-          "text-[11px] whitespace-pre-wrap break-words leading-relaxed",
+          "select-text text-[11px] whitespace-pre-wrap break-words leading-relaxed",
           preClassName,
         )}
       >
@@ -233,11 +233,13 @@ const HistoryItem = memo(function HistoryItem({
           defaultOpen={false}
         >
           <div className="space-y-1 text-[11px] leading-relaxed text-foreground/84">
-            <p className="font-mono uppercase tracking-[0.08em] text-foreground/78">
+            <p className="select-text font-mono uppercase tracking-[0.08em] text-foreground/78">
               {entry.state ?? "unknown"}
             </p>
             {entry.reason ? (
-              <p className="text-muted-foreground">{entry.reason}</p>
+              <p className="select-text text-muted-foreground">
+                {entry.reason}
+              </p>
             ) : null}
           </div>
         </CollapsibleBlock>
@@ -303,7 +305,7 @@ const HistoryItem = memo(function HistoryItem({
               <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
                 Arguments
               </div>
-              <pre className="text-[11px] whitespace-pre-wrap break-words leading-relaxed text-foreground/78">
+              <pre className="select-text text-[11px] whitespace-pre-wrap break-words leading-relaxed text-foreground/78">
                 {formattedArguments}
               </pre>
             </div>

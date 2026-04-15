@@ -96,7 +96,7 @@ function ToolCard({
               <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
                 Parameters
               </p>
-              <pre className="max-h-48 overflow-auto rounded-xl border border-white/[0.04] bg-black/40 p-3.5 text-[11px] font-mono text-white/60 scrollbar-none">
+              <pre className="max-h-48 select-text overflow-auto rounded-xl border border-white/[0.04] bg-black/40 p-3.5 text-[11px] font-mono text-white/60 scrollbar-none">
                 {JSON.stringify(tool.parameters ?? {}, null, 2)}
               </pre>
             </div>

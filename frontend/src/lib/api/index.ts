@@ -13,6 +13,8 @@ export {
   fetchTabDetail,
   createTabNodeRequest,
   createTabEdgeRequest,
+  deleteTabNodeRequest,
+  deleteTabEdgeRequest,
 } from "./tabs";
 export {
   fetchBlueprints,

@@ -11,7 +11,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
   return (
     <div
       className={cn(
-        "min-w-0 max-w-full overflow-hidden break-words [overflow-wrap:anywhere]",
+        "min-w-0 max-w-full select-text overflow-hidden break-words [overflow-wrap:anywhere]",
         className,
       )}
     >

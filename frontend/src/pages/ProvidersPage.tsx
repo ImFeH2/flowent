@@ -823,7 +823,7 @@ export function ProvidersPage() {
                     >
                       <div
                         className={cn(
-                          "w-full rounded-lg border px-3.5 py-2.5 text-[12px]",
+                          "w-full select-text rounded-lg border px-3.5 py-2.5 text-[12px]",
                           endpointPreview.error
                             ? "border-red-500/20 bg-red-500/5 text-red-400"
                             : "border-white/[0.04] bg-white/[0.01] text-white/70",
@@ -832,7 +832,7 @@ export function ProvidersPage() {
                         {endpointPreview.error ? (
                           endpointPreview.error
                         ) : endpointPreview.previewUrl ? (
-                          <code className="font-mono">
+                          <code className="select-text font-mono">
                             {endpointPreview.previewUrl}
                           </code>
                         ) : (
@@ -1004,7 +1004,7 @@ export function ProvidersPage() {
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <p className="truncate font-mono text-[13px] text-white/85">
+                                    <p className="truncate select-text font-mono text-[13px] text-white/85">
                                       {entry.model}
                                     </p>
                                     <span
@@ -1020,23 +1020,23 @@ export function ProvidersPage() {
                                         : "Discovered"}
                                     </span>
                                   </div>
-                                  <p className="mt-1 text-[11px] leading-relaxed text-white/40">
+                                  <p className="mt-1 select-text text-[11px] leading-relaxed text-white/40">
                                     {buildModelSummary(entry)}
                                   </p>
                                   {testState?.state === "running" ? (
-                                    <p className="mt-2 text-[11px] text-white/55">
+                                    <p className="mt-2 select-text text-[11px] text-white/55">
                                       Testing this model against the current
                                       draft provider...
                                     </p>
                                   ) : null}
                                   {testState?.state === "success" ? (
-                                    <p className="mt-2 text-[11px] text-emerald-200/80">
+                                    <p className="mt-2 select-text text-[11px] text-emerald-200/80">
                                       Test succeeded in {testState.duration_ms}
                                       ms
                                     </p>
                                   ) : null}
                                   {testState?.state === "error" ? (
-                                    <p className="mt-2 text-[11px] text-red-300/85">
+                                    <p className="mt-2 select-text text-[11px] text-red-300/85">
                                       {testState.error_summary}
                                     </p>
                                   ) : null}
@@ -1085,7 +1085,7 @@ export function ProvidersPage() {
                 {!isCreating && selectedProvider ? (
                   <div className="border-t border-white/[0.04] pt-8">
                     <SettingsRow label="Provider ID" description="Read-only">
-                      <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-3.5 py-2.5 font-mono text-[12px] text-white/70">
+                      <div className="select-text rounded-lg border border-white/[0.04] bg-white/[0.01] px-3.5 py-2.5 font-mono text-[12px] text-white/70">
                         {selectedProvider.id}
                       </div>
                     </SettingsRow>

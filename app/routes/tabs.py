@@ -7,6 +7,8 @@ from app.graph_service import (
     create_agent_node,
     create_edge,
     create_tab,
+    delete_agent_node,
+    delete_edge,
     delete_tab,
     is_tab_leader,
     list_tab_edges,
@@ -133,3 +135,36 @@ async def create_tab_edge(tab_id: str, req: CreateTabEdgeRequest) -> dict[str, o
     if error is not None or edge is None:
         raise HTTPException(status_code=400, detail=error or "Failed to create edge")
     return edge.serialize()
+
+
+@router.delete("/api/tabs/{tab_id}/nodes/{node_id}")
+async def delete_tab_node(tab_id: str, node_id: str) -> dict[str, object]:
+    deleted, error = delete_agent_node(
+        tab_id=tab_id,
+        node_id=node_id,
+    )
+    if error is not None or deleted is None:
+        status_code = 404 if error and error.endswith("not found") else 400
+        raise HTTPException(
+            status_code=status_code, detail=error or "Failed to delete node"
+        )
+    return deleted
+
+
+@router.delete("/api/tabs/{tab_id}/edges")
+async def delete_tab_edge(
+    tab_id: str,
+    from_node_id: str,
+    to_node_id: str,
+) -> dict[str, object]:
+    deleted, error = delete_edge(
+        tab_id=tab_id,
+        from_node_id=from_node_id,
+        to_node_id=to_node_id,
+    )
+    if error is not None or deleted is None:
+        status_code = 404 if error and error.endswith("not found") else 400
+        raise HTTPException(
+            status_code=status_code, detail=error or "Failed to delete edge"
+        )
+    return deleted

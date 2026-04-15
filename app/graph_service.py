@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app import settings as settings_module
 from app.events import event_bus
-from app.graph_runtime import connect_nodes
+from app.graph_runtime import connect_nodes, disconnect_nodes
 from app.models import (
     AgentBlueprint,
     AgentState,
@@ -1020,10 +1020,12 @@ def create_edge(
         or source_record.config.tab_id != target_record.config.tab_id
     ):
         return None, "Both nodes must belong to the same tab"
+    if from_node_id == to_node_id:
+        return None, "Self-loop edges are not allowed"
 
     for edge in workspace_store.list_edges(source_record.config.tab_id):
         if edge.from_node_id == from_node_id and edge.to_node_id == to_node_id:
-            return edge, None
+            return None, "Duplicate directed edges are not allowed"
 
     edge = GraphEdge(
         id=str(uuid.uuid4()),
@@ -1042,6 +1044,97 @@ def create_edge(
         agent_id=from_node_id,
     )
     return edge, None
+
+
+def delete_edge(
+    *,
+    tab_id: str,
+    from_node_id: str,
+    to_node_id: str,
+) -> tuple[dict[str, object] | None, str | None]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None, f"Tab '{tab_id}' not found"
+
+    edge = next(
+        (
+            item
+            for item in workspace_store.list_edges(tab_id)
+            if item.from_node_id == from_node_id and item.to_node_id == to_node_id
+        ),
+        None,
+    )
+    if edge is None:
+        return None, "Edge not found"
+
+    live_source = registry.get(from_node_id)
+    if live_source is not None:
+        disconnect_nodes(from_node_id, to_node_id)
+
+    workspace_store.delete_edge(edge.id)
+    _emit_tab_updated(
+        tab_id=tab_id,
+        agent_id=from_node_id,
+    )
+    return edge.serialize(), None
+
+
+def delete_agent_node(
+    *,
+    tab_id: str,
+    node_id: str,
+    timeout: float = SYSTEM_NODE_TIMEOUT,
+) -> tuple[dict[str, object] | None, str | None]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None, f"Tab '{tab_id}' not found"
+
+    record = workspace_store.get_node_record(node_id)
+    if record is None or record.config.tab_id != tab_id:
+        return None, f"Node '{node_id}' not found"
+    if record.config.node_type == NodeType.ASSISTANT:
+        return None, "Assistant does not belong to task tabs"
+    if is_tab_leader(node_id=node_id, tab_id=tab_id):
+        return None, "Tab Leader cannot be deleted from the graph"
+
+    related_edges = [
+        edge
+        for edge in workspace_store.list_edges(tab_id)
+        if edge.from_node_id == node_id or edge.to_node_id == node_id
+    ]
+    live_node = registry.get(node_id)
+
+    for edge in related_edges:
+        if registry.get(edge.from_node_id) is None:
+            continue
+        disconnect_nodes(edge.from_node_id, edge.to_node_id)
+
+    if live_node is not None:
+        live_node.request_termination("graph_deleted")
+        if not live_node.wait_for_termination(timeout=timeout):
+            return (
+                None,
+                f"Failed to delete node '{node_id}' because it did not terminate",
+            )
+
+    workspace_store.delete_node_record(node_id)
+    payload: dict[str, object] = {
+        "id": node_id,
+        "tab_id": tab_id,
+        "removed_edge_ids": [edge.id for edge in related_edges],
+    }
+    event_bus.emit(
+        Event(
+            type=EventType.NODE_DELETED,
+            agent_id=node_id,
+            data=payload,
+        )
+    )
+    _emit_tab_updated(
+        tab_id=tab_id,
+        agent_id=node_id,
+    )
+    return payload, None
 
 
 def dispatch_node_message(

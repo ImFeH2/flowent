@@ -15,12 +15,14 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Radio,
+  Redo2,
   Save,
   Shield,
   Trash2,
+  Undo2,
   X,
 } from "lucide-react";
-import { AgentGraph } from "@/components/AgentGraph";
+import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
 import type { AgentBlueprint, HistoryEntry, Node, Role } from "@/types";
 import {
@@ -40,6 +42,7 @@ import { useAssistantChat } from "@/hooks/useAssistantChat";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMeasuredHeight } from "@/hooks/useMeasuredHeight";
+import { useTabGraphHistory } from "@/hooks/useTabGraphHistory";
 import { Badge } from "@/components/ui/badge";
 import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
 import {
@@ -52,8 +55,6 @@ import { getAssistantNode } from "@/lib/assistant";
 import {
   fetchRoles,
   fetchBlueprints,
-  createTabEdgeRequest,
-  createTabNodeRequest,
   createTabRequest,
   deleteTabRequest,
   interruptNode,
@@ -146,7 +147,10 @@ export function HomePage() {
     title: string;
     nodeCount?: number;
   } | null>(null);
+  const graphRef = useRef<AgentGraphHandle | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const graphHistory = useTabGraphHistory();
+  const [graphConnectMode, setGraphConnectMode] = useState(false);
   const [panelWidth, setStoredPanelWidth] = usePanelWidth(
     WORKSPACE_PANEL_ID,
     DEFAULT_PANEL_WIDTH,
@@ -346,6 +350,36 @@ export function HomePage() {
     streamingDeltas,
   ]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const isModPressed = event.metaKey || event.ctrlKey;
+      if (!isModPressed || event.key.toLowerCase() !== "z") {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable ||
+        activeDialog !== null
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      if (event.shiftKey) {
+        void graphHistory.redo(activeTabId).catch(() => undefined);
+        return;
+      }
+      void graphHistory.undo(activeTabId).catch(() => undefined);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeDialog, activeTabId, graphHistory]);
+
   const handleOpenAssistantDetails = useCallback(() => {
     setPanelOpen(true);
     setAssistantPanelView("detail");
@@ -505,8 +539,9 @@ export function HomePage() {
     }
     setPendingAction("create-agent");
     try {
-      await createTabNodeRequest(activeTabId, {
-        role_name: roleName,
+      await graphHistory.createStandaloneAgent({
+        tabId: activeTabId,
+        roleName,
         name: createAgentName.trim() || undefined,
       });
       setActiveDialog(null);
@@ -580,7 +615,11 @@ export function HomePage() {
     }
     setPendingAction("connect-agents");
     try {
-      await createTabEdgeRequest(activeTabId, connectSourceId, connectTargetId);
+      await graphHistory.createConnection(
+        activeTabId,
+        connectSourceId,
+        connectTargetId,
+      );
       setActiveDialog(null);
     } catch (error) {
       toast.error(
@@ -661,7 +700,19 @@ export function HomePage() {
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-[linear-gradient(90deg,transparent,rgba(8,8,9,0.14))]" />
 
         <div className="relative flex-1">
-          <AgentGraph />
+          <AgentGraph
+            ref={graphRef}
+            loadingRoles={loadingRoles}
+            onConnectModeChange={setGraphConnectMode}
+            onCreateConnection={graphHistory.createConnection}
+            onCreateLinkedAgent={graphHistory.createLinkedAgent}
+            onCreateStandaloneAgent={graphHistory.createStandaloneAgent}
+            onDeleteAgent={graphHistory.deleteAgent}
+            onDeleteConnection={graphHistory.deleteConnection}
+            onInsertAgentBetween={graphHistory.insertAgentBetween}
+            onOpenConnectDialog={openConnectDialog}
+            roles={roles}
+          />
           <div
             className={cn(
               "absolute top-4 z-40 flex max-w-[calc(100%-2.5rem)] flex-wrap items-center gap-1.5",
@@ -685,6 +736,26 @@ export function HomePage() {
 
           <div className="pointer-events-auto absolute bottom-4 left-1/2 z-40 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-[14px] border border-white/10 bg-[rgba(12,12,13,0.76)] p-0.5 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md">
             <ToolbarButton
+              disabled={!activeTabId || !graphHistory.canUndo(activeTabId)}
+              onClick={() => {
+                void graphHistory.undo(activeTabId);
+              }}
+            >
+              <Undo2 className="size-4 opacity-70" />
+              Undo
+            </ToolbarButton>
+            <ToolbarDivider />
+            <ToolbarButton
+              disabled={!activeTabId || !graphHistory.canRedo(activeTabId)}
+              onClick={() => {
+                void graphHistory.redo(activeTabId);
+              }}
+            >
+              <Redo2 className="size-4 opacity-70" />
+              Redo
+            </ToolbarButton>
+            <ToolbarDivider />
+            <ToolbarButton
               disabled={!activeTabId || regularTabAgents.length === 0}
               onClick={openSaveBlueprintDialog}
             >
@@ -702,7 +773,8 @@ export function HomePage() {
             <ToolbarDivider />
             <ToolbarButton
               disabled={!activeTabId || tabAgentOptions.length < 2}
-              onClick={openConnectDialog}
+              active={graphConnectMode}
+              onClick={() => graphRef.current?.enterConnectMode()}
             >
               <Link2 className="size-4 opacity-70" />
               Connect
@@ -1539,7 +1611,7 @@ function AgentDetailPanel({
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Contacts
               </p>
-              <p className="mt-2 text-sm text-foreground">
+              <p className="mt-2 select-text text-sm text-foreground">
                 {detailContacts.length} reachable nodes
               </p>
             </div>
@@ -1548,7 +1620,7 @@ function AgentDetailPanel({
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Task Tab
               </p>
-              <p className="mt-2 text-sm text-foreground">
+              <p className="mt-2 select-text text-sm text-foreground">
                 {detailTab?.title ?? detailTabId?.slice(0, 8) ?? "None"}
               </p>
             </div>
@@ -1561,7 +1633,7 @@ function AgentDetailPanel({
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     ID
                   </p>
-                  <p className="mt-1 font-mono text-[11px] text-foreground">
+                  <p className="mt-1 select-text font-mono text-[11px] text-foreground">
                     {detailTabId ?? "None"}
                   </p>
                 </div>
@@ -1569,7 +1641,7 @@ function AgentDetailPanel({
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Title
                   </p>
-                  <p className="mt-1 text-foreground">
+                  <p className="mt-1 select-text text-foreground">
                     {detailTab?.title ?? "Unknown"}
                   </p>
                 </div>
@@ -1577,7 +1649,7 @@ function AgentDetailPanel({
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Role
                   </p>
-                  <p className="mt-1 text-foreground">
+                  <p className="mt-1 select-text text-foreground">
                     {detailRoleName ?? "None"}
                   </p>
                 </div>
@@ -1586,7 +1658,9 @@ function AgentDetailPanel({
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Goal
                     </p>
-                    <p className="mt-1 text-foreground">{detailTab.goal}</p>
+                    <p className="mt-1 select-text text-foreground">
+                      {detailTab.goal}
+                    </p>
                   </div>
                 ) : null}
               </div>
@@ -1620,12 +1694,12 @@ function AgentDetailPanel({
                           {(entry.state ?? detailState).toUpperCase()}
                         </Badge>
                         {entry.reason ? (
-                          <p className="mt-1 text-xs text-muted-foreground/78">
+                          <p className="mt-1 select-text text-xs text-muted-foreground/78">
                             {entry.reason}
                           </p>
                         ) : null}
                       </div>
-                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground/64">
+                      <span className="shrink-0 select-text font-mono text-[10px] text-muted-foreground/64">
                         {formatDetailTimestamp(entry.timestamp)}
                       </span>
                     </div>
@@ -1644,7 +1718,7 @@ function AgentDetailPanel({
                 {contactItems.map((contact) => (
                   <span
                     key={contact.id}
-                    className="rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
+                    className="select-text rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
                   >
                     {contact.label}
                   </span>
@@ -1661,7 +1735,7 @@ function AgentDetailPanel({
                 {connectionItems.map((connection) => (
                   <span
                     key={connection.id}
-                    className="rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
+                    className="select-text rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
                   >
                     {connection.label}
                   </span>
@@ -1680,7 +1754,7 @@ function AgentDetailPanel({
                 {detailTools.map((tool) => (
                   <span
                     key={tool}
-                    className="rounded-md bg-white/[0.04] px-2 py-1 text-xs font-mono text-foreground"
+                    className="select-text rounded-md bg-white/[0.04] px-2 py-1 text-xs font-mono text-foreground"
                   >
                     {tool}
                   </span>
@@ -1695,7 +1769,7 @@ function AgentDetailPanel({
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Network
                 </p>
-                <p className="mt-1 text-sm text-foreground">
+                <p className="mt-1 select-text text-sm text-foreground">
                   {detailAllowNetwork ? "Enabled" : "Disabled"}
                 </p>
               </div>
@@ -1713,7 +1787,7 @@ function AgentDetailPanel({
                     {detailWriteDirs.map((path) => (
                       <p
                         key={path}
-                        className="rounded-md bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-foreground"
+                        className="select-text rounded-md bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-foreground"
                       >
                         {path}
                       </p>

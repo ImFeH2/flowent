@@ -76,6 +76,23 @@ export function useAgents() {
         next.set(event.agent_id, { ...node, state: "terminated" });
         return next;
       });
+    } else if (event.type === "node_deleted") {
+      setAgents((prev) => {
+        if (!prev.has(event.agent_id)) {
+          return prev;
+        }
+        const next = new Map(prev);
+        next.delete(event.agent_id);
+        for (const [nodeId, node] of next.entries()) {
+          const connections = node.connections.filter(
+            (connection) => connection !== event.agent_id,
+          );
+          if (connections.length !== node.connections.length) {
+            next.set(nodeId, { ...node, connections });
+          }
+        }
+        return next;
+      });
     } else if (event.type === "tab_deleted") {
       const removedNodeIds = Array.isArray(event.data.removed_node_ids)
         ? event.data.removed_node_ids.filter(

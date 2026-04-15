@@ -86,7 +86,7 @@ export function PromptsPage() {
                 value={customPrompt}
                 onChange={(event) => setCustomPrompt(event.target.value)}
                 placeholder="Add a custom prompt appended to every agent's system prompt..."
-                className="min-h-0 w-full flex-1 resize-none rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
+                className="min-h-0 w-full flex-1 resize-none select-text rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
               />
             </div>
           </div>
@@ -110,7 +110,7 @@ export function PromptsPage() {
                 value={customPostPrompt}
                 onChange={(event) => setCustomPostPrompt(event.target.value)}
                 placeholder="Add custom runtime instructions appended after the built-in post prompt..."
-                className="min-h-0 w-full flex-1 resize-none rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
+                className="min-h-0 w-full flex-1 resize-none select-text rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
               />
             </div>
           </div>

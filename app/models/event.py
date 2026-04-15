@@ -15,6 +15,7 @@ class EventType(StrEnum):
     NODE_TODOS_CHANGED = "node_todos_changed"
     NODE_MESSAGE = "node_message"
     NODE_TERMINATED = "node_terminated"
+    NODE_DELETED = "node_deleted"
     NODE_CONNECTED = "node_connected"
     NODE_DISCONNECTED = "node_disconnected"
     ASSISTANT_CONTENT = "assistant_content"
@@ -33,6 +34,7 @@ DISPLAY_EVENTS: set[EventType] = {
     EventType.NODE_TODOS_CHANGED,
     EventType.NODE_MESSAGE,
     EventType.NODE_TERMINATED,
+    EventType.NODE_DELETED,
     EventType.NODE_CONNECTED,
     EventType.NODE_DISCONNECTED,
     EventType.ASSISTANT_CONTENT,

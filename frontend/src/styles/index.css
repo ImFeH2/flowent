@@ -150,12 +150,20 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    user-select: none;
     letter-spacing: -0.012em;
     font-feature-settings:
       "cv02" 1,
       "cv03" 1,
       "cv04" 1,
       "cv11" 1;
+  }
+
+  input,
+  textarea,
+  [contenteditable=""],
+  [contenteditable="true"] {
+    user-select: text;
   }
 
   code,

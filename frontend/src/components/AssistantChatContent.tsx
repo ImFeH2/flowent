@@ -906,7 +906,7 @@ function ToolCallCard({
           <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">
             Arguments
           </div>
-          <pre className="whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/70">
+          <pre className="select-text whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/70">
             {formattedArguments}
           </pre>
         </div>
@@ -1012,7 +1012,7 @@ function ErrorCard({
           />
         </span>
       </div>
-      <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-red-200">
+      <p className="select-text whitespace-pre-wrap break-words text-[13px] leading-relaxed text-red-200">
         {content}
       </p>
     </div>
@@ -1147,7 +1147,7 @@ function RichContentBlock({
     return (
       <pre
         className={cn(
-          "whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/80",
+          "select-text whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/80",
           preClassName,
         )}
       >
@@ -1186,7 +1186,7 @@ function RichContentBlock({
     return (
       <div
         className={cn(
-          "min-w-0 whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
+          "min-w-0 select-text whitespace-pre-wrap break-words [overflow-wrap:anywhere]",
           markdownClassName,
         )}
       >

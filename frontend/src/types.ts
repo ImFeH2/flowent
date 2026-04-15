@@ -17,6 +17,7 @@ export type DisplayEventType =
   | "node_todos_changed"
   | "node_message"
   | "node_terminated"
+  | "node_deleted"
   | "node_connected"
   | "node_disconnected"
   | "assistant_content"

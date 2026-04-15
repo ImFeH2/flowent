@@ -294,6 +294,29 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      if (event.type === "node_deleted") {
+        const deletedNodeId = event.agent_id;
+        setSelectedAgentId((current) =>
+          current === deletedNodeId ? null : current,
+        );
+        setHoveredAgentId((current) =>
+          current === deletedNodeId ? null : current,
+        );
+        setAgentHistories((prev) => deleteMapEntry(prev, deletedNodeId));
+        setStreamingDeltas((prev) => deleteMapEntry(prev, deletedNodeId));
+        setActiveMessages((prev) =>
+          prev.filter(
+            (message) =>
+              message.fromId !== deletedNodeId &&
+              message.toId !== deletedNodeId,
+          ),
+        );
+        setActiveToolCalls((prev) => deleteMapEntry(prev, deletedNodeId));
+        setRecentActivities((prev) =>
+          prev.filter((activity) => activity.agentId !== deletedNodeId),
+        );
+      }
+
       if (event.type === "node_message") {
         const fromId = event.agent_id;
         const toId = event.data.to_id as string | undefined;

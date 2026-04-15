@@ -11,6 +11,17 @@ interface TabDetailResponse {
   edges: TabEdge[];
 }
 
+interface CreateTabNodeResponse {
+  id: string;
+}
+
+interface CreateTabEdgeResponse {
+  id: string;
+  tab_id: string;
+  from_node_id: string;
+  to_node_id: string;
+}
+
 export async function fetchTabs(signal?: AbortSignal): Promise<TaskTab[]> {
   return requestJson<TabsResponse, TaskTab[]>("/api/tabs", {
     method: "GET",
@@ -65,11 +76,27 @@ export async function createTabNodeRequest(
     write_dirs?: string[];
     allow_network?: boolean;
   },
+): Promise<CreateTabNodeResponse> {
+  return requestJson<Record<string, unknown>, CreateTabNodeResponse>(
+    `/api/tabs/${tabId}/nodes`,
+    {
+      method: "POST",
+      body,
+      errorMessage: "Failed to create node",
+      map: (data) => ({
+        id: typeof data?.id === "string" ? data.id : "",
+      }),
+    },
+  );
+}
+
+export async function deleteTabNodeRequest(
+  tabId: string,
+  nodeId: string,
 ): Promise<void> {
-  await requestVoid(`/api/tabs/${tabId}/nodes`, {
-    method: "POST",
-    body,
-    errorMessage: "Failed to create node",
+  await requestVoid(`/api/tabs/${tabId}/nodes/${nodeId}`, {
+    method: "DELETE",
+    errorMessage: "Failed to delete node",
   });
 }
 
@@ -77,13 +104,31 @@ export async function createTabEdgeRequest(
   tabId: string,
   fromNodeId: string,
   toNodeId: string,
-): Promise<void> {
-  await requestVoid(`/api/tabs/${tabId}/edges`, {
-    method: "POST",
-    body: {
-      from_node_id: fromNodeId,
-      to_node_id: toNodeId,
+): Promise<CreateTabEdgeResponse> {
+  return requestJson<CreateTabEdgeResponse, CreateTabEdgeResponse>(
+    `/api/tabs/${tabId}/edges`,
+    {
+      method: "POST",
+      body: {
+        from_node_id: fromNodeId,
+        to_node_id: toNodeId,
+      },
+      errorMessage: "Failed to create edge",
     },
-    errorMessage: "Failed to create edge",
+  );
+}
+
+export async function deleteTabEdgeRequest(
+  tabId: string,
+  fromNodeId: string,
+  toNodeId: string,
+): Promise<void> {
+  const params = new URLSearchParams({
+    from_node_id: fromNodeId,
+    to_node_id: toNodeId,
+  });
+  await requestVoid(`/api/tabs/${tabId}/edges?${params.toString()}`, {
+    method: "DELETE",
+    errorMessage: "Failed to delete edge",
   });
 }

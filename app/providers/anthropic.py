@@ -195,7 +195,7 @@ class AnthropicProvider(LLMProvider):
         register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
         model_params: ModelParams | None = None,
     ) -> LLMResponse:
-        url = f"{self._api_base_url}/v1/messages"
+        url = f"{self._api_base_url}/messages"
         system, converted_messages = self._convert_messages(messages)
 
         payload: dict[str, Any] = {
@@ -436,7 +436,7 @@ class AnthropicProvider(LLMProvider):
         self,
         register_interrupt: Callable[[Callable[[], None] | None], None] | None = None,
     ) -> list[ModelInfo]:
-        url = f"{self._api_base_url}/v1/models"
+        url = f"{self._api_base_url}/models"
         client = self._client
         close_client = getattr(client, "close", None)
         if register_interrupt is not None and callable(close_client):

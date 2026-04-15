@@ -488,8 +488,9 @@ def test_create_agent_tool_schema_exposes_connect_to_creator_default():
             "connect_to_creator": {
                 "type": "boolean",
                 "description": (
-                    "Whether to automatically create an explicit connection "
-                    "between the creator and the new node"
+                    "Whether to automatically create an explicit peer "
+                    "connection between the creator and the new node when "
+                    "the creator is a regular task node"
                 ),
                 "default": True,
             },

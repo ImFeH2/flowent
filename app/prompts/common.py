@@ -59,7 +59,8 @@ CREATE_AGENT_TOOL_GUIDANCE = """\
 - Prefer creating the right set of peer agents up front. If you also have `connect`, wire them as needed.
 - `create_agent` always creates the new peer in your current tab. It does not take `tab_id` or any other cross-tab target parameter.
 - Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them.
-- `connect_to_creator` defaults to `true`; set it to `false` only when you intentionally want a disconnected node and will wire explicit connections yourself.
+- For ordinary task nodes, `connect_to_creator` defaults to `true` and creates an explicit peer connection to the new node; set it to `false` only when you intentionally want a disconnected node and will wire explicit connections yourself.
+- When the current node is the tab's Leader, `connect_to_creator` does not create a graph edge from the Leader to the new node. Leader-to-agent direct messaging is already a stable contact relationship outside Agent Network edges.
 - Creating an agent does not start work by itself; explicitly dispatch its first task with `send`.
 - After creating multiple agents, dispatch tasks to all of them before calling `idle`.
 - Do not insert unrelated tool calls or Human-facing text while some planned nodes are still waiting for their first task.

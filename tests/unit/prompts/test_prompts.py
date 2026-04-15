@@ -108,7 +108,14 @@ def test_compose_system_prompt_injects_create_agent_guidance_when_tool_present()
     assert (
         "If you also have `connect`, wire them as needed." in CREATE_AGENT_TOOL_GUIDANCE
     )
-    assert "`connect_to_creator` defaults to `true`" in CREATE_AGENT_TOOL_GUIDANCE
+    assert (
+        "For ordinary task nodes, `connect_to_creator` defaults to `true`"
+        in CREATE_AGENT_TOOL_GUIDANCE
+    )
+    assert (
+        "When the current node is the tab's Leader, `connect_to_creator` does not create a graph edge"
+        in CREATE_AGENT_TOOL_GUIDANCE
+    )
     assert "does not take `tab_id`" in CREATE_AGENT_TOOL_GUIDANCE
     assert (
         "Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them."

@@ -39,11 +39,11 @@ import {
   updateBlueprintRequest,
 } from "@/lib/api";
 import type {
+  AgentBlueprint,
   BlueprintEdge,
   BlueprintSlot,
   BlueprintVersionSummary,
   Role,
-  RouteBlueprint,
 } from "@/types";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -136,7 +136,7 @@ function createBlueprintEdgeDraft(
 }
 
 function resolveVersionHistory(
-  blueprint: Pick<RouteBlueprint, "version" | "updated_at" | "version_history">,
+  blueprint: Pick<AgentBlueprint, "version" | "updated_at" | "version_history">,
 ): BlueprintVersionSummary[] {
   if (blueprint.version_history && blueprint.version_history.length > 0) {
     return blueprint.version_history;
@@ -334,7 +334,7 @@ function DrawerShell({
 
 export function BlueprintsPage() {
   const isCompactLayout = useMediaQuery("(max-width: 1320px)");
-  const [blueprints, setBlueprints] = useState<RouteBlueprint[]>([]);
+  const [blueprints, setBlueprints] = useState<AgentBlueprint[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loadingBlueprints, setLoadingBlueprints] = useState(true);
   const [loadingRoles, setLoadingRoles] = useState(true);
@@ -585,7 +585,7 @@ export function BlueprintsPage() {
   }, [isCompactLayout]);
 
   const beginEditDraft = useCallback(
-    (blueprint: RouteBlueprint) => {
+    (blueprint: AgentBlueprint) => {
       setDraft({
         sourceId: blueprint.id,
         mode: "edit",
@@ -1067,7 +1067,7 @@ function BlueprintLibraryColumn({
   onSearchChange,
   onSelectBlueprint,
 }: {
-  blueprints: RouteBlueprint[];
+  blueprints: AgentBlueprint[];
   loading: boolean;
   searchQuery: string;
   selectedBlueprintId: string | null;

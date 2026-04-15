@@ -679,7 +679,7 @@ export function AgentGraph() {
       return {
         eyebrow: "Workspace",
         title: "No task tabs yet",
-        description: "Create a task tab to start building an agent route.",
+        description: "Create a task tab to start building an agent network.",
         hint: "Use the + button in the tab strip to open your first workspace.",
       };
     }
@@ -687,7 +687,7 @@ export function AgentGraph() {
       return {
         eyebrow: "Workspace",
         title: "Select a task tab",
-        description: "Choose a tab to inspect and edit its agent route.",
+        description: "Choose a tab to inspect and edit its agent network.",
         hint: "Each tab keeps its own goal, nodes, and connections.",
       };
     }
@@ -695,7 +695,7 @@ export function AgentGraph() {
       eyebrow: "Empty canvas",
       title: "This task tab is ready for its first agent",
       description:
-        "Add agents, connect them, or ask Assistant to scaffold the route.",
+        "Add agents, connect them, or ask Assistant to scaffold the network.",
       hint: "Start with a worker, a reviewer, or another helper node.",
     };
   }, [activeTabId, tabs.size]);

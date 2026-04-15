@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 class CreateTabTool(Tool):
     name = "create_tab"
-    description = "Create a new task tab with its bound Leader and Agent Route."
+    description = "Create a new task tab with its bound Leader and Agent Network."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -35,7 +35,7 @@ class CreateTabTool(Tool):
             },
             "blueprint_id": {
                 "type": "string",
-                "description": "Optional global Route Blueprint ID to materialize as the tab's initial route",
+                "description": "Optional global Agent Blueprint ID to materialize as the tab's initial Agent Network",
             },
         },
         "required": ["title"],

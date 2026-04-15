@@ -8,10 +8,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.models import (
+    AgentBlueprint,
     BlueprintVersionSummary,
     GraphEdge,
     GraphNodeRecord,
-    RouteBlueprint,
     Tab,
 )
 
@@ -27,7 +27,7 @@ class WorkspaceSnapshot:
     tabs: dict[str, Tab] = field(default_factory=dict)
     nodes: dict[str, GraphNodeRecord] = field(default_factory=dict)
     edges: dict[str, GraphEdge] = field(default_factory=dict)
-    blueprints: dict[str, RouteBlueprint] = field(default_factory=dict)
+    blueprints: dict[str, AgentBlueprint] = field(default_factory=dict)
 
     def serialize(self) -> dict[str, object]:
         return {
@@ -72,7 +72,7 @@ class WorkspaceSnapshot:
         blueprints = {
             blueprint.id: blueprint
             for blueprint in (
-                RouteBlueprint.from_mapping(item)
+                AgentBlueprint.from_mapping(item)
                 for item in (raw_blueprints if isinstance(raw_blueprints, list) else [])
                 if isinstance(item, dict)
             )
@@ -224,15 +224,15 @@ class WorkspaceStore:
                 snapshot.tabs[edge.tab_id].updated_at = time.time()
             self._persist_snapshot(snapshot)
 
-    def list_blueprints(self) -> list[RouteBlueprint]:
+    def list_blueprints(self) -> list[AgentBlueprint]:
         with self._lock:
             return list(self._load_snapshot().blueprints.values())
 
-    def get_blueprint(self, blueprint_id: str) -> RouteBlueprint | None:
+    def get_blueprint(self, blueprint_id: str) -> AgentBlueprint | None:
         with self._lock:
             return self._load_snapshot().blueprints.get(blueprint_id)
 
-    def upsert_blueprint(self, blueprint: RouteBlueprint) -> None:
+    def upsert_blueprint(self, blueprint: AgentBlueprint) -> None:
         with self._lock:
             snapshot = self._load_snapshot()
             updated_at = time.time()

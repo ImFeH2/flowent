@@ -7,6 +7,7 @@ from app import settings as settings_module
 from app.events import event_bus
 from app.graph_runtime import connect_nodes
 from app.models import (
+    AgentBlueprint,
     AgentState,
     BlueprintEdge,
     BlueprintSlot,
@@ -16,7 +17,6 @@ from app.models import (
     GraphNodeRecord,
     NodeConfig,
     NodeType,
-    RouteBlueprint,
     Tab,
 )
 from app.registry import registry
@@ -160,7 +160,7 @@ def _validate_blueprint_graph(
     return None
 
 
-def serialize_blueprint(blueprint: RouteBlueprint) -> dict[str, object]:
+def serialize_blueprint(blueprint: AgentBlueprint) -> dict[str, object]:
     return {
         **blueprint.serialize(),
         "node_count": len(blueprint.slots),
@@ -168,7 +168,7 @@ def serialize_blueprint(blueprint: RouteBlueprint) -> dict[str, object]:
     }
 
 
-def list_blueprints() -> list[RouteBlueprint]:
+def list_blueprints() -> list[AgentBlueprint]:
     return sorted(
         workspace_store.list_blueprints(),
         key=lambda blueprint: (
@@ -185,13 +185,13 @@ def create_blueprint(
     description: str = "",
     slots: list[BlueprintSlot],
     edges: list[BlueprintEdge],
-) -> tuple[RouteBlueprint | None, str | None]:
+) -> tuple[AgentBlueprint | None, str | None]:
     if not name.strip():
         return None, "name must not be empty"
     error = _validate_blueprint_graph(slots=slots, edges=edges)
     if error is not None:
         return None, error
-    blueprint = RouteBlueprint(
+    blueprint = AgentBlueprint(
         id=str(uuid.uuid4()),
         name=name.strip(),
         description=description.strip(),
@@ -210,7 +210,7 @@ def update_blueprint(
     description: str = "",
     slots: list[BlueprintSlot],
     edges: list[BlueprintEdge],
-) -> tuple[RouteBlueprint | None, str | None]:
+) -> tuple[AgentBlueprint | None, str | None]:
     blueprint = workspace_store.get_blueprint(blueprint_id)
     if blueprint is None:
         return None, f"Blueprint '{blueprint_id}' not found"
@@ -236,22 +236,22 @@ def delete_blueprint(blueprint_id: str) -> tuple[dict[str, object] | None, str |
     return {"id": blueprint.id}, None
 
 
-def _route_matches_blueprint_source(tab: Tab) -> bool:
+def _network_matches_blueprint_source(tab: Tab) -> bool:
     if (
-        tab.route_blueprint_id is None
-        or tab.route_blueprint_version is None
+        tab.network_blueprint_id is None
+        or tab.network_blueprint_version is None
         or tab.leader_id is None
     ):
         return False
 
-    slot_by_id = {slot.id: slot for slot in tab.route_blueprint_slots}
-    if len(slot_by_id) != len(tab.route_blueprint_slots):
+    slot_by_id = {slot.id: slot for slot in tab.network_blueprint_slots}
+    if len(slot_by_id) != len(tab.network_blueprint_slots):
         return False
 
     current_nodes = [
         record for record in _sorted_tab_nodes(tab.id) if record.id != tab.leader_id
     ]
-    if len(current_nodes) != len(tab.route_blueprint_slots):
+    if len(current_nodes) != len(tab.network_blueprint_slots):
         return False
 
     node_by_slot_id: dict[str, GraphNodeRecord] = {}
@@ -271,7 +271,7 @@ def _route_matches_blueprint_source(tab: Tab) -> bool:
             return False
 
     expected_edges: set[tuple[str, str]] = set()
-    for edge in tab.route_blueprint_edges:
+    for edge in tab.network_blueprint_edges:
         from_record = node_by_slot_id.get(edge.from_slot_id)
         to_record = node_by_slot_id.get(edge.to_slot_id)
         from_node_id = (
@@ -298,13 +298,13 @@ def _route_matches_blueprint_source(tab: Tab) -> bool:
     return current_edges == expected_edges
 
 
-def serialize_route_source(tab: Tab) -> dict[str, object]:
+def serialize_network_source(tab: Tab) -> dict[str, object]:
     blueprint = (
-        workspace_store.get_blueprint(tab.route_blueprint_id)
-        if tab.route_blueprint_id is not None
+        workspace_store.get_blueprint(tab.network_blueprint_id)
+        if tab.network_blueprint_id is not None
         else None
     )
-    if tab.route_blueprint_id is None or tab.route_blueprint_version is None:
+    if tab.network_blueprint_id is None or tab.network_blueprint_version is None:
         return {
             "state": "manual",
             "blueprint_id": None,
@@ -314,13 +314,13 @@ def serialize_route_source(tab: Tab) -> dict[str, object]:
         }
     return {
         "state": (
-            "blueprint-derived" if _route_matches_blueprint_source(tab) else "drifted"
+            "blueprint-derived" if _network_matches_blueprint_source(tab) else "drifted"
         ),
-        "blueprint_id": tab.route_blueprint_id,
+        "blueprint_id": tab.network_blueprint_id,
         "blueprint_name": (
-            blueprint.name if blueprint is not None else tab.route_blueprint_name
+            blueprint.name if blueprint is not None else tab.network_blueprint_name
         ),
-        "blueprint_version": tab.route_blueprint_version,
+        "blueprint_version": tab.network_blueprint_version,
         "blueprint_available": blueprint is not None,
     }
 
@@ -333,7 +333,7 @@ def serialize_tab_summary(tab: Tab) -> dict[str, object]:
         "leader_id": tab.leader_id,
         "created_at": tab.created_at,
         "updated_at": tab.updated_at,
-        "route_source": serialize_route_source(tab),
+        "network_source": serialize_network_source(tab),
         "node_count": len(list_tab_nodes(tab.id)),
         "edge_count": len(list_tab_edges(tab.id)),
     }
@@ -551,11 +551,11 @@ def _start_tab_runtime(tab_id: str) -> None:
             continue
 
 
-def _validate_blueprint_for_tab(blueprint: RouteBlueprint) -> str | None:
+def _validate_blueprint_for_tab(blueprint: AgentBlueprint) -> str | None:
     return _validate_blueprint_graph(slots=blueprint.slots, edges=blueprint.edges)
 
 
-def _materialize_blueprint_route(*, tab: Tab, blueprint: RouteBlueprint) -> None:
+def _materialize_blueprint_network(*, tab: Tab, blueprint: AgentBlueprint) -> None:
     slot_node_ids: dict[str, str] = {}
     for slot in blueprint.slots:
         config, error = build_node_config(
@@ -600,7 +600,7 @@ def save_tab_as_blueprint(
     tab_id: str,
     name: str,
     description: str = "",
-) -> tuple[RouteBlueprint | None, str | None]:
+) -> tuple[AgentBlueprint | None, str | None]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
         return None, f"Tab '{tab_id}' not found"
@@ -637,7 +637,7 @@ def save_tab_as_blueprint(
         else:
             to_slot_id = slot_id_by_node_id.get(edge.to_node_id)
         if from_slot_id is None or to_slot_id is None:
-            return None, "Route contains an edge that points outside the current tab"
+            return None, "Network contains an edge that points outside the current tab"
         edges.append(
             BlueprintEdge(
                 from_slot_id=from_slot_id,
@@ -676,11 +676,11 @@ def create_tab(
         title=title.strip(),
         goal=goal.strip(),
         leader_id=leader_id,
-        route_blueprint_id=blueprint.id if blueprint is not None else None,
-        route_blueprint_name=blueprint.name if blueprint is not None else None,
-        route_blueprint_version=blueprint.version if blueprint is not None else None,
-        route_blueprint_slots=list(blueprint.slots) if blueprint is not None else [],
-        route_blueprint_edges=list(blueprint.edges) if blueprint is not None else [],
+        network_blueprint_id=blueprint.id if blueprint is not None else None,
+        network_blueprint_name=blueprint.name if blueprint is not None else None,
+        network_blueprint_version=blueprint.version if blueprint is not None else None,
+        network_blueprint_slots=list(blueprint.slots) if blueprint is not None else [],
+        network_blueprint_edges=list(blueprint.edges) if blueprint is not None else [],
     )
     workspace_store.upsert_tab(tab)
     leader_record = _build_leader_record(
@@ -693,7 +693,7 @@ def create_tab(
     workspace_store.upsert_node_record(leader_record)
     try:
         if blueprint is not None:
-            _materialize_blueprint_route(tab=tab, blueprint=blueprint)
+            _materialize_blueprint_network(tab=tab, blueprint=blueprint)
     except Exception:
         workspace_store.delete_tab(tab.id)
         raise

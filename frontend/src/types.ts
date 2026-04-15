@@ -141,10 +141,10 @@ export interface NodeDetail {
   history: HistoryEntry[];
 }
 
-export type RouteSourceState = "manual" | "blueprint-derived" | "drifted";
+export type NetworkSourceState = "manual" | "blueprint-derived" | "drifted";
 
-export interface RouteSource {
-  state: RouteSourceState;
+export interface NetworkSource {
+  state: NetworkSourceState;
   blueprint_id: string | null;
   blueprint_name: string | null;
   blueprint_version: number | null;
@@ -167,7 +167,7 @@ export interface BlueprintVersionSummary {
   updated_at: number;
 }
 
-export interface RouteBlueprint {
+export interface AgentBlueprint {
   id: string;
   name: string;
   description: string;
@@ -188,7 +188,7 @@ export interface TaskTab {
   leader_id?: string | null;
   created_at: number;
   updated_at: number;
-  route_source: RouteSource;
+  network_source: NetworkSource;
   node_count?: number;
   edge_count?: number;
 }

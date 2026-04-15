@@ -1,10 +1,10 @@
 from app.models.agent import AgentState, NodeConfig, NodeType
 from app.models.base import Serializable
 from app.models.blueprint import (
+    AgentBlueprint,
     BlueprintEdge,
     BlueprintSlot,
     BlueprintVersionSummary,
-    RouteBlueprint,
 )
 from app.models.content import (
     ContentPart,
@@ -53,6 +53,7 @@ from app.models.todo import TodoItem
 
 __all__ = [
     "DISPLAY_EVENTS",
+    "AgentBlueprint",
     "AgentState",
     "AssistantText",
     "AssistantThinking",
@@ -82,7 +83,6 @@ __all__ = [
     "NodeType",
     "ReceivedMessage",
     "ReceivedMessageDelta",
-    "RouteBlueprint",
     "SentMessage",
     "SentMessageDelta",
     "Serializable",

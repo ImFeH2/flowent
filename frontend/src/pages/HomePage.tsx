@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { AgentGraph } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
-import type { HistoryEntry, Node, Role, RouteBlueprint } from "@/types";
+import type { AgentBlueprint, HistoryEntry, Node, Role } from "@/types";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -131,7 +131,7 @@ export function HomePage() {
   const [createTabBlueprintId, setCreateTabBlueprintId] = useState("");
   const [createTabBlueprintQuery, setCreateTabBlueprintQuery] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
-  const [blueprints, setBlueprints] = useState<RouteBlueprint[]>([]);
+  const [blueprints, setBlueprints] = useState<AgentBlueprint[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingBlueprints, setLoadingBlueprints] = useState(false);
   const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
@@ -458,7 +458,7 @@ export function HomePage() {
     setActiveDialog("save-blueprint");
   }
 
-  const handleSaveCurrentRouteAsBlueprint = async () => {
+  const handleSaveCurrentNetworkAsBlueprint = async () => {
     if (!activeTabId) {
       return;
     }
@@ -1052,7 +1052,7 @@ export function HomePage() {
               Cancel
             </Button>
             <Button
-              onClick={() => void handleSaveCurrentRouteAsBlueprint()}
+              onClick={() => void handleSaveCurrentNetworkAsBlueprint()}
               disabled={
                 !saveBlueprintName.trim() || pendingAction === "save-blueprint"
               }
@@ -1065,7 +1065,7 @@ export function HomePage() {
         }
       >
         <WorkspaceDialogMeta>
-          This only saves the current route structure. History, runtime state,
+          This only saves the current network structure. History, runtime state,
           todos, and permissions are not copied into the blueprint.
         </WorkspaceDialogMeta>
         <WorkspaceDialogField label="Name" hint="Required">
@@ -1319,7 +1319,7 @@ export function HomePage() {
                   <span className="font-semibold text-white">
                     {deleteTabTarget.title}
                   </span>{" "}
-                  and clean up its persisted route.
+                  and clean up its persisted agent network.
                   {typeof deleteTabTarget.nodeCount === "number"
                     ? ` ${deleteTabTarget.nodeCount} node${deleteTabTarget.nodeCount === 1 ? "" : "s"} will be removed with it.`
                     : ""}
@@ -1653,9 +1653,9 @@ function AgentDetailPanel({
             )}
           </DetailSection>
 
-          <DetailSection title="Route Connections">
+          <DetailSection title="Network Connections">
             {connectionItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No route edges</p>
+              <p className="text-sm text-muted-foreground">No network edges</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {connectionItems.map((connection) => (

@@ -370,7 +370,7 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
-        "**Create the route structure** with `create_agent` and `connect`"
+        "**Create the network structure** with `create_agent` and `connect`"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert "**Dispatch immediately** after creation" in CONDUCTOR_ROLE_SYSTEM_PROMPT

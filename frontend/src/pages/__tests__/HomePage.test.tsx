@@ -184,7 +184,7 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     leader_id: overrides.leader_id ?? "leader-1",
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 1,
-    route_source: overrides.route_source ?? {
+    network_source: overrides.network_source ?? {
       state: "manual",
       blueprint_id: null,
       blueprint_name: null,
@@ -303,7 +303,7 @@ describe("HomePage", () => {
       id: "tab-2",
       title: "Release Prep",
       goal: "Coordinate the launch work",
-      route_source: {
+      network_source: {
         state: "manual",
         blueprint_id: null,
         blueprint_name: null,
@@ -335,7 +335,7 @@ describe("HomePage", () => {
     expect(setActiveTabId).toHaveBeenCalledWith("tab-2");
   }, 10000);
 
-  it("saves the current route as a blueprint from the workspace toolbar", async () => {
+  it("saves the current network as a blueprint from the workspace toolbar", async () => {
     fetchBlueprintsMock.mockResolvedValue([
       {
         id: "blueprint-1",
@@ -358,8 +358,8 @@ describe("HomePage", () => {
     ]);
     saveTabAsBlueprintRequestMock.mockResolvedValue({
       id: "blueprint-2",
-      name: "Saved Route",
-      description: "Saved from current route",
+      name: "Saved Network",
+      description: "Saved from current network",
       version: 1,
       slots: [],
       edges: [],
@@ -382,7 +382,7 @@ describe("HomePage", () => {
       screen.getAllByRole("button", { name: "Save as Blueprint" })[0],
     );
     fireEvent.change(screen.getByLabelText("Blueprint name"), {
-      target: { value: "Saved Route" },
+      target: { value: "Saved Network" },
     });
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", {
@@ -393,7 +393,7 @@ describe("HomePage", () => {
     await waitFor(() =>
       expect(saveTabAsBlueprintRequestMock).toHaveBeenCalledWith(
         "tab-1",
-        "Saved Route",
+        "Saved Network",
         "",
       ),
     );

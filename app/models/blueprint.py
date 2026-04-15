@@ -88,7 +88,7 @@ class BlueprintVersionSummary:
 
 
 @dataclass
-class RouteBlueprint:
+class AgentBlueprint:
     id: str
     name: str
     description: str = ""
@@ -113,7 +113,7 @@ class RouteBlueprint:
         }
 
     @classmethod
-    def from_mapping(cls, data: dict[str, object]) -> RouteBlueprint:
+    def from_mapping(cls, data: dict[str, object]) -> AgentBlueprint:
         created_at = data.get("created_at")
         updated_at = data.get("updated_at")
         raw_slots = data.get("slots")

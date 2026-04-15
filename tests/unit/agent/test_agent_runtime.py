@@ -2056,7 +2056,7 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Directory Worker (`12345678`).\n- `create_agent` only creates a new route node. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Directory Worker (`12345678`).\n- `create_agent` only creates a new peer node in the current Agent Network. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
         },
     ]
 
@@ -2121,7 +2121,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Worker (`12345678`).\n- `create_agent` only creates a new route node. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Worker (`12345678`).\n- `create_agent` only creates a new peer node in the current Agent Network. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
         },
     ]
 

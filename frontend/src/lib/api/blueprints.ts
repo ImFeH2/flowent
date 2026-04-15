@@ -1,8 +1,8 @@
 import { requestJson, requestVoid } from "./shared";
-import type { BlueprintEdge, BlueprintSlot, RouteBlueprint } from "@/types";
+import type { AgentBlueprint, BlueprintEdge, BlueprintSlot } from "@/types";
 
 interface BlueprintsResponse {
-  blueprints: RouteBlueprint[];
+  blueprints: AgentBlueprint[];
 }
 
 interface BlueprintPayload {
@@ -14,8 +14,8 @@ interface BlueprintPayload {
 
 export async function fetchBlueprints(
   signal?: AbortSignal,
-): Promise<RouteBlueprint[]> {
-  return requestJson<BlueprintsResponse, RouteBlueprint[]>("/api/blueprints", {
+): Promise<AgentBlueprint[]> {
+  return requestJson<BlueprintsResponse, AgentBlueprint[]>("/api/blueprints", {
     method: "GET",
     signal,
     errorMessage: "Failed to fetch blueprints",
@@ -26,8 +26,8 @@ export async function fetchBlueprints(
 
 export async function createBlueprintRequest(
   payload: BlueprintPayload,
-): Promise<RouteBlueprint> {
-  return requestJson<RouteBlueprint, RouteBlueprint>("/api/blueprints", {
+): Promise<AgentBlueprint> {
+  return requestJson<AgentBlueprint, AgentBlueprint>("/api/blueprints", {
     method: "POST",
     body: payload,
     errorMessage: "Failed to create blueprint",
@@ -37,8 +37,8 @@ export async function createBlueprintRequest(
 export async function updateBlueprintRequest(
   blueprintId: string,
   payload: BlueprintPayload,
-): Promise<RouteBlueprint> {
-  return requestJson<RouteBlueprint, RouteBlueprint>(
+): Promise<AgentBlueprint> {
+  return requestJson<AgentBlueprint, AgentBlueprint>(
     `/api/blueprints/${blueprintId}`,
     {
       method: "PUT",
@@ -61,8 +61,8 @@ export async function saveTabAsBlueprintRequest(
   tabId: string,
   name: string,
   description = "",
-): Promise<RouteBlueprint> {
-  return requestJson<RouteBlueprint, RouteBlueprint>(
+): Promise<AgentBlueprint> {
+  return requestJson<AgentBlueprint, AgentBlueprint>(
     `/api/tabs/${tabId}/blueprint`,
     {
       method: "POST",

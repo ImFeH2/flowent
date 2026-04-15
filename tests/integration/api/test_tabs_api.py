@@ -148,7 +148,7 @@ def test_create_tab_rejects_reserved_conductor_role_for_regular_nodes(
     )
 
 
-def test_create_tab_from_blueprint_materializes_route(client: TestClient):
+def test_create_tab_from_blueprint_materializes_network(client: TestClient):
     blueprint_response = client.post(
         "/api/blueprints",
         json={
@@ -182,7 +182,7 @@ def test_create_tab_from_blueprint_materializes_route(client: TestClient):
         "/api/tabs",
         json={
             "title": "Blueprint Task",
-            "goal": "Apply the saved route",
+            "goal": "Apply the saved network",
             "blueprint_id": blueprint["id"],
         },
     )
@@ -191,7 +191,7 @@ def test_create_tab_from_blueprint_materializes_route(client: TestClient):
     tab = create_tab_response.json()
     assert tab["node_count"] == 3
     assert tab["edge_count"] == 2
-    assert tab["route_source"] == {
+    assert tab["network_source"] == {
         "state": "blueprint-derived",
         "blueprint_id": blueprint["id"],
         "blueprint_name": "Review Pipeline",
@@ -203,7 +203,7 @@ def test_create_tab_from_blueprint_materializes_route(client: TestClient):
 
     assert tab_detail_response.status_code == 200
     tab_detail = tab_detail_response.json()
-    assert tab_detail["tab"]["route_source"]["state"] == "blueprint-derived"
+    assert tab_detail["tab"]["network_source"]["state"] == "blueprint-derived"
     assert {node["name"] for node in tab_detail["nodes"]} == {
         "Leader",
         "Primary Reviewer",
@@ -212,12 +212,12 @@ def test_create_tab_from_blueprint_materializes_route(client: TestClient):
     assert len(tab_detail["edges"]) == 2
 
 
-def test_save_route_as_blueprint_and_mark_drifted_after_manual_change(
+def test_save_network_as_blueprint_and_mark_drifted_after_manual_change(
     client: TestClient,
 ):
     create_tab_response = client.post(
         "/api/tabs",
-        json={"title": "Manual Route", "goal": "Build and reuse"},
+        json={"title": "Manual Network", "goal": "Build and reuse"},
     )
     assert create_tab_response.status_code == 200
     tab = create_tab_response.json()
@@ -258,8 +258,8 @@ def test_save_route_as_blueprint_and_mark_drifted_after_manual_change(
     save_blueprint_response = client.post(
         f"/api/tabs/{tab_id}/blueprint",
         json={
-            "name": "Saved Manual Route",
-            "description": "Derived from the current route",
+            "name": "Saved Manual Network",
+            "description": "Derived from the current network",
         },
     )
 
@@ -271,14 +271,14 @@ def test_save_route_as_blueprint_and_mark_drifted_after_manual_change(
     derived_tab_response = client.post(
         "/api/tabs",
         json={
-            "title": "Derived Route",
+            "title": "Derived Network",
             "goal": "Start from blueprint",
             "blueprint_id": blueprint["id"],
         },
     )
     assert derived_tab_response.status_code == 200
     derived_tab = derived_tab_response.json()
-    assert derived_tab["route_source"]["state"] == "blueprint-derived"
+    assert derived_tab["network_source"]["state"] == "blueprint-derived"
 
     extra_node_response = client.post(
         f"/api/tabs/{derived_tab['id']}/nodes",
@@ -288,10 +288,10 @@ def test_save_route_as_blueprint_and_mark_drifted_after_manual_change(
 
     updated_detail_response = client.get(f"/api/tabs/{derived_tab['id']}")
     assert updated_detail_response.status_code == 200
-    assert updated_detail_response.json()["tab"]["route_source"] == {
+    assert updated_detail_response.json()["tab"]["network_source"] == {
         "state": "drifted",
         "blueprint_id": blueprint["id"],
-        "blueprint_name": "Saved Manual Route",
+        "blueprint_name": "Saved Manual Network",
         "blueprint_version": 1,
         "blueprint_available": True,
     }

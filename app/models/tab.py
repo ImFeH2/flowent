@@ -12,11 +12,11 @@ class Tab:
     title: str
     goal: str = ""
     leader_id: str | None = None
-    route_blueprint_id: str | None = None
-    route_blueprint_name: str | None = None
-    route_blueprint_version: int | None = None
-    route_blueprint_slots: list[BlueprintSlot] = field(default_factory=list)
-    route_blueprint_edges: list[BlueprintEdge] = field(default_factory=list)
+    network_blueprint_id: str | None = None
+    network_blueprint_name: str | None = None
+    network_blueprint_version: int | None = None
+    network_blueprint_slots: list[BlueprintSlot] = field(default_factory=list)
+    network_blueprint_edges: list[BlueprintEdge] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
@@ -26,15 +26,19 @@ class Tab:
             "title": self.title,
             "goal": self.goal,
             "leader_id": self.leader_id,
-            "route_blueprint_source": (
+            "network_blueprint_source": (
                 {
-                    "blueprint_id": self.route_blueprint_id,
-                    "blueprint_name": self.route_blueprint_name,
-                    "blueprint_version": self.route_blueprint_version,
-                    "slots": [slot.serialize() for slot in self.route_blueprint_slots],
-                    "edges": [edge.serialize() for edge in self.route_blueprint_edges],
+                    "blueprint_id": self.network_blueprint_id,
+                    "blueprint_name": self.network_blueprint_name,
+                    "blueprint_version": self.network_blueprint_version,
+                    "slots": [
+                        slot.serialize() for slot in self.network_blueprint_slots
+                    ],
+                    "edges": [
+                        edge.serialize() for edge in self.network_blueprint_edges
+                    ],
                 }
-                if self.route_blueprint_id is not None
+                if self.network_blueprint_id is not None
                 else None
             ),
             "created_at": self.created_at,
@@ -45,14 +49,16 @@ class Tab:
     def from_mapping(cls, data: dict[str, object]) -> Tab:
         created_at = data.get("created_at")
         updated_at = data.get("updated_at")
-        raw_route_blueprint_source = data.get("route_blueprint_source")
-        route_blueprint_source = (
-            raw_route_blueprint_source
-            if isinstance(raw_route_blueprint_source, dict)
+        raw_network_blueprint_source = data.get("network_blueprint_source")
+        if not isinstance(raw_network_blueprint_source, dict):
+            raw_network_blueprint_source = data.get("route_blueprint_source")
+        network_blueprint_source = (
+            raw_network_blueprint_source
+            if isinstance(raw_network_blueprint_source, dict)
             else {}
         )
-        raw_slots = route_blueprint_source.get("slots")
-        raw_edges = route_blueprint_source.get("edges")
+        raw_slots = network_blueprint_source.get("slots")
+        raw_edges = network_blueprint_source.get("edges")
         return cls(
             id=str(data.get("id", "")),
             title=str(data.get("title", "")),
@@ -60,25 +66,25 @@ class Tab:
             leader_id=str(data["leader_id"])
             if isinstance(data.get("leader_id"), str)
             else None,
-            route_blueprint_id=(
-                str(route_blueprint_source["blueprint_id"])
-                if isinstance(route_blueprint_source.get("blueprint_id"), str)
-                and str(route_blueprint_source["blueprint_id"]).strip()
+            network_blueprint_id=(
+                str(network_blueprint_source["blueprint_id"])
+                if isinstance(network_blueprint_source.get("blueprint_id"), str)
+                and str(network_blueprint_source["blueprint_id"]).strip()
                 else None
             ),
-            route_blueprint_name=(
-                str(route_blueprint_source["blueprint_name"])
-                if isinstance(route_blueprint_source.get("blueprint_name"), str)
-                and str(route_blueprint_source["blueprint_name"]).strip()
+            network_blueprint_name=(
+                str(network_blueprint_source["blueprint_name"])
+                if isinstance(network_blueprint_source.get("blueprint_name"), str)
+                and str(network_blueprint_source["blueprint_name"]).strip()
                 else None
             ),
-            route_blueprint_version=(
-                route_blueprint_source["blueprint_version"]
-                if isinstance(route_blueprint_source.get("blueprint_version"), int)
-                and route_blueprint_source["blueprint_version"] > 0
+            network_blueprint_version=(
+                network_blueprint_source["blueprint_version"]
+                if isinstance(network_blueprint_source.get("blueprint_version"), int)
+                and network_blueprint_source["blueprint_version"] > 0
                 else None
             ),
-            route_blueprint_slots=[
+            network_blueprint_slots=[
                 slot
                 for slot in (
                     BlueprintSlot.from_mapping(item)
@@ -87,7 +93,7 @@ class Tab:
                 )
                 if slot is not None
             ],
-            route_blueprint_edges=[
+            network_blueprint_edges=[
                 edge
                 for edge in (
                     BlueprintEdge.from_mapping(item)

@@ -63,7 +63,7 @@ class ConnectTool(Tool):
             return json.dumps({"error": "Both nodes must belong to the same tab"})
         if agent.node_type == NodeType.ASSISTANT:
             return json.dumps(
-                {"error": "Assistant may not rewire a tab route directly"}
+                {"error": "Assistant may not rewire a tab Agent Network directly"}
             )
         if not agent.config.tab_id or agent.config.tab_id != source.config.tab_id:
             return json.dumps(

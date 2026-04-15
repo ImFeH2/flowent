@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BlueprintsPage } from "@/pages/BlueprintsPage";
 import type { ReactNode } from "react";
-import type { BlueprintVersionSummary, Role, RouteBlueprint } from "@/types";
+import type { AgentBlueprint, BlueprintVersionSummary, Role } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 
@@ -112,8 +112,8 @@ function buildRole(overrides: Partial<Role> & Pick<Role, "name">): Role {
 }
 
 function buildBlueprint(
-  overrides: Partial<RouteBlueprint> & Pick<RouteBlueprint, "id" | "name">,
-): RouteBlueprint {
+  overrides: Partial<AgentBlueprint> & Pick<AgentBlueprint, "id" | "name">,
+): AgentBlueprint {
   const versionHistory: BlueprintVersionSummary[] =
     overrides.version_history ?? [
       {

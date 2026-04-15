@@ -931,7 +931,7 @@ class Agent:
                 f"- Newly created agents still waiting for their first task: {targets}."
             )
             lines.append(
-                "- `create_agent` only creates a new route node. It does not start work by itself."
+                "- `create_agent` only creates a new peer node in the current Agent Network. It does not start work by itself."
             )
             lines.append(
                 "- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`."

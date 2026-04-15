@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchTabs } from "@/lib/api";
-import type { AgentEvent, RouteSource, TaskTab } from "@/types";
+import type { AgentEvent, NetworkSource, TaskTab } from "@/types";
 
-const MANUAL_ROUTE_SOURCE: RouteSource = {
+const MANUAL_NETWORK_SOURCE: NetworkSource = {
   state: "manual",
   blueprint_id: null,
   blueprint_name: null,
@@ -44,10 +44,11 @@ export function useTabs() {
             typeof data.created_at === "number" ? data.created_at : Date.now(),
           updated_at:
             typeof data.updated_at === "number" ? data.updated_at : Date.now(),
-          route_source:
-            typeof data.route_source === "object" && data.route_source !== null
-              ? (data.route_source as RouteSource)
-              : MANUAL_ROUTE_SOURCE,
+          network_source:
+            typeof data.network_source === "object" &&
+            data.network_source !== null
+              ? (data.network_source as NetworkSource)
+              : MANUAL_NETWORK_SOURCE,
           node_count:
             typeof data.node_count === "number" ? data.node_count : undefined,
           edge_count:

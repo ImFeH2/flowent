@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.graph_service import is_tab_leader
+from app.graph_service import is_tab_leader, list_node_connection_ids
 from app.registry import registry
 from app.settings import find_provider, find_role, get_settings, resolve_model_info
 from app.tools import MINIMUM_TOOLS
@@ -76,11 +76,6 @@ async def list_nodes() -> dict:
 
     for record in workspace_store.list_node_records():
         live = registry.get(record.id)
-        edges = (
-            workspace_store.list_edges(record.config.tab_id)
-            if record.config.tab_id
-            else []
-        )
         nodes_by_id[record.id] = {
             "id": record.id,
             "node_type": record.config.node_type.value,
@@ -88,9 +83,14 @@ async def list_nodes() -> dict:
             "role_name": record.config.role_name,
             "is_leader": is_tab_leader(node_id=record.id, tab_id=record.config.tab_id),
             "state": (live.state if live is not None else record.state).value,
-            "connections": [
-                edge.to_node_id for edge in edges if edge.from_node_id == record.id
-            ],
+            "connections": (
+                list_node_connection_ids(
+                    tab_id=record.config.tab_id,
+                    node_id=record.id,
+                )
+                if record.config.tab_id
+                else []
+            ),
             "name": record.config.name,
             "todos": [
                 todo.serialize()
@@ -114,7 +114,14 @@ async def list_nodes() -> dict:
             "role_name": node.config.role_name,
             "is_leader": is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id),
             "state": node.state.value,
-            "connections": node.get_connections_snapshot(),
+            "connections": (
+                list_node_connection_ids(
+                    tab_id=node.config.tab_id,
+                    node_id=node.uuid,
+                )
+                if node.config.tab_id
+                else node.get_connections_snapshot()
+            ),
             "name": node.config.name,
             "todos": [t.serialize() for t in node.todos],
             "capabilities": _serialize_model_capabilities(node.config.role_name),
@@ -143,9 +150,6 @@ async def get_node(node_id: str) -> dict:
         record_id = record.id
         record_state = record.state
         target_config = record.config
-    edges = (
-        workspace_store.list_edges(target_config.tab_id) if target_config.tab_id else []
-    )
     history = (
         node.get_history_snapshot()
         if node is not None
@@ -166,7 +170,10 @@ async def get_node(node_id: str) -> dict:
         "state": record_state.value,
         "contacts": node.get_contact_ids_snapshot() if node is not None else [],
         "connections": (
-            [edge.to_node_id for edge in edges if edge.from_node_id == record_id]
+            list_node_connection_ids(
+                tab_id=target_config.tab_id,
+                node_id=record_id,
+            )
             if target_config.tab_id
             else (node.get_connections_snapshot() if node is not None else [])
         ),

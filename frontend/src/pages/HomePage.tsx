@@ -274,7 +274,7 @@ export function HomePage() {
   );
   const tabAgentOptions = useMemo(
     () =>
-      tabAgents.map((agent) => ({
+      regularTabAgents.map((agent) => ({
         id: agent.id,
         label: getNodeLabel({
           name: agent.name,
@@ -283,7 +283,7 @@ export function HomePage() {
           isLeader: agent.is_leader,
         }),
       })),
-    [tabAgents],
+    [regularTabAgents],
   );
   const selectedCreateAgentRole = useMemo(
     () => roles.find((role) => role.name === createAgentRoleName) ?? null,
@@ -1295,7 +1295,7 @@ export function HomePage() {
             >
               {pendingAction === "connect-agents"
                 ? "Connecting..."
-                : "Create Edge"}
+                : "Create Connection"}
             </Button>
           </>
         }
@@ -1307,13 +1307,13 @@ export function HomePage() {
               <span className="font-semibold text-white">
                 {activeTab.title}
               </span>{" "}
-              · {tabAgentOptions.length} nodes available
+              · {tabAgentOptions.length} agents available
             </>
           ) : (
             "No active tab"
           )}
         </WorkspaceDialogMeta>
-        <WorkspaceDialogField label="Source" hint="Sends messages out">
+        <WorkspaceDialogField label="Agent A" hint="First endpoint">
           <Select
             value={connectSourceId}
             onValueChange={(value) => {
@@ -1326,10 +1326,10 @@ export function HomePage() {
             }}
           >
             <SelectTrigger
-              aria-label="Source agent"
+              aria-label="Agent A"
               className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
             >
-              <SelectValue placeholder="Choose source node" />
+              <SelectValue placeholder="Choose first agent" />
             </SelectTrigger>
             <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
               {tabAgentOptions.map((agent) => (
@@ -1340,13 +1340,13 @@ export function HomePage() {
             </SelectContent>
           </Select>
         </WorkspaceDialogField>
-        <WorkspaceDialogField label="Target" hint="Receives messages">
+        <WorkspaceDialogField label="Agent B" hint="Second endpoint">
           <Select value={connectTargetId} onValueChange={setConnectTargetId}>
             <SelectTrigger
-              aria-label="Target agent"
+              aria-label="Agent B"
               className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
             >
-              <SelectValue placeholder="Choose target node" />
+              <SelectValue placeholder="Choose second agent" />
             </SelectTrigger>
             <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
               {tabAgentOptions

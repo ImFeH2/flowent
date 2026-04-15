@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
-import uuid
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from app.graph_runtime import connect_nodes, resolve_node_ref
-from app.models import GraphEdge, NodeType
+from app.graph_runtime import resolve_node_ref
+from app.models import NodeType
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -15,42 +14,33 @@ if TYPE_CHECKING:
 class ConnectTool(Tool):
     name = "connect"
     description = (
-        "Create a directed message edge between two nodes in the same task tab. "
-        "Use bidirectional=true to create edges in both directions."
+        "Create a peer connection between two regular nodes in the same task tab."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "from": {
                 "type": "string",
-                "description": "Source node UUID or name",
+                "description": "First node UUID or name",
             },
             "to": {
                 "type": "string",
-                "description": "Target node UUID or name",
-            },
-            "bidirectional": {
-                "type": "boolean",
-                "description": "Whether to also create the reverse edge",
-                "default": False,
+                "description": "Second node UUID or name",
             },
         },
         "required": ["from", "to"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app.graph_service import is_tab_leader
+        from app.graph_service import create_edge, is_tab_leader
 
         from_ref = args.get("from")
         to_ref = args.get("to")
-        bidirectional = args.get("bidirectional", False)
 
         if not isinstance(from_ref, str) or not from_ref:
             return json.dumps({"error": "from must be a non-empty string"})
         if not isinstance(to_ref, str) or not to_ref:
             return json.dumps({"error": "to must be a non-empty string"})
-        if not isinstance(bidirectional, bool):
-            return json.dumps({"error": "bidirectional must be a boolean"})
 
         source = resolve_node_ref(from_ref)
         target = resolve_node_ref(to_ref)
@@ -72,32 +62,13 @@ class ConnectTool(Tool):
         if not is_tab_leader(node_id=agent.uuid, tab_id=agent.config.tab_id):
             return json.dumps({"error": "Only a tab Leader may connect task nodes"})
 
-        connected = [[source.uuid, target.uuid]]
-        connect_nodes(source.uuid, target.uuid)
-        if source.config.tab_id:
-            from app.workspace_store import workspace_store
+        edge, error = create_edge(
+            from_node_id=source.uuid,
+            to_node_id=target.uuid,
+        )
+        if error is not None or edge is None:
+            return json.dumps({"error": error or "Failed to connect nodes"})
 
-            workspace_store.upsert_edge(
-                GraphEdge(
-                    id=str(uuid.uuid4()),
-                    tab_id=source.config.tab_id,
-                    from_node_id=source.uuid,
-                    to_node_id=target.uuid,
-                )
-            )
-        if bidirectional:
-            connect_nodes(target.uuid, source.uuid)
-            connected.append([target.uuid, source.uuid])
-            if source.config.tab_id:
-                from app.workspace_store import workspace_store
-
-                workspace_store.upsert_edge(
-                    GraphEdge(
-                        id=str(uuid.uuid4()),
-                        tab_id=source.config.tab_id,
-                        from_node_id=target.uuid,
-                        to_node_id=source.uuid,
-                    )
-                )
-
-        return json.dumps({"connected": connected})
+        return json.dumps(
+            {"connected": [[edge.from_node_id, edge.to_node_id]]},
+        )

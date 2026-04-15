@@ -223,7 +223,7 @@ def test_contacts_tool_uses_agent_public_api(monkeypatch):
     assert result == {"contacts": expected}
 
 
-def test_agent_get_contacts_info_excludes_leader_without_explicit_edge():
+def test_agent_get_contacts_info_includes_leader_without_explicit_edge():
     registry.reset()
     workspace_store.reset_cache()
     workspace_store.upsert_tab(
@@ -264,6 +264,14 @@ def test_agent_get_contacts_info_excludes_leader_without_explicit_edge():
     try:
         assert agent.get_contacts_info() == [
             {
+                "id": "leader-a",
+                "node_type": "agent",
+                "role_name": "Conductor",
+                "name": "Leader",
+                "state": "initializing",
+                "is_leader": True,
+            },
+            {
                 "id": "agent-b",
                 "node_type": "agent",
                 "role_name": "Worker",
@@ -277,7 +285,7 @@ def test_agent_get_contacts_info_excludes_leader_without_explicit_edge():
         workspace_store.reset_cache()
 
 
-def test_agent_get_contacts_info_includes_leader_when_explicitly_connected():
+def test_agent_get_contacts_info_keeps_leader_stable_when_explicitly_connected():
     registry.reset()
     workspace_store.reset_cache()
     workspace_store.upsert_tab(
@@ -362,6 +370,14 @@ def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
     try:
         assert agent.get_contacts_info() == [
             {
+                "id": "leader-a",
+                "node_type": "agent",
+                "role_name": "Conductor",
+                "name": "Leader",
+                "state": "initializing",
+                "is_leader": True,
+            },
+            {
                 "id": "agent-b",
                 "node_type": "agent",
                 "role_name": "Reviewer",
@@ -375,7 +391,7 @@ def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
         workspace_store.reset_cache()
 
 
-def test_leader_get_contacts_info_includes_assistant_and_explicit_edges_only():
+def test_leader_get_contacts_info_includes_assistant_and_all_tab_agents():
     registry.reset()
     workspace_store.reset_cache()
     workspace_store.upsert_tab(
@@ -452,6 +468,14 @@ def test_leader_get_contacts_info_includes_assistant_and_explicit_edges_only():
                 "node_type": "agent",
                 "role_name": "Reviewer",
                 "name": "Reviewer",
+                "state": "initializing",
+                "is_leader": False,
+            },
+            {
+                "id": "agent-d",
+                "node_type": "agent",
+                "role_name": "Analyst",
+                "name": "Analyst",
                 "state": "initializing",
                 "is_leader": False,
             },
@@ -702,12 +726,12 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
         assert summaries[0]["goal"] == tab.goal
         assert summaries[0]["created_at"] == tab.created_at
         assert isinstance(summaries[0]["updated_at"], float)
-        assert summaries[0]["node_count"] == 3
+        assert summaries[0]["node_count"] == 2
         assert summaries[0]["edge_count"] == 1
 
         detail = json.loads(ListTabsTool().execute(agent, {"tab_id": tab.id}))
         assert detail["tab"]["id"] == tab.id
-        assert {node["name"] for node in detail["nodes"]} == {"Leader", "Left", "Right"}
+        assert {node["name"] for node in detail["nodes"]} == {"Left", "Right"}
         assert detail["edges"] == [edge.serialize()]
     finally:
         registry.reset()

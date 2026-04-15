@@ -59,7 +59,7 @@ CREATE_AGENT_TOOL_GUIDANCE = """\
 - Prefer creating the right set of peer agents up front. If you also have `connect`, wire them as needed.
 - `create_agent` always creates the new peer in your current tab. It does not take `tab_id` or any other cross-tab target parameter.
 - Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them.
-- `connect_to_creator` defaults to `true`; set it to `false` only when you intentionally want a disconnected node and will wire explicit edges yourself.
+- `connect_to_creator` defaults to `true`; set it to `false` only when you intentionally want a disconnected node and will wire explicit connections yourself.
 - Creating an agent does not start work by itself; explicitly dispatch its first task with `send`.
 - After creating multiple agents, dispatch tasks to all of them before calling `idle`.
 - Do not insert unrelated tool calls or Human-facing text while some planned nodes are still waiting for their first task.
@@ -88,7 +88,7 @@ DELEGATION_GENERAL_GUIDANCE = """\
 CONNECT_TOOL_GUIDANCE = """\
 ## Connect Tool Rules
 
-- Use `connect` to establish additional directed message edges inside a task tab when the current network topology needs them.
+- Use `connect` to establish additional peer connections inside a task tab when the current network topology needs them.
 """
 
 CONTACTS_TOOL_GUIDANCE = """\

@@ -19,7 +19,7 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     tab_id = tab["id"]
     assert tab["title"] == "Review Task"
     assert tab["goal"] == "Inspect changed files"
-    assert tab["node_count"] == 1
+    assert tab["node_count"] == 0
     assert tab["edge_count"] == 0
     assert isinstance(tab["leader_id"], str)
 
@@ -50,18 +50,16 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     assert edge_response.status_code == 200
     edge = edge_response.json()
     assert edge["tab_id"] == tab_id
-    assert edge["from_node_id"] == reader["id"]
-    assert edge["to_node_id"] == writer["id"]
+    assert {edge["from_node_id"], edge["to_node_id"]} == {
+        reader["id"],
+        writer["id"],
+    }
 
     tab_detail_response = client.get(f"/api/tabs/{tab_id}")
     assert tab_detail_response.status_code == 200
     tab_detail = tab_detail_response.json()
     assert tab_detail["tab"]["id"] == tab_id
-    assert {node["name"] for node in tab_detail["nodes"]} == {
-        "Leader",
-        "Reader",
-        "Writer",
-    }
+    assert {node["name"] for node in tab_detail["nodes"]} == {"Reader", "Writer"}
     assert tab_detail["edges"] == [edge]
 
     nodes_response = client.get("/api/nodes")
@@ -72,6 +70,7 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     assert reader_node["tab_id"] == tab_id
     assert writer_node["tab_id"] == tab_id
     assert reader_node["connections"] == [writer["id"]]
+    assert writer_node["connections"] == [reader["id"]]
 
 
 def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
@@ -164,20 +163,23 @@ def test_delete_tab_edge_removes_only_the_target_edge(client: TestClient):
     delete_response = client.delete(
         f"/api/tabs/{tab_id}/edges",
         params={
-            "from_node_id": left["id"],
-            "to_node_id": middle["id"],
+            "from_node_id": middle["id"],
+            "to_node_id": left["id"],
         },
     )
 
     assert delete_response.status_code == 200
-    assert delete_response.json()["from_node_id"] == left["id"]
-    assert delete_response.json()["to_node_id"] == middle["id"]
+    assert {
+        delete_response.json()["from_node_id"],
+        delete_response.json()["to_node_id"],
+    } == {left["id"], middle["id"]}
 
     detail = client.get(f"/api/tabs/{tab_id}").json()
     remaining_edges = {
-        (edge["from_node_id"], edge["to_node_id"]) for edge in detail["edges"]
+        frozenset((edge["from_node_id"], edge["to_node_id"]))
+        for edge in detail["edges"]
     }
-    assert remaining_edges == {(middle["id"], right["id"])}
+    assert remaining_edges == {frozenset((middle["id"], right["id"]))}
     remaining_nodes = {node["id"] for node in detail["nodes"]}
     assert {left["id"], middle["id"], right["id"]}.issubset(remaining_nodes)
 
@@ -230,7 +232,7 @@ def test_delete_tab_node_removes_node_and_all_incident_edges(client: TestClient)
     assert detail["edges"] == []
 
 
-def test_tab_edge_creation_rejects_self_loops_and_duplicate_direct_edges(
+def test_tab_edge_creation_rejects_self_loops_and_duplicate_connections(
     client: TestClient,
 ):
     tab = client.post(
@@ -267,7 +269,65 @@ def test_tab_edge_creation_rejects_self_loops_and_duplicate_direct_edges(
     assert duplicate_edge_response.status_code == 400
     assert (
         duplicate_edge_response.json()["detail"]
-        == "Duplicate directed edges are not allowed"
+        == "Duplicate connections are not allowed"
+    )
+
+    reverse_duplicate_edge_response = client.post(
+        f"/api/tabs/{tab_id}/edges",
+        json={"from_node_id": reviewer["id"], "to_node_id": worker["id"]},
+    )
+    assert reverse_duplicate_edge_response.status_code == 400
+    assert (
+        reverse_duplicate_edge_response.json()["detail"]
+        == "Duplicate connections are not allowed"
+    )
+
+    delete_reverse_order_response = client.delete(
+        f"/api/tabs/{tab_id}/edges",
+        params={
+            "from_node_id": reviewer["id"],
+            "to_node_id": worker["id"],
+        },
+    )
+    assert delete_reverse_order_response.status_code == 200
+    assert {
+        delete_reverse_order_response.json()["from_node_id"],
+        delete_reverse_order_response.json()["to_node_id"],
+    } == {worker["id"], reviewer["id"]}
+
+    detail_response = client.get(f"/api/tabs/{tab_id}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["edges"] == []
+
+
+def test_create_blueprint_rejects_reverse_duplicate_connections(client: TestClient):
+    response = client.post(
+        "/api/blueprints",
+        json={
+            "name": "Duplicate Connections",
+            "description": "Should reject duplicate pairs",
+            "slots": [
+                {
+                    "id": "slot-a",
+                    "role_name": "Worker",
+                    "display_name": "Agent A",
+                },
+                {
+                    "id": "slot-b",
+                    "role_name": "Designer",
+                    "display_name": "Agent B",
+                },
+            ],
+            "edges": [
+                {"from_slot_id": "slot-a", "to_slot_id": "slot-b"},
+                {"from_slot_id": "slot-b", "to_slot_id": "slot-a"},
+            ],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Blueprint connection 'slot-a - slot-b' is duplicated"
     )
 
 
@@ -298,7 +358,7 @@ def test_create_tab_from_blueprint_materializes_network(client: TestClient):
         "/api/blueprints",
         json={
             "name": "Review Pipeline",
-            "description": "Leader fans out to implementation",
+            "description": "Reviewer collaborates with design",
             "slots": [
                 {
                     "id": "slot-review",
@@ -312,7 +372,6 @@ def test_create_tab_from_blueprint_materializes_network(client: TestClient):
                 },
             ],
             "edges": [
-                {"from_slot_id": "leader", "to_slot_id": "slot-review"},
                 {"from_slot_id": "slot-review", "to_slot_id": "slot-design"},
             ],
         },
@@ -321,7 +380,7 @@ def test_create_tab_from_blueprint_materializes_network(client: TestClient):
     assert blueprint_response.status_code == 200
     blueprint = blueprint_response.json()
     assert blueprint["node_count"] == 2
-    assert blueprint["edge_count"] == 2
+    assert blueprint["edge_count"] == 1
 
     create_tab_response = client.post(
         "/api/tabs",
@@ -334,8 +393,8 @@ def test_create_tab_from_blueprint_materializes_network(client: TestClient):
 
     assert create_tab_response.status_code == 200
     tab = create_tab_response.json()
-    assert tab["node_count"] == 3
-    assert tab["edge_count"] == 2
+    assert tab["node_count"] == 2
+    assert tab["edge_count"] == 1
     assert tab["network_source"] == {
         "state": "blueprint-derived",
         "blueprint_id": blueprint["id"],
@@ -350,11 +409,10 @@ def test_create_tab_from_blueprint_materializes_network(client: TestClient):
     tab_detail = tab_detail_response.json()
     assert tab_detail["tab"]["network_source"]["state"] == "blueprint-derived"
     assert {node["name"] for node in tab_detail["nodes"]} == {
-        "Leader",
         "Primary Reviewer",
         "UI Designer",
     }
-    assert len(tab_detail["edges"]) == 2
+    assert len(tab_detail["edges"]) == 1
 
 
 def test_save_network_as_blueprint_and_mark_drifted_after_manual_change(
@@ -367,14 +425,6 @@ def test_save_network_as_blueprint_and_mark_drifted_after_manual_change(
     assert create_tab_response.status_code == 200
     tab = create_tab_response.json()
     tab_id = tab["id"]
-
-    detail_response = client.get(f"/api/tabs/{tab_id}")
-    assert detail_response.status_code == 200
-    leader_id = next(
-        node["id"]
-        for node in detail_response.json()["nodes"]
-        if node["is_leader"] is True
-    )
 
     reader_response = client.post(
         f"/api/tabs/{tab_id}/nodes",
@@ -389,16 +439,11 @@ def test_save_network_as_blueprint_and_mark_drifted_after_manual_change(
     reader_id = reader_response.json()["id"]
     writer_id = writer_response.json()["id"]
 
-    first_edge_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
-        json={"from_node_id": leader_id, "to_node_id": reader_id},
-    )
-    second_edge_response = client.post(
+    edge_response = client.post(
         f"/api/tabs/{tab_id}/edges",
         json={"from_node_id": reader_id, "to_node_id": writer_id},
     )
-    assert first_edge_response.status_code == 200
-    assert second_edge_response.status_code == 200
+    assert edge_response.status_code == 200
 
     save_blueprint_response = client.post(
         f"/api/tabs/{tab_id}/blueprint",
@@ -411,7 +456,7 @@ def test_save_network_as_blueprint_and_mark_drifted_after_manual_change(
     assert save_blueprint_response.status_code == 200
     blueprint = save_blueprint_response.json()
     assert blueprint["node_count"] == 2
-    assert blueprint["edge_count"] == 2
+    assert blueprint["edge_count"] == 1
 
     derived_tab_response = client.post(
         "/api/tabs",

@@ -34,7 +34,24 @@ from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
 LEADER_NODE_NAME = "Leader"
-LEADER_BLUEPRINT_ANCHOR = "leader"
+
+
+def _canonical_connection_pair(
+    left_id: str,
+    right_id: str,
+) -> tuple[str, str]:
+    return (left_id, right_id) if left_id <= right_id else (right_id, left_id)
+
+
+def _sorted_tab_network_nodes(tab_id: str) -> list[GraphNodeRecord]:
+    return sorted(
+        [
+            record
+            for record in list_tab_nodes(tab_id)
+            if not is_tab_leader(node_id=record.id, tab_id=tab_id)
+        ],
+        key=lambda record: (record.created_at, record.id),
+    )
 
 
 def build_tools_for_role(
@@ -121,6 +138,8 @@ def _validate_blueprint_graph(
     edges: list[BlueprintEdge],
 ) -> str | None:
     settings = settings_module.get_settings()
+    if not slots:
+        return "Blueprint must contain at least one slot"
     slot_ids: set[str] = set()
     slot_names: set[str] = set()
     for slot in slots:
@@ -138,23 +157,20 @@ def _validate_blueprint_graph(
         slot_names.add(slot.display_name)
 
     seen_edges: set[tuple[str, str]] = set()
-    valid_targets = {LEADER_BLUEPRINT_ANCHOR, *slot_ids}
+    valid_targets = set(slot_ids)
     for edge in edges:
         if edge.from_slot_id not in valid_targets:
-            return f"Blueprint edge source '{edge.from_slot_id}' is invalid"
+            return f"Blueprint connection endpoint A '{edge.from_slot_id}' is invalid"
         if edge.to_slot_id not in valid_targets:
-            return f"Blueprint edge target '{edge.to_slot_id}' is invalid"
-        if (
-            edge.from_slot_id == LEADER_BLUEPRINT_ANCHOR
-            and edge.to_slot_id == LEADER_BLUEPRINT_ANCHOR
-        ):
-            return "Blueprint may not connect leader to leader"
-        edge_key = (edge.from_slot_id, edge.to_slot_id)
+            return f"Blueprint connection endpoint B '{edge.to_slot_id}' is invalid"
+        if edge.from_slot_id == edge.to_slot_id:
+            return "Blueprint self-loop connections are not allowed"
+        edge_key = _canonical_connection_pair(
+            edge.from_slot_id,
+            edge.to_slot_id,
+        )
         if edge_key in seen_edges:
-            return (
-                "Blueprint edge "
-                f"'{edge.from_slot_id} -> {edge.to_slot_id}' is duplicated"
-            )
+            return f"Blueprint connection '{edge_key[0]} - {edge_key[1]}' is duplicated"
         seen_edges.add(edge_key)
 
     return None
@@ -237,20 +253,14 @@ def delete_blueprint(blueprint_id: str) -> tuple[dict[str, object] | None, str |
 
 
 def _network_matches_blueprint_source(tab: Tab) -> bool:
-    if (
-        tab.network_blueprint_id is None
-        or tab.network_blueprint_version is None
-        or tab.leader_id is None
-    ):
+    if tab.network_blueprint_id is None or tab.network_blueprint_version is None:
         return False
 
     slot_by_id = {slot.id: slot for slot in tab.network_blueprint_slots}
     if len(slot_by_id) != len(tab.network_blueprint_slots):
         return False
 
-    current_nodes = [
-        record for record in _sorted_tab_nodes(tab.id) if record.id != tab.leader_id
-    ]
+    current_nodes = _sorted_tab_network_nodes(tab.id)
     if len(current_nodes) != len(tab.network_blueprint_slots):
         return False
 
@@ -274,26 +284,15 @@ def _network_matches_blueprint_source(tab: Tab) -> bool:
     for edge in tab.network_blueprint_edges:
         from_record = node_by_slot_id.get(edge.from_slot_id)
         to_record = node_by_slot_id.get(edge.to_slot_id)
-        from_node_id = (
-            tab.leader_id
-            if edge.from_slot_id == LEADER_BLUEPRINT_ANCHOR
-            else from_record.id
-            if from_record is not None
-            else None
-        )
-        to_node_id = (
-            tab.leader_id
-            if edge.to_slot_id == LEADER_BLUEPRINT_ANCHOR
-            else to_record.id
-            if to_record is not None
-            else None
-        )
+        from_node_id = from_record.id if from_record is not None else None
+        to_node_id = to_record.id if to_record is not None else None
         if from_node_id is None or to_node_id is None:
             return False
-        expected_edges.add((from_node_id, to_node_id))
+        expected_edges.add(_canonical_connection_pair(from_node_id, to_node_id))
 
     current_edges = {
-        (edge.from_node_id, edge.to_node_id) for edge in _sorted_tab_edges(tab.id)
+        _canonical_connection_pair(edge.from_node_id, edge.to_node_id)
+        for edge in _sorted_tab_edges(tab.id)
     }
     return current_edges == expected_edges
 
@@ -334,7 +333,7 @@ def serialize_tab_summary(tab: Tab) -> dict[str, object]:
         "created_at": tab.created_at,
         "updated_at": tab.updated_at,
         "network_source": serialize_network_source(tab),
-        "node_count": len(list_tab_nodes(tab.id)),
+        "node_count": len(_sorted_tab_network_nodes(tab.id)),
         "edge_count": len(list_tab_edges(tab.id)),
     }
 
@@ -575,16 +574,8 @@ def _materialize_blueprint_network(*, tab: Tab, blueprint: AgentBlueprint) -> No
         slot_node_ids[slot.id] = record.id
 
     for blueprint_edge in blueprint.edges:
-        from_node_id = (
-            tab.leader_id
-            if blueprint_edge.from_slot_id == LEADER_BLUEPRINT_ANCHOR
-            else slot_node_ids.get(blueprint_edge.from_slot_id)
-        )
-        to_node_id = (
-            tab.leader_id
-            if blueprint_edge.to_slot_id == LEADER_BLUEPRINT_ANCHOR
-            else slot_node_ids.get(blueprint_edge.to_slot_id)
-        )
+        from_node_id = slot_node_ids.get(blueprint_edge.from_slot_id)
+        to_node_id = slot_node_ids.get(blueprint_edge.to_slot_id)
         if from_node_id is None or to_node_id is None:
             raise ValueError("Blueprint edge references an unknown slot")
         _, error = create_edge(
@@ -604,14 +595,10 @@ def save_tab_as_blueprint(
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
         return None, f"Tab '{tab_id}' not found"
-    if tab.leader_id is None:
-        return None, f"Tab '{tab_id}' does not have a bound Leader"
 
     slot_id_by_node_id: dict[str, str] = {}
     slots: list[BlueprintSlot] = []
-    for index, record in enumerate(
-        record for record in _sorted_tab_nodes(tab.id) if record.id != tab.leader_id
-    ):
+    for index, record in enumerate(_sorted_tab_network_nodes(tab.id)):
         if record.config.role_name is None or not record.config.role_name.strip():
             return None, f"Node '{record.id}' does not have a role_name"
         slot_id = f"slot-{index + 1}"
@@ -626,16 +613,8 @@ def save_tab_as_blueprint(
 
     edges: list[BlueprintEdge] = []
     for edge in _sorted_tab_edges(tab.id):
-        from_slot_id: str | None
-        if edge.from_node_id == tab.leader_id:
-            from_slot_id = LEADER_BLUEPRINT_ANCHOR
-        else:
-            from_slot_id = slot_id_by_node_id.get(edge.from_node_id)
-        to_slot_id: str | None
-        if edge.to_node_id == tab.leader_id:
-            to_slot_id = LEADER_BLUEPRINT_ANCHOR
-        else:
-            to_slot_id = slot_id_by_node_id.get(edge.to_node_id)
+        from_slot_id = slot_id_by_node_id.get(edge.from_node_id)
+        to_slot_id = slot_id_by_node_id.get(edge.to_node_id)
         if from_slot_id is None or to_slot_id is None:
             return None, "Network contains an edge that points outside the current tab"
         edges.append(
@@ -987,16 +966,21 @@ def _finalize_agent_creation(
     started_record, error = _start_persisted_agent(record=record)
     if error is not None or started_record is None:
         return None, error or "Failed to create agent"
-    if connect_to_creator and creator_node_id is not None:
+    should_create_network_edge = (
+        connect_to_creator
+        and creator_node_id is not None
+        and record.config.tab_id is not None
+        and not is_tab_leader(node_id=creator_node_id, tab_id=record.config.tab_id)
+    )
+    if should_create_network_edge:
+        assert creator_node_id is not None
         _, edge_error = create_edge(
             from_node_id=creator_node_id,
             to_node_id=record.id,
         )
         if edge_error is not None:
             return None, edge_error
-    if record.config.tab_id is not None and (
-        not connect_to_creator or creator_node_id is None
-    ):
+    if record.config.tab_id is not None and not should_create_network_edge:
         _emit_tab_updated(
             tab_id=record.config.tab_id,
             agent_id=creator_node_id or record.id,
@@ -1020,28 +1004,42 @@ def create_edge(
         or source_record.config.tab_id != target_record.config.tab_id
     ):
         return None, "Both nodes must belong to the same tab"
+    tab_id = source_record.config.tab_id
     if from_node_id == to_node_id:
         return None, "Self-loop edges are not allowed"
+    if is_tab_leader(node_id=from_node_id, tab_id=tab_id) or is_tab_leader(
+        node_id=to_node_id,
+        tab_id=tab_id,
+    ):
+        return None, "Leader does not participate in Agent Network edges"
 
-    for edge in workspace_store.list_edges(source_record.config.tab_id):
-        if edge.from_node_id == from_node_id and edge.to_node_id == to_node_id:
-            return None, "Duplicate directed edges are not allowed"
+    canonical_from_node_id, canonical_to_node_id = _canonical_connection_pair(
+        from_node_id,
+        to_node_id,
+    )
+
+    for edge in list_tab_edges(tab_id):
+        if _canonical_connection_pair(edge.from_node_id, edge.to_node_id) == (
+            canonical_from_node_id,
+            canonical_to_node_id,
+        ):
+            return None, "Duplicate connections are not allowed"
 
     edge = GraphEdge(
         id=str(uuid.uuid4()),
-        tab_id=source_record.config.tab_id,
-        from_node_id=from_node_id,
-        to_node_id=to_node_id,
+        tab_id=tab_id,
+        from_node_id=canonical_from_node_id,
+        to_node_id=canonical_to_node_id,
     )
     workspace_store.upsert_edge(edge)
 
-    source = registry.get(from_node_id)
-    target = registry.get(to_node_id)
+    source = registry.get(canonical_from_node_id)
+    target = registry.get(canonical_to_node_id)
     if source is not None and target is not None:
-        connect_nodes(from_node_id, to_node_id)
+        connect_nodes(canonical_from_node_id, canonical_to_node_id)
     _emit_tab_updated(
         tab_id=edge.tab_id,
-        agent_id=from_node_id,
+        agent_id=canonical_from_node_id,
     )
     return edge, None
 
@@ -1056,25 +1054,28 @@ def delete_edge(
     if tab is None:
         return None, f"Tab '{tab_id}' not found"
 
+    edge_key = _canonical_connection_pair(from_node_id, to_node_id)
     edge = next(
         (
             item
-            for item in workspace_store.list_edges(tab_id)
-            if item.from_node_id == from_node_id and item.to_node_id == to_node_id
+            for item in list_tab_edges(tab_id)
+            if _canonical_connection_pair(item.from_node_id, item.to_node_id)
+            == edge_key
         ),
         None,
     )
     if edge is None:
         return None, "Edge not found"
 
-    live_source = registry.get(from_node_id)
-    if live_source is not None:
-        disconnect_nodes(from_node_id, to_node_id)
+    live_source = registry.get(edge.from_node_id)
+    live_target = registry.get(edge.to_node_id)
+    if live_source is not None and live_target is not None:
+        disconnect_nodes(edge.from_node_id, edge.to_node_id)
 
     workspace_store.delete_edge(edge.id)
     _emit_tab_updated(
         tab_id=tab_id,
-        agent_id=from_node_id,
+        agent_id=edge.from_node_id,
     )
     return edge.serialize(), None
 
@@ -1164,4 +1165,59 @@ def list_tab_nodes(tab_id: str) -> list[GraphNodeRecord]:
 
 
 def list_tab_edges(tab_id: str) -> list[GraphEdge]:
-    return workspace_store.list_edges(tab_id)
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return []
+
+    edges = sorted(
+        workspace_store.list_edges(tab_id),
+        key=lambda edge: (edge.created_at, edge.id),
+    )
+    seen_pairs: set[tuple[str, str]] = set()
+    normalized_edges: list[GraphEdge] = []
+
+    for edge in edges:
+        if tab.leader_id and (
+            edge.from_node_id == tab.leader_id or edge.to_node_id == tab.leader_id
+        ):
+            continue
+        if edge.from_node_id == edge.to_node_id:
+            continue
+        canonical_from_node_id, canonical_to_node_id = _canonical_connection_pair(
+            edge.from_node_id,
+            edge.to_node_id,
+        )
+        edge_key = (canonical_from_node_id, canonical_to_node_id)
+        if edge_key in seen_pairs:
+            continue
+        seen_pairs.add(edge_key)
+        normalized_edges.append(
+            GraphEdge(
+                id=edge.id,
+                tab_id=edge.tab_id,
+                from_node_id=canonical_from_node_id,
+                to_node_id=canonical_to_node_id,
+                created_at=edge.created_at,
+            )
+        )
+
+    return normalized_edges
+
+
+def list_node_connection_ids(*, tab_id: str, node_id: str) -> list[str]:
+    if is_tab_leader(node_id=node_id, tab_id=tab_id):
+        return []
+
+    seen_node_ids: set[str] = set()
+    connection_ids: list[str] = []
+    for edge in list_tab_edges(tab_id):
+        other_node_id: str | None = None
+        if edge.from_node_id == node_id:
+            other_node_id = edge.to_node_id
+        elif edge.to_node_id == node_id:
+            other_node_id = edge.from_node_id
+        if other_node_id is None or other_node_id in seen_node_ids:
+            continue
+        seen_node_ids.add(other_node_id)
+        connection_ids.append(other_node_id)
+    return connection_ids

@@ -558,6 +558,138 @@ def test_bootstrap_runtime_restores_active_nodes_as_idle(
         _stop_all_agents()
 
 
+def test_bootstrap_runtime_restores_only_normalized_tab_connections(
+    monkeypatch,
+    tmp_path,
+):
+    settings_file = tmp_path / "settings.json"
+    workspace_file = tmp_path / "workspace.json"
+    registry.reset()
+    settings_file.write_text(
+        json.dumps(
+            {
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    workspace_file.write_text(
+        json.dumps(
+            {
+                "tabs": [
+                    {
+                        "id": "tab-1",
+                        "title": "Restore",
+                        "goal": "",
+                        "leader_id": "leader-1",
+                        "created_at": 1,
+                        "updated_at": 1,
+                    }
+                ],
+                "nodes": [
+                    {
+                        "id": "leader-1",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Conductor",
+                            "tab_id": "tab-1",
+                            "name": "Leader",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "idle",
+                        "todos": [],
+                        "history": [],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    },
+                    {
+                        "id": "node-a",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Worker",
+                            "tab_id": "tab-1",
+                            "name": "Worker A",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "idle",
+                        "todos": [],
+                        "history": [],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    },
+                    {
+                        "id": "node-b",
+                        "config": {
+                            "node_type": "agent",
+                            "role_name": "Worker",
+                            "tab_id": "tab-1",
+                            "name": "Worker B",
+                            "tools": [],
+                            "write_dirs": [],
+                            "allow_network": False,
+                        },
+                        "state": "idle",
+                        "todos": [],
+                        "history": [],
+                        "position": None,
+                        "created_at": 1,
+                        "updated_at": 1,
+                    },
+                ],
+                "edges": [
+                    {
+                        "id": "edge-1",
+                        "tab_id": "tab-1",
+                        "from_node_id": "leader-1",
+                        "to_node_id": "node-a",
+                    },
+                    {
+                        "id": "edge-2",
+                        "tab_id": "tab-1",
+                        "from_node_id": "node-a",
+                        "to_node_id": "node-b",
+                    },
+                    {
+                        "id": "edge-3",
+                        "tab_id": "tab-1",
+                        "from_node_id": "node-b",
+                        "to_node_id": "node-a",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        leader = registry.get("leader-1")
+        left = registry.get("node-a")
+        right = registry.get("node-b")
+
+        assert leader is not None
+        assert left is not None
+        assert right is not None
+        assert leader.get_connections_snapshot() == []
+        assert left.get_connections_snapshot() == ["node-b"]
+        assert right.get_connections_snapshot() == ["node-a"]
+    finally:
+        registry.reset()
+
+
 def test_bootstrap_runtime_preserves_error_state_for_restored_nodes(
     monkeypatch,
     tmp_path,

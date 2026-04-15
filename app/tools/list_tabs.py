@@ -39,7 +39,11 @@ class ListTabsTool(Tool):
             tab = workspace_store.get_tab(tab_id.strip())
             if tab is None:
                 return json.dumps({"error": f"Tab '{tab_id.strip()}' not found"})
-            nodes = list_tab_nodes(tab.id)
+            nodes = [
+                node
+                for node in list_tab_nodes(tab.id)
+                if not is_tab_leader(node_id=node.id, tab_id=tab.id)
+            ]
             edges = list_tab_edges(tab.id)
             return json.dumps(
                 {

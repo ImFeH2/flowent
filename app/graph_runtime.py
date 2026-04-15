@@ -11,6 +11,7 @@ def connect_nodes(from_id: str, to_id: str) -> None:
     if source is None or target is None:
         raise ValueError("Both nodes must exist before connecting them")
     source.add_connection(to_id)
+    target.add_connection(from_id)
     event_bus.emit(
         Event(
             type=EventType.NODE_CONNECTED,
@@ -18,18 +19,34 @@ def connect_nodes(from_id: str, to_id: str) -> None:
             data={"from_id": from_id, "to_id": to_id},
         )
     )
+    event_bus.emit(
+        Event(
+            type=EventType.NODE_CONNECTED,
+            agent_id=to_id,
+            data={"from_id": to_id, "to_id": from_id},
+        )
+    )
 
 
 def disconnect_nodes(from_id: str, to_id: str) -> None:
     source = registry.get(from_id)
-    if source is None:
-        raise ValueError("Source node must exist before disconnecting it")
+    target = registry.get(to_id)
+    if source is None or target is None:
+        raise ValueError("Both nodes must exist before disconnecting them")
     source.remove_connection(to_id)
+    target.remove_connection(from_id)
     event_bus.emit(
         Event(
             type=EventType.NODE_DISCONNECTED,
             agent_id=from_id,
             data={"from_id": from_id, "to_id": to_id},
+        )
+    )
+    event_bus.emit(
+        Event(
+            type=EventType.NODE_DISCONNECTED,
+            agent_id=to_id,
+            data={"from_id": to_id, "to_id": from_id},
         )
     )
 

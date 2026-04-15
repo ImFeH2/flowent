@@ -25,11 +25,37 @@ interface AgentNodeData {
   selected: boolean;
   toolCall: string | null;
   leaving: boolean;
-  showIncomingHandle: boolean;
-  showOutgoingHandle: boolean;
+  showConnectionHandle: boolean;
   connectionState?: "source" | "valid-target" | "invalid-target" | null;
   [key: string]: unknown;
 }
+
+const connectionHandles = [
+  {
+    id: "left-source",
+    type: "source" as const,
+    position: Position.Left,
+    top: "36%",
+  },
+  {
+    id: "left-target",
+    type: "target" as const,
+    position: Position.Left,
+    top: "64%",
+  },
+  {
+    id: "right-source",
+    type: "source" as const,
+    position: Position.Right,
+    top: "36%",
+  },
+  {
+    id: "right-target",
+    type: "target" as const,
+    position: Position.Right,
+    top: "64%",
+  },
+];
 
 export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
   const {
@@ -40,8 +66,7 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
     latestTodo,
     selected,
     toolCall,
-    showIncomingHandle,
-    showOutgoingHandle,
+    showConnectionHandle,
     connectionState,
   } = data as unknown as AgentNodeData;
   const leaving = Boolean((data as AgentNodeData).leaving);
@@ -137,16 +162,25 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
         )}
       />
 
-      <Handle
-        type="target"
-        position={Position.Top}
-        className={cn(
-          "!z-10 !size-4 !border !border-graph-handle-border !bg-graph-handle-bg transition-[opacity,transform,box-shadow] duration-150 after:absolute after:-inset-2.5 after:content-['']",
-          !showIncomingHandle && "!opacity-0 !pointer-events-none",
-          connectionState === "valid-target" &&
-            "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
-        )}
-      />
+      {connectionHandles.map((handle) => (
+        <Handle
+          key={handle.id}
+          id={handle.id}
+          type={handle.type}
+          position={handle.position}
+          className={cn(
+            "!z-10 !size-4 !-translate-y-1/2 !border !border-graph-handle-border !bg-graph-handle-bg transition-[opacity,transform,box-shadow] duration-150 after:absolute after:-inset-2.5 after:content-['']",
+            !showConnectionHandle && "!pointer-events-none !opacity-0",
+            handle.type === "source" &&
+              connectionState === "source" &&
+              "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
+            handle.type === "target" &&
+              connectionState === "valid-target" &&
+              "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
+          )}
+          style={{ top: handle.top }}
+        />
+      ))}
 
       <div
         className={cn(
@@ -199,17 +233,6 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
           </span>
         </motion.div>
       )}
-
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className={cn(
-          "!z-10 !size-4 !border !border-graph-handle-border !bg-graph-handle-bg transition-[opacity,transform,box-shadow] duration-150 after:absolute after:-inset-2.5 after:content-['']",
-          !showOutgoingHandle && "!opacity-0 !pointer-events-none",
-          connectionState === "source" &&
-            "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
-        )}
-      />
     </motion.div>
   );
 });

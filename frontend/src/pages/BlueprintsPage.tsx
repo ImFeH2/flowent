@@ -9,7 +9,6 @@ import {
 import {
   Background,
   Handle,
-  MarkerType,
   Position,
   ReactFlow,
   type Edge as FlowEdge,
@@ -27,7 +26,6 @@ import {
   PanelRightClose,
   Plus,
   Save,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -74,7 +72,6 @@ import { PageScaffold } from "@/components/layout/PageScaffold";
 
 const LIBRARY_PANEL_ID = "blueprints-library-width";
 const INSPECTOR_PANEL_ID = "blueprints-inspector-width";
-const LEADER_NODE_ID = "leader";
 
 type DraftMode = "create" | "edit";
 
@@ -101,10 +98,31 @@ interface BlueprintViewModel {
 }
 
 interface BlueprintFlowNodeData extends Record<string, unknown> {
-  kind: "leader" | "slot";
   label: string;
   roleName: string | null;
   selected: boolean;
+}
+
+function getCanonicalEdgeId(leftId: string, rightId: string) {
+  return leftId <= rightId
+    ? `${leftId}<->${rightId}`
+    : `${rightId}<->${leftId}`;
+}
+
+function getHorizontalHandleIds(
+  sourcePosition: { x: number; y: number } | undefined,
+  targetPosition: { x: number; y: number } | undefined,
+) {
+  if ((sourcePosition?.x ?? 0) <= (targetPosition?.x ?? 0)) {
+    return {
+      sourceHandle: "right-source",
+      targetHandle: "left-target",
+    };
+  }
+  return {
+    sourceHandle: "left-source",
+    targetHandle: "right-target",
+  };
 }
 
 function createBlueprintSlotDraft(roleName = "Worker"): BlueprintSlot {
@@ -121,11 +139,11 @@ function createBlueprintEdgeDraft(
   slots: BlueprintSlot[],
   sourceSlotId?: string | null,
 ): BlueprintEdge {
-  const validTargets = [LEADER_NODE_ID, ...slots.map((slot) => slot.id)];
+  const validTargets = slots.map((slot) => slot.id);
   const nextSource =
     sourceSlotId && validTargets.includes(sourceSlotId)
       ? sourceSlotId
-      : LEADER_NODE_ID;
+      : (validTargets[0] ?? "");
   const nextTarget =
     validTargets.find((candidate) => candidate !== nextSource) ?? "";
 
@@ -158,61 +176,54 @@ function formatTimestamp(timestamp: number | null): string {
 }
 
 function BlueprintFlowNode({ data }: NodeProps) {
-  const { kind, label, roleName, selected } = data as BlueprintFlowNodeData;
-  const isLeader = kind === "leader";
+  const { label, roleName, selected } = data as BlueprintFlowNodeData;
 
   return (
     <div
       className={cn(
         "group relative min-w-[140px] rounded-[18px] border px-4 py-3 shadow-[0_18px_36px_-26px_rgba(0,0,0,0.78)] transition-[border-color,background-color,box-shadow] duration-200",
-        isLeader
-          ? "border-white/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.1),rgba(255,255,255,0.04))]"
-          : "border-white/10 bg-[linear-gradient(180deg,rgba(17,17,18,0.94),rgba(12,12,13,0.9))]",
+        "border-white/10 bg-[linear-gradient(180deg,rgba(17,17,18,0.94),rgba(12,12,13,0.9))]",
         selected
           ? "shadow-[0_22px_46px_-24px_rgba(255,255,255,0.2)] ring-1 ring-white/18"
           : "hover:border-white/18 hover:bg-white/[0.06]",
       )}
     >
       <Handle
+        id="left-source"
+        type="source"
+        position={Position.Left}
+        className="!top-[36%] !size-2 !-translate-y-1/2 !border-white/12 !bg-white/12 !opacity-0"
+      />
+      <Handle
+        id="left-target"
         type="target"
-        position={Position.Top}
-        className="!size-2 !border-white/12 !bg-white/12 !opacity-0"
+        position={Position.Left}
+        className="!top-[64%] !size-2 !-translate-y-1/2 !border-white/12 !bg-white/12 !opacity-0"
       />
       <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-2xl border",
-            isLeader
-              ? "border-white/20 bg-white/[0.08] text-white"
-              : "border-white/12 bg-black/28 text-white/80",
-          )}
-        >
-          {isLeader ? (
-            <Sparkles className="size-4" />
-          ) : (
-            <Bot className="size-4" />
-          )}
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-white/12 bg-black/28 text-white/80">
+          <Bot className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-[13px] font-semibold text-white">
-              {label}
-            </p>
-            {isLeader ? (
-              <span className="rounded-full border border-white/16 bg-white/[0.08] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-white/72">
-                Owner
-              </span>
-            ) : null}
-          </div>
+          <p className="truncate text-[13px] font-semibold text-white">
+            {label}
+          </p>
           <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-white/36">
-            {isLeader ? "Task Tab Leader" : roleName}
+            {roleName}
           </p>
         </div>
       </div>
       <Handle
+        id="right-source"
         type="source"
-        position={Position.Bottom}
-        className="!size-2 !border-white/12 !bg-white/12 !opacity-0"
+        position={Position.Right}
+        className="!top-[36%] !size-2 !-translate-y-1/2 !border-white/12 !bg-white/12 !opacity-0"
+      />
+      <Handle
+        id="right-target"
+        type="target"
+        position={Position.Right}
+        className="!top-[64%] !size-2 !-translate-y-1/2 !border-white/12 !bg-white/12 !opacity-0"
       />
     </div>
   );
@@ -230,69 +241,68 @@ function buildFlowGraph(
     return { nodes: [], edges: [] };
   }
 
-  const baseNodes: FlowNode[] = [
-    {
-      id: LEADER_NODE_ID,
+  const baseNodes: FlowNode[] = blueprint.slots.map((slot) => {
+    const label = slot.display_name || slot.role_name;
+    return {
+      id: slot.id,
       type: "blueprint",
       position: { x: 0, y: 0 },
-      width: getAgentNodeWidth("Leader"),
+      width: getAgentNodeWidth(label),
       data: {
-        kind: "leader",
-        label: "Leader",
-        roleName: null,
-        selected: selectedSlotId === null,
+        label,
+        roleName: slot.role_name,
+        selected: selectedSlotId === slot.id,
       },
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
       selectable: true,
       draggable: false,
-    },
-    ...blueprint.slots.map((slot) => {
-      const label = slot.display_name || slot.role_name;
-      return {
-        id: slot.id,
-        type: "blueprint",
-        position: { x: 0, y: 0 },
-        width: getAgentNodeWidth(label),
-        data: {
-          kind: "slot",
-          label,
-          roleName: slot.role_name,
-          selected: selectedSlotId === slot.id,
-        },
-        sourcePosition: Position.Bottom,
-        targetPosition: Position.Top,
-        selectable: true,
-        draggable: false,
-      } satisfies FlowNode;
-    }),
-  ];
+    } satisfies FlowNode;
+  });
 
   const nodeIds = new Set(baseNodes.map((node) => node.id));
-  const baseEdges: FlowEdge[] = blueprint.edges
-    .filter(
-      (edge) => nodeIds.has(edge.from_slot_id) && nodeIds.has(edge.to_slot_id),
-    )
-    .map((edge, index) => ({
-      id: `${edge.from_slot_id}-${edge.to_slot_id}-${index}`,
-      source: edge.from_slot_id,
-      target: edge.to_slot_id,
+  const seenEdgeIds = new Set<string>();
+  const baseEdges: FlowEdge[] = [];
+  for (const edge of blueprint.edges) {
+    if (!nodeIds.has(edge.from_slot_id) || !nodeIds.has(edge.to_slot_id)) {
+      continue;
+    }
+    const edgeId = getCanonicalEdgeId(edge.from_slot_id, edge.to_slot_id);
+    if (seenEdgeIds.has(edgeId)) {
+      continue;
+    }
+    seenEdgeIds.add(edgeId);
+    const [source, target] =
+      edge.from_slot_id <= edge.to_slot_id
+        ? [edge.from_slot_id, edge.to_slot_id]
+        : [edge.to_slot_id, edge.from_slot_id];
+    baseEdges.push({
+      id: edgeId,
+      source,
+      target,
       type: "smoothstep",
       animated: false,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 18,
-        height: 18,
-        color: "rgba(255,255,255,0.42)",
-      },
       style: {
         stroke: "rgba(255,255,255,0.22)",
         strokeWidth: 1.5,
       },
       selectable: false,
-    }));
+    });
+  }
 
-  return getLayoutedElements(baseNodes, baseEdges);
+  const layouted = getLayoutedElements(baseNodes, baseEdges);
+  const nodePositions = new Map(
+    layouted.nodes.map((node) => [node.id, node.position] as const),
+  );
+
+  return {
+    nodes: layouted.nodes,
+    edges: layouted.edges.map((edge) => ({
+      ...edge,
+      ...getHorizontalHandleIds(
+        nodePositions.get(edge.source),
+        nodePositions.get(edge.target),
+      ),
+    })),
+  };
 }
 
 function DrawerShell({
@@ -709,10 +719,7 @@ export function BlueprintsPage() {
       return;
     }
 
-    const validNodeIds = new Set([
-      LEADER_NODE_ID,
-      ...draft.slots.map((slot) => slot.id),
-    ]);
+    const validNodeIds = new Set(draft.slots.map((slot) => slot.id));
     const hasInvalidEdge = draft.edges.some(
       (edge) =>
         !validNodeIds.has(edge.from_slot_id) ||
@@ -720,8 +727,19 @@ export function BlueprintsPage() {
         edge.from_slot_id === edge.to_slot_id,
     );
     if (hasInvalidEdge) {
-      toast.error("All blueprint edges must connect valid nodes");
+      toast.error(
+        "All blueprint connections must link two different valid slots",
+      );
       return;
+    }
+    const seenConnectionIds = new Set<string>();
+    for (const edge of draft.edges) {
+      const edgeId = getCanonicalEdgeId(edge.from_slot_id, edge.to_slot_id);
+      if (seenConnectionIds.has(edgeId)) {
+        toast.error("Duplicate blueprint connections are not allowed");
+        return;
+      }
+      seenConnectionIds.add(edgeId);
     }
 
     const payload = {
@@ -918,7 +936,7 @@ export function BlueprintsPage() {
                 }}
                 onInspectorToggle={() => setInspectorOpen(true)}
                 onSelectNode={(nodeId) => {
-                  setSelectedSlotId(nodeId === LEADER_NODE_ID ? null : nodeId);
+                  setSelectedSlotId(nodeId);
                   setInspectorOpen(true);
                 }}
               />
@@ -981,7 +999,7 @@ export function BlueprintsPage() {
                   flowRef.current = instance;
                 }}
                 onSelectNode={(nodeId) => {
-                  setSelectedSlotId(nodeId === LEADER_NODE_ID ? null : nodeId);
+                  setSelectedSlotId(nodeId);
                 }}
               />
 
@@ -1175,8 +1193,8 @@ function BlueprintLibraryColumn({
                     {blueprint.description || "No description"}
                   </p>
                   <div className="mt-2 flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-white/34">
-                    <span>{blueprint.node_count} nodes</span>
-                    <span>{blueprint.edge_count} edges</span>
+                    <span>{blueprint.node_count} slots</span>
+                    <span>{blueprint.edge_count} connections</span>
                   </div>
                 </button>
               );
@@ -1242,7 +1260,7 @@ function BlueprintStageColumn({
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-white/45">
               {blueprint
-                ? `${blueprint.slots.length} slots · ${blueprint.edges.length} edges`
+                ? `${blueprint.slots.length} slots · ${blueprint.edges.length} connections`
                 : "Select a blueprint from the library or start a new draft."}
             </p>
           </div>
@@ -1267,7 +1285,7 @@ function BlueprintStageColumn({
                 </Button>
                 <Button size="sm" variant="outline" onClick={onAddEdge}>
                   <Plus className="mr-1 size-3.5" />
-                  Connect
+                  Add Connection
                 </Button>
                 <Button size="sm" variant="outline" onClick={onFitView}>
                   Fit View
@@ -1383,13 +1401,10 @@ function BlueprintInspectorColumn({
     );
   }
 
-  const edgeTargets = [
-    { id: LEADER_NODE_ID, label: "Leader" },
-    ...blueprint.slots.map((slot) => ({
-      id: slot.id,
-      label: slot.display_name || slot.role_name || slot.id,
-    })),
-  ];
+  const edgeTargets = blueprint.slots.map((slot) => ({
+    id: slot.id,
+    label: slot.display_name || slot.role_name || slot.id,
+  }));
 
   return (
     <div className="flex h-full flex-col">
@@ -1578,10 +1593,12 @@ function BlueprintInspectorColumn({
                     ? "New draft"
                     : `v${blueprint.version}`}
                 </SummaryRow>
-                <SummaryRow label="Nodes">{blueprint.slots.length}</SummaryRow>
-                <SummaryRow label="Edges">{blueprint.edges.length}</SummaryRow>
+                <SummaryRow label="Slots">{blueprint.slots.length}</SummaryRow>
+                <SummaryRow label="Connections">
+                  {blueprint.edges.length}
+                </SummaryRow>
                 <SummaryRow label="Structure">
-                  Leader + {blueprint.slots.length} slot
+                  {blueprint.slots.length} slot
                   {blueprint.slots.length === 1 ? "" : "s"}
                 </SummaryRow>
               </div>
@@ -1623,20 +1640,20 @@ function BlueprintInspectorColumn({
               title="Connections"
               description={
                 draft
-                  ? "Edit formal directed edges preserved by this blueprint."
-                  : "Formal directed edges preserved by this blueprint."
+                  ? "Edit the formal slot-to-slot connections preserved by this blueprint."
+                  : "Formal slot-to-slot connections preserved by this blueprint."
               }
             >
               <div className="space-y-3">
                 {draft ? (
                   <Button size="sm" variant="outline" onClick={onAddEdge}>
                     <Plus className="mr-1 size-3.5" />
-                    Add Edge
+                    Add Connection
                   </Button>
                 ) : null}
                 {blueprint.edges.length === 0 ? (
                   <div className="rounded-[1rem] border border-dashed border-white/10 px-3 py-3 text-[12px] text-white/45">
-                    No edges in this blueprint.
+                    No connections in this blueprint.
                   </div>
                 ) : (
                   blueprint.edges.map((edge, index) => (
@@ -1654,10 +1671,10 @@ function BlueprintInspectorColumn({
                               }
                             >
                               <SelectTrigger
-                                aria-label={`Edge source ${index + 1}`}
+                                aria-label={`Connection endpoint A ${index + 1}`}
                                 className="h-10 rounded-[0.95rem] border-white/10 bg-black/18 text-white focus-visible:border-white/24 focus-visible:ring-white/8"
                               >
-                                <SelectValue placeholder="Source" />
+                                <SelectValue placeholder="Endpoint A" />
                               </SelectTrigger>
                               <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
                                 {edgeTargets.map((target) => (
@@ -1674,10 +1691,10 @@ function BlueprintInspectorColumn({
                               }
                             >
                               <SelectTrigger
-                                aria-label={`Edge target ${index + 1}`}
+                                aria-label={`Connection endpoint B ${index + 1}`}
                                 className="h-10 rounded-[0.95rem] border-white/10 bg-black/18 text-white focus-visible:border-white/24 focus-visible:ring-white/8"
                               >
-                                <SelectValue placeholder="Target" />
+                                <SelectValue placeholder="Endpoint B" />
                               </SelectTrigger>
                               <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
                                 {edgeTargets.map((target) => (
@@ -1694,7 +1711,7 @@ function BlueprintInspectorColumn({
                             onClick={() => onRemoveEdge(index)}
                           >
                             <Trash2 className="mr-1 size-3.5" />
-                            Remove Edge
+                            Remove Connection
                           </Button>
                         </div>
                       ) : (
@@ -1702,7 +1719,7 @@ function BlueprintInspectorColumn({
                           {edgeTargets.find(
                             (item) => item.id === edge.from_slot_id,
                           )?.label ?? edge.from_slot_id}{" "}
-                          →{" "}
+                          •{" "}
                           {edgeTargets.find(
                             (item) => item.id === edge.to_slot_id,
                           )?.label ?? edge.to_slot_id}

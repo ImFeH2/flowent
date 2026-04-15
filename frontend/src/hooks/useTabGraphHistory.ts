@@ -25,7 +25,6 @@ type CreateAgentInput = {
 
 type CreateLinkedAgentInput = CreateAgentInput & {
   anchorNodeId: string;
-  direction: "upstream" | "downstream";
 };
 
 type DeleteAgentInput = {
@@ -100,13 +99,7 @@ export function useTabGraphHistory() {
   );
 
   const createLinkedAgent = useCallback(
-    async ({
-      tabId,
-      anchorNodeId,
-      direction,
-      roleName,
-      name,
-    }: CreateLinkedAgentInput) => {
+    async ({ tabId, anchorNodeId, roleName, name }: CreateLinkedAgentInput) => {
       const normalizedName = normalizeOptionalName(name);
       let currentNodeId = (
         await createTabNodeRequest(tabId, {
@@ -116,11 +109,7 @@ export function useTabGraphHistory() {
       ).id;
 
       try {
-        if (direction === "downstream") {
-          await createTabEdgeRequest(tabId, anchorNodeId, currentNodeId);
-        } else {
-          await createTabEdgeRequest(tabId, currentNodeId, anchorNodeId);
-        }
+        await createTabEdgeRequest(tabId, anchorNodeId, currentNodeId);
       } catch (error) {
         await deleteTabNodeRequest(tabId, currentNodeId).catch(() => undefined);
         throw error;
@@ -137,11 +126,7 @@ export function useTabGraphHistory() {
               name: normalizedName,
             })
           ).id;
-          if (direction === "downstream") {
-            await createTabEdgeRequest(tabId, anchorNodeId, currentNodeId);
-          } else {
-            await createTabEdgeRequest(tabId, currentNodeId, anchorNodeId);
-          }
+          await createTabEdgeRequest(tabId, anchorNodeId, currentNodeId);
         },
       });
 
@@ -193,8 +178,12 @@ export function useTabGraphHistory() {
         .filter((candidate) => candidate.id !== node.id)
         .filter((candidate) => candidate.connections.includes(node.id))
         .map((candidate) => candidate.id);
-      const outgoingNodeIds = node.connections.filter((targetId) =>
-        tabAgents.some((candidate) => candidate.id === targetId),
+      const connectedNodeIds = Array.from(
+        new Set(
+          [...incomingNodeIds, ...node.connections].filter((targetId) =>
+            tabAgents.some((candidate) => candidate.id === targetId),
+          ),
+        ),
       );
       const normalizedName = normalizeOptionalName(node.name);
       let currentNodeId = node.id;
@@ -210,11 +199,8 @@ export function useTabGraphHistory() {
             })
           ).id;
 
-          for (const sourceNodeId of incomingNodeIds) {
-            await createTabEdgeRequest(tabId, sourceNodeId, currentNodeId);
-          }
-          for (const targetNodeId of outgoingNodeIds) {
-            await createTabEdgeRequest(tabId, currentNodeId, targetNodeId);
+          for (const connectedNodeId of connectedNodeIds) {
+            await createTabEdgeRequest(tabId, connectedNodeId, currentNodeId);
           }
         },
         redo: async () => {

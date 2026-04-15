@@ -340,7 +340,7 @@ describe("HomePage", () => {
       {
         id: "blueprint-1",
         name: "Review Pipeline",
-        description: "Leader plus reviewers",
+        description: "Reviewer collaboration pattern",
         version: 1,
         slots: [
           {
@@ -349,11 +349,11 @@ describe("HomePage", () => {
             display_name: "Primary Reviewer",
           },
         ],
-        edges: [{ from_slot_id: "leader", to_slot_id: "slot-1" }],
+        edges: [],
         created_at: 1,
         updated_at: 1,
         node_count: 1,
-        edge_count: 1,
+        edge_count: 0,
       },
     ]);
     saveTabAsBlueprintRequestMock.mockResolvedValue({

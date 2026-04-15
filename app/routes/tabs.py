@@ -11,6 +11,7 @@ from app.graph_service import (
     delete_edge,
     delete_tab,
     is_tab_leader,
+    list_node_connection_ids,
     list_tab_edges,
     list_tab_nodes,
     serialize_tab_summary,
@@ -70,7 +71,11 @@ async def get_tab(tab_id: str) -> dict[str, object]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
         raise HTTPException(status_code=404, detail="Tab not found")
-    nodes = list_tab_nodes(tab_id)
+    nodes = [
+        node
+        for node in list_tab_nodes(tab_id)
+        if not is_tab_leader(node_id=node.id, tab_id=tab_id)
+    ]
     edges = list_tab_edges(tab_id)
     return {
         "tab": serialize_tab_summary(tab),
@@ -80,11 +85,9 @@ async def get_tab(tab_id: str) -> dict[str, object]:
                 "node_type": node.config.node_type.value,
                 "tab_id": node.config.tab_id,
                 "role_name": node.config.role_name,
-                "is_leader": is_tab_leader(node_id=node.id, tab_id=tab_id),
+                "is_leader": False,
                 "state": node.state.value,
-                "connections": [
-                    edge.to_node_id for edge in edges if edge.from_node_id == node.id
-                ],
+                "connections": list_node_connection_ids(tab_id=tab_id, node_id=node.id),
                 "name": node.config.name,
                 "todos": [todo.serialize() for todo in node.todos],
                 "position": node.position.serialize()

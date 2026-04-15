@@ -56,7 +56,9 @@ def test_get_node_detail_includes_runtime_config(client: TestClient):
     assert isinstance(data["allow_network"], bool)
 
 
-def test_worker_contacts_require_explicit_edge_to_leader(client: TestClient):
+def test_worker_and_leader_are_stable_contacts_without_explicit_edge(
+    client: TestClient,
+):
     tab = client.post(
         "/api/tabs",
         json={"title": "Execution", "goal": "Coordinate work"},
@@ -69,10 +71,10 @@ def test_worker_contacts_require_explicit_edge_to_leader(client: TestClient):
     detail_without_edge = client.get(f"/api/nodes/{worker['id']}")
 
     assert detail_without_edge.status_code == 200
-    assert detail_without_edge.json()["contacts"] == []
+    assert detail_without_edge.json()["contacts"] == [tab["leader_id"]]
     leader_without_edge = client.get(f"/api/nodes/{tab['leader_id']}")
     assert leader_without_edge.status_code == 200
-    assert worker["id"] not in leader_without_edge.json()["contacts"]
+    assert worker["id"] in leader_without_edge.json()["contacts"]
 
     edge_response = client.post(
         f"/api/tabs/{tab['id']}/edges",
@@ -82,15 +84,10 @@ def test_worker_contacts_require_explicit_edge_to_leader(client: TestClient):
         },
     )
 
-    assert edge_response.status_code == 200
-
-    detail_with_edge = client.get(f"/api/nodes/{worker['id']}")
-
-    assert detail_with_edge.status_code == 200
-    assert detail_with_edge.json()["contacts"] == [tab["leader_id"]]
-    leader_with_edge = client.get(f"/api/nodes/{tab['leader_id']}")
-    assert leader_with_edge.status_code == 200
-    assert worker["id"] in leader_with_edge.json()["contacts"]
+    assert edge_response.status_code == 400
+    assert edge_response.json()["detail"] == (
+        "Leader does not participate in Agent Network edges"
+    )
 
 
 def test_direct_node_message_api_is_not_available(client: TestClient):

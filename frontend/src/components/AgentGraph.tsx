@@ -101,7 +101,6 @@ type QuickCreateState =
       x: number;
       y: number;
       anchorNodeId: string;
-      direction: "upstream" | "downstream";
     }
   | {
       kind: "between";
@@ -124,8 +123,7 @@ interface AgentNodeData extends Record<string, unknown> {
   selected: boolean;
   toolCall: string | null;
   leaving: boolean;
-  showIncomingHandle: boolean;
-  showOutgoingHandle: boolean;
+  showConnectionHandle: boolean;
   connectionState?: "source" | "valid-target" | "invalid-target" | null;
 }
 
@@ -155,7 +153,6 @@ interface AgentGraphProps {
   onCreateLinkedAgent?: (input: {
     tabId: string;
     anchorNodeId: string;
-    direction: "upstream" | "downstream";
     roleName: string;
     name?: string;
   }) => Promise<unknown>;
@@ -172,6 +169,28 @@ interface AgentGraphProps {
     name?: string;
   }) => Promise<unknown>;
   onOpenConnectDialog?: () => void;
+}
+
+function getCanonicalEdgeId(leftId: string, rightId: string) {
+  return leftId <= rightId
+    ? `${leftId}<->${rightId}`
+    : `${rightId}<->${leftId}`;
+}
+
+function getHorizontalHandleIds(
+  sourcePosition: { x: number; y: number } | undefined,
+  targetPosition: { x: number; y: number } | undefined,
+) {
+  if ((sourcePosition?.x ?? 0) <= (targetPosition?.x ?? 0)) {
+    return {
+      sourceHandle: "right-source",
+      targetHandle: "left-target",
+    };
+  }
+  return {
+    sourceHandle: "left-source",
+    targetHandle: "right-target",
+  };
 }
 
 function useTransientGraphElements(
@@ -342,9 +361,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
     const [dragConnectionSourceId, setDragConnectionSourceId] = useState<
       string | null
     >(null);
-    const [dragConnectionHandleType, setDragConnectionHandleType] = useState<
-      "source" | "target" | null
-    >(null);
     const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
     const [quickCreateRoleQuery, setQuickCreateRoleQuery] = useState("");
     const [quickCreateRoleName, setQuickCreateRoleName] = useState("");
@@ -444,7 +460,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       setConnectMode(false);
       setTargetPickSourceId(null);
       setDragConnectionSourceId(null);
-      setDragConnectionHandleType(null);
     }, []);
 
     const clearGraphSelection = useCallback(() => {
@@ -492,7 +507,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         { fromId: string; toId: string; timestamp: number }
       >();
       for (const msg of activeMessages) {
-        const edgeId = `${msg.fromId}->${msg.toId}`;
+        const edgeId = getCanonicalEdgeId(msg.fromId, msg.toId);
         const current = map.get(edgeId);
         if (!current || current.timestamp <= msg.timestamp) {
           map.set(edgeId, {
@@ -508,7 +523,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
     const visibleAgents = useMemo(
       () =>
         Array.from(agents.values()).filter((agent) => {
-          if (agent.node_type === "assistant") {
+          if (agent.node_type === "assistant" || agent.is_leader) {
             return false;
           }
           if (activeTabId) {
@@ -524,8 +539,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       [visibleAgents],
     );
     const connectPreviewSourceId = dragConnectionSourceId ?? targetPickSourceId;
-    const connectPreviewDirection =
-      dragConnectionHandleType ?? (targetPickSourceId ? "source" : null);
     const isValidDirectConnection = useCallback(
       (sourceNodeId: string, targetNodeId: string) => {
         if (sourceNodeId === targetNodeId) {
@@ -545,20 +558,14 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       const visibleAgentIds = new Set<string>();
       for (let i = 0; i < visibleAgents.length; i++)
         visibleAgentIds.add(visibleAgents[i].id);
-      const incomingAgentIds = new Set<string>();
-      for (const agent of visibleAgents) {
-        for (const targetId of agent.connections) {
-          if (!visibleAgentIds.has(targetId)) {
-            continue;
-          }
-          incomingAgentIds.add(targetId);
-        }
-      }
 
       const data = new Map<string, AgentNodeData>();
 
       for (const agent of visibleAgents) {
         const id = agent.id;
+        const hasVisibleConnection = agent.connections.some((targetId) =>
+          visibleAgentIds.has(targetId),
+        );
         const label = getNodeLabel({
           name: agent.name,
           roleName: agent.role_name,
@@ -578,28 +585,16 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
           selected: id === selectedAgentId && selectedEdgeId === null,
           toolCall: activeToolCalls.get(id) ?? null,
           leaving: false,
-          showIncomingHandle:
+          showConnectionHandle:
             Boolean(activeTabId) &&
-            (incomingAgentIds.has(id) || connecting || connectMode),
-          showOutgoingHandle:
-            Boolean(activeTabId) &&
-            (agent.connections.some((targetId) =>
-              visibleAgentIds.has(targetId),
-            ) ||
-              connecting ||
-              connectMode),
-          connectionState:
-            connectPreviewSourceId && connectPreviewDirection
-              ? id === connectPreviewSourceId
-                ? "source"
-                : connectPreviewDirection === "source"
-                  ? isValidDirectConnection(connectPreviewSourceId, id)
-                    ? "valid-target"
-                    : "invalid-target"
-                  : isValidDirectConnection(id, connectPreviewSourceId)
-                    ? "valid-target"
-                    : "invalid-target"
-              : null,
+            (hasVisibleConnection || connecting || connectMode),
+          connectionState: connectPreviewSourceId
+            ? id === connectPreviewSourceId
+              ? "source"
+              : isValidDirectConnection(connectPreviewSourceId, id)
+                ? "valid-target"
+                : "invalid-target"
+            : null,
         });
       }
 
@@ -608,7 +603,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       activeTabId,
       activeToolCalls,
       connectMode,
-      connectPreviewDirection,
       connectPreviewSourceId,
       connecting,
       isValidDirectConnection,
@@ -621,16 +615,28 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       const visibleAgentIds = new Set<string>();
       for (let i = 0; i < visibleAgents.length; i++)
         visibleAgentIds.add(visibleAgents[i].id);
-      const baseEdges = visibleAgents.flatMap((agent) =>
-        agent.connections
-          .filter((targetId) => visibleAgentIds.has(targetId))
-          .map((targetId) => ({
-            id: `${agent.id}->${targetId}`,
-            source: agent.id,
-            target: targetId,
-            type: "animated" as const,
-          })),
-      );
+      const seenEdgeIds = new Set<string>();
+      const baseEdges: FlowEdge[] = [];
+      for (const agent of visibleAgents) {
+        for (const targetId of agent.connections) {
+          if (!visibleAgentIds.has(targetId)) {
+            continue;
+          }
+          const edgeId = getCanonicalEdgeId(agent.id, targetId);
+          if (seenEdgeIds.has(edgeId)) {
+            continue;
+          }
+          seenEdgeIds.add(edgeId);
+          const [source, target] =
+            agent.id <= targetId ? [agent.id, targetId] : [targetId, agent.id];
+          baseEdges.push({
+            id: edgeId,
+            source,
+            target,
+            type: "animated",
+          });
+        }
+      }
 
       const rawNodes: FlowNode[] = visibleAgents.flatMap((agent) => {
         const data = transientData.get(agent.id);
@@ -689,13 +695,26 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         ...node,
         position: positions.get(node.id) ?? { x: 0, y: 0 },
       }));
+      const nodePositions = new Map(
+        nodes.map((node) => [node.id, node.position] as const),
+      );
       const edges = baseEdges.map((edge) => {
         const activeMessage = activeEdgeMessages.get(edge.id);
+        const handleIds = getHorizontalHandleIds(
+          nodePositions.get(edge.source),
+          nodePositions.get(edge.target),
+        );
         return {
           ...edge,
+          ...handleIds,
           data: {
             active: !!activeMessage,
-            flowDirection: activeMessage ? "forward" : null,
+            flowDirection: activeMessage
+              ? activeMessage.fromId === edge.source &&
+                activeMessage.toId === edge.target
+                ? "forward"
+                : "reverse"
+              : null,
             leaving: false,
             selected: edge.id === selectedEdgeId,
           },
@@ -729,7 +748,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
             return;
           }
           if (!isValidDirectConnection(targetPickSourceId, node.id)) {
-            toast.error("Duplicate directed edges are not allowed");
+            toast.error("Duplicate connections are not allowed");
             return;
           }
           void onCreateConnection(activeTabId, targetPickSourceId, node.id)
@@ -858,9 +877,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       ) => {
         setSelectedEdgeId(null);
         setDragConnectionSourceId(params?.nodeId ?? null);
-        setDragConnectionHandleType(
-          params?.handleType === "target" ? "target" : null,
-        );
         if (params?.nodeId) {
           selectAgent(params.nodeId);
         }
@@ -876,13 +892,8 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       ) => {
         setConnecting(false);
         setDragConnectionSourceId(null);
-        setDragConnectionHandleType(null);
 
         const fromNode = state?.fromNode as { id: string } | null | undefined;
-        const fromHandle = state?.fromHandle as
-          | { type?: "source" | "target" | null }
-          | null
-          | undefined;
         const toNode = state?.toNode as { id: string } | null | undefined;
 
         if (!toNode && activeTabId && fromNode && event) {
@@ -893,8 +904,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
               x: pointer.x,
               y: pointer.y,
               anchorNodeId: fromNode.id,
-              direction:
-                fromHandle?.type === "target" ? "upstream" : "downstream",
             });
             return;
           }
@@ -952,26 +961,13 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
           return [];
         }
         items.push({
-          label: "Add Downstream Agent",
+          label: "Add Connected Agent",
           onClick: () => {
             openQuickCreate({
               kind: "linked",
               x: contextMenu.x,
               y: contextMenu.y,
               anchorNodeId: contextAgent.id,
-              direction: "downstream",
-            });
-          },
-        });
-        items.push({
-          label: "Add Upstream Agent",
-          onClick: () => {
-            openQuickCreate({
-              kind: "linked",
-              x: contextMenu.x,
-              y: contextMenu.y,
-              anchorNodeId: contextAgent.id,
-              direction: "upstream",
             });
           },
         });
@@ -1273,7 +1269,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
           await onCreateLinkedAgent({
             tabId: activeTabId,
             anchorNodeId: quickCreate.anchorNodeId,
-            direction: quickCreate.direction,
             roleName: quickCreateRoleName,
             name: quickCreateName,
           });
@@ -1335,13 +1330,13 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       if (targetPickSourceId) {
         const sourceAgent = agents.get(targetPickSourceId);
         return sourceAgent
-          ? `Connecting From ${getNodeLabel({
+          ? `Connect ${getNodeLabel({
               name: sourceAgent.name,
               roleName: sourceAgent.role_name,
               nodeType: sourceAgent.node_type,
               isLeader: sourceAgent.is_leader,
             })}`
-          : "Connecting From Agent";
+          : "Connect Agent";
       }
       if (connectMode) {
         return "Connect Mode";
@@ -1541,9 +1536,7 @@ function getQuickCreateTitle(state: QuickCreateState) {
   if (state.kind === "between") {
     return "Insert Agent Between";
   }
-  return state.direction === "upstream"
-    ? "Add Upstream Agent"
-    : "Add Downstream Agent";
+  return "Add Connected Agent";
 }
 
 function getPointerPosition(event: globalThis.MouseEvent | TouchEvent) {

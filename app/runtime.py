@@ -45,7 +45,7 @@ def restart_telegram_channel() -> None:
 def bootstrap_runtime() -> None:
     from app.agent import Agent
     from app.graph_runtime import connect_nodes
-    from app.graph_service import ensure_tab_leaders
+    from app.graph_service import ensure_tab_leaders, list_tab_edges
     from app.models import AgentState, NodeConfig, NodeType, StateEntry
     from app.settings import (
         STEWARD_ROLE_INCLUDED_TOOLS,
@@ -166,19 +166,20 @@ def bootstrap_runtime() -> None:
         node.start()
         restored_node_ids.add(node.uuid)
 
-    for edge in workspace_store.list_edges():
-        if edge.from_node_id not in restored_node_ids:
-            continue
-        if edge.to_node_id not in restored_node_ids:
-            continue
-        try:
-            connect_nodes(edge.from_node_id, edge.to_node_id)
-        except ValueError:
-            logger.warning(
-                "Skipping invalid restored edge {} -> {}",
-                edge.from_node_id[:8],
-                edge.to_node_id[:8],
-            )
+    for tab in workspace_store.list_tabs():
+        for edge in list_tab_edges(tab.id):
+            if edge.from_node_id not in restored_node_ids:
+                continue
+            if edge.to_node_id not in restored_node_ids:
+                continue
+            try:
+                connect_nodes(edge.from_node_id, edge.to_node_id)
+            except ValueError:
+                logger.warning(
+                    "Skipping invalid restored edge {} -> {}",
+                    edge.from_node_id[:8],
+                    edge.to_node_id[:8],
+                )
 
     if settings.telegram.bot_token.strip():
         restart_telegram_channel()

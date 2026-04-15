@@ -76,10 +76,9 @@ vi.mock("@xyflow/react", async () => {
   return {
     Background: () => null,
     Handle: () => null,
-    MarkerType: {
-      ArrowClosed: "arrow-closed",
-    },
     Position: {
+      Left: "left",
+      Right: "right",
       Bottom: "bottom",
       Top: "top",
     },
@@ -125,7 +124,7 @@ function buildBlueprint(
   return {
     id: overrides.id,
     name: overrides.name,
-    description: overrides.description ?? "Leader plus reviewers",
+    description: overrides.description ?? "Reviewer collaborates with design",
     version: overrides.version ?? 2,
     slots: overrides.slots ?? [
       {
@@ -133,16 +132,21 @@ function buildBlueprint(
         role_name: "Reviewer",
         display_name: "Primary Reviewer",
       },
+      {
+        id: "slot-2",
+        role_name: "Worker",
+        display_name: "Designer",
+      },
     ],
     edges: overrides.edges ?? [
       {
-        from_slot_id: "leader",
-        to_slot_id: "slot-1",
+        from_slot_id: "slot-1",
+        to_slot_id: "slot-2",
       },
     ],
     created_at: overrides.created_at ?? 1700000000,
     updated_at: overrides.updated_at ?? 1710000000,
-    node_count: overrides.node_count ?? 1,
+    node_count: overrides.node_count ?? 2,
     edge_count: overrides.edge_count ?? 1,
     version_history: versionHistory,
   };
@@ -212,18 +216,23 @@ describe("BlueprintsPage", () => {
     await waitFor(() =>
       expect(updateBlueprintRequestMock).toHaveBeenCalledWith("blueprint-1", {
         name: "Updated Pipeline",
-        description: "Leader plus reviewers",
+        description: "Reviewer collaborates with design",
         slots: [
           {
             id: "slot-1",
             role_name: "Reviewer",
             display_name: "Primary Reviewer",
           },
+          {
+            id: "slot-2",
+            role_name: "Worker",
+            display_name: "Designer",
+          },
         ],
         edges: [
           {
-            from_slot_id: "leader",
-            to_slot_id: "slot-1",
+            from_slot_id: "slot-1",
+            to_slot_id: "slot-2",
           },
         ],
       }),

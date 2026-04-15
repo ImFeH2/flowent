@@ -44,8 +44,8 @@ class CreateAgentTool(Tool):
             "connect_to_creator": {
                 "type": "boolean",
                 "description": (
-                    "Whether to automatically create an explicit edge from the "
-                    "creator to the new node"
+                    "Whether to automatically create an explicit connection "
+                    "between the creator and the new node"
                 ),
                 "default": True,
             },

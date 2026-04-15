@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AGENT_NODE_HEIGHT, getLayoutedElements } from "@/lib/layout";
 
 describe("getLayoutedElements", () => {
-  it("keeps dependency layers readable for connected structures", () => {
+  it("keeps connected structures spread into a readable undirected layout", () => {
     const { nodes } = getLayoutedElements(
       [
         {
@@ -47,12 +47,23 @@ describe("getLayoutedElements", () => {
     const right = nodes.find((node) => node.id === "right");
     const sink = nodes.find((node) => node.id === "sink");
 
-    expect(source?.position.y ?? 0).toBeLessThan(left?.position.y ?? 0);
-    expect(source?.position.y ?? 0).toBeLessThan(right?.position.y ?? 0);
-    expect(sink?.position.y ?? 0).toBeGreaterThan(left?.position.y ?? 0);
-    expect(sink?.position.y ?? 0).toBeGreaterThan(right?.position.y ?? 0);
-    expect(left?.position.y).toBe(right?.position.y);
-    expect(left?.position.x).not.toBe(right?.position.x);
+    const positionKeys = new Set(
+      nodes.map(
+        (node) =>
+          `${Math.round(node.position.x)}:${Math.round(node.position.y)}`,
+      ),
+    );
+
+    expect(positionKeys.size).toBe(4);
+    expect(
+      Math.abs((left?.position.x ?? 0) - (right?.position.x ?? 0)),
+    ).toBeGreaterThan(40);
+    expect(
+      Math.hypot(
+        (source?.position.x ?? 0) - (sink?.position.x ?? 0),
+        (source?.position.y ?? 0) - (sink?.position.y ?? 0),
+      ),
+    ).toBeGreaterThan(80);
   });
 
   it("groups isolated nodes into a grid below connected components", () => {

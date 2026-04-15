@@ -27,7 +27,9 @@ def reset_runtime_state(monkeypatch, tmp_path):
     monkeypatch.setattr(settings_module, "_cached_settings", None)
 
 
-def test_create_agent_defaults_to_current_tab_and_connects_to_creator(monkeypatch):
+def test_leader_create_agent_defaults_to_current_tab_without_network_edge(
+    monkeypatch,
+):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
@@ -67,11 +69,8 @@ def test_create_agent_defaults_to_current_tab_and_connects_to_creator(monkeypatc
 
     assert result["config"]["tab_id"] == tab.id
     assert result["config"]["name"] == "Peer Worker"
-    assert owner.get_connections_snapshot() == [result["id"]]
-    assert [
-        (edge.from_node_id, edge.to_node_id)
-        for edge in workspace_store.list_edges(tab.id)
-    ] == [(owner.uuid, result["id"])]
+    assert owner.get_connections_snapshot() == []
+    assert workspace_store.list_edges(tab.id) == []
 
 
 def test_create_agent_can_disable_automatic_edge_to_creator(monkeypatch):
@@ -489,8 +488,8 @@ def test_create_agent_tool_schema_exposes_connect_to_creator_default():
             "connect_to_creator": {
                 "type": "boolean",
                 "description": (
-                    "Whether to automatically create an explicit edge from the "
-                    "creator to the new node"
+                    "Whether to automatically create an explicit connection "
+                    "between the creator and the new node"
                 ),
                 "default": True,
             },

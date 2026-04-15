@@ -212,10 +212,20 @@ vi.mock("@xyflow/react", async () => {
     ReactFlow: ReactFlowMock,
     Background: () => null,
     BaseEdge: ({ id }: { id: string }) => <div data-testid={`edge-${id}`} />,
-    Handle: ({ type, className }: { type: string; className?: string }) => (
-      <div data-testid={`handle-${type}`} className={className} />
+    Handle: ({
+      type,
+      position,
+      className,
+    }: {
+      type: string;
+      position: string;
+      className?: string;
+    }) => (
+      <div data-testid={`handle-${type}-${position}`} className={className} />
     ),
     Position: {
+      Left: "left",
+      Right: "right",
       Top: "top",
       Bottom: "bottom",
     },
@@ -286,6 +296,28 @@ function renderGraph(
   return render(<AgentGraph />);
 }
 
+function expectConnectionHandlesVisible(node: HTMLElement) {
+  for (const handleId of [
+    "handle-source-left",
+    "handle-target-left",
+    "handle-source-right",
+    "handle-target-right",
+  ]) {
+    expect(within(node).getByTestId(handleId)).not.toHaveClass("!opacity-0");
+  }
+}
+
+function expectConnectionHandlesHidden(node: HTMLElement) {
+  for (const handleId of [
+    "handle-source-left",
+    "handle-target-left",
+    "handle-source-right",
+    "handle-target-right",
+  ]) {
+    expect(within(node).getByTestId(handleId)).toHaveClass("!opacity-0");
+  }
+}
+
 beforeEach(() => {
   fitViewMock.mockClear();
   getZoomMock.mockClear();
@@ -327,7 +359,7 @@ describe("AgentGraph", () => {
     expect(workerNode).toHaveClass("h-14");
   });
 
-  it("shows only the stable handles for existing incoming and outgoing edges", async () => {
+  it("shows stable connection handles for connected nodes", async () => {
     renderGraph([
       buildNode({
         id: "worker-1",
@@ -337,7 +369,7 @@ describe("AgentGraph", () => {
       buildNode({
         id: "worker-2",
         role_name: "Reviewer",
-        connections: [],
+        connections: ["worker-1"],
       }),
     ]);
 
@@ -346,18 +378,8 @@ describe("AgentGraph", () => {
     const plannerNode = screen.getByTestId("node-worker-1");
     const reviewerNode = screen.getByTestId("node-worker-2");
 
-    expect(within(plannerNode).getByTestId("handle-source")).not.toHaveClass(
-      "!opacity-0",
-    );
-    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
-      "!opacity-0",
-    );
-    expect(within(reviewerNode).getByTestId("handle-target")).not.toHaveClass(
-      "!opacity-0",
-    );
-    expect(within(reviewerNode).getByTestId("handle-source")).toHaveClass(
-      "!opacity-0",
-    );
+    expectConnectionHandlesVisible(plannerNode);
+    expectConnectionHandlesVisible(reviewerNode);
   });
 
   it("temporarily shows handles for isolated nodes during explicit connect interaction", async () => {
@@ -377,30 +399,15 @@ describe("AgentGraph", () => {
     await screen.findByText("Planner");
 
     const plannerNode = screen.getByTestId("node-worker-1");
-    expect(within(plannerNode).getByTestId("handle-source")).toHaveClass(
-      "!opacity-0",
-    );
-    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
-      "!opacity-0",
-    );
+    expectConnectionHandlesHidden(plannerNode);
 
     fireEvent.click(screen.getByTestId("connect-start"));
 
-    expect(within(plannerNode).getByTestId("handle-source")).not.toHaveClass(
-      "!opacity-0",
-    );
-    expect(within(plannerNode).getByTestId("handle-target")).not.toHaveClass(
-      "!opacity-0",
-    );
+    expectConnectionHandlesVisible(plannerNode);
 
     fireEvent.click(screen.getByTestId("connect-end"));
 
-    expect(within(plannerNode).getByTestId("handle-source")).toHaveClass(
-      "!opacity-0",
-    );
-    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
-      "!opacity-0",
-    );
+    expectConnectionHandlesHidden(plannerNode);
   });
 
   it("keeps isolated handles hidden when selection is the only state", async () => {
@@ -418,12 +425,7 @@ describe("AgentGraph", () => {
     await screen.findByText("Planner");
 
     const plannerNode = screen.getByTestId("node-worker-1");
-    expect(within(plannerNode).getByTestId("handle-source")).toHaveClass(
-      "!opacity-0",
-    );
-    expect(within(plannerNode).getByTestId("handle-target")).toHaveClass(
-      "!opacity-0",
-    );
+    expectConnectionHandlesHidden(plannerNode);
   });
 
   it("renders only nodes from the active task tab", async () => {
@@ -663,7 +665,7 @@ describe("AgentGraph", () => {
     );
   });
 
-  it("does not lay out detached workers as implicit leader children", async () => {
+  it("keeps leader nodes out of the visible graph", async () => {
     renderGraph([
       buildNode({
         id: "leader-1",
@@ -678,23 +680,20 @@ describe("AgentGraph", () => {
       }),
     ]);
 
-    await screen.findByText("Leader");
+    await screen.findByText("Worker");
 
     const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
       | {
           nodes: Array<{ id: string; position: { x: number; y: number } }>;
         }
       | undefined;
-    const leaderNode = latestProps?.nodes.find(
-      (node) => node.id === "leader-1",
-    );
     const workerNode = latestProps?.nodes.find(
       (node) => node.id === "worker-1",
     );
 
-    expect(leaderNode).toBeDefined();
     expect(workerNode).toBeDefined();
-    expect(workerNode?.position.y).toBe(leaderNode?.position.y);
+    expect(latestProps?.nodes).toHaveLength(1);
+    expect(screen.queryByText("Leader")).not.toBeInTheDocument();
   });
 
   it("ignores stale worker layout results after structure changes", async () => {

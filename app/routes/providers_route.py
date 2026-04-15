@@ -77,6 +77,14 @@ class ProviderModelTestRequest(ProviderDraftRequest):
     model: str
 
 
+def _validate_provider_base_url_input(provider_type: str, base_url: str) -> str:
+    raw_base_url = base_url.strip()
+    if not raw_base_url:
+        raise ValueError("provider base_url is required")
+    resolve_provider_base_url(provider_type, raw_base_url)
+    return raw_base_url
+
+
 def _build_provider_model_entry(
     req: ProviderModelRequest,
 ) -> ProviderModelCatalogEntry:
@@ -186,7 +194,7 @@ def _resolve_provider_from_request(req: ProviderDraftRequest) -> ProviderConfig:
         raise HTTPException(status_code=400, detail="provider base_url is required")
 
     try:
-        resolved_base_url = resolve_provider_base_url(provider_type, base_url)
+        raw_base_url = _validate_provider_base_url_input(provider_type, base_url)
         headers = build_provider_headers(
             req.headers
             if req.headers is not None
@@ -208,7 +216,7 @@ def _resolve_provider_from_request(req: ProviderDraftRequest) -> ProviderConfig:
             else ""
         ),
         type=provider_type,
-        base_url=resolved_base_url,
+        base_url=raw_base_url,
         api_key=(
             req.api_key
             if isinstance(req.api_key, str)
@@ -293,7 +301,7 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
 
     settings = get_settings()
     try:
-        resolved_base_url = resolve_provider_base_url(req.type, req.base_url)
+        raw_base_url = _validate_provider_base_url_input(req.type, req.base_url)
         headers = build_provider_headers(req.headers)
         retry_429_delay_seconds = build_provider_retry_429_delay_seconds(
             req.retry_429_delay_seconds
@@ -305,7 +313,7 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
         id=str(uuid.uuid4()),
         name=req.name,
         type=req.type,
-        base_url=resolved_base_url,
+        base_url=raw_base_url,
         api_key=req.api_key,
         headers=headers,
         retry_429_delay_seconds=retry_429_delay_seconds,
@@ -329,9 +337,11 @@ async def update_provider(
             continue
         next_name = req.name if req.name is not None else provider.name
         next_type = req.type if req.type is not None else provider.type
-        next_base_url = req.base_url if req.base_url is not None else provider.base_url
+        next_base_url = (
+            req.base_url.strip() if req.base_url is not None else provider.base_url
+        )
         try:
-            resolved_base_url = resolve_provider_base_url(next_type, next_base_url)
+            raw_base_url = _validate_provider_base_url_input(next_type, next_base_url)
             next_headers = (
                 build_provider_headers(req.headers)
                 if req.headers is not None
@@ -354,7 +364,7 @@ async def update_provider(
         if req.type is not None:
             provider.type = next_type
         if req.base_url is not None or req.type is not None:
-            provider.base_url = resolved_base_url
+            provider.base_url = raw_base_url
         if req.api_key is not None:
             provider.api_key = req.api_key
         if req.headers is not None:

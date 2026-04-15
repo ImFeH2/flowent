@@ -35,6 +35,14 @@ def _serialize_provider(provider: ProviderConfig) -> dict[str, object]:
     }
 
 
+def _validate_provider_base_url_input(provider_type: str, base_url: str) -> str:
+    raw_base_url = base_url.strip()
+    if not raw_base_url:
+        raise ValueError("base_url is required")
+    resolve_provider_base_url(provider_type, raw_base_url)
+    return raw_base_url
+
+
 class ManageProvidersTool(Tool):
     name = "manage_providers"
     description = (
@@ -144,7 +152,10 @@ class ManageProvidersTool(Tool):
             if not isinstance(base_url, str) or not base_url.strip():
                 return json.dumps({"error": "base_url is required"})
             try:
-                resolved_base_url = resolve_provider_base_url(provider_type, base_url)
+                raw_base_url = _validate_provider_base_url_input(
+                    provider_type,
+                    base_url,
+                )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
 
@@ -152,7 +163,7 @@ class ManageProvidersTool(Tool):
                 id=str(uuid.uuid4()),
                 name=name,
                 type=provider_type,
-                base_url=resolved_base_url,
+                base_url=raw_base_url,
                 api_key=api_key or "",
                 headers=headers or {},
                 retry_429_delay_seconds=build_provider_retry_429_delay_seconds(
@@ -179,12 +190,12 @@ class ManageProvidersTool(Tool):
                     else provider.type
                 )
                 next_base_url = (
-                    base_url
+                    base_url.strip()
                     if isinstance(base_url, str) and base_url is not None
                     else provider.base_url
                 )
                 try:
-                    resolved_base_url = resolve_provider_base_url(
+                    raw_base_url = _validate_provider_base_url_input(
                         next_type,
                         next_base_url,
                     )
@@ -195,7 +206,7 @@ class ManageProvidersTool(Tool):
                 if provider_type is not None:
                     provider.type = provider_type
                 if base_url is not None or provider_type is not None:
-                    provider.base_url = resolved_base_url
+                    provider.base_url = raw_base_url
                 if api_key is not None:
                     provider.api_key = api_key
                 if headers is not None:

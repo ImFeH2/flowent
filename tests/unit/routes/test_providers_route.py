@@ -17,7 +17,7 @@ from app.routes.providers_route import (
 from app.settings import ProviderConfig, Settings
 
 
-def test_create_provider_normalizes_base_url(monkeypatch):
+def test_create_provider_preserves_raw_base_url(monkeypatch):
     settings = Settings()
     saved: list[Settings] = []
     invalidations: list[str] = []
@@ -44,10 +44,10 @@ def test_create_provider_normalizes_base_url(monkeypatch):
         )
     )
 
-    assert result["base_url"] == "https://api.openai.com/v1"
+    assert result["base_url"] == "https://api.openai.com"
     assert result["headers"] == {"Authorization": "Bearer override"}
     assert result["retry_429_delay_seconds"] == 0
-    assert settings.providers[0].base_url == "https://api.openai.com/v1"
+    assert settings.providers[0].base_url == "https://api.openai.com"
     assert settings.providers[0].headers == {"Authorization": "Bearer override"}
     assert settings.providers[0].retry_429_delay_seconds == 0
     assert saved == [settings]
@@ -239,6 +239,7 @@ def test_list_provider_models_runs_gateway_in_threadpool(monkeypatch):
 
 def test_test_provider_model_runs_against_provider_draft(monkeypatch):
     calls: list[tuple[str, object]] = []
+    captured: dict[str, object] = {}
 
     class FakeProvider:
         def chat(
@@ -258,7 +259,7 @@ def test_test_provider_model_runs_against_provider_draft(monkeypatch):
 
     monkeypatch.setattr(
         "app.routes.providers_route.create_llm_provider",
-        lambda **kwargs: FakeProvider(),
+        lambda **kwargs: captured.update(kwargs) or FakeProvider(),
     )
     monkeypatch.setattr(
         "app.routes.providers_route.run_in_threadpool",
@@ -279,6 +280,51 @@ def test_test_provider_model_runs_against_provider_draft(monkeypatch):
     assert isinstance(result["duration_ms"], int)
     assert calls[0][0] == "threadpool"
     assert calls[1][0] == "chat"
+    assert captured["base_url"] == "https://api.example.com"
+
+
+def test_list_provider_models_from_draft_passes_raw_base_url_to_provider(
+    monkeypatch,
+):
+    captured: dict[str, object] = {}
+
+    class FakeProvider:
+        def list_models(self, register_interrupt=None):
+            return [ModelInfo(id="gpt-5")]
+
+    async def fake_run_in_threadpool(func, *args):
+        return func(*args)
+
+    monkeypatch.setattr(
+        "app.routes.providers_route.create_llm_provider",
+        lambda **kwargs: captured.update(kwargs) or FakeProvider(),
+    )
+    monkeypatch.setattr(
+        "app.routes.providers_route.run_in_threadpool",
+        fake_run_in_threadpool,
+    )
+
+    result = asyncio.run(
+        list_provider_models(
+            ListModelsRequest(
+                type="openai_compatible",
+                base_url="https://api.example.com",
+            )
+        )
+    )
+
+    assert result == {
+        "models": [
+            {
+                "model": "gpt-5",
+                "source": "discovered",
+                "context_window_tokens": None,
+                "input_image": False,
+                "output_image": False,
+            }
+        ]
+    }
+    assert captured["base_url"] == "https://api.example.com"
 
 
 def test_test_provider_model_returns_normalized_error_summary(monkeypatch):

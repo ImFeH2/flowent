@@ -72,13 +72,13 @@ def test_manage_providers_create_persists_provider(monkeypatch):
 
     assert result["name"] == "Test Provider"
     assert result["type"] == "openai_compatible"
-    assert result["base_url"] == "https://api.example.com/v1"
+    assert result["base_url"] == "https://api.example.com"
     assert result["headers"] == {}
     assert result["retry_429_delay_seconds"] == 0
     assert "api_key" not in result
     assert len(settings.providers) == 1
     assert settings.providers[0].name == "Test Provider"
-    assert settings.providers[0].base_url == "https://api.example.com/v1"
+    assert settings.providers[0].base_url == "https://api.example.com"
     assert saved == [settings]
     assert invalidations == ["invalidate"]
 
@@ -131,7 +131,7 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
             {
                 "action": "update",
                 "id": "provider-1",
-                "base_url": "https://new.example.com/v1",
+                "base_url": "https://new.example.com",
             },
         )
     )
@@ -140,14 +140,14 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
         "id": "provider-1",
         "name": "Old Name",
         "type": "openai_compatible",
-        "base_url": "https://new.example.com/v1",
+        "base_url": "https://new.example.com",
         "headers": {},
         "retry_429_delay_seconds": 0,
         "models": [],
     }
     assert settings.providers[0].name == "Old Name"
     assert settings.providers[0].type == "openai_compatible"
-    assert settings.providers[0].base_url == "https://new.example.com/v1"
+    assert settings.providers[0].base_url == "https://new.example.com"
     assert settings.providers[0].api_key == "secret"
     assert saved == [settings]
     assert invalidations == ["invalidate"]

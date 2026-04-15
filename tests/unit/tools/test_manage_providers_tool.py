@@ -38,6 +38,7 @@ def test_manage_providers_list_omits_api_keys(monkeypatch):
             "base_url": "https://api.example.com/v1",
             "headers": {},
             "retry_429_delay_seconds": 0,
+            "models": [],
         }
     ]
 
@@ -142,6 +143,7 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
         "base_url": "https://new.example.com/v1",
         "headers": {},
         "retry_429_delay_seconds": 0,
+        "models": [],
     }
     assert settings.providers[0].name == "Old Name"
     assert settings.providers[0].type == "openai_compatible"
@@ -429,20 +431,18 @@ def test_manage_providers_list_models_streams_model_ids(monkeypatch):
 
     assert result == [
         {
-            "id": "provider-1-a",
-            "capabilities": {
-                "input_image": False,
-                "output_image": False,
-            },
+            "model": "provider-1-a",
+            "source": "discovered",
             "context_window_tokens": None,
+            "input_image": False,
+            "output_image": False,
         },
         {
-            "id": "provider-1-b",
-            "capabilities": {
-                "input_image": False,
-                "output_image": False,
-            },
+            "model": "provider-1-b",
+            "source": "discovered",
             "context_window_tokens": None,
+            "input_image": False,
+            "output_image": False,
         },
     ]
     assert "".join(chunks) == (

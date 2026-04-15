@@ -117,6 +117,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                     "api_key": "secret",
                     "headers": {},
                     "retry_429_delay_seconds": 0,
+                    "models": [],
                 }
             ],
             "roles": [
@@ -140,6 +141,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "api_key": "secret",
                 "headers": {},
                 "retry_429_delay_seconds": 0,
+                "models": [],
             }
         ],
         "roles": [

@@ -5,6 +5,8 @@ import {
   Check,
   Eye,
   EyeOff,
+  PencilLine,
+  Play,
   Plus,
   RefreshCw,
   Server,
@@ -14,7 +16,9 @@ import { toast } from "sonner";
 import {
   createProvider,
   deleteProvider,
+  fetchProviderCatalogPreview,
   fetchProviders,
+  testProviderModelRequest,
   updateProvider,
 } from "@/lib/api";
 import {
@@ -28,7 +32,7 @@ import {
 } from "@/lib/providerHeaders";
 import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
 import { buildProviderRequestPreview } from "@/lib/providerUrls";
-import type { Provider } from "@/types";
+import type { Provider, ProviderModelCatalogEntry } from "@/types";
 import { cn } from "@/lib/utils";
 import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
@@ -44,6 +48,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -51,28 +63,196 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type TriStateCapability = "auto" | "enabled" | "disabled";
+
 type ProviderDraft = Omit<Provider, "id" | "headers"> & {
   headers_text: string;
 };
 
-const emptyDraft = (): ProviderDraft => ({
-  name: "",
-  type: "openai_compatible",
-  base_url: "",
-  api_key: "",
-  headers_text: "",
-  retry_429_delay_seconds: 0,
-});
+type ProviderModelEditorDraft = {
+  model: string;
+  context_window_tokens: string;
+  input_image: TriStateCapability;
+  output_image: TriStateCapability;
+  source: "discovered" | "manual";
+};
+
+type ProviderModelEditorState = {
+  mode: "create" | "edit";
+  originalModel: string | null;
+} | null;
+
+type ProviderModelTestState =
+  | {
+      state: "running";
+    }
+  | {
+      state: "success";
+      duration_ms: number;
+    }
+  | {
+      state: "error";
+      error_summary: string;
+    };
+
+function triStateFromNullableBool(value: boolean | null): TriStateCapability {
+  if (value === true) {
+    return "enabled";
+  }
+  if (value === false) {
+    return "disabled";
+  }
+  return "auto";
+}
+
+function nullableBoolFromTriState(value: TriStateCapability): boolean | null {
+  if (value === "enabled") {
+    return true;
+  }
+  if (value === "disabled") {
+    return false;
+  }
+  return null;
+}
+
+function createProviderDraft(provider?: Provider | null): ProviderDraft {
+  if (!provider) {
+    return {
+      name: "",
+      type: "openai_compatible",
+      base_url: "",
+      api_key: "",
+      headers_text: "",
+      retry_429_delay_seconds: 0,
+      models: [],
+    };
+  }
+  return {
+    name: provider.name,
+    type: provider.type,
+    base_url: provider.base_url,
+    api_key: provider.api_key,
+    headers_text: formatProviderHeaders(provider.headers),
+    retry_429_delay_seconds: provider.retry_429_delay_seconds,
+    models: provider.models.map((entry) => ({ ...entry })),
+  };
+}
+
+function createProviderModelEditorDraft(
+  entry?: ProviderModelCatalogEntry | null,
+): ProviderModelEditorDraft {
+  return {
+    model: entry?.model ?? "",
+    context_window_tokens:
+      entry?.context_window_tokens === null ||
+      entry?.context_window_tokens === undefined
+        ? ""
+        : String(entry.context_window_tokens),
+    input_image: triStateFromNullableBool(entry?.input_image ?? null),
+    output_image: triStateFromNullableBool(entry?.output_image ?? null),
+    source: entry?.source ?? "manual",
+  };
+}
+
+function serializeProviderDraft(draft: ProviderDraft): string {
+  return JSON.stringify({
+    name: draft.name,
+    type: draft.type,
+    base_url: draft.base_url,
+    api_key: draft.api_key,
+    headers_text: draft.headers_text,
+    retry_429_delay_seconds: draft.retry_429_delay_seconds,
+    models: draft.models,
+  });
+}
+
+function buildProviderPayload(
+  draft: ProviderDraft,
+  headers: Record<string, string>,
+): Omit<Provider, "id"> {
+  return {
+    name: draft.name,
+    type: draft.type,
+    base_url: draft.base_url,
+    api_key: draft.api_key,
+    headers,
+    retry_429_delay_seconds: draft.retry_429_delay_seconds,
+    models: draft.models,
+  };
+}
+
+function mergeFetchedModelsIntoDraft(
+  existing: ProviderModelCatalogEntry[],
+  fetched: ProviderModelCatalogEntry[],
+): ProviderModelCatalogEntry[] {
+  const existingByModel = new Map(
+    existing.map((entry) => [entry.model, entry]),
+  );
+  const fetchedByModel = new Map(fetched.map((entry) => [entry.model, entry]));
+  const merged: ProviderModelCatalogEntry[] = [];
+
+  for (const entry of existing) {
+    const discoveredEntry = fetchedByModel.get(entry.model);
+    if (!discoveredEntry) {
+      merged.push(entry);
+      continue;
+    }
+    if (entry.source === "manual") {
+      merged.push({
+        ...entry,
+        context_window_tokens:
+          entry.context_window_tokens ?? discoveredEntry.context_window_tokens,
+        input_image: entry.input_image ?? discoveredEntry.input_image,
+        output_image: entry.output_image ?? discoveredEntry.output_image,
+      });
+      fetchedByModel.delete(entry.model);
+      continue;
+    }
+    merged.push(discoveredEntry);
+    fetchedByModel.delete(entry.model);
+  }
+
+  for (const entry of fetched) {
+    if (existingByModel.has(entry.model)) {
+      continue;
+    }
+    merged.push(entry);
+  }
+
+  return merged;
+}
+
+function buildModelSummary(entry: ProviderModelCatalogEntry): string {
+  const parts: string[] = [];
+  if (entry.context_window_tokens !== null) {
+    parts.push(`${entry.context_window_tokens.toLocaleString()} tokens`);
+  }
+  if (entry.input_image !== null) {
+    parts.push(`input_image=${entry.input_image ? "true" : "false"}`);
+  }
+  if (entry.output_image !== null) {
+    parts.push(`output_image=${entry.output_image ? "true" : "false"}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : "No capability metadata";
+}
 
 export function ProvidersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [draft, setDraft] = useState<ProviderDraft>(emptyDraft());
+  const [draft, setDraft] = useState<ProviderDraft>(createProviderDraft());
   const [saving, setSaving] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(
     null,
   );
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [modelEditorState, setModelEditorState] =
+    useState<ProviderModelEditorState>(null);
+  const [modelEditorDraft, setModelEditorDraft] =
+    useState<ProviderModelEditorDraft>(createProviderModelEditorDraft());
+  const [modelTestStates, setModelTestStates] = useState<
+    Record<string, ProviderModelTestState>
+  >({});
 
   const {
     data: providers = [],
@@ -80,9 +260,11 @@ export function ProvidersPage() {
     mutate: mutateProviders,
   } = useSWR("providers", fetchProviders, {
     onSuccess: (items) => {
-      if (selectedId && !items.find((p) => p.id === selectedId)) {
+      if (selectedId && !items.find((provider) => provider.id === selectedId)) {
         setSelectedId(null);
         setIsCreating(false);
+        setDraft(createProviderDraft());
+        setModelTestStates({});
       }
     },
   });
@@ -99,7 +281,9 @@ export function ProvidersPage() {
     "right",
   );
 
-  const selectedProvider = providers.find((p) => p.id === selectedId);
+  const selectedProvider = providers.find(
+    (provider) => provider.id === selectedId,
+  );
   const endpointPreview = useMemo(
     () => buildProviderRequestPreview(draft.type, draft.base_url),
     [draft.base_url, draft.type],
@@ -108,6 +292,12 @@ export function ProvidersPage() {
     () => parseProviderHeadersInput(draft.headers_text),
     [draft.headers_text],
   );
+  const hasChanges = useMemo(() => {
+    const baseline = isCreating
+      ? createProviderDraft()
+      : createProviderDraft(selectedProvider);
+    return serializeProviderDraft(draft) !== serializeProviderDraft(baseline);
+  }, [draft, isCreating, selectedProvider]);
 
   const refreshProviders = useCallback(async () => {
     await mutateProviders();
@@ -116,38 +306,30 @@ export function ProvidersPage() {
   const handleSelect = (provider: Provider) => {
     setSelectedId(provider.id);
     setIsCreating(false);
-    setDraft({
-      name: provider.name,
-      type: provider.type,
-      base_url: provider.base_url,
-      api_key: provider.api_key,
-      headers_text: formatProviderHeaders(provider.headers),
-      retry_429_delay_seconds: provider.retry_429_delay_seconds,
-    });
+    setDraft(createProviderDraft(provider));
     setShowKey(false);
+    setModelTestStates({});
+    setModelEditorState(null);
   };
 
   const handleCreateNew = () => {
     setIsCreating(true);
     setSelectedId(null);
-    setDraft(emptyDraft());
+    setDraft(createProviderDraft());
     setShowKey(false);
+    setModelTestStates({});
+    setModelEditorState(null);
   };
 
   const handleCancel = () => {
     if (isCreating) {
       setIsCreating(false);
-      setDraft(emptyDraft());
-    } else if (selectedProvider) {
-      setDraft({
-        name: selectedProvider.name,
-        type: selectedProvider.type,
-        base_url: selectedProvider.base_url,
-        api_key: selectedProvider.api_key,
-        headers_text: formatProviderHeaders(selectedProvider.headers),
-        retry_429_delay_seconds: selectedProvider.retry_429_delay_seconds,
-      });
+      setDraft(createProviderDraft());
+    } else {
+      setDraft(createProviderDraft(selectedProvider));
     }
+    setModelTestStates({});
+    setModelEditorState(null);
   };
 
   const handleSave = async () => {
@@ -168,14 +350,16 @@ export function ProvidersPage() {
       return;
     }
 
-    const payload = {
-      name: draft.name,
-      type: draft.type,
-      base_url: draft.base_url,
-      api_key: draft.api_key,
-      headers: parsedHeaders.headers,
-      retry_429_delay_seconds: draft.retry_429_delay_seconds,
-    };
+    const duplicateModels = new Set<string>();
+    for (const entry of draft.models) {
+      if (duplicateModels.has(entry.model.trim())) {
+        toast.error(`Model ID '${entry.model}' is duplicated`);
+        return;
+      }
+      duplicateModels.add(entry.model.trim());
+    }
+
+    const payload = buildProviderPayload(draft, parsedHeaders.headers);
 
     setSaving(true);
     try {
@@ -184,31 +368,20 @@ export function ProvidersPage() {
         void mutateProviders([...providers, created], false);
         setIsCreating(false);
         setSelectedId(created.id);
-        setDraft({
-          name: created.name,
-          type: created.type,
-          base_url: created.base_url,
-          api_key: created.api_key,
-          headers_text: formatProviderHeaders(created.headers),
-          retry_429_delay_seconds: created.retry_429_delay_seconds,
-        });
+        setDraft(createProviderDraft(created));
         toast.success("Provider created");
       } else if (selectedId) {
         const updated = await updateProvider(selectedId, payload);
         void mutateProviders(
-          providers.map((p) => (p.id === selectedId ? updated : p)),
+          providers.map((provider) =>
+            provider.id === selectedId ? updated : provider,
+          ),
           false,
         );
-        setDraft({
-          name: updated.name,
-          type: updated.type,
-          base_url: updated.base_url,
-          api_key: updated.api_key,
-          headers_text: formatProviderHeaders(updated.headers),
-          retry_429_delay_seconds: updated.retry_429_delay_seconds,
-        });
+        setDraft(createProviderDraft(updated));
         toast.success("Provider updated");
       }
+      setModelTestStates({});
     } catch {
       toast.error(
         isCreating ? "Failed to create provider" : "Failed to update provider",
@@ -219,46 +392,212 @@ export function ProvidersPage() {
   };
 
   const handleDelete = async () => {
-    if (!providerToDelete) return;
-    const id = providerToDelete.id;
+    if (!providerToDelete) {
+      return;
+    }
+    const providerId = providerToDelete.id;
     setProviderToDelete(null);
     try {
-      await deleteProvider(id);
+      await deleteProvider(providerId);
       void mutateProviders(
-        providers.filter((p) => p.id !== id),
+        providers.filter((provider) => provider.id !== providerId),
         false,
       );
-      if (selectedId === id) {
+      if (selectedId === providerId) {
         setSelectedId(null);
-        setDraft(emptyDraft());
+        setDraft(createProviderDraft());
       }
+      setModelTestStates({});
       toast.success("Provider deleted");
     } catch {
       toast.error("Failed to delete provider");
     }
   };
 
-  const hasChanges = isCreating
-    ? draft.name !== "" ||
-      draft.base_url !== "" ||
-      draft.api_key !== "" ||
-      draft.headers_text !== "" ||
-      draft.retry_429_delay_seconds !== 0
-    : selectedProvider
-      ? draft.name !== selectedProvider.name ||
-        draft.type !== selectedProvider.type ||
-        draft.base_url !== selectedProvider.base_url ||
-        draft.api_key !== selectedProvider.api_key ||
-        draft.headers_text !==
-          formatProviderHeaders(selectedProvider.headers) ||
-        draft.retry_429_delay_seconds !==
-          selectedProvider.retry_429_delay_seconds
-      : false;
+  const openCreateModelDialog = () => {
+    setModelEditorState({ mode: "create", originalModel: null });
+    setModelEditorDraft(createProviderModelEditorDraft());
+  };
+
+  const openEditModelDialog = (entry: ProviderModelCatalogEntry) => {
+    setModelEditorState({ mode: "edit", originalModel: entry.model });
+    setModelEditorDraft(createProviderModelEditorDraft(entry));
+  };
+
+  const closeModelDialog = () => {
+    setModelEditorState(null);
+    setModelEditorDraft(createProviderModelEditorDraft());
+  };
+
+  const handleSaveModel = () => {
+    const modelId = modelEditorDraft.model.trim();
+    if (!modelId) {
+      toast.error("Model ID is required");
+      return;
+    }
+    if (
+      draft.models.some(
+        (entry) =>
+          entry.model === modelId &&
+          entry.model !== modelEditorState?.originalModel,
+      )
+    ) {
+      toast.error(`Model ID '${modelId}' already exists in this provider`);
+      return;
+    }
+    if (
+      modelEditorDraft.context_window_tokens &&
+      !/^\d+$/.test(modelEditorDraft.context_window_tokens)
+    ) {
+      toast.error("Context Window must be a positive integer");
+      return;
+    }
+
+    const nextEntry: ProviderModelCatalogEntry = {
+      model: modelId,
+      source: modelEditorDraft.source,
+      context_window_tokens: modelEditorDraft.context_window_tokens
+        ? Number.parseInt(modelEditorDraft.context_window_tokens, 10)
+        : null,
+      input_image: nullableBoolFromTriState(modelEditorDraft.input_image),
+      output_image: nullableBoolFromTriState(modelEditorDraft.output_image),
+    };
+
+    setDraft((current) => {
+      if (modelEditorState?.mode === "edit" && modelEditorState.originalModel) {
+        return {
+          ...current,
+          models: current.models.map((entry) =>
+            entry.model === modelEditorState.originalModel ? nextEntry : entry,
+          ),
+        };
+      }
+      return {
+        ...current,
+        models: [...current.models, nextEntry],
+      };
+    });
+    setModelTestStates((current) => {
+      const next = { ...current };
+      if (
+        modelEditorState?.originalModel &&
+        modelEditorState.originalModel !== modelId
+      ) {
+        delete next[modelEditorState.originalModel];
+      }
+      return next;
+    });
+    closeModelDialog();
+  };
+
+  const handleDeleteModel = (modelId: string) => {
+    setDraft((current) => ({
+      ...current,
+      models: current.models.filter((entry) => entry.model !== modelId),
+    }));
+    setModelTestStates((current) => {
+      const next = { ...current };
+      delete next[modelId];
+      return next;
+    });
+  };
+
+  const handleFetchModels = async () => {
+    if (!draft.type.trim() || !draft.base_url.trim()) {
+      toast.error(
+        "Provider type and base URL are required before fetching models",
+      );
+      return;
+    }
+    if (endpointPreview.error) {
+      toast.error(endpointPreview.error);
+      return;
+    }
+    if (parsedHeaders.error) {
+      toast.error(parsedHeaders.error);
+      return;
+    }
+
+    setFetchingModels(true);
+    try {
+      const fetchedModels = await fetchProviderCatalogPreview({
+        provider_id: selectedId ?? undefined,
+        name: draft.name,
+        type: draft.type,
+        base_url: draft.base_url,
+        api_key: draft.api_key,
+        headers: parsedHeaders.headers,
+        retry_429_delay_seconds: draft.retry_429_delay_seconds,
+      });
+      setDraft((current) => ({
+        ...current,
+        models: mergeFetchedModelsIntoDraft(current.models, fetchedModels),
+      }));
+      toast.success("Provider models fetched");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to fetch provider models",
+      );
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
+  const handleTestModel = async (entry: ProviderModelCatalogEntry) => {
+    if (endpointPreview.error) {
+      toast.error(endpointPreview.error);
+      return;
+    }
+    if (parsedHeaders.error) {
+      toast.error(parsedHeaders.error);
+      return;
+    }
+
+    setModelTestStates((current) => ({
+      ...current,
+      [entry.model]: { state: "running" },
+    }));
+
+    try {
+      const result = await testProviderModelRequest({
+        provider_id: selectedId ?? undefined,
+        name: draft.name,
+        type: draft.type,
+        base_url: draft.base_url,
+        api_key: draft.api_key,
+        headers: parsedHeaders.headers,
+        retry_429_delay_seconds: draft.retry_429_delay_seconds,
+        model: entry.model,
+      });
+      setModelTestStates((current) => ({
+        ...current,
+        [entry.model]: result.ok
+          ? {
+              state: "success",
+              duration_ms: result.duration_ms ?? 0,
+            }
+          : {
+              state: "error",
+              error_summary: result.error_summary ?? "Provider test failed",
+            },
+      }));
+    } catch (error) {
+      setModelTestStates((current) => ({
+        ...current,
+        [entry.model]: {
+          state: "error",
+          error_summary:
+            error instanceof Error ? error.message : "Provider test failed",
+        },
+      }));
+    }
+  };
 
   return (
     <PageScaffold className="overflow-hidden p-0 md:p-0">
       <div className="flex h-full w-full">
-        {/* Left Sidebar List */}
         <div
           style={{ width: `${panelWidth}px` }}
           className="relative flex shrink-0 flex-col border-r border-white/[0.04] bg-white/[0.01] pt-8 pl-8"
@@ -294,9 +633,9 @@ export function ProvidersPage() {
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {loading ? (
               <div className="space-y-1">
-                {[...Array(3)].map((_, i) => (
+                {[...Array(3)].map((_, index) => (
                   <div
-                    key={i}
+                    key={index}
                     className="h-10 w-full animate-pulse rounded-lg bg-white/[0.02]"
                   />
                 ))}
@@ -314,17 +653,17 @@ export function ProvidersPage() {
                   className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/[0.06]"
                 >
                   <Plus className="size-3" />
-                  Add Provider
+                  Add your first provider
                 </button>
               </motion.div>
             ) : (
               <div className="space-y-0.5">
-                {providers.map((provider, i) => (
+                {providers.map((provider, index) => (
                   <motion.div
                     key={provider.id}
                     initial={{ opacity: 0, x: -4 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
+                    transition={{ delay: index * 0.03 }}
                     role="button"
                     tabIndex={0}
                     onClick={() => handleSelect(provider)}
@@ -335,13 +674,21 @@ export function ProvidersPage() {
                       }
                     }}
                     className={cn(
-                      "group flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-all",
+                      "group relative flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-all",
                       selectedId === provider.id
                         ? "bg-white/[0.06] text-white"
                         : "text-white/60 hover:bg-white/[0.03] hover:text-white/90",
                     )}
                   >
-                    <div className="min-w-0 flex-1">
+                    <div
+                      className={cn(
+                        "absolute inset-y-1 left-0 w-px rounded-full bg-white/40 transition-opacity",
+                        selectedId === provider.id
+                          ? "opacity-100"
+                          : "opacity-0",
+                      )}
+                    />
+                    <div className="min-w-0 flex-1 pl-2">
                       <p className="truncate text-[13px] font-medium">
                         {provider.name}
                       </p>
@@ -364,6 +711,7 @@ export function ProvidersPage() {
               </div>
             )}
           </div>
+
           <PanelResizer
             position="right"
             isDragging={isDragging}
@@ -371,7 +719,6 @@ export function ProvidersPage() {
           />
         </div>
 
-        {/* Right Content Area */}
         <div className="min-w-0 flex-1 overflow-y-auto bg-transparent">
           {isCreating || selectedProvider ? (
             <div className="flex min-h-full flex-col px-8 py-8 md:px-12 md:py-10">
@@ -382,12 +729,12 @@ export function ProvidersPage() {
                   </h2>
                   <p className="mt-1 text-[13px] text-white/40">
                     {isCreating
-                      ? "Configure a new LLM backend"
+                      ? "Configure a new provider and its model catalog"
                       : `ID: ${selectedProvider?.id}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {hasChanges && (
+                  {hasChanges ? (
                     <>
                       <button
                         type="button"
@@ -407,11 +754,11 @@ export function ProvidersPage() {
                         {saving ? "Saving..." : "Save"}
                       </button>
                     </>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
-              <div className="mx-auto w-full max-w-[640px] flex-1">
+              <div className="mx-auto w-full max-w-[720px] flex-1">
                 <SectionHeader
                   title="Identity"
                   description="Set the provider name and runtime type."
@@ -421,8 +768,8 @@ export function ProvidersPage() {
                     <input
                       type="text"
                       value={draft.name}
-                      onChange={(e) =>
-                        setDraft({ ...draft, name: e.target.value })
+                      onChange={(event) =>
+                        setDraft({ ...draft, name: event.target.value })
                       }
                       placeholder="e.g., OpenAI Production"
                       className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
@@ -439,13 +786,13 @@ export function ProvidersPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
-                        {providerTypeOptions.map((opt) => (
+                        {providerTypeOptions.map((option) => (
                           <SelectItem
-                            key={opt.value}
-                            value={opt.value}
+                            key={option.value}
+                            value={option.value}
                             className="text-[13px]"
                           >
-                            {opt.label}
+                            {option.label}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -455,16 +802,16 @@ export function ProvidersPage() {
 
                 <div className="border-t border-white/[0.04] pt-8">
                   <SectionHeader
-                    title="Endpoint Details"
-                    description="Configure connection details and optional credentials."
+                    title="Endpoint & Auth"
+                    description="Configure connection details, request preview, credentials, and retry behavior."
                   />
                   <div className="space-y-2">
                     <SettingsRow label="Base URL">
                       <input
                         type="text"
                         value={draft.base_url}
-                        onChange={(e) =>
-                          setDraft({ ...draft, base_url: e.target.value })
+                        onChange={(event) =>
+                          setDraft({ ...draft, base_url: event.target.value })
                         }
                         placeholder="https://api.openai.com/v1"
                         className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
@@ -472,7 +819,7 @@ export function ProvidersPage() {
                     </SettingsRow>
                     <SettingsRow
                       label="Request Preview"
-                      description="Resolved endpoint based on configuration"
+                      description="Resolved endpoint based on the current draft"
                     >
                       <div
                         className={cn(
@@ -500,15 +847,15 @@ export function ProvidersPage() {
                         <input
                           type={showKey ? "text" : "password"}
                           value={draft.api_key}
-                          onChange={(e) =>
-                            setDraft({ ...draft, api_key: e.target.value })
+                          onChange={(event) =>
+                            setDraft({ ...draft, api_key: event.target.value })
                           }
                           placeholder="sk-..."
                           className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 pr-10 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
                         />
                         <button
                           type="button"
-                          onClick={() => setShowKey(!showKey)}
+                          onClick={() => setShowKey((current) => !current)}
                           className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
                         >
                           {showKey ? (
@@ -526,10 +873,10 @@ export function ProvidersPage() {
                       <div className="space-y-2">
                         <textarea
                           value={draft.headers_text}
-                          onChange={(e) =>
+                          onChange={(event) =>
                             setDraft({
                               ...draft,
-                              headers_text: e.target.value,
+                              headers_text: event.target.value,
                             })
                           }
                           placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
@@ -541,11 +888,11 @@ export function ProvidersPage() {
                               : "border-white/[0.06] focus:border-white/20 focus:bg-white/[0.04]",
                           )}
                         />
-                        {parsedHeaders.error && (
+                        {parsedHeaders.error ? (
                           <p className="text-[11px] text-red-400">
                             {parsedHeaders.error}
                           </p>
-                        )}
+                        ) : null}
                       </div>
                     </SettingsRow>
                     <SettingsRow
@@ -560,8 +907,8 @@ export function ProvidersPage() {
                             inputMode="numeric"
                             pattern="[0-9]*"
                             value={String(draft.retry_429_delay_seconds)}
-                            onChange={(e) => {
-                              const nextValue = e.target.value.trim();
+                            onChange={(event) => {
+                              const nextValue = event.target.value.trim();
                               if (!/^\d+$/.test(nextValue)) {
                                 return;
                               }
@@ -582,12 +929,168 @@ export function ProvidersPage() {
                         </div>
                         <p className="text-[11px] text-white/40 leading-relaxed">
                           Adds extra wait only when this provider returns HTTP
-                          429 and the system will continue retrying.
+                          429 and the system continues retrying.
                         </p>
                       </div>
                     </SettingsRow>
                   </div>
                 </div>
+
+                <div className="border-t border-white/[0.04] pt-8">
+                  <SectionHeader
+                    title="Models"
+                    description="Manage this provider-scoped model catalog, fetch discovered entries, and run model-level tests against the current draft."
+                  />
+
+                  <div className="space-y-4 rounded-2xl border border-white/[0.04] bg-white/[0.01] p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="text-[13px] font-medium text-white/80">
+                          {draft.models.length} model
+                          {draft.models.length === 1 ? "" : "s"}
+                        </p>
+                        <p className="mt-1 text-[11px] text-white/40">
+                          Fetch discovered models or maintain manual entries in
+                          this draft before saving.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={fetchingModels}
+                          onClick={() => void handleFetchModels()}
+                        >
+                          <RefreshCw
+                            className={cn(
+                              "size-3.5",
+                              fetchingModels && "animate-spin",
+                            )}
+                          />
+                          Fetch Models
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={openCreateModelDialog}
+                        >
+                          <Plus className="size-3.5" />
+                          Add Model
+                        </Button>
+                      </div>
+                    </div>
+
+                    {draft.models.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-white/[0.08] bg-black/10 px-4 py-5 text-center">
+                        <p className="text-[13px] font-medium text-white/70">
+                          No models in this provider draft
+                        </p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-white/40">
+                          Fetch models from the current draft connection, or add
+                          a manual entry.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {draft.models.map((entry) => {
+                          const testState = modelTestStates[entry.model];
+                          return (
+                            <div
+                              key={entry.model}
+                              className="rounded-xl border border-white/[0.05] bg-black/12 px-4 py-3"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="truncate font-mono text-[13px] text-white/85">
+                                      {entry.model}
+                                    </p>
+                                    <span
+                                      className={cn(
+                                        "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em]",
+                                        entry.source === "manual"
+                                          ? "border-amber-300/20 bg-amber-300/[0.08] text-amber-100/80"
+                                          : "border-emerald-300/20 bg-emerald-300/[0.08] text-emerald-100/80",
+                                      )}
+                                    >
+                                      {entry.source === "manual"
+                                        ? "Manual"
+                                        : "Discovered"}
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-[11px] leading-relaxed text-white/40">
+                                    {buildModelSummary(entry)}
+                                  </p>
+                                  {testState?.state === "running" ? (
+                                    <p className="mt-2 text-[11px] text-white/55">
+                                      Testing this model against the current
+                                      draft provider...
+                                    </p>
+                                  ) : null}
+                                  {testState?.state === "success" ? (
+                                    <p className="mt-2 text-[11px] text-emerald-200/80">
+                                      Test succeeded in {testState.duration_ms}
+                                      ms
+                                    </p>
+                                  ) : null}
+                                  {testState?.state === "error" ? (
+                                    <p className="mt-2 text-[11px] text-red-300/85">
+                                      {testState.error_summary}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={testState?.state === "running"}
+                                    onClick={() => void handleTestModel(entry)}
+                                  >
+                                    <Play className="size-3.5" />
+                                    Test
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openEditModelDialog(entry)}
+                                  >
+                                    <PencilLine className="size-3.5" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDeleteModel(entry.model)
+                                    }
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                    Delete
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {!isCreating && selectedProvider ? (
+                  <div className="border-t border-white/[0.04] pt-8">
+                    <SettingsRow label="Provider ID" description="Read-only">
+                      <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-3.5 py-2.5 font-mono text-[12px] text-white/70">
+                        {selectedProvider.id}
+                      </div>
+                    </SettingsRow>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -604,12 +1107,151 @@ export function ProvidersPage() {
               </h3>
               <p className="mt-1.5 max-w-sm text-[13px] text-white/40">
                 Select a provider from the sidebar to edit its connection
-                details.
+                fields, model catalog, and model tests.
               </p>
             </motion.div>
           )}
         </div>
       </div>
+
+      <Dialog
+        open={modelEditorState !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            closeModelDialog();
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {modelEditorState?.mode === "edit" ? "Edit Model" : "Add Model"}
+            </DialogTitle>
+            <DialogDescription>
+              Maintain one provider-scoped catalog entry at a time.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 px-5 py-4">
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium text-white/80">
+                Model ID
+              </label>
+              <input
+                aria-label="Model ID"
+                type="text"
+                value={modelEditorDraft.model}
+                onChange={(event) =>
+                  setModelEditorDraft({
+                    ...modelEditorDraft,
+                    model: event.target.value,
+                  })
+                }
+                placeholder="gpt-5"
+                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium text-white/80">
+                Source
+              </label>
+              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-3.5 py-2.5 text-[13px] text-white/70">
+                {modelEditorDraft.source === "manual" ? "Manual" : "Discovered"}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium text-white/80">
+                Context Window
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  aria-label="Context Window"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={modelEditorDraft.context_window_tokens}
+                  onChange={(event) => {
+                    const nextValue = event.target.value.trim();
+                    if (!/^\d*$/.test(nextValue)) {
+                      return;
+                    }
+                    setModelEditorDraft({
+                      ...modelEditorDraft,
+                      context_window_tokens: nextValue,
+                    });
+                  }}
+                  placeholder="Optional"
+                  className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                />
+                <span className="text-[13px] font-medium text-white/40">
+                  tokens
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-[13px] font-medium text-white/80">
+                  Input Image
+                </label>
+                <Select
+                  value={modelEditorDraft.input_image}
+                  onValueChange={(value: TriStateCapability) =>
+                    setModelEditorDraft({
+                      ...modelEditorDraft,
+                      input_image: value,
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="enabled">Enabled</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[13px] font-medium text-white/80">
+                  Output Image
+                </label>
+                <Select
+                  value={modelEditorDraft.output_image}
+                  onValueChange={(value: TriStateCapability) =>
+                    setModelEditorDraft({
+                      ...modelEditorDraft,
+                      output_image: value,
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="enabled">Enabled</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="px-5 pb-5">
+            <Button variant="ghost" onClick={closeModelDialog}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveModel}>
+              {modelEditorState?.mode === "edit" ? "Save Model" : "Add Model"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={providerToDelete !== null}
         onOpenChange={(open) => {

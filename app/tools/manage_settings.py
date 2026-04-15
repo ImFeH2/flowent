@@ -11,15 +11,14 @@ from app.tools import Tool
 
 
 def _serialize_settings(settings: Settings) -> dict[str, object]:
-    from app.model_metadata import build_model_info
-    from app.settings import find_provider
+    from app.settings import find_provider, resolve_model_info
 
     provider = find_provider(settings, settings.model.active_provider_id)
     if provider is None or not settings.model.active_model.strip():
         model_info = None
     else:
-        model_info = build_model_info(
-            provider_type=provider.type,
+        model_info = resolve_model_info(
+            provider=provider,
             model_id=settings.model.active_model,
             input_image=settings.model.input_image,
             output_image=settings.model.output_image,

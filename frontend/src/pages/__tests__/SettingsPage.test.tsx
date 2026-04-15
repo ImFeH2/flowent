@@ -8,22 +8,15 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "@/pages/SettingsPage";
 
-const {
-  fetchProviderModels,
-  fetchSettingsBootstrap,
-  saveSettings,
-  toastError,
-  toastSuccess,
-} = vi.hoisted(() => ({
-  fetchProviderModels: vi.fn(),
-  fetchSettingsBootstrap: vi.fn(),
-  saveSettings: vi.fn(),
-  toastError: vi.fn(),
-  toastSuccess: vi.fn(),
-}));
+const { fetchSettingsBootstrap, saveSettings, toastError, toastSuccess } =
+  vi.hoisted(() => ({
+    fetchSettingsBootstrap: vi.fn(),
+    saveSettings: vi.fn(),
+    toastError: vi.fn(),
+    toastSuccess: vi.fn(),
+  }));
 
 vi.mock("@/lib/api", () => ({
-  fetchProviderModels,
   fetchSettingsBootstrap,
   saveSettings,
 }));
@@ -220,7 +213,6 @@ describe("SettingsPage", () => {
 
     expect(toastSuccess).toHaveBeenCalledWith("Settings saved");
     expect(toastError).not.toHaveBeenCalled();
-    expect(fetchProviderModels).not.toHaveBeenCalled();
   }, 10000);
 
   it("blocks saving a compact token limit that reaches the known safe window", async () => {

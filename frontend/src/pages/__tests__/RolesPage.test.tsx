@@ -5,7 +5,6 @@ import { RolesPage } from "@/pages/RolesPage";
 const {
   createRoleMock,
   deleteRoleMock,
-  fetchProviderModelsMock,
   fetchRolesBootstrapMock,
   updateRoleMock,
   toastErrorMock,
@@ -13,7 +12,6 @@ const {
 } = vi.hoisted(() => ({
   createRoleMock: vi.fn(),
   deleteRoleMock: vi.fn(),
-  fetchProviderModelsMock: vi.fn(),
   fetchRolesBootstrapMock: vi.fn(),
   updateRoleMock: vi.fn(),
   toastErrorMock: vi.fn(),
@@ -23,7 +21,6 @@ const {
 vi.mock("@/lib/api", () => ({
   createRole: (...args: unknown[]) => createRoleMock(...args),
   deleteRole: (...args: unknown[]) => deleteRoleMock(...args),
-  fetchProviderModels: (...args: unknown[]) => fetchProviderModelsMock(...args),
   fetchRolesBootstrap: (...args: unknown[]) => fetchRolesBootstrapMock(...args),
   updateRole: (...args: unknown[]) => updateRoleMock(...args),
 }));

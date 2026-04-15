@@ -1,13 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { RefreshCw, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
-import {
-  fetchProviderModels,
-  fetchSettingsBootstrap,
-  saveSettings,
-  type ModelOption,
-} from "@/lib/api";
+import { fetchSettingsBootstrap, saveSettings } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
 import {
   PageScaffold,
@@ -21,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
@@ -112,9 +106,8 @@ export function SettingsPage() {
   } = useSWR("settingsBootstrap", () => fetchSettingsBootstrap<UserSettings>());
 
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
-  const [models, setModels] = useState<ModelOption[]>([]);
+  const [providerModelQuery, setProviderModelQuery] = useState("");
   const [saving, setSaving] = useState(false);
-  const [loadingModels, setLoadingModels] = useState(false);
 
   const providers = useMemo(
     () => bootstrapData?.providers ?? [],
@@ -148,35 +141,47 @@ export function SettingsPage() {
     );
   }, [roles, settings]);
 
-  const selectedModel = useMemo(() => {
+  const activeProviderModels = activeProvider?.models ?? [];
+  const filteredActiveProviderModels = useMemo(() => {
+    const normalizedQuery = providerModelQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return activeProviderModels;
+    }
+    return activeProviderModels.filter((model) =>
+      model.model.toLowerCase().includes(normalizedQuery),
+    );
+  }, [activeProviderModels, providerModelQuery]);
+  const selectedCatalogModel = useMemo(() => {
     if (!settings?.model.active_model) {
       return null;
     }
     return (
-      models.find((model) => model.id === settings.model.active_model) ?? null
+      activeProviderModels.find(
+        (model) => model.model === settings.model.active_model,
+      ) ?? null
     );
-  }, [models, settings?.model.active_model]);
+  }, [activeProviderModels, settings?.model.active_model]);
   const effectiveContextWindowTokens =
     settings?.model.context_window_tokens ??
-    selectedModel?.context_window_tokens ??
+    selectedCatalogModel?.context_window_tokens ??
     settings?.model.resolved_context_window_tokens ??
     null;
   const effectiveModelCapabilities = useMemo(
     () => ({
       input_image:
         settings?.model.input_image ??
-        selectedModel?.capabilities?.input_image ??
+        selectedCatalogModel?.input_image ??
         settings?.model.capabilities?.input_image ??
         false,
       output_image:
         settings?.model.output_image ??
-        selectedModel?.capabilities?.output_image ??
+        selectedCatalogModel?.output_image ??
         settings?.model.capabilities?.output_image ??
         false,
     }),
     [
-      selectedModel?.capabilities?.input_image,
-      selectedModel?.capabilities?.output_image,
+      selectedCatalogModel?.input_image,
+      selectedCatalogModel?.output_image,
       settings?.model.capabilities?.input_image,
       settings?.model.capabilities?.output_image,
       settings?.model.input_image,
@@ -203,47 +208,6 @@ export function SettingsPage() {
       roles.find((role) => role.name === settings.leader.role_name) ?? null
     );
   }, [roles, settings]);
-
-  useEffect(() => {
-    if (!settings?.model.active_provider_id) {
-      setModels([]);
-      return;
-    }
-
-    let mounted = true;
-    setLoadingModels(true);
-    fetchProviderModels(settings.model.active_provider_id)
-      .then((items) => {
-        if (!mounted) return;
-        setModels(items);
-      })
-      .catch(() => {
-        toast.error("Failed to fetch models");
-      })
-      .finally(() => {
-        if (mounted) setLoadingModels(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [settings?.model.active_provider_id]);
-
-  const refreshModels = async () => {
-    if (!settings?.model.active_provider_id) return;
-    setLoadingModels(true);
-    try {
-      const items = await fetchProviderModels(
-        settings.model.active_provider_id,
-      );
-      setModels(items);
-      toast.success("Models refreshed");
-    } catch {
-      toast.error("Failed to fetch models");
-    } finally {
-      setLoadingModels(false);
-    }
-  };
 
   const handleSave = async () => {
     if (!settings) return;
@@ -508,7 +472,7 @@ export function SettingsPage() {
               >
                 <Select
                   value={settings.model.active_provider_id}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     setLocalSettings({
                       ...settings,
                       model: {
@@ -516,8 +480,9 @@ export function SettingsPage() {
                         active_provider_id: value,
                         active_model: "",
                       },
-                    })
-                  }
+                    });
+                    setProviderModelQuery("");
+                  }}
                 >
                   <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
                     <SelectValue placeholder="Select a provider" />
@@ -538,48 +503,67 @@ export function SettingsPage() {
               </SettingsRow>
 
               <SettingsRow label="Model" description="Catalog or manual ID">
-                <div className="mb-1.5 flex justify-end">
-                  <Button
-                    onClick={refreshModels}
-                    disabled={
-                      !settings.model.active_provider_id || loadingModels
-                    }
-                    variant="ghost"
-                    size="xs"
-                    className="h-auto px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                  >
-                    <RefreshCw
-                      className={cn("size-3", loadingModels && "animate-spin")}
-                    />
-                    Refresh
-                  </Button>
-                </div>
+                <div className="space-y-3">
+                  {settings.model.active_provider_id ? (
+                    activeProviderModels.length > 0 ? (
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">
+                          Provider Models
+                        </label>
+                        <input
+                          aria-label="Search Provider Models"
+                          type="text"
+                          value={providerModelQuery}
+                          onChange={(event) =>
+                            setProviderModelQuery(event.target.value)
+                          }
+                          placeholder="Search provider models"
+                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        />
+                        <Select
+                          value={
+                            activeProviderModels.some(
+                              (model) =>
+                                model.model === settings.model.active_model,
+                            )
+                              ? settings.model.active_model
+                              : undefined
+                          }
+                          onValueChange={(value) =>
+                            setLocalSettings({
+                              ...settings,
+                              model: {
+                                ...settings.model,
+                                active_model: value,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                            <SelectValue placeholder="Select a provider model" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {filteredActiveProviderModels.map((model) => (
+                              <SelectItem key={model.model} value={model.model}>
+                                {model.model}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {filteredActiveProviderModels.length === 0 ? (
+                          <p className="text-[11px] text-white/40 leading-relaxed">
+                            No provider models match the current search.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-white/40 leading-relaxed">
+                        No saved provider models. Manage this catalog in
+                        Providers, or enter a model ID manually below.
+                      </p>
+                    )
+                  ) : null}
 
-                {models.length > 0 ? (
-                  <Select
-                    value={settings.model.active_model}
-                    onValueChange={(value) =>
-                      setLocalSettings({
-                        ...settings,
-                        model: {
-                          ...settings.model,
-                          active_model: value,
-                        },
-                      })
-                    }
-                  >
-                    <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
-                      <SelectValue placeholder="Select a model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {models.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
                   <input
                     type="text"
                     value={settings.model.active_model}
@@ -593,13 +577,13 @@ export function SettingsPage() {
                       })
                     }
                     placeholder={
-                      loadingModels
-                        ? "Loading models..."
-                        : "Enter model ID manually"
+                      settings.model.active_provider_id
+                        ? "Enter model ID manually"
+                        : "Select a provider first"
                     }
                     className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
                   />
-                )}
+                </div>
                 {settings.model.active_model ? (
                   <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-white/40">
                     <p>

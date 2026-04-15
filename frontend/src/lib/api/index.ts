@@ -33,8 +33,8 @@ export {
   createProvider,
   updateProvider,
   deleteProvider,
-  fetchProviderModels,
-  type ModelOption,
+  fetchProviderCatalogPreview,
+  testProviderModelRequest,
 } from "./providers";
 export { fetchPromptSettings, savePromptSettings } from "./prompts";
 export {

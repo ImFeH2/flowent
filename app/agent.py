@@ -1752,8 +1752,7 @@ class Agent:
         return tab.title
 
     def _get_effective_model_source(self) -> ResolvedModelSource:
-        from app.model_metadata import build_model_info
-        from app.settings import find_provider, find_role
+        from app.settings import find_provider, find_role, resolve_model_info
 
         settings = get_settings()
         provider_id = settings.model.active_provider_id
@@ -1795,8 +1794,8 @@ class Agent:
             provider_name=provider.name,
             provider_type=provider.type,
             model=model_id,
-            model_info=build_model_info(
-                provider_type=provider.type,
+            model_info=resolve_model_info(
+                provider=provider,
                 model_id=model_id,
                 input_image=(
                     settings.model.input_image if use_system_model_overrides else None

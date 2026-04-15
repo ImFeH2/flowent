@@ -12,7 +12,12 @@ if TYPE_CHECKING:
     from app.settings import ProviderConfig
 
 from app.providers.base_url import resolve_provider_base_url
-from app.settings import build_provider_headers, build_provider_retry_429_delay_seconds
+from app.settings import (
+    ProviderModelCatalogEntry,
+    build_provider_headers,
+    build_provider_retry_429_delay_seconds,
+    serialize_provider_model_catalog_entry,
+)
 from app.tools import Tool, re_raise_interrupt
 
 
@@ -24,6 +29,9 @@ def _serialize_provider(provider: ProviderConfig) -> dict[str, object]:
         "base_url": provider.base_url,
         "headers": dict(provider.headers),
         "retry_429_delay_seconds": provider.retry_429_delay_seconds,
+        "models": [
+            serialize_provider_model_catalog_entry(entry) for entry in provider.models
+        ],
     }
 
 
@@ -232,14 +240,15 @@ class ManageProvidersTool(Tool):
                         on_output(f"{model.id}\n")
                 return json.dumps(
                     [
-                        {
-                            "id": model.id,
-                            "capabilities": {
-                                "input_image": model.capabilities.input_image,
-                                "output_image": model.capabilities.output_image,
-                            },
-                            "context_window_tokens": model.context_window_tokens,
-                        }
+                        serialize_provider_model_catalog_entry(
+                            ProviderModelCatalogEntry(
+                                model=model.id,
+                                source="discovered",
+                                context_window_tokens=model.context_window_tokens,
+                                input_image=model.capabilities.input_image,
+                                output_image=model.capabilities.output_image,
+                            )
+                        )
                         for model in models
                     ]
                 )

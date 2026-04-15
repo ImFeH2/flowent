@@ -1,7 +1,5 @@
-import type { ModelOption, Provider } from "@/types";
+import type { Provider, ProviderModelCatalogEntry } from "@/types";
 import { requestJson, requestVoid } from "./shared";
-
-export type { ModelOption } from "@/types";
 
 export async function fetchProviders(): Promise<Provider[]> {
   return requestJson<{ providers?: Provider[] }, Provider[]>("/api/providers", {
@@ -39,17 +37,39 @@ export async function deleteProvider(id: string): Promise<void> {
   });
 }
 
-export async function fetchProviderModels(
-  providerId: string,
-): Promise<ModelOption[]> {
-  return requestJson<{ models?: ModelOption[] }, ModelOption[]>(
-    "/api/providers/models",
-    {
-      method: "POST",
-      body: { provider_id: providerId },
-      errorMessage: "Failed to fetch provider models",
-      fallback: [],
-      map: (data) => data?.models ?? [],
-    },
-  );
+type ProviderDraftPayload = Omit<Provider, "id" | "models"> & {
+  provider_id?: string;
+};
+
+export async function fetchProviderCatalogPreview(
+  payload: ProviderDraftPayload,
+): Promise<ProviderModelCatalogEntry[]> {
+  return requestJson<
+    { models?: ProviderModelCatalogEntry[] },
+    ProviderModelCatalogEntry[]
+  >("/api/providers/models", {
+    method: "POST",
+    body: payload,
+    errorMessage: "Failed to fetch provider models",
+    fallback: [],
+    map: (data) => data?.models ?? [],
+  });
+}
+
+export async function testProviderModelRequest(
+  payload: ProviderDraftPayload & { model: string },
+): Promise<{
+  ok: boolean;
+  duration_ms?: number;
+  error_summary?: string | null;
+}> {
+  return requestJson<{
+    ok: boolean;
+    duration_ms?: number;
+    error_summary?: string | null;
+  }>("/api/providers/models/test", {
+    method: "POST",
+    body: payload,
+    errorMessage: "Failed to test provider model",
+  });
 }

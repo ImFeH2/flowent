@@ -123,6 +123,7 @@ DESIGNER_ROLE_INCLUDED_TOOLS = ["read", "edit", "exec"]
 MODEL_REASONING_EFFORT_OPTIONS = frozenset({"none", "low", "medium", "high", "xhigh"})
 MODEL_VERBOSITY_OPTIONS = frozenset({"low", "medium", "high"})
 MODEL_RETRY_POLICY_OPTIONS = frozenset({"no_retry", "limited", "unlimited"})
+PROVIDER_MODEL_SOURCE_OPTIONS = frozenset({"discovered", "manual"})
 REMOVED_TOOL_NAMES = frozenset({"exit", "list_connections"})
 DEFAULT_LLM_TIMEOUT_MS = 10000
 DEFAULT_LLM_MAX_RETRIES = 5
@@ -144,6 +145,15 @@ class EventLogSettings:
 
 
 @dataclass
+class ProviderModelCatalogEntry:
+    model: str
+    source: str = "manual"
+    context_window_tokens: int | None = None
+    input_image: bool | None = None
+    output_image: bool | None = None
+
+
+@dataclass
 class ProviderConfig:
     id: str
     name: str
@@ -152,6 +162,7 @@ class ProviderConfig:
     api_key: str
     headers: dict[str, str] = field(default_factory=dict)
     retry_429_delay_seconds: int = 0
+    models: list[ProviderModelCatalogEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -632,6 +643,67 @@ def _normalize_provider_headers(raw_headers: object) -> tuple[dict[str, str], bo
     return headers, migrated
 
 
+def _normalize_provider_model_source(raw_source: object) -> tuple[str, bool]:
+    if raw_source is None:
+        return "manual", True
+    if not isinstance(raw_source, str):
+        return "manual", True
+    normalized = raw_source.strip().lower()
+    if normalized not in PROVIDER_MODEL_SOURCE_OPTIONS:
+        return "manual", True
+    return normalized, normalized != raw_source
+
+
+def _normalize_provider_model_catalog_entries(
+    raw_models: object,
+) -> tuple[list[ProviderModelCatalogEntry], bool]:
+    if raw_models is None:
+        return [], False
+    if not isinstance(raw_models, list):
+        return [], True
+
+    entries_by_model: dict[str, ProviderModelCatalogEntry] = {}
+    migrated = False
+    for raw_entry in raw_models:
+        if not isinstance(raw_entry, dict):
+            migrated = True
+            continue
+        raw_model = raw_entry.get("model")
+        if not isinstance(raw_model, str) or not raw_model.strip():
+            migrated = True
+            continue
+        model = raw_model.strip()
+        source, source_migrated = _normalize_provider_model_source(
+            raw_entry.get("source")
+        )
+        input_image, input_image_migrated = _normalize_nullable_bool(
+            raw_entry.get("input_image")
+        )
+        output_image, output_image_migrated = _normalize_nullable_bool(
+            raw_entry.get("output_image")
+        )
+        context_window_tokens, context_window_tokens_migrated = _normalize_positive_int(
+            raw_entry.get("context_window_tokens")
+        )
+        migrated = (
+            migrated
+            or source_migrated
+            or input_image_migrated
+            or output_image_migrated
+            or context_window_tokens_migrated
+            or model != raw_model
+            or model in entries_by_model
+        )
+        entries_by_model[model] = ProviderModelCatalogEntry(
+            model=model,
+            source=source,
+            context_window_tokens=context_window_tokens,
+            input_image=input_image,
+            output_image=output_image,
+        )
+    return list(entries_by_model.values()), migrated
+
+
 def _fallback_role_description(role_name: str, system_prompt: str) -> str:
     for line in system_prompt.splitlines():
         stripped = " ".join(line.split())
@@ -656,6 +728,18 @@ def _normalize_role_description(
     return _fallback_role_description(role_name, system_prompt), True
 
 
+def serialize_provider_model_catalog_entry(
+    entry: ProviderModelCatalogEntry,
+) -> dict[str, object]:
+    return {
+        "model": entry.model,
+        "source": entry.source,
+        "context_window_tokens": entry.context_window_tokens,
+        "input_image": entry.input_image,
+        "output_image": entry.output_image,
+    }
+
+
 def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
     return {
         "id": provider.id,
@@ -665,6 +749,9 @@ def serialize_provider(provider: ProviderConfig) -> dict[str, object]:
         "api_key": provider.api_key,
         "headers": dict(provider.headers),
         "retry_429_delay_seconds": provider.retry_429_delay_seconds,
+        "models": [
+            serialize_provider_model_catalog_entry(entry) for entry in provider.models
+        ],
     }
 
 
@@ -706,15 +793,13 @@ def serialize_settings(
     *,
     mask_telegram_token: bool = True,
 ) -> dict[str, object]:
-    from app.model_metadata import build_model_info
-
     data = asdict(settings)
     provider = find_provider(settings, settings.model.active_provider_id)
     if provider is None or not settings.model.active_model.strip():
         model_info = None
     else:
-        model_info = build_model_info(
-            provider_type=provider.type,
+        model_info = resolve_model_info(
+            provider=provider,
             model_id=settings.model.active_model,
             input_image=settings.model.input_image,
             output_image=settings.model.output_image,
@@ -731,6 +816,57 @@ def serialize_settings(
         mask_token=mask_telegram_token,
     )
     return data
+
+
+def find_provider_model_catalog_entry(
+    provider: ProviderConfig,
+    model_id: str,
+) -> ProviderModelCatalogEntry | None:
+    normalized_model_id = model_id.strip()
+    if not normalized_model_id:
+        return None
+    for entry in provider.models:
+        if entry.model.strip() == normalized_model_id:
+            return entry
+    return None
+
+
+def resolve_model_info(
+    *,
+    provider: ProviderConfig,
+    model_id: str,
+    input_image: bool | None = None,
+    output_image: bool | None = None,
+    context_window_tokens: int | None = None,
+):
+    from app.model_metadata import build_model_info
+
+    catalog_entry = find_provider_model_catalog_entry(provider, model_id)
+    return build_model_info(
+        provider_type=provider.type,
+        model_id=model_id,
+        input_image=(
+            input_image
+            if input_image is not None
+            else catalog_entry.input_image
+            if catalog_entry is not None
+            else None
+        ),
+        output_image=(
+            output_image
+            if output_image is not None
+            else catalog_entry.output_image
+            if catalog_entry is not None
+            else None
+        ),
+        context_window_tokens=(
+            context_window_tokens
+            if context_window_tokens is not None
+            else catalog_entry.context_window_tokens
+            if catalog_entry is not None
+            else None
+        ),
+    )
 
 
 def _normalize_role_model(
@@ -1320,7 +1456,11 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         if not isinstance(provider, dict):
             continue
         headers, headers_migrated = _normalize_provider_headers(provider.get("headers"))
+        models, models_migrated = _normalize_provider_model_catalog_entries(
+            provider.get("models")
+        )
         migrated = migrated or headers_migrated
+        migrated = migrated or models_migrated
         raw_retry_429_delay_seconds = provider.get("retry_429_delay_seconds")
         if raw_retry_429_delay_seconds is None:
             retry_429_delay_seconds = 0
@@ -1342,6 +1482,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
                 api_key=str(provider.get("api_key", "")),
                 headers=headers,
                 retry_429_delay_seconds=retry_429_delay_seconds,
+                models=models,
             )
         )
 

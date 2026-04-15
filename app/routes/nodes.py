@@ -4,9 +4,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.graph_service import is_tab_leader
-from app.model_metadata import build_model_info
 from app.registry import registry
-from app.settings import find_provider, find_role, get_settings
+from app.settings import find_provider, find_role, get_settings, resolve_model_info
 from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
@@ -22,6 +21,7 @@ def _serialize_model_capabilities(role_name: str | None) -> dict[str, bool] | No
     settings = get_settings()
     provider_id = settings.model.active_provider_id
     model_id = settings.model.active_model
+    use_system_model_overrides = True
     role_cfg = find_role(settings, role_name) if role_name else None
     if (
         role_cfg is not None
@@ -31,12 +31,23 @@ def _serialize_model_capabilities(role_name: str | None) -> dict[str, bool] | No
     ):
         provider_id = role_cfg.model.provider_id
         model_id = role_cfg.model.model
+        use_system_model_overrides = False
     if not provider_id or not model_id:
         return None
     provider = find_provider(settings, provider_id)
     if provider is None:
         return None
-    model_info = build_model_info(provider_type=provider.type, model_id=model_id)
+    model_info = resolve_model_info(
+        provider=provider,
+        model_id=model_id,
+        input_image=settings.model.input_image if use_system_model_overrides else None,
+        output_image=(
+            settings.model.output_image if use_system_model_overrides else None
+        ),
+        context_window_tokens=(
+            settings.model.context_window_tokens if use_system_model_overrides else None
+        ),
+    )
     return {
         "input_image": model_info.capabilities.input_image,
         "output_image": model_info.capabilities.output_image,

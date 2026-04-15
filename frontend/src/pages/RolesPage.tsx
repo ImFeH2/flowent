@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { motion } from "motion/react";
 import { Edit2, Eye, Plus, RefreshCw, Trash2, Users, X } from "lucide-react";
@@ -6,10 +6,8 @@ import { toast } from "sonner";
 import {
   createRole,
   deleteRole,
-  fetchProviderModels,
   fetchRolesBootstrap,
   updateRole,
-  type ModelOption,
 } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
 import {
@@ -65,12 +63,7 @@ export function RolesPage() {
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
-  const [modelOptionsByProvider, setModelOptionsByProvider] = useState<
-    Record<string, ModelOption[]>
-  >({});
-  const [loadingModelProviderId, setLoadingModelProviderId] = useState<
-    string | null
-  >(null);
+  const [providerModelQuery, setProviderModelQuery] = useState("");
 
   const {
     data: bootstrapData,
@@ -102,64 +95,33 @@ export function RolesPage() {
   );
   const activeProviderId = draft.model?.provider_id ?? "";
   const activeProviderModelOptions = activeProviderId
-    ? (modelOptionsByProvider[activeProviderId] ?? [])
+    ? (providersById[activeProviderId]?.models ?? [])
     : [];
+  const filteredActiveProviderModelOptions = useMemo(() => {
+    const normalizedQuery = providerModelQuery.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return activeProviderModelOptions;
+    }
+    return activeProviderModelOptions.filter((option) =>
+      option.model.toLowerCase().includes(normalizedQuery),
+    );
+  }, [activeProviderModelOptions, providerModelQuery]);
 
   const refreshRoles = async () => {
     await mutateRolesBootstrap();
   };
 
-  useEffect(() => {
-    const providerId = draft.model?.provider_id;
-    if (!providerId || modelOptionsByProvider[providerId]) {
-      return;
-    }
-
-    let cancelled = false;
-    setLoadingModelProviderId(providerId);
-
-    void fetchProviderModels(providerId)
-      .then((items) => {
-        if (cancelled) {
-          return;
-        }
-        setModelOptionsByProvider((current) => ({
-          ...current,
-          [providerId]: items,
-        }));
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-        toast.error("Failed to load provider models");
-        setModelOptionsByProvider((current) => ({
-          ...current,
-          [providerId]: [],
-        }));
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingModelProviderId((current) =>
-            current === providerId ? null : current,
-          );
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [draft.model?.provider_id, modelOptionsByProvider]);
-
   const handleCreate = () => {
     setPanelMode("create");
     setActiveRoleName(null);
     setDraft(emptyDraft());
+    setProviderModelQuery("");
   };
 
   const handleView = (role: Role) => {
     setPanelMode("view");
     setActiveRoleName(role.name);
+    setProviderModelQuery("");
     setDraft({
       name: role.name,
       description: role.description,
@@ -181,6 +143,7 @@ export function RolesPage() {
   const handleEdit = (role: Role) => {
     setPanelMode("edit");
     setActiveRoleName(role.name);
+    setProviderModelQuery("");
     setDraft({
       name: role.name,
       description: role.description,
@@ -203,6 +166,7 @@ export function RolesPage() {
     setPanelMode(null);
     setActiveRoleName(null);
     setDraft(emptyDraft());
+    setProviderModelQuery("");
   };
 
   const handleModelModeChange = (enabled: boolean) => {
@@ -226,6 +190,7 @@ export function RolesPage() {
   };
 
   const handleProviderChange = (providerId: string) => {
+    setProviderModelQuery("");
     setDraft((current) => ({
       ...current,
       model: current.model
@@ -623,7 +588,7 @@ export function RolesPage() {
                         <Select
                           value={
                             activeProviderModelOptions.some(
-                              (option) => option.id === draft.model?.model,
+                              (option) => option.model === draft.model?.model,
                             )
                               ? draft.model?.model
                               : undefined
@@ -639,35 +604,60 @@ export function RolesPage() {
                           disabled={
                             isReadOnly ||
                             !draft.model.provider_id ||
-                            loadingModelProviderId ===
-                              draft.model.provider_id ||
                             activeProviderModelOptions.length === 0
                           }
                         >
                           <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
                             <SelectValue
                               placeholder={
-                                loadingModelProviderId ===
-                                draft.model.provider_id
-                                  ? "Loading models..."
-                                  : activeProviderModelOptions.length > 0
-                                    ? "Pick a discovered model"
-                                    : "No discovered models"
+                                activeProviderModelOptions.length > 0
+                                  ? "Pick a provider model"
+                                  : "No saved provider models"
                               }
                             />
                           </SelectTrigger>
                           <SelectContent className="max-h-[300px] rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
-                            {activeProviderModelOptions.map((option) => (
-                              <SelectItem
-                                key={option.id}
-                                value={option.id}
-                                className="text-[13px]"
-                              >
-                                {option.id}
-                              </SelectItem>
-                            ))}
+                            {filteredActiveProviderModelOptions.map(
+                              (option) => (
+                                <SelectItem
+                                  key={option.model}
+                                  value={option.model}
+                                  className="text-[13px]"
+                                >
+                                  {option.model}
+                                </SelectItem>
+                              ),
+                            )}
                           </SelectContent>
                         </Select>
+                        {activeProviderModelOptions.length > 0 ? (
+                          <input
+                            type="text"
+                            value={providerModelQuery}
+                            onChange={(event) =>
+                              setProviderModelQuery(event.target.value)
+                            }
+                            readOnly={isReadOnly}
+                            placeholder="Search provider models"
+                            className={cn(
+                              "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30",
+                              isReadOnly
+                                ? "cursor-default opacity-60 focus:outline-none"
+                                : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                            )}
+                          />
+                        ) : (
+                          <p className="text-[11px] text-white/40 leading-relaxed">
+                            No saved provider models. Manage this provider
+                            catalog in Providers.
+                          </p>
+                        )}
+                        {activeProviderModelOptions.length > 0 &&
+                        filteredActiveProviderModelOptions.length === 0 ? (
+                          <p className="text-[11px] text-white/40 leading-relaxed">
+                            No provider models match the current search.
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="space-y-2 md:col-span-2">

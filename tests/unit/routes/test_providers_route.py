@@ -7,9 +7,11 @@ from app.models import ModelInfo
 from app.routes.providers_route import (
     CreateProviderRequest,
     ListModelsRequest,
+    ProviderModelTestRequest,
     UpdateProviderRequest,
     create_provider,
     list_provider_models,
+    run_provider_model_test_route,
     update_provider,
 )
 from app.settings import ProviderConfig, Settings
@@ -221,12 +223,11 @@ def test_list_provider_models_runs_gateway_in_threadpool(monkeypatch):
     assert result == {
         "models": [
             {
-                "id": "gpt-5",
-                "capabilities": {
-                    "input_image": False,
-                    "output_image": False,
-                },
+                "model": "gpt-5",
+                "source": "discovered",
                 "context_window_tokens": None,
+                "input_image": False,
+                "output_image": False,
             }
         ]
     }
@@ -234,3 +235,82 @@ def test_list_provider_models_runs_gateway_in_threadpool(monkeypatch):
         ("threadpool", ("provider-1",)),
         ("gateway", ("provider-1",)),
     ]
+
+
+def test_test_provider_model_runs_against_provider_draft(monkeypatch):
+    calls: list[tuple[str, object]] = []
+
+    class FakeProvider:
+        def chat(
+            self,
+            messages,
+            tools=None,
+            on_chunk=None,
+            register_interrupt=None,
+            model_params=None,
+        ):
+            calls.append(("chat", messages))
+            return object()
+
+    async def fake_run_in_threadpool(func, *args):
+        calls.append(("threadpool", args))
+        return func(*args)
+
+    monkeypatch.setattr(
+        "app.routes.providers_route.create_llm_provider",
+        lambda **kwargs: FakeProvider(),
+    )
+    monkeypatch.setattr(
+        "app.routes.providers_route.run_in_threadpool",
+        fake_run_in_threadpool,
+    )
+
+    result = asyncio.run(
+        run_provider_model_test_route(
+            ProviderModelTestRequest(
+                type="openai_compatible",
+                base_url="https://api.example.com",
+                model="gpt-5",
+            )
+        )
+    )
+
+    assert result["ok"] is True
+    assert isinstance(result["duration_ms"], int)
+    assert calls[0][0] == "threadpool"
+    assert calls[1][0] == "chat"
+
+
+def test_test_provider_model_returns_normalized_error_summary(monkeypatch):
+    class FakeProvider:
+        def chat(
+            self,
+            messages,
+            tools=None,
+            on_chunk=None,
+            register_interrupt=None,
+            model_params=None,
+        ):
+            raise RuntimeError(
+                "LLM API access blocked\nDetail: Challenge or interstitial HTML response from upstream"
+            )
+
+    monkeypatch.setattr(
+        "app.routes.providers_route.create_llm_provider",
+        lambda **kwargs: FakeProvider(),
+    )
+
+    result = asyncio.run(
+        run_provider_model_test_route(
+            ProviderModelTestRequest(
+                type="openai_compatible",
+                base_url="https://api.example.com",
+                model="gpt-5",
+            )
+        )
+    )
+
+    assert result == {
+        "ok": False,
+        "error_summary": "Challenge or interstitial HTML response from upstream",
+    }

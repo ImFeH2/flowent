@@ -255,6 +255,15 @@ export interface Provider {
   api_key: string;
   headers: Record<string, string>;
   retry_429_delay_seconds: number;
+  models: ProviderModelCatalogEntry[];
+}
+
+export interface ProviderModelCatalogEntry {
+  model: string;
+  source: "discovered" | "manual";
+  context_window_tokens: number | null;
+  input_image: boolean | null;
+  output_image: boolean | null;
 }
 
 export interface ModelOption {

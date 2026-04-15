@@ -237,7 +237,10 @@ class AnthropicProvider(LLMProvider):
         input_tokens: int | None = None
         output_tokens: int | None = None
         cached_input_tokens: int | None = None
+        cache_read_tokens: int | None = None
+        cache_write_tokens: int | None = None
         usage_details: dict[str, int] = {}
+        raw_usage: dict[str, Any] | None = None
         client = self._client
         if register_interrupt is not None:
             register_interrupt(client.close)
@@ -288,14 +291,17 @@ class AnthropicProvider(LLMProvider):
                         message = event.get("message", {})
                         usage = message.get("usage", {})
                         if isinstance(usage, dict):
+                            raw_usage = dict(usage)
                             input_tokens = _extract_usage_value(usage, "input_tokens")
-                            cached_input_tokens = _extract_usage_value(
+                            cache_read_tokens = _extract_usage_value(
                                 usage, "cache_read_input_tokens"
                             )
+                            cache_write_tokens = _extract_usage_value(
+                                usage, "cache_creation_input_tokens"
+                            )
+                            cached_input_tokens = cache_read_tokens
                             if cached_input_tokens is None:
-                                cached_input_tokens = _extract_usage_value(
-                                    usage, "cache_creation_input_tokens"
-                                )
+                                cached_input_tokens = cache_write_tokens
                             for key in (
                                 "cache_creation_input_tokens",
                                 "cache_read_input_tokens",
@@ -385,6 +391,8 @@ class AnthropicProvider(LLMProvider):
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 cached_input_tokens=cached_input_tokens,
+                cache_read_tokens=cache_read_tokens,
+                cache_write_tokens=cache_write_tokens,
                 details=usage_details,
             )
 
@@ -414,9 +422,15 @@ class AnthropicProvider(LLMProvider):
                 tool_calls=tool_calls,
                 thinking=thinking,
                 usage=usage,
+                raw_usage=raw_usage,
             )
 
-        return LLMResponse(content=content or "", thinking=thinking, usage=usage)
+        return LLMResponse(
+            content=content or "",
+            thinking=thinking,
+            usage=usage,
+            raw_usage=raw_usage,
+        )
 
     def list_models(
         self,

@@ -5,7 +5,13 @@ import time
 import pytest
 from loguru import logger
 
-from app.agent import Agent, InterruptRequestedError, WakeSignal
+from app.agent import (
+    Agent,
+    ContextPreflight,
+    InterruptRequestedError,
+    PreparedLLMContext,
+    WakeSignal,
+)
 from app.events import event_bus
 from app.models import (
     AgentState,
@@ -31,6 +37,7 @@ from app.models import (
 from app.providers.errors import LLMProviderError
 from app.registry import registry
 from app.settings import ModelSettings, ProviderConfig, Settings
+from app.stats_service import stats_store
 from app.workspace_store import workspace_store
 
 
@@ -44,9 +51,11 @@ def reset_runtime_state(monkeypatch, tmp_path):
     monkeypatch.setattr(settings_module, "_cached_settings", None)
     registry.reset()
     workspace_store.reset_cache()
+    stats_store.reset()
     yield
     registry.reset()
     workspace_store.reset_cache()
+    stats_store.reset()
     monkeypatch.setattr(settings_module, "_cached_settings", None)
 
 
@@ -173,6 +182,94 @@ def test_agent_retries_transient_llm_errors_before_succeeding(monkeypatch):
         isinstance(entry, AssistantText) and entry.content == "Recovered answer"
         for entry in agent.get_history_snapshot()
     )
+
+
+def test_chat_with_retries_records_single_request_stat(monkeypatch):
+    workspace_store.upsert_tab(
+        Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    )
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Worker",
+            name="Planner",
+            tab_id="tab-1",
+        ),
+        uuid="agent-1",
+    )
+    settings = Settings(
+        model=ModelSettings(
+            active_provider_id="provider-1",
+            active_model="gpt-5.2",
+            retry_policy="limited",
+            max_retries=2,
+        ),
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_responses",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+    )
+    monkeypatch.setattr("app.agent.get_settings", lambda: settings)
+    monkeypatch.setattr(agent, "_get_llm_retry_delay", lambda retry_number: 0.0)
+
+    llm_calls = 0
+
+    def fake_chat(
+        messages,
+        tools=None,
+        on_chunk=None,
+        register_interrupt=None,
+        role_name=None,
+    ):
+        nonlocal llm_calls
+        llm_calls += 1
+        if llm_calls == 1:
+            raise LLMProviderError(
+                "temporary failure",
+                transient=True,
+                status_code=429,
+            )
+        return LLMResponse(
+            content="Done",
+            usage=LLMUsage(
+                total_tokens=120,
+                input_tokens=90,
+                output_tokens=30,
+                cache_read_tokens=12,
+            ),
+            raw_usage={"total_tokens": 120, "input_tokens": 90},
+        )
+
+    monkeypatch.setattr("app.agent.gateway.chat", fake_chat)
+
+    response, _ = agent._chat_with_retries(
+        prepared_context=PreparedLLMContext(
+            messages=[{"role": "user", "content": "hello"}],
+            system_messages=[],
+            execution_context_messages=[],
+            runtime_tail_messages=[],
+        ),
+        tools_schema=None,
+    )
+
+    records = stats_store.list_requests(since=0)
+
+    assert response.content == "Done"
+    assert len(records) == 1
+    assert records[0]["node_id"] == "agent-1"
+    assert records[0]["node_label"] == "Planner"
+    assert records[0]["tab_title"] == "Task"
+    assert records[0]["provider_id"] == "provider-1"
+    assert records[0]["model"] == "gpt-5.2"
+    assert records[0]["retry_count"] == 1
+    assert records[0]["result"] == "success"
+    assert records[0]["normalized_usage"]["cache_read_tokens"] == 12
+    assert records[0]["raw_usage"] == {"total_tokens": 120, "input_tokens": 90}
 
 
 def test_agent_does_not_retry_transient_llm_errors_when_retry_policy_is_no_retry(
@@ -465,6 +562,80 @@ def test_get_llm_retry_429_delay_uses_active_provider_only_for_429(monkeypatch):
 
     assert agent._get_llm_retry_429_delay(429) == 4.0
     assert agent._get_llm_retry_429_delay(500) == 0.0
+
+
+def test_prepare_messages_records_auto_compact_stat(monkeypatch):
+    workspace_store.upsert_tab(
+        Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    )
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Worker",
+            name="Planner",
+            tab_id="tab-1",
+        ),
+        uuid="agent-1",
+    )
+    settings = Settings(
+        model=ModelSettings(
+            active_provider_id="provider-1",
+            active_model="gpt-5.2",
+        ),
+        providers=[
+            ProviderConfig(
+                id="provider-1",
+                name="Primary",
+                type="openai_responses",
+                base_url="https://api.example.com/v1",
+                api_key="secret",
+            )
+        ],
+    )
+    monkeypatch.setattr("app.agent.get_settings", lambda: settings)
+
+    prepared_context = PreparedLLMContext(
+        messages=[{"role": "user", "content": "hello"}],
+        system_messages=[],
+        execution_context_messages=[],
+        runtime_tail_messages=[],
+    )
+    preflights = iter(
+        [
+            ContextPreflight(
+                estimated_total_tokens=50,
+                auto_compact_token_limit=10,
+            ),
+            ContextPreflight(
+                estimated_total_tokens=2,
+                auto_compact_token_limit=10,
+            ),
+        ]
+    )
+
+    monkeypatch.setattr(agent, "_build_prepared_llm_context", lambda: prepared_context)
+    monkeypatch.setattr(
+        agent,
+        "_compute_context_preflight",
+        lambda context: next(preflights),
+    )
+    compact_calls: list[str | None] = []
+    monkeypatch.setattr(
+        agent,
+        "_compact_execution_context",
+        lambda focus=None: compact_calls.append(focus) or "",
+    )
+
+    result = agent._prepare_messages_for_llm()
+    records = stats_store.list_compacts(since=0)
+
+    assert result == prepared_context
+    assert compact_calls == [None]
+    assert len(records) == 1
+    assert records[0]["trigger_type"] == "auto"
+    assert records[0]["result"] == "success"
+    assert records[0]["provider_id"] == "provider-1"
+    assert records[0]["model"] == "gpt-5.2"
 
 
 def test_clear_assistant_chat_history_drops_conversation_entries():

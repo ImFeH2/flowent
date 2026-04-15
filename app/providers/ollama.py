@@ -93,6 +93,7 @@ class OllamaProvider(LLMProvider):
         tool_calls_list: list[ToolCall] = []
         chunk_count = 0
         usage: LLMUsage | None = None
+        raw_usage: dict[str, Any] | None = None
         think_parser = ThinkTagParser()
         client = self._client
         if register_interrupt is not None:
@@ -181,6 +182,14 @@ class OllamaProvider(LLMProvider):
                         ):
                             eval_count = None
                         if prompt_eval_count is not None or eval_count is not None:
+                            raw_usage = {
+                                key: value
+                                for key, value in (
+                                    ("prompt_eval_count", prompt_eval_count),
+                                    ("eval_count", eval_count),
+                                )
+                                if value is not None
+                            }
                             usage = LLMUsage(
                                 total_tokens=(prompt_eval_count or 0)
                                 + (eval_count or 0),
@@ -240,9 +249,15 @@ class OllamaProvider(LLMProvider):
                 tool_calls=tool_calls_list,
                 thinking=thinking,
                 usage=usage,
+                raw_usage=raw_usage,
             )
 
-        return LLMResponse(content=content or "", thinking=thinking, usage=usage)
+        return LLMResponse(
+            content=content or "",
+            thinking=thinking,
+            usage=usage,
+            raw_usage=raw_usage,
+        )
 
     def list_models(
         self,

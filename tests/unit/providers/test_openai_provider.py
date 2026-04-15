@@ -98,6 +98,13 @@ def test_openai_chat_requests_stream_usage_and_returns_usage():
     assert response.usage.input_tokens == 13
     assert response.usage.output_tokens == 8
     assert response.usage.cached_input_tokens == 5
+    assert response.usage.cache_read_tokens == 5
+    assert response.raw_usage == {
+        "total_tokens": 21,
+        "prompt_tokens": 13,
+        "completion_tokens": 8,
+        "prompt_tokens_details": {"cached_tokens": 5},
+    }
 
 
 def test_openai_chat_retries_without_stream_usage_when_provider_rejects_it():
@@ -129,3 +136,4 @@ def test_openai_chat_retries_without_stream_usage_when_provider_rejects_it():
     assert "stream_options" not in client.payloads[1]
     assert response.content == "Recovered"
     assert response.usage is None
+    assert response.raw_usage is None

@@ -45,6 +45,7 @@ export interface ActiveMessage {
 
 export type PageId =
   | "workspace"
+  | "stats"
   | "blueprints"
   | "providers"
   | "roles"

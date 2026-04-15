@@ -10,6 +10,7 @@ import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
 import {
   BookCopy,
   LayoutDashboard,
+  ChartNoAxesCombined,
   Server,
   Users,
   MessageSquareQuote,
@@ -21,6 +22,7 @@ import type { LucideIcon } from "lucide-react";
 
 const NAV_ITEMS: Array<{ id: PageId; label: string; icon: LucideIcon }> = [
   { id: "workspace", label: "Workspace", icon: LayoutDashboard },
+  { id: "stats", label: "Stats", icon: ChartNoAxesCombined },
   { id: "blueprints", label: "Blueprints", icon: BookCopy },
   { id: "providers", label: "Providers", icon: Server },
   { id: "roles", label: "Roles", icon: Users },

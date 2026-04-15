@@ -23,6 +23,8 @@ class LLMUsage:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_input_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
     details: dict[str, int] = field(default_factory=dict)
 
 
@@ -56,3 +58,4 @@ class LLMResponse:
     tool_calls: list[ToolCallResult] | None = None
     thinking: str | None = None
     usage: LLMUsage | None = None
+    raw_usage: dict[str, Any] | None = None

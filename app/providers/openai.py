@@ -104,6 +104,7 @@ def _extract_usage(chunk: dict[str, Any]) -> LLMUsage | None:
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cached_input_tokens=cached_input_tokens,
+        cache_read_tokens=cached_input_tokens,
         details=details,
     )
 
@@ -208,13 +209,14 @@ class OpenAIProvider(LLMProvider):
         tool_calls_accum: dict[int, dict[str, Any]] = {}
         chunk_count = 0
         response_usage: LLMUsage | None = None
+        raw_usage: dict[str, Any] | None = None
         think_parser = ThinkTagParser()
         client = self._client
         if register_interrupt is not None:
             register_interrupt(client.close)
 
         def stream_request(request_payload: dict[str, Any]) -> None:
-            nonlocal chunk_count, response_usage
+            nonlocal chunk_count, response_usage, raw_usage
             with client.stream(
                 "POST",
                 url,
@@ -247,6 +249,8 @@ class OpenAIProvider(LLMProvider):
                     chunk_count += 1
                     if response_usage is None:
                         response_usage = _extract_usage(chunk)
+                    if raw_usage is None and isinstance(chunk.get("usage"), dict):
+                        raw_usage = dict(chunk["usage"])
                     choices = chunk.get("choices")
                     if not choices:
                         continue
@@ -372,12 +376,14 @@ class OpenAIProvider(LLMProvider):
                 tool_calls=tool_calls,
                 thinking=thinking,
                 usage=response_usage,
+                raw_usage=raw_usage,
             )
 
         return LLMResponse(
             content=content or "",
             thinking=thinking,
             usage=response_usage,
+            raw_usage=raw_usage,
         )
 
     def list_models(

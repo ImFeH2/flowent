@@ -202,6 +202,7 @@ def _extract_usage(response: dict[str, Any]) -> LLMUsage | None:
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         cached_input_tokens=cached_input_tokens,
+        cache_read_tokens=cached_input_tokens,
         details=details,
     )
 
@@ -416,6 +417,7 @@ class OpenAIResponsesProvider(LLMProvider):
         saw_reasoning_text = False
         reasoning_tokens = 0
         response_usage: LLMUsage | None = None
+        raw_usage: dict[str, Any] | None = None
 
         current_tool: dict[str, Any] = {}
         client = self._client
@@ -539,6 +541,9 @@ class OpenAIResponsesProvider(LLMProvider):
                         if isinstance(response_data, dict):
                             reasoning_tokens = _extract_reasoning_tokens(response_data)
                             response_usage = _extract_usage(response_data)
+                            usage_payload = response_data.get("usage")
+                            if isinstance(usage_payload, dict):
+                                raw_usage = dict(usage_payload)
                             if not saw_reasoning_text:
                                 reasoning_text = _extract_reasoning_text_from_output(
                                     response_data.get("output")
@@ -600,6 +605,7 @@ class OpenAIResponsesProvider(LLMProvider):
                 tool_calls=tool_calls,
                 thinking=thinking,
                 usage=response_usage,
+                raw_usage=raw_usage,
             )
 
         return LLMResponse(
@@ -607,6 +613,7 @@ class OpenAIResponsesProvider(LLMProvider):
             parts=response_parts,
             thinking=thinking,
             usage=response_usage,
+            raw_usage=raw_usage,
         )
 
     def list_models(

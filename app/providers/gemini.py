@@ -227,6 +227,7 @@ class GeminiProvider(LLMProvider):
         tool_calls_list: list[ToolCall] = []
         chunk_count = 0
         usage: LLMUsage | None = None
+        raw_usage: dict[str, Any] | None = None
         client = self._client
         if register_interrupt is not None:
             register_interrupt(client.close)
@@ -273,6 +274,7 @@ class GeminiProvider(LLMProvider):
                     chunk_count += 1
                     usage_metadata = chunk.get("usageMetadata", {})
                     if isinstance(usage_metadata, dict):
+                        raw_usage = dict(usage_metadata)
                         input_tokens = _extract_usage_metadata_value(
                             usage_metadata, "promptTokenCount"
                         )
@@ -304,6 +306,7 @@ class GeminiProvider(LLMProvider):
                                 input_tokens=input_tokens,
                                 output_tokens=output_tokens,
                                 cached_input_tokens=cached_input_tokens,
+                                cache_read_tokens=cached_input_tokens,
                                 details=details,
                             )
                     candidates = chunk.get("candidates", [])
@@ -388,12 +391,14 @@ class GeminiProvider(LLMProvider):
                 parts=output_parts or None,
                 tool_calls=tool_calls_list,
                 usage=usage,
+                raw_usage=raw_usage,
             )
 
         return LLMResponse(
             content=content or "",
             parts=output_parts or None,
             usage=usage,
+            raw_usage=raw_usage,
         )
 
     def list_models(

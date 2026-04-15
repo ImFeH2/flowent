@@ -118,6 +118,15 @@ class ContextTokenUsageBaseline:
     runtime_tail_messages: list[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class ResolvedModelSource:
+    provider_id: str | None
+    provider_name: str | None
+    provider_type: str | None
+    model: str | None
+    model_info: ModelInfo | None
+
+
 def build_error_context(content: str) -> str:
     return f"<system>Previous runtime error:\n{content}</system>"
 
@@ -540,7 +549,7 @@ class Agent:
             timeout=interrupt_timeout
         )
         try:
-            self._compact_execution_context(focus=focus)
+            self._run_compact_with_stats(trigger_type="manual", focus=focus)
             content = "Compacted the current Assistant execution context."
             if focus and focus.strip():
                 content += f"\n\nFocus: {focus.strip()}"
@@ -1333,6 +1342,7 @@ class Agent:
         retry_policy = self._get_llm_retry_policy()
         retry_limit = self._get_llm_max_retries()
         retry_count = 0
+        started_at = _time.time()
 
         while True:
             stream_state = StreamingContentState()
@@ -1353,11 +1363,21 @@ class Agent:
                 finally:
                     self.set_interrupt_callback(None)
                 self._raise_if_interrupt_requested()
+                self._record_request_stats(
+                    started_at=started_at,
+                    ended_at=_time.time(),
+                    retry_count=retry_count,
+                    result="success",
+                    usage=response.usage,
+                    raw_usage=response.raw_usage,
+                )
                 self._record_context_token_usage_baseline(
                     prepared_context=prepared_context,
                     usage=response.usage,
                 )
                 return response, stream_state
+            except InterruptRequestedError:
+                raise
             except LLMProviderError as exc:
                 should_retry = False
                 if exc.transient:
@@ -1366,6 +1386,13 @@ class Agent:
                     elif retry_policy == "unlimited":
                         should_retry = True
                 if not should_retry:
+                    self._record_request_stats(
+                        started_at=started_at,
+                        ended_at=_time.time(),
+                        retry_count=retry_count,
+                        result="error",
+                        error_summary=str(exc),
+                    )
                     raise
                 retry_count += 1
                 delay_seconds = self._get_llm_retry_delay(
@@ -1379,6 +1406,15 @@ class Agent:
                     exc,
                 )
                 self._wait_for_llm_retry_delay(delay_seconds)
+            except Exception as exc:
+                self._record_request_stats(
+                    started_at=started_at,
+                    ended_at=_time.time(),
+                    retry_count=retry_count,
+                    result="error",
+                    error_summary=str(exc),
+                )
+                raise
 
     def _handle_interrupt(self, stream_state: StreamingContentState | None) -> None:
         if stream_state is not None:
@@ -1692,7 +1728,30 @@ class Agent:
                 runtime_tail_messages=list(prepared_context.runtime_tail_messages),
             )
 
-    def _get_effective_model_info(self) -> tuple[str | None, ModelInfo | None]:
+    def _get_stats_node_label(self) -> str:
+        if self.config.name:
+            return self.config.name
+        if self.config.role_name:
+            return self.config.role_name
+        if self.node_type == NodeType.ASSISTANT:
+            return "Assistant"
+        from app.graph_service import is_tab_leader
+
+        if is_tab_leader(node_id=self.uuid, tab_id=self.config.tab_id):
+            return "Leader"
+        return "Agent"
+
+    def _get_stats_tab_title(self) -> str | None:
+        if not self.config.tab_id:
+            return None
+        from app.workspace_store import workspace_store
+
+        tab = workspace_store.get_tab(self.config.tab_id)
+        if tab is None:
+            return None
+        return tab.title
+
+    def _get_effective_model_source(self) -> ResolvedModelSource:
         from app.model_metadata import build_model_info
         from app.settings import find_provider, find_role
 
@@ -1715,13 +1774,28 @@ class Agent:
             model_id = role_cfg.model.model
             use_system_model_overrides = False
         if not provider_id or not model_id:
-            return None, None
+            return ResolvedModelSource(
+                provider_id=None,
+                provider_name=None,
+                provider_type=None,
+                model=None,
+                model_info=None,
+            )
         provider = find_provider(settings, provider_id)
         if provider is None:
-            return None, None
-        return (
-            provider.type,
-            build_model_info(
+            return ResolvedModelSource(
+                provider_id=None,
+                provider_name=None,
+                provider_type=None,
+                model=None,
+                model_info=None,
+            )
+        return ResolvedModelSource(
+            provider_id=provider.id,
+            provider_name=provider.name,
+            provider_type=provider.type,
+            model=model_id,
+            model_info=build_model_info(
                 provider_type=provider.type,
                 model_id=model_id,
                 input_image=(
@@ -1737,6 +1811,96 @@ class Agent:
                 ),
             ),
         )
+
+    def _get_effective_model_info(self) -> tuple[str | None, ModelInfo | None]:
+        resolved_source = self._get_effective_model_source()
+        return resolved_source.provider_type, resolved_source.model_info
+
+    def _record_request_stats(
+        self,
+        *,
+        started_at: float,
+        ended_at: float,
+        retry_count: int,
+        result: str,
+        usage: LLMUsage | None = None,
+        raw_usage: dict[str, Any] | None = None,
+        error_summary: str | None = None,
+    ) -> None:
+        from app.stats_service import RequestRecordInput, stats_store
+
+        resolved_source = self._get_effective_model_source()
+        stats_store.record_request(
+            RequestRecordInput(
+                node_id=self.uuid,
+                node_label=self._get_stats_node_label(),
+                role_name=self.config.role_name,
+                tab_id=self.config.tab_id,
+                tab_title=self._get_stats_tab_title(),
+                provider_id=resolved_source.provider_id,
+                provider_name=resolved_source.provider_name,
+                provider_type=resolved_source.provider_type,
+                model=resolved_source.model,
+                started_at=started_at,
+                ended_at=ended_at,
+                retry_count=retry_count,
+                result="success" if result == "success" else "error",
+                normalized_usage=usage,
+                raw_usage=raw_usage,
+                error_summary=error_summary,
+            )
+        )
+
+    def _run_compact_with_stats(
+        self,
+        *,
+        trigger_type: str,
+        focus: str | None = None,
+    ) -> str:
+        from app.stats_service import CompactRecordInput, stats_store
+
+        started_at = _time.time()
+        resolved_source = self._get_effective_model_source()
+        try:
+            result = self._compact_execution_context(focus=focus)
+        except Exception as exc:
+            stats_store.record_compact(
+                CompactRecordInput(
+                    node_id=self.uuid,
+                    node_label=self._get_stats_node_label(),
+                    role_name=self.config.role_name,
+                    tab_id=self.config.tab_id,
+                    tab_title=self._get_stats_tab_title(),
+                    provider_id=resolved_source.provider_id,
+                    provider_name=resolved_source.provider_name,
+                    provider_type=resolved_source.provider_type,
+                    model=resolved_source.model,
+                    trigger_type="manual" if trigger_type == "manual" else "auto",
+                    started_at=started_at,
+                    ended_at=_time.time(),
+                    result="error",
+                    error_summary=str(exc),
+                )
+            )
+            raise
+        stats_store.record_compact(
+            CompactRecordInput(
+                node_id=self.uuid,
+                node_label=self._get_stats_node_label(),
+                role_name=self.config.role_name,
+                tab_id=self.config.tab_id,
+                tab_title=self._get_stats_tab_title(),
+                provider_id=resolved_source.provider_id,
+                provider_name=resolved_source.provider_name,
+                provider_type=resolved_source.provider_type,
+                model=resolved_source.model,
+                trigger_type="manual" if trigger_type == "manual" else "auto",
+                started_at=started_at,
+                ended_at=_time.time(),
+                result="success",
+            )
+        )
+        return result
 
     def _get_effective_output_budget_tokens(self) -> int:
         from app.settings import find_role, merge_model_params
@@ -1829,7 +1993,7 @@ class Agent:
             preflight.context_window_tokens,
         )
         try:
-            self._compact_execution_context()
+            self._run_compact_with_stats(trigger_type="auto")
         except Exception as exc:
             if (
                 preflight.safe_input_tokens is not None

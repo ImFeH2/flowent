@@ -189,7 +189,15 @@ def test_openai_responses_requests_reasoning_and_returns_summary_text():
     assert response.usage.input_tokens == 89
     assert response.usage.output_tokens == 55
     assert response.usage.cached_input_tokens == 34
+    assert response.usage.cache_read_tokens == 34
     assert response.usage.details == {"output_tokens_details.reasoning_tokens": 5}
+    assert response.raw_usage == {
+        "total_tokens": 144,
+        "input_tokens": 89,
+        "output_tokens": 55,
+        "input_tokens_details": {"cached_tokens": 34},
+        "output_tokens_details": {"reasoning_tokens": 5},
+    }
     assert chunks == [("thinking", "Checked the prompt."), ("content", "221")]
 
 

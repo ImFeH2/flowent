@@ -54,9 +54,11 @@ def bootstrap_runtime() -> None:
         get_settings,
         save_settings,
     )
+    from app.stats_service import stats_store
     from app.workspace_store import workspace_store
 
     workspace_store.reset_cache()
+    stats_store.reset()
     settings = get_settings()
     if ensure_builtin_roles(settings):
         save_settings(settings)

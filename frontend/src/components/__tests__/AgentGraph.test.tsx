@@ -16,6 +16,7 @@ import { getLayoutedElements } from "@/lib/layout";
 import type { Node, TaskTab } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
+const getZoomMock = vi.fn(() => 1);
 const terminateNodeMock = vi.fn().mockResolvedValue(undefined);
 const useAgentNodesRuntimeMock = vi.fn();
 const useAgentTabsRuntimeMock = vi.fn();
@@ -101,6 +102,7 @@ vi.mock("@xyflow/react", async () => {
     onNodeMouseLeave,
     onConnectStart,
     onConnectEnd,
+    onMove,
     onNodeContextMenu,
     onPaneContextMenu,
     nodesDraggable,
@@ -118,13 +120,20 @@ vi.mock("@xyflow/react", async () => {
       position: { x: number; y: number };
     }>;
     nodeTypes: Record<string, React.ComponentType<MockNodeComponentProps>>;
-    onInit?: (instance: { fitView: typeof fitViewMock }) => void;
+    onInit?: (instance: {
+      fitView: typeof fitViewMock;
+      getZoom: typeof getZoomMock;
+    }) => void;
     onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseEnter?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseMove?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseLeave?: (event: React.MouseEvent, node: { id: string }) => void;
     onConnectStart?: () => void;
     onConnectEnd?: () => void;
+    onMove?: (
+      event: MouseEvent | TouchEvent | null,
+      viewport: { x: number; y: number; zoom: number },
+    ) => void;
     onNodeContextMenu?: (event: React.MouseEvent, node: { id: string }) => void;
     onPaneContextMenu?: (event: React.MouseEvent) => void;
     nodesDraggable?: boolean;
@@ -146,7 +155,7 @@ vi.mock("@xyflow/react", async () => {
     });
 
     react.useEffect(() => {
-      onInit?.({ fitView: fitViewMock });
+      onInit?.({ fitView: fitViewMock, getZoom: getZoomMock });
     }, [onInit]);
 
     return (
@@ -159,6 +168,10 @@ vi.mock("@xyflow/react", async () => {
           onClick={() => onConnectStart?.()}
         />
         <button data-testid="connect-end" onClick={() => onConnectEnd?.()} />
+        <button
+          data-testid="move-zoom-142"
+          onClick={() => onMove?.(null, { x: 0, y: 0, zoom: 1.42 })}
+        />
         {nodes.map((node) => {
           const Component = nodeTypes[node.type];
           return (
@@ -275,6 +288,8 @@ function renderGraph(
 
 beforeEach(() => {
   fitViewMock.mockClear();
+  getZoomMock.mockClear();
+  getZoomMock.mockReturnValue(1);
   terminateNodeMock.mockClear();
   reactFlowPropsMock.mockClear();
   resizeObservers.splice(0, resizeObservers.length);
@@ -582,6 +597,33 @@ describe("AgentGraph", () => {
         zoomOnPinch: true,
       });
     });
+  });
+
+  it("shows the current viewport zoom when a graph is visible and updates it live", async () => {
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Worker",
+      }),
+    ]);
+
+    expect(
+      await screen.findByTestId("agent-graph-zoom-indicator"),
+    ).toHaveTextContent("100%");
+
+    fireEvent.click(screen.getByTestId("move-zoom-142"));
+
+    expect(screen.getByTestId("agent-graph-zoom-indicator")).toHaveTextContent(
+      "142%",
+    );
+  });
+
+  it("hides the graph zoom indicator in the stable empty state", () => {
+    renderGraph([]);
+
+    expect(
+      screen.queryByTestId("agent-graph-zoom-indicator"),
+    ).not.toBeInTheDocument();
   });
 
   it("lays out active tab nodes from graph structure instead of stored positions", async () => {

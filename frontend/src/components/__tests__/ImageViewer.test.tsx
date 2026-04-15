@@ -103,6 +103,9 @@ describe("ImageViewer", () => {
     expect(
       screen.queryByRole("button", { name: "Reset" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId("global-image-viewer-zoom")).toHaveTextContent(
+      "100%",
+    );
 
     fireEvent.keyDown(window, { key: "Escape" });
 
@@ -162,6 +165,9 @@ describe("ImageViewer", () => {
     const backgroundAnchor = { x: 36, y: 32 };
 
     expect(image).toHaveClass("cursor-grab");
+    expect(screen.getByTestId("global-image-viewer-zoom")).toHaveTextContent(
+      "100%",
+    );
 
     fireEvent.wheel(backdrop, {
       deltaY: -100,
@@ -170,10 +176,16 @@ describe("ImageViewer", () => {
     });
 
     expect(readScale(stage)).toBeGreaterThan(1);
+    expect(screen.getByTestId("global-image-viewer-zoom")).toHaveTextContent(
+      `${Math.round(readScale(stage) * 100)}%`,
+    );
 
     fireEvent.mouseDown(backdrop, { button: 0, clientX: 100, clientY: 100 });
     fireEvent.mouseMove(window, { clientX: 160, clientY: 160 });
     fireEvent.mouseUp(window);
+    expect(screen.getByTestId("global-image-viewer-zoom")).toHaveTextContent(
+      `${Math.round(readScale(stage) * 100)}%`,
+    );
 
     const beforeZoom = getLocalImagePoint({
       anchor: imageAnchor,

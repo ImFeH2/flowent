@@ -29,7 +29,7 @@ import { AgentTooltip } from "@/components/AgentTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import { ViewportPortal } from "@/components/ViewportPortal";
 import { AGENT_NODE_HEIGHT, getAgentNodeWidth } from "@/lib/layout";
-import { cn } from "@/lib/utils";
+import { cn, formatZoomPercentage } from "@/lib/utils";
 import {
   useAgentActivityRuntime,
   useAgentNodesRuntime,
@@ -59,6 +59,10 @@ const nodeTypes: NodeTypes = {
 const edgeTypes: EdgeTypes = {
   animated: AgentEdge,
 };
+
+type FlowFitViewOptions = NonNullable<
+  Parameters<ReactFlowInstance["fitView"]>[0]
+>;
 
 interface TooltipData {
   agentId: string;
@@ -329,6 +333,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
     const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(
       null,
     );
+    const [viewportZoom, setViewportZoom] = useState(1);
     const [connecting, setConnecting] = useState(false);
     const [connectMode, setConnectMode] = useState(false);
     const [targetPickSourceId, setTargetPickSourceId] = useState<string | null>(
@@ -379,6 +384,54 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       width: number;
       height: number;
     } | null>(null);
+
+    const syncViewportZoom = useCallback((zoom: number) => {
+      if (!Number.isFinite(zoom) || zoom <= 0) {
+        return;
+      }
+      setViewportZoom(zoom);
+    }, []);
+
+    const syncViewportZoomFromInstance = useCallback(
+      (instance: ReactFlowInstance | null) => {
+        if (!instance) {
+          return;
+        }
+        syncViewportZoom(instance.getZoom());
+      },
+      [syncViewportZoom],
+    );
+
+    const fitViewport = useCallback(
+      async (options: FlowFitViewOptions) => {
+        if (!flowInstance) {
+          return false;
+        }
+        try {
+          const didFit = await flowInstance.fitView(options);
+          syncViewportZoomFromInstance(flowInstance);
+          return didFit;
+        } catch {
+          return false;
+        }
+      },
+      [flowInstance, syncViewportZoomFromInstance],
+    );
+
+    const handleFlowInit = useCallback(
+      (instance: ReactFlowInstance) => {
+        setFlowInstance(instance);
+        syncViewportZoomFromInstance(instance);
+      },
+      [syncViewportZoomFromInstance],
+    );
+
+    const handleViewportMove = useCallback(
+      (_event: MouseEvent | TouchEvent | null, viewport: { zoom: number }) => {
+        syncViewportZoom(viewport.zoom);
+      },
+      [syncViewportZoom],
+    );
 
     const closeQuickCreate = useCallback(() => {
       setQuickCreate(null);
@@ -1021,7 +1074,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         label: "Fit View",
         disabled: !flowInstance,
         onClick: () => {
-          flowInstance?.fitView({
+          void fitViewport({
             padding: VIEWPORT_FIT_PADDING,
             maxZoom: VIEWPORT_FIT_MAX_ZOOM,
             duration: 350,
@@ -1040,6 +1093,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       agents,
       clearGraphSelection,
       contextMenu,
+      fitViewport,
       flowInstance,
       onDeleteAgent,
       onDeleteConnection,
@@ -1087,17 +1141,20 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       lastViewportStructureKey.current = graphElements.structureKey;
 
       const raf = requestAnimationFrame(() => {
-        void flowInstance
-          .fitView({
-            padding: VIEWPORT_FIT_PADDING,
-            maxZoom: VIEWPORT_FIT_MAX_ZOOM,
-            duration: isInitialViewport ? 0 : 250,
-          })
-          .catch(() => false);
+        void fitViewport({
+          padding: VIEWPORT_FIT_PADDING,
+          maxZoom: VIEWPORT_FIT_MAX_ZOOM,
+          duration: isInitialViewport ? 0 : 250,
+        });
       });
 
       return () => cancelAnimationFrame(raf);
-    }, [animatedNodes.length, flowInstance, graphElements.structureKey]);
+    }, [
+      animatedNodes.length,
+      fitViewport,
+      flowInstance,
+      graphElements.structureKey,
+    ]);
 
     useEffect(() => {
       if (
@@ -1112,13 +1169,11 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       const observer = new ResizeObserver(() => {
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(() => {
-          void flowInstance
-            .fitView({
-              padding: VIEWPORT_FIT_PADDING,
-              maxZoom: VIEWPORT_FIT_MAX_ZOOM,
-              duration: 250,
-            })
-            .catch(() => false);
+          void fitViewport({
+            padding: VIEWPORT_FIT_PADDING,
+            maxZoom: VIEWPORT_FIT_MAX_ZOOM,
+            duration: 250,
+          });
         });
       });
 
@@ -1128,7 +1183,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         cancelAnimationFrame(raf);
         observer.disconnect();
       };
-    }, [animatedNodes.length, flowInstance]);
+    }, [animatedNodes.length, fitViewport, flowInstance]);
 
     useEffect(() => {
       if (
@@ -1337,7 +1392,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
               colorMode="dark"
-              onInit={setFlowInstance}
+              onInit={handleFlowInit}
               onNodeClick={onNodeClick}
               onNodeMouseEnter={onNodeMouseEnter}
               onNodeMouseMove={onNodeMouseMove}
@@ -1350,6 +1405,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
               onConnect={onConnect}
               onConnectStart={onConnectStart}
               onConnectEnd={onConnectEnd}
+              onMove={handleViewportMove}
               isValidConnection={isValidConnection}
               proOptions={{ hideAttribution: true }}
               nodesDraggable={false}
@@ -1418,6 +1474,17 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
             </ReactFlow>
           )}
         </div>
+
+        {animatedNodes.length > 0 ? (
+          <div className="pointer-events-none absolute bottom-4 left-4 z-30">
+            <div
+              className="rounded-full border border-white/10 bg-black/65 px-3 py-1 text-[11px] font-medium text-white/84 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md"
+              data-testid="agent-graph-zoom-indicator"
+            >
+              {formatZoomPercentage(viewportZoom)}
+            </div>
+          </div>
+        ) : null}
 
         {connectHintLabel ? (
           <div className="pointer-events-none absolute right-4 top-4 z-30">

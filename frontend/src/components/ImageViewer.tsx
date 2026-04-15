@@ -15,7 +15,7 @@ import {
   ImageViewerContext,
   type ImageViewerPayload,
 } from "@/context/imageViewer";
-import { cn } from "@/lib/utils";
+import { cn, formatZoomPercentage } from "@/lib/utils";
 
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 64;
@@ -609,6 +609,7 @@ function ImageViewerOverlay({
   viewportRef: MutableRefObject<HTMLDivElement | null>;
 }) {
   const imageLabel = payload.alt || "Image";
+  const zoomLabel = formatZoomPercentage(view.zoom);
 
   return (
     <div
@@ -623,7 +624,17 @@ function ImageViewerOverlay({
         onClick={handleViewportClick}
         onMouseDown={handleViewportMouseDown}
       >
-        <div className="absolute right-4 top-4 z-20" data-pan-exempt="true">
+        <div
+          className="absolute right-4 top-4 z-20 flex items-center gap-2"
+          data-pan-exempt="true"
+        >
+          <div
+            className="rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[11px] font-medium text-white/84 shadow-[0_22px_48px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl"
+            data-pan-exempt="true"
+            data-testid="global-image-viewer-zoom"
+          >
+            {zoomLabel}
+          </div>
           <ViewerControlButton
             ariaLabel="Close image preview"
             onClick={closeImage}

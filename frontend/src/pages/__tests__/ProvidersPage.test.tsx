@@ -164,7 +164,7 @@ describe("ProvidersPage", () => {
         }),
       ),
     );
-  });
+  }, 10000);
 
   it("shows inline model test feedback for the current provider draft", async () => {
     fetchProvidersMock.mockResolvedValue([

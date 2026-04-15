@@ -47,6 +47,7 @@ import type {
 } from "@/types";
 
 export type AssistantChatVariant = "panel" | "floating" | "workspace";
+type RichContentLayout = "parts-order" | "human-attachments-top";
 
 interface AssistantChatMessagesProps {
   bottomInset?: number;
@@ -724,6 +725,7 @@ function HumanBubble({
         <div className="flex min-w-0 flex-col gap-2">
           <RichContentBlock
             content={content}
+            layout="human-attachments-top"
             parts={parts}
             markdownClassName="text-sm text-white"
             preClassName="text-white/90"
@@ -1085,20 +1087,61 @@ function ActivityDisclosure({
 
 function RichContentBlock({
   content,
+  layout = "parts-order",
   parts,
   streaming,
   markdownClassName,
   preClassName,
 }: {
   content: string | null | undefined;
+  layout?: RichContentLayout;
   parts?: ContentPart[] | null;
   streaming?: boolean;
   markdownClassName?: string;
   preClassName?: string;
 }) {
   const normalizedParts = normalizeContentParts(parts, content);
+  const hasImagePart = normalizedParts.some((part) => part.type === "image");
   const textContent = contentPartsToText(normalizedParts, content);
   const formattedJson = formatJsonOutput(textContent);
+
+  if (layout === "human-attachments-top" && hasImagePart) {
+    const textParts = normalizedParts.filter(
+      (part): part is Extract<ContentPart, { type: "text" }> =>
+        part.type === "text",
+    );
+    const imageParts = normalizedParts.filter(
+      (part): part is Extract<ContentPart, { type: "image" }> =>
+        part.type === "image",
+    );
+
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2.5">
+          {imageParts.map((part, index) => (
+            <ImageAssetPreview
+              key={`${index}-attachment-${part.asset_id}`}
+              alt={part.alt}
+              assetId={part.asset_id}
+              compact
+              height={part.height}
+              mimeType={part.mime_type}
+              width={part.width}
+            />
+          ))}
+        </div>
+        {textParts.length > 0 ? (
+          <RichContentBlock
+            content={contentPartsToText(textParts)}
+            markdownClassName={markdownClassName}
+            preClassName={preClassName}
+            parts={textParts}
+            streaming={streaming}
+          />
+        ) : null}
+      </div>
+    );
+  }
 
   if (formattedJson) {
     return (
@@ -1113,10 +1156,7 @@ function RichContentBlock({
     );
   }
 
-  if (
-    normalizedParts.length > 0 &&
-    normalizedParts.some((part) => part.type === "image")
-  ) {
+  if (normalizedParts.length > 0 && hasImagePart) {
     return (
       <div className="space-y-3">
         {normalizedParts.map((part, index) =>

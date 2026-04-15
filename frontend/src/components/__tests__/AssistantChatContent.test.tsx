@@ -27,6 +27,14 @@ function renderWithImageViewer(ui: ReactElement) {
   return render(<ImageViewerProvider>{ui}</ImageViewerProvider>);
 }
 
+function expectDocumentOrder(
+  first: HTMLElement,
+  second: HTMLElement,
+  relation: number,
+) {
+  expect(first.compareDocumentPosition(second) & relation).toBeTruthy();
+}
+
 describe("AssistantChatMessages", () => {
   it("renders idle tool calls before and after the result is available", () => {
     const nodes = new Map<string, Node>([
@@ -398,6 +406,218 @@ describe("AssistantChatMessages", () => {
     expect(
       screen.getAllByRole("button", { name: "Close image preview" }).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("pins human message images above the text body after sending", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+
+    renderWithImageViewer(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Please review the attached sketch.",
+            parts: [
+              {
+                type: "text",
+                text: "Please review the attached sketch.",
+              },
+              {
+                type: "image",
+                asset_id: "asset-human-1",
+                alt: "Pinned sketch",
+                mime_type: "image/png",
+                width: 1600,
+                height: 900,
+              },
+            ],
+            timestamp: 1,
+          },
+        ]}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    const imageButton = screen.getByRole("button", { name: /Pinned sketch/i });
+    const textBody = screen.getByText("Please review the attached sketch.");
+
+    expectDocumentOrder(
+      imageButton,
+      textBody,
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(screen.queryByText(/\[image:/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps formal parts semantics when copying a pinned human message", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderWithImageViewer(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Please review the attached sketch.",
+            parts: [
+              {
+                type: "text",
+                text: "Please review the attached sketch.",
+              },
+              {
+                type: "image",
+                asset_id: "asset-human-1",
+                alt: "Pinned sketch",
+                mime_type: "image/png",
+                width: 1600,
+                height: 900,
+              },
+            ],
+            timestamp: 1,
+          },
+        ]}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    const messageGroup = screen
+      .getByText("Please review the attached sketch.")
+      .closest(".group");
+
+    expect(messageGroup).not.toBeNull();
+    fireEvent.click(
+      within(messageGroup as HTMLElement).getByRole("button", { name: "Copy" }),
+    );
+
+    expect(writeText).toHaveBeenCalledWith(
+      "Please review the attached sketch.[image: Pinned sketch]",
+    );
+  });
+
+  it("keeps non-human mixed content in formal parts order", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+    const nodes = new Map<string, Node>([
+      [
+        "worker-1",
+        {
+          id: "worker-1",
+          node_type: "agent",
+          is_leader: false,
+          state: "running",
+          connections: [],
+          name: "Project Analyst",
+          todos: [],
+          role_name: "Worker",
+        },
+      ],
+    ]);
+
+    renderWithImageViewer(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "AssistantText",
+            parts: [
+              {
+                type: "text",
+                text: "First explain the diagram.",
+              },
+              {
+                type: "image",
+                asset_id: "asset-assistant-1",
+                alt: "Assistant diagram",
+                mime_type: "image/png",
+                width: 1600,
+                height: 900,
+              },
+            ],
+            timestamp: 1,
+          },
+          {
+            type: "ReceivedMessage",
+            from_id: "worker-1",
+            parts: [
+              {
+                type: "text",
+                text: "Worker reply first.",
+              },
+              {
+                type: "image",
+                asset_id: "asset-worker-received-1",
+                alt: "Worker received diagram",
+                mime_type: "image/png",
+                width: 1600,
+                height: 900,
+              },
+            ],
+            timestamp: 2,
+          },
+          {
+            type: "SentMessage",
+            to_ids: ["worker-1"],
+            parts: [
+              {
+                type: "text",
+                text: "Directive first.",
+              },
+              {
+                type: "image",
+                asset_id: "asset-worker-sent-1",
+                alt: "Worker sent diagram",
+                mime_type: "image/png",
+                width: 1600,
+                height: 900,
+              },
+            ],
+            timestamp: 3,
+          },
+        ]}
+        nodes={nodes}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    const textBody = screen.getByText("First explain the diagram.");
+    const imageButton = screen.getByRole("button", {
+      name: /Assistant diagram/i,
+    });
+
+    expectDocumentOrder(
+      textBody,
+      imageButton,
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /From Project Analyst/i }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /To Project Analyst/i }),
+    );
+
+    expectDocumentOrder(
+      screen.getByText("Worker reply first."),
+      screen.getByRole("button", { name: /Worker received diagram/i }),
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expectDocumentOrder(
+      screen.getByText("Directive first."),
+      screen.getByRole("button", { name: /Worker sent diagram/i }),
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 });
 

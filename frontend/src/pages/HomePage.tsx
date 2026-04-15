@@ -1137,8 +1137,8 @@ export function HomePage() {
         }
       >
         <WorkspaceDialogMeta>
-          This only saves the current network structure. History, runtime state,
-          todos, and permissions are not copied into the blueprint.
+          This only saves the current Agent Network structure. History, runtime
+          state, todos, and permissions are not copied into the Agent Blueprint.
         </WorkspaceDialogMeta>
         <WorkspaceDialogField label="Name" hint="Required">
           <Input
@@ -1727,9 +1727,9 @@ function AgentDetailPanel({
             )}
           </DetailSection>
 
-          <DetailSection title="Network Connections">
+          <DetailSection title="Agent Graph">
             {connectionItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No network edges</p>
+              <p className="text-sm text-muted-foreground">No graph edges</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {connectionItems.map((connection) => (

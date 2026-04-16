@@ -200,8 +200,8 @@ jobs:
         with:
           images: docker.io/${{ steps.image.outputs.name }}
           tags: |
-            type=raw,value=${{ steps.release.outputs.tag }}
             type=raw,value=${{ steps.release.outputs.version }}
+            type=raw,value=latest
 
       - uses: docker/build-push-action@v6
         with:

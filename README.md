@@ -44,12 +44,14 @@ Settings are saved to `settings.json` and can be changed at runtime without rest
 git clone https://github.com/ImFeH2/autopoe.git
 cd autopoe
 
-# Backend (hot reload)
+# Backend (API + WebSocket only)
 uv sync
-uv run fastapi dev
+uv run fastapi dev app/dev.py
 
 # Frontend (hot reload, separate terminal)
 cd frontend
 pnpm install
 pnpm dev
 ```
+
+In development, open `http://localhost:5173`. In production, the backend serves the built frontend from `app/static`.

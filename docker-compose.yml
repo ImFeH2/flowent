@@ -1,0 +1,15 @@
+services:
+  autopoe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${AUTOPOE_IMAGE:-autopoe:local}
+    ports:
+      - "${AUTOPOE_PORT:-8000}:8000"
+    volumes:
+      - autopoe-data:/data
+    restart: unless-stopped
+    init: true
+
+volumes:
+  autopoe-data:

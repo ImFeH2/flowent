@@ -45,3 +45,15 @@ cd frontend
 pnpm install
 pnpm dev
 ```
+
+## Docker
+
+To run Autopoe in Docker:
+
+```bash
+docker-compose up -d --build
+```
+
+The container stores runtime data in `/data`, including `settings.json`, `workspace.json`, `image-assets/`, and `logs/`. The bundled `docker-compose.yml` mounts that path as a named volume so your settings and workspaces survive container restarts.
+
+Autopoe relies on `bubblewrap` for sandboxed command execution. The image includes `bwrap`, but whether sandboxed agent execution works depends on the host container runtime allowing the required namespace features.

@@ -51,13 +51,13 @@ const SettingsPage = lazyPage(
 
 const lazyPageMap: Record<PageId, ComponentType> = {
   workspace: HomePage,
-  stats: StatsPage,
   blueprints: BlueprintsPage,
   providers: ProvidersPage,
   roles: RolesPage,
   prompts: PromptsPage,
   tools: ToolsPage,
   channels: ChannelsPage,
+  stats: StatsPage,
   settings: SettingsPage,
 };
 

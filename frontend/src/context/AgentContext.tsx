@@ -45,13 +45,13 @@ export interface ActiveMessage {
 
 export type PageId =
   | "workspace"
-  | "stats"
   | "blueprints"
   | "providers"
   | "roles"
   | "prompts"
   | "tools"
   | "channels"
+  | "stats"
   | "settings";
 
 interface AgentRuntimeContextValue {

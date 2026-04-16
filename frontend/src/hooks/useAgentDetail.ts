@@ -22,12 +22,21 @@ export function useAgentDetail(
   const {
     agentHistories,
     clearAgentHistory,
+    clearHistorySnapshot,
+    historyInvalidatedAt,
     historyClearedAt,
+    historySnapshots,
     streamingDeltas,
   } = useAgentHistoryRuntime();
   const detailHistoryClearedAt = agentId
     ? (historyClearedAt.get(agentId) ?? 0)
     : 0;
+  const detailHistoryInvalidatedAt = agentId
+    ? (historyInvalidatedAt.get(agentId) ?? 0)
+    : 0;
+  const detailHistorySnapshot = agentId
+    ? (historySnapshots.get(agentId) ?? null)
+    : null;
 
   useEffect(() => {
     if (!detailHistoryClearedAt) {
@@ -44,6 +53,22 @@ export function useAgentDetail(
     );
     setFetchedAt(Date.now());
   }, [detailHistoryClearedAt]);
+
+  useEffect(() => {
+    if (!detailHistoryInvalidatedAt || !detailHistorySnapshot) {
+      return;
+    }
+
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            history: detailHistorySnapshot,
+          }
+        : current,
+    );
+    setFetchedAt(Date.now());
+  }, [detailHistoryInvalidatedAt, detailHistorySnapshot]);
 
   useEffect(() => {
     if (!agentId) {
@@ -67,6 +92,7 @@ export function useAgentDetail(
         if (cancelled) return;
         setDetail(data);
         setFetchedAt(Date.now());
+        clearHistorySnapshot(agentId);
       } catch (err) {
         if (cancelled || controller.signal.aborted) return;
         setDetail(null);
@@ -86,14 +112,20 @@ export function useAgentDetail(
       cancelled = true;
       controller.abort();
     };
-  }, [agentId, clearAgentHistory, preserveIncrementalHistory]);
+  }, [
+    agentId,
+    clearAgentHistory,
+    clearHistorySnapshot,
+    detailHistoryInvalidatedAt,
+    preserveIncrementalHistory,
+  ]);
 
   const merged = useMemo(() => {
     if (!detail || !agentId) return null;
     const incremental = agentHistories.get(agentId);
     const deltas = streamingDeltas.get(agentId);
     const base = mergeHistoryWithDeltas({
-      history: detail.history,
+      history: detailHistorySnapshot ?? detail.history,
       incremental,
       deltas,
       fetchedAt,
@@ -106,7 +138,15 @@ export function useAgentDetail(
       merged.todos = liveAgent.todos;
     }
     return merged;
-  }, [detail, agentId, agentHistories, streamingDeltas, agents, fetchedAt]);
+  }, [
+    detail,
+    agentId,
+    agentHistories,
+    detailHistorySnapshot,
+    streamingDeltas,
+    agents,
+    fetchedAt,
+  ]);
 
   return { detail: merged, loading, error, fetchedAt };
 }

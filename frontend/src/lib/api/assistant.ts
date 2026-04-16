@@ -7,6 +7,11 @@ export interface AssistantMessageResponse {
   message_id?: string;
 }
 
+export interface AssistantRetryResponse {
+  status: "retried";
+  message_id: string;
+}
+
 export async function sendAssistantMessageRequest(input: {
   content?: string;
   parts?: ContentPart[];
@@ -17,6 +22,18 @@ export async function sendAssistantMessageRequest(input: {
       method: "POST",
       body: input,
       errorMessage: "Failed to send Assistant message",
+    },
+  );
+}
+
+export async function retryAssistantMessageRequest(
+  messageId: string,
+): Promise<AssistantRetryResponse> {
+  return requestJson<AssistantRetryResponse, AssistantRetryResponse>(
+    `/api/assistant/messages/${messageId}/retry`,
+    {
+      method: "POST",
+      errorMessage: "Failed to retry Assistant message",
     },
   );
 }

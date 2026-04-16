@@ -409,6 +409,79 @@ describe("AssistantChatMessages", () => {
     expect(writeText).toHaveBeenCalledWith("Copy this human message");
   });
 
+  it("shows retry on committed human messages and invokes the callback", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+    const onRetryHumanMessage = vi.fn();
+
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Retry this human message",
+            message_id: "msg-1",
+            timestamp: 1,
+          },
+        ]}
+        onRetryHumanMessage={onRetryHumanMessage}
+        onScroll={() => {}}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    const messageGroup = screen
+      .getByText("Retry this human message")
+      .closest(".group");
+
+    expect(messageGroup).not.toBeNull();
+    fireEvent.click(
+      within(messageGroup as HTMLElement).getByRole("button", {
+        name: "Retry",
+      }),
+    );
+
+    expect(onRetryHumanMessage).toHaveBeenCalledWith("msg-1");
+  });
+
+  it("disables retry for image messages when image input is unavailable", () => {
+    const scrollRef = createRef<HTMLDivElement>();
+
+    renderWithImageViewer(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            message_id: "msg-image",
+            parts: [
+              {
+                type: "text",
+                text: "Retry this image message",
+              },
+              {
+                type: "image",
+                asset_id: "asset-1",
+                mime_type: "image/png",
+                width: 1,
+                height: 1,
+              },
+            ],
+            timestamp: 1,
+          },
+        ]}
+        onRetryHumanMessage={() => {}}
+        onScroll={() => {}}
+        retryImageInputEnabled={false}
+        scrollRef={scrollRef}
+        variant="workspace"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Retry" })).toBeDisabled();
+  });
+
   it("opens sent image parts in the shared preview surface", () => {
     const scrollRef = createRef<HTMLDivElement>();
 

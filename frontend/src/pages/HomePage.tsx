@@ -1878,6 +1878,8 @@ function AssistantChatPanel({
     input,
     onMessagesScroll,
     removeImage = () => {},
+    retryMessage,
+    retryingMessageId,
     scrollRef,
     sending,
     sendMessage,
@@ -1928,7 +1930,10 @@ function AssistantChatPanel({
           bottomInset={composerHeight}
           items={timelineItems}
           nodes={agents}
+          onRetryHumanMessage={(messageId) => void retryMessage(messageId)}
           onScroll={onMessagesScroll}
+          retryImageInputEnabled={supportsInputImage}
+          retryingMessageId={retryingMessageId}
           runningHint={assistantActivity.runningHint}
           scrollRef={scrollRef}
           variant="workspace"

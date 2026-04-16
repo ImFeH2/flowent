@@ -12,12 +12,16 @@ import { useAssistantChat } from "@/hooks/useAssistantChat";
 import type { HistoryEntry, Node, NodeDetail } from "@/types";
 
 const clearAssistantChatRequestMock = vi.fn();
+const interruptNodeMock = vi.fn();
+const retryAssistantMessageRequestMock = vi.fn();
+const toastErrorMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
 const useAgentConnectionRuntimeMock = vi.fn();
 const useAgentHistoryRuntimeMock = vi.fn();
 const useAgentNodesRuntimeMock = vi.fn();
 const useAgentUIMock = vi.fn();
 const fetchNodeDetailMock = vi.fn();
+const uploadImageAssetRequestMock = vi.fn();
 const resizeObservers: ResizeObserverMock[] = [];
 
 vi.mock("@/context/AgentContext", () => ({
@@ -28,10 +32,21 @@ vi.mock("@/context/AgentContext", () => ({
   useAgentUI: () => useAgentUIMock(),
 }));
 
+vi.mock("sonner", () => ({
+  toast: {
+    error: (...args: unknown[]) => toastErrorMock(...args),
+  },
+}));
+
 vi.mock("@/lib/api", () => ({
   clearAssistantChatRequest: (...args: unknown[]) =>
     clearAssistantChatRequestMock(...args),
   fetchNodeDetail: (...args: unknown[]) => fetchNodeDetailMock(...args),
+  interruptNode: (...args: unknown[]) => interruptNodeMock(...args),
+  retryAssistantMessageRequest: (...args: unknown[]) =>
+    retryAssistantMessageRequestMock(...args),
+  uploadImageAssetRequest: (...args: unknown[]) =>
+    uploadImageAssetRequestMock(...args),
 }));
 
 class ResizeObserverMock {
@@ -59,12 +74,15 @@ function buildAssistantNode(state: Node["state"] = "running"): Node {
   };
 }
 
-function buildDetail(history: HistoryEntry[]): NodeDetail {
+function buildDetail(
+  history: HistoryEntry[],
+  state: NodeDetail["state"] = "running",
+): NodeDetail {
   return {
     id: "assistant",
     node_type: "assistant",
     is_leader: false,
-    state: "running",
+    state,
     name: null,
     contacts: [],
     connections: [],
@@ -151,12 +169,16 @@ function mockScrollableElement(
 describe("useAssistantChat", () => {
   beforeEach(() => {
     clearAssistantChatRequestMock.mockReset();
+    interruptNodeMock.mockReset();
+    retryAssistantMessageRequestMock.mockReset();
+    toastErrorMock.mockReset();
     useAgentActivityRuntimeMock.mockReset();
     useAgentConnectionRuntimeMock.mockReset();
     useAgentHistoryRuntimeMock.mockReset();
     useAgentNodesRuntimeMock.mockReset();
     useAgentUIMock.mockReset();
     fetchNodeDetailMock.mockReset();
+    uploadImageAssetRequestMock.mockReset();
 
     useAgentConnectionRuntimeMock.mockReturnValue({
       connected: true,
@@ -164,7 +186,10 @@ describe("useAssistantChat", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories: new Map(),
       clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
       historyClearedAt: new Map(),
+      historySnapshots: new Map(),
       streamingDeltas: new Map(),
     });
     useAgentUIMock.mockReturnValue({
@@ -298,7 +323,10 @@ describe("useAssistantChat", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories: new Map(),
       clearAgentHistory: clearAgentHistoryMock,
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
       historyClearedAt: new Map(),
+      historySnapshots: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock
@@ -328,6 +356,261 @@ describe("useAssistantChat", () => {
     expect(clearAssistantChatRequestMock).toHaveBeenCalledWith("assistant");
     expect(clearAgentHistoryMock).toHaveBeenCalledWith("assistant");
     expect(result.current.timelineItems).toHaveLength(0);
+  });
+
+  it("retries a committed human message and reloads the rewritten history", async () => {
+    const clearAgentHistoryMock = vi.fn();
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("idle")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
+      agentHistories: new Map(),
+      clearAgentHistory: clearAgentHistoryMock,
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
+      historyClearedAt: new Map(),
+      historySnapshots: new Map(),
+      streamingDeltas: new Map(),
+    });
+    fetchNodeDetailMock
+      .mockResolvedValueOnce(
+        buildDetail([
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Retry this request",
+            message_id: "msg-old",
+            timestamp: 1,
+          },
+          {
+            type: "AssistantText",
+            content: "Old reply",
+            timestamp: 2,
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        buildDetail([
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Retry this request",
+            message_id: "msg-new",
+            timestamp: 3,
+          },
+        ]),
+      );
+    retryAssistantMessageRequestMock.mockResolvedValue({
+      status: "retried",
+      message_id: "msg-new",
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(result.current.timelineItems).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await result.current.retryMessage("msg-old");
+    });
+
+    expect(retryAssistantMessageRequestMock).toHaveBeenCalledWith("msg-old");
+    expect(clearAgentHistoryMock).toHaveBeenCalledWith("assistant");
+    expect(result.current.timelineItems).toHaveLength(1);
+    expect(result.current.timelineItems[0]).toMatchObject({
+      type: "ReceivedMessage",
+      message_id: "msg-new",
+    });
+  });
+
+  it("switches to the history_replaced snapshot before the refetch resolves", async () => {
+    const initialHistoryRuntime = {
+      agentHistories: new Map(),
+      clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
+      historyClearedAt: new Map(),
+      historySnapshots: new Map(),
+      streamingDeltas: new Map(),
+    };
+    const invalidatedHistoryRuntime = {
+      ...initialHistoryRuntime,
+      historyInvalidatedAt: new Map([["assistant", 1]]),
+      historySnapshots: new Map([
+        [
+          "assistant",
+          [
+            {
+              type: "ReceivedMessage",
+              from_id: "human",
+              content: "Snapshot retry result",
+              message_id: "msg-snapshot",
+              timestamp: 5,
+            },
+          ],
+        ],
+      ]),
+    };
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("idle")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue(initialHistoryRuntime);
+    fetchNodeDetailMock.mockResolvedValueOnce(
+      buildDetail([
+        {
+          type: "ReceivedMessage",
+          from_id: "human",
+          content: "Old history",
+          message_id: "msg-old",
+          timestamp: 1,
+        },
+      ]),
+    );
+
+    const { result, rerender } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(result.current.timelineItems[0]).toMatchObject({
+        message_id: "msg-old",
+      });
+    });
+
+    useAgentHistoryRuntimeMock.mockReturnValue(invalidatedHistoryRuntime);
+    fetchNodeDetailMock.mockImplementationOnce(
+      () => new Promise<NodeDetail | null>(() => {}),
+    );
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.timelineItems[0]).toMatchObject({
+        message_id: "msg-snapshot",
+      });
+    });
+  });
+
+  it("interrupts a running assistant before retrying the selected message", async () => {
+    const clearAgentHistoryMock = vi.fn();
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("running")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
+      agentHistories: new Map(),
+      clearAgentHistory: clearAgentHistoryMock,
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
+      historyClearedAt: new Map(),
+      historySnapshots: new Map(),
+      streamingDeltas: new Map(),
+    });
+    fetchNodeDetailMock
+      .mockResolvedValueOnce(
+        buildDetail([
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Retry this request",
+            message_id: "msg-old",
+            timestamp: 1,
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(buildDetail([], "running"))
+      .mockResolvedValueOnce(buildDetail([], "idle"))
+      .mockResolvedValueOnce(
+        buildDetail([
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Retry this request",
+            message_id: "msg-new",
+            timestamp: 3,
+          },
+        ]),
+      );
+    interruptNodeMock.mockResolvedValue(undefined);
+    retryAssistantMessageRequestMock.mockResolvedValue({
+      status: "retried",
+      message_id: "msg-new",
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(result.current.timelineItems).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.retryMessage("msg-old");
+    });
+
+    expect(interruptNodeMock).toHaveBeenCalledWith("assistant");
+    expect(retryAssistantMessageRequestMock).toHaveBeenCalledWith("msg-old");
+    expect(clearAgentHistoryMock).toHaveBeenCalledWith("assistant");
+  });
+
+  it("does not report retry failure when the retry request succeeds but the follow-up reload fails", async () => {
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("idle")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue({
+      agentHistories: new Map(),
+      clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
+      historyClearedAt: new Map(),
+      historySnapshots: new Map(),
+      streamingDeltas: new Map(),
+    });
+    fetchNodeDetailMock
+      .mockResolvedValueOnce(
+        buildDetail([
+          {
+            type: "ReceivedMessage",
+            from_id: "human",
+            content: "Retry this request",
+            message_id: "msg-old",
+            timestamp: 1,
+          },
+        ]),
+      )
+      .mockRejectedValueOnce(new Error("reload failed"));
+    retryAssistantMessageRequestMock.mockResolvedValue({
+      status: "retried",
+      message_id: "msg-new",
+    });
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(result.current.timelineItems).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.retryMessage("msg-old");
+    });
+
+    expect(retryAssistantMessageRequestMock).toHaveBeenCalledWith("msg-old");
+    expect(toastErrorMock).not.toHaveBeenCalled();
   });
 
   it("keeps following the bottom when the running hint appears without a new timeline item", async () => {

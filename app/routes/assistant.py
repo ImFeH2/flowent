@@ -60,6 +60,11 @@ class AssistantMessagePart(BaseModel):
 AssistantMessageRequest.model_rebuild()
 
 
+class AssistantRetryResponse(BaseModel):
+    status: Literal["retried"]
+    message_id: str
+
+
 def _parse_request_parts(req: AssistantMessageRequest):
     if req.parts:
         parts = parse_content_parts_payload(
@@ -129,3 +134,22 @@ async def send_assistant_message(req: AssistantMessageRequest) -> dict:
     )
     assistant.enqueue_message(msg)
     return {"status": "sent", "message_id": message_id}
+
+
+@router.post(
+    "/api/assistant/messages/{message_id}/retry",
+    response_model=AssistantRetryResponse,
+)
+async def retry_assistant_message(message_id: str) -> AssistantRetryResponse:
+    assistant = _get_assistant()
+    if assistant is None:
+        raise HTTPException(status_code=404, detail="Assistant not found")
+
+    try:
+        retried_message_id = assistant.retry_human_message(message_id=message_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, TimeoutError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return AssistantRetryResponse(status="retried", message_id=retried_message_id)

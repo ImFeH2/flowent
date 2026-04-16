@@ -73,7 +73,10 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory,
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
       historyClearedAt: new Map(),
+      historySnapshots: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue(buildDetail());
@@ -105,7 +108,10 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory,
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
       historyClearedAt: new Map(),
+      historySnapshots: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue({
@@ -139,7 +145,10 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
       historyClearedAt: new Map(),
+      historySnapshots: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([sharedEntry]));
@@ -182,7 +191,10 @@ describe("useAgentDetail", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories,
       clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
       historyClearedAt: new Map(),
+      historySnapshots: new Map(),
       streamingDeltas: new Map(),
     });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([fetchedState]));
@@ -195,6 +207,72 @@ describe("useAgentDetail", () => {
         fetchedState,
         incrementalState,
       ]);
+    });
+  });
+
+  it("switches to the history_replaced snapshot before the refetch resolves", async () => {
+    const initialHistoryRuntime = {
+      agentHistories: new Map<string, HistoryEntry[]>(),
+      clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map<string, number>(),
+      historyClearedAt: new Map<string, number>(),
+      historySnapshots: new Map<string, HistoryEntry[]>(),
+      streamingDeltas: new Map(),
+    };
+    const invalidatedHistoryRuntime = {
+      ...initialHistoryRuntime,
+      historyInvalidatedAt: new Map([["assistant", 1]]),
+      historySnapshots: new Map([
+        [
+          "assistant",
+          [
+            {
+              type: "ReceivedMessage",
+              from_id: "human",
+              content: "Snapshot retry result",
+              message_id: "msg-snapshot",
+              timestamp: 5,
+            },
+          ],
+        ],
+      ]),
+    };
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map<string, Node>([["assistant", buildNode()]]),
+    });
+    useAgentHistoryRuntimeMock.mockReturnValue(initialHistoryRuntime);
+    fetchNodeDetailMock.mockResolvedValueOnce(
+      buildDetail([
+        {
+          type: "ReceivedMessage",
+          from_id: "human",
+          content: "Old history",
+          message_id: "msg-old",
+          timestamp: 1,
+        },
+      ]),
+    );
+
+    const { result, rerender } = renderHook(() => useAgentDetail("assistant"));
+
+    await waitFor(() => {
+      expect(result.current.detail?.history[0]).toMatchObject({
+        message_id: "msg-old",
+      });
+    });
+
+    useAgentHistoryRuntimeMock.mockReturnValue(invalidatedHistoryRuntime);
+    fetchNodeDetailMock.mockImplementationOnce(
+      () => new Promise<NodeDetail | null>(() => {}),
+    );
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.detail?.history[0]).toMatchObject({
+        message_id: "msg-snapshot",
+      });
     });
   });
 });

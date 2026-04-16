@@ -25,6 +25,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
     input,
     onMessagesScroll,
     removeImage = () => {},
+    retryMessage,
+    retryingMessageId,
     scrollRef,
     sending,
     sendMessage,
@@ -59,7 +61,10 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
           bottomInset={composerHeight}
           items={timelineItems}
           nodes={agents}
+          onRetryHumanMessage={(messageId) => void retryMessage(messageId)}
           onScroll={onMessagesScroll}
+          retryImageInputEnabled={supportsInputImage}
+          retryingMessageId={retryingMessageId}
           scrollRef={scrollRef}
           variant={chatVariant}
         />

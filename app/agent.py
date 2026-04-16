@@ -489,6 +489,33 @@ class Agent:
         for signal in preserved_signals:
             self._wake_queue.put(signal)
 
+    def _extract_pending_message_wakeups(self) -> list[WakeSignal]:
+        extracted_signals: list[WakeSignal] = []
+        preserved_signals: list[WakeSignal] = []
+
+        while True:
+            try:
+                signal = self._wake_queue.get_nowait()
+            except Empty:
+                break
+
+            if signal.reason == "message":
+                extracted_signals.append(signal)
+                continue
+            preserved_signals.append(signal)
+
+        for signal in preserved_signals:
+            self._wake_queue.put(signal)
+
+        return extracted_signals
+
+    def _restore_pending_message_wakeups(
+        self,
+        signals: list[WakeSignal],
+    ) -> None:
+        for signal in signals:
+            self._wake_queue.put(signal)
+
     def _pause_for_command_execution(self, *, timeout: float) -> bool:
         if self.state not in {AgentState.RUNNING, AgentState.SLEEPING}:
             return False
@@ -549,6 +576,147 @@ class Agent:
                 )
             )
             self._persist_workspace_node()
+        finally:
+            if paused_for_command:
+                self._resume_after_command_execution()
+
+    def retry_human_message(
+        self,
+        *,
+        message_id: str,
+        interrupt_timeout: float = 5.0,
+    ) -> str:
+        if self.node_type != NodeType.ASSISTANT:
+            raise RuntimeError("Only assistant chat history can be retried")
+
+        normalized_message_id = message_id.strip()
+        if not normalized_message_id:
+            raise ValueError("Assistant retry message_id cannot be empty")
+
+        paused_for_command = self._pause_for_command_execution(
+            timeout=interrupt_timeout
+        )
+        extracted_message_signals: list[WakeSignal] = []
+        previous_runtime_notices: list[str] = []
+        previous_history: list[HistoryEntry] = []
+        previous_pending_input_turn = False
+        previous_turn_started_with_pending_input = False
+        previous_turn_made_progress = False
+        previous_execution_summary = ""
+        previous_execution_cutoff = 0
+        previous_context_token_usage_baseline: ContextTokenUsageBaseline | None = None
+        try:
+            with self._history_lock:
+                anchor_index = -1
+                anchor_parts: list[TextPart | ImagePart] = []
+                current_history = list(self.history)
+                for index, entry in enumerate(current_history):
+                    if (
+                        isinstance(entry, ReceivedMessage)
+                        and entry.from_id == "human"
+                        and entry.message_id == normalized_message_id
+                    ):
+                        anchor_index = index
+                        anchor_parts = list(entry.parts)
+                        break
+
+            if anchor_index < 0:
+                raise LookupError(
+                    f"Assistant human message `{normalized_message_id}` was not found."
+                )
+
+            if has_image_parts(anchor_parts) and not self.supports_input_image():
+                raise RuntimeError(
+                    "Assistant current model does not support `input_image`."
+                )
+
+            for part in anchor_parts:
+                asset_id = getattr(part, "asset_id", None)
+                if isinstance(asset_id, str):
+                    require_image_asset(asset_id)
+
+            extracted_message_signals = self._extract_pending_message_wakeups()
+            with self._runtime_notice_lock:
+                previous_runtime_notices = list(self._pending_runtime_notices)
+                self._pending_runtime_notices.clear()
+
+            with self._history_lock:
+                previous_history = list(self.history)
+                previous_pending_input_turn = self._pending_input_turn
+                previous_turn_started_with_pending_input = (
+                    self._turn_started_with_pending_input
+                )
+                previous_turn_made_progress = self._turn_made_progress
+                self.history = [
+                    entry
+                    for index, entry in enumerate(previous_history)
+                    if index < anchor_index
+                    or isinstance(entry, (SystemEntry, StateEntry))
+                ]
+                retried_message_id = str(_uuid.uuid4())
+                self.history.append(
+                    ReceivedMessage(
+                        from_id="human",
+                        parts=anchor_parts,
+                        message_id=retried_message_id,
+                    )
+                )
+                self._pending_input_turn = True
+                self._turn_started_with_pending_input = False
+                self._turn_made_progress = False
+
+            with self._execution_context_lock:
+                previous_execution_summary = self._execution_context_summary
+                previous_execution_cutoff = self._execution_context_history_cutoff
+                previous_context_token_usage_baseline = (
+                    self._context_token_usage_baseline
+                )
+            self._set_execution_context(summary="", history_cutoff=0)
+            self._persist_workspace_node()
+            self.enqueue_message(
+                Message(
+                    from_id="human",
+                    to_id=self.uuid,
+                    parts=anchor_parts,
+                    message_id=retried_message_id,
+                    history_recorded=True,
+                )
+            )
+            history_snapshot = self.get_history_snapshot()
+            event_bus.emit(
+                Event(
+                    type=EventType.HISTORY_REPLACED,
+                    agent_id=self.uuid,
+                    data={
+                        "scope": "assistant_retry",
+                        "replaced_message_id": normalized_message_id,
+                        "message_id": retried_message_id,
+                        "history": [entry.serialize() for entry in history_snapshot],
+                    },
+                )
+            )
+            return retried_message_id
+        except Exception:
+            if previous_history:
+                with self._history_lock:
+                    self.history = previous_history
+                    self._pending_input_turn = previous_pending_input_turn
+                    self._turn_started_with_pending_input = (
+                        previous_turn_started_with_pending_input
+                    )
+                    self._turn_made_progress = previous_turn_made_progress
+                with self._runtime_notice_lock:
+                    self._pending_runtime_notices = previous_runtime_notices
+                with self._execution_context_lock:
+                    self._execution_context_summary = previous_execution_summary
+                    self._execution_context_history_cutoff = previous_execution_cutoff
+                    self._context_token_usage_baseline = (
+                        previous_context_token_usage_baseline
+                    )
+                if extracted_message_signals:
+                    self._restore_pending_message_wakeups(extracted_message_signals)
+                self._persist_workspace_node()
+            raise
         finally:
             if paused_for_command:
                 self._resume_after_command_execution()

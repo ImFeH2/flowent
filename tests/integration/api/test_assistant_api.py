@@ -1,7 +1,7 @@
 import base64
 from uuid import UUID
 
-from app.models import AssistantText, LLMResponse, ReceivedMessage
+from app.models import AssistantText, ImagePart, LLMResponse, ReceivedMessage, TextPart
 from app.registry import registry
 
 _ONE_PIXEL_PNG = base64.b64decode(
@@ -127,6 +127,125 @@ def test_compact_command_replaces_history_with_summary(monkeypatch, client):
         and "Focus: slash command rollout" in entry["content"]
         and "Ship the slash commands." not in entry["content"]
         for entry in detail["history"]
+    )
+
+
+def test_retry_message_rewrites_tail_and_reuses_image_parts(monkeypatch, client):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+    queued_messages = []
+
+    upload_response = client.post(
+        "/api/image-assets",
+        files={"file": ("pixel.png", _ONE_PIXEL_PNG, "image/png")},
+    )
+    assert upload_response.status_code == 200
+    asset_id = upload_response.json()["id"]
+
+    assistant.history.extend(
+        [
+            ReceivedMessage(
+                content="Keep this turn",
+                from_id="human",
+                message_id="msg-1",
+            ),
+            AssistantText(content="Keep this reply"),
+            ReceivedMessage(
+                from_id="human",
+                parts=[
+                    TextPart(text="Retry this image request"),
+                    ImagePart(
+                        asset_id=asset_id,
+                        mime_type="image/png",
+                        width=1,
+                        height=1,
+                    ),
+                ],
+                message_id="msg-2",
+            ),
+            AssistantText(content="Discard this reply"),
+        ]
+    )
+
+    monkeypatch.setattr(assistant, "supports_input_image", lambda: True)
+    monkeypatch.setattr(
+        assistant,
+        "enqueue_message",
+        lambda message: queued_messages.append(message),
+    )
+
+    response = client.post("/api/assistant/messages/msg-2/retry")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "retried"
+    assert payload["message_id"] != "msg-2"
+
+    detail = client.get(f"/api/nodes/{assistant_id}").json()
+
+    assert any(
+        entry["type"] == "ReceivedMessage"
+        and entry.get("message_id") == "msg-1"
+        and entry.get("content") == "Keep this turn"
+        for entry in detail["history"]
+    )
+    assert not any(
+        entry["type"] == "ReceivedMessage" and entry.get("message_id") == "msg-2"
+        for entry in detail["history"]
+    )
+    assert not any(
+        entry["type"] == "AssistantText"
+        and entry.get("content") == "Discard this reply"
+        for entry in detail["history"]
+    )
+    assert any(
+        entry["type"] == "ReceivedMessage"
+        and entry.get("message_id") == payload["message_id"]
+        and entry.get("content") == "Retry this image request[image]"
+        for entry in detail["history"]
+    )
+    assert len(queued_messages) == 1
+    assert queued_messages[0].message_id == payload["message_id"]
+    assert queued_messages[0].parts[0].text == "Retry this image request"
+    assert queued_messages[0].parts[1].asset_id == asset_id
+
+
+def test_retry_message_returns_404_for_missing_anchor(client):
+    response = client.post("/api/assistant/messages/missing/retry")
+
+    assert response.status_code == 404
+    assert "was not found" in response.json()["detail"]
+
+
+def test_retry_message_returns_409_when_image_input_is_unsupported(monkeypatch, client):
+    assistant_id = _get_assistant_id(client)
+    assistant = registry.get(assistant_id)
+    assert assistant is not None
+
+    upload_response = client.post(
+        "/api/image-assets",
+        files={"file": ("pixel.png", _ONE_PIXEL_PNG, "image/png")},
+    )
+    assert upload_response.status_code == 200
+    asset_id = upload_response.json()["id"]
+
+    assistant.history.append(
+        ReceivedMessage(
+            from_id="human",
+            parts=[
+                ImagePart(asset_id=asset_id, mime_type="image/png", width=1, height=1)
+            ],
+            message_id="msg-image",
+        )
+    )
+    monkeypatch.setattr(assistant, "supports_input_image", lambda: False)
+
+    response = client.post("/api/assistant/messages/msg-image/retry")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Assistant current model does not support `input_image`."
     )
 
 

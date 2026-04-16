@@ -20,6 +20,7 @@ from app.models import (
     CommandResultEntry,
     ErrorEntry,
     EventType,
+    ImagePart,
     LLMResponse,
     LLMUsage,
     Message,
@@ -762,6 +763,165 @@ def test_execute_clear_command_does_not_append_visible_feedback():
     assert not any(
         isinstance(item, CommandResultEntry) and item.command_name == "/clear"
         for item in history
+    )
+
+
+def test_retry_human_message_replaces_selected_tail_and_requeues_input(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    queued_messages: list[Message] = []
+    monkeypatch.setattr(
+        assistant,
+        "enqueue_message",
+        lambda message: queued_messages.append(message),
+    )
+    assistant.history.extend(
+        [
+            ReceivedMessage(
+                content="Keep this message",
+                from_id="human",
+                message_id="msg-1",
+            ),
+            AssistantText(content="Keep this reply"),
+            ReceivedMessage(
+                content="Retry this request",
+                from_id="human",
+                message_id="msg-2",
+            ),
+            AssistantThinking(content="Old thinking"),
+            AssistantText(content="Discard this reply"),
+            ErrorEntry(content="Old failure"),
+        ]
+    )
+
+    retried_message_id = assistant.retry_human_message(message_id="msg-2")
+    history = assistant.get_history_snapshot()
+
+    assert retried_message_id != "msg-2"
+    assert any(
+        isinstance(entry, ReceivedMessage)
+        and entry.message_id == "msg-1"
+        and entry.content == "Keep this message"
+        for entry in history
+    )
+    assert any(
+        isinstance(entry, AssistantText) and entry.content == "Keep this reply"
+        for entry in history
+    )
+    assert not any(
+        isinstance(entry, ReceivedMessage) and entry.message_id == "msg-2"
+        for entry in history
+    )
+    assert not any(
+        isinstance(entry, AssistantText) and entry.content == "Discard this reply"
+        for entry in history
+    )
+    assert not any(
+        isinstance(entry, ErrorEntry) and entry.content == "Old failure"
+        for entry in history
+    )
+    assert any(
+        isinstance(entry, ReceivedMessage)
+        and entry.message_id == retried_message_id
+        and entry.content == "Retry this request"
+        for entry in history
+    )
+    assert len(queued_messages) == 1
+    assert queued_messages[0].message_id == retried_message_id
+    assert queued_messages[0].history_recorded is True
+    assert queued_messages[0].content == "Retry this request"
+
+
+def test_retry_human_message_reuses_image_parts(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    queued_messages: list[Message] = []
+    monkeypatch.setattr(assistant, "supports_input_image", lambda: True)
+    monkeypatch.setattr(
+        "app.agent.require_image_asset",
+        lambda asset_id: object() if asset_id == "asset-1" else None,
+    )
+    monkeypatch.setattr(
+        assistant,
+        "enqueue_message",
+        lambda message: queued_messages.append(message),
+    )
+    assistant.history.extend(
+        [
+            ReceivedMessage(
+                from_id="human",
+                parts=[
+                    ImagePart(
+                        asset_id="asset-1",
+                        mime_type="image/png",
+                        width=1,
+                        height=1,
+                    )
+                ],
+                message_id="msg-image",
+            ),
+            AssistantText(content="Old image reply"),
+        ]
+    )
+
+    retried_message_id = assistant.retry_human_message(message_id="msg-image")
+
+    assert retried_message_id
+    assert len(queued_messages) == 1
+    assert len(queued_messages[0].parts) == 1
+    assert isinstance(queued_messages[0].parts[0], ImagePart)
+    assert queued_messages[0].parts[0].asset_id == "asset-1"
+
+
+def test_retry_human_message_missing_anchor_keeps_queued_messages():
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant._wake_queue.put(
+        WakeSignal(
+            reason="message",
+            payload={"message": {"content": "queued message", "from": "human"}},
+            resume_reason="received message from human",
+        )
+    )
+
+    with pytest.raises(LookupError):
+        assistant.retry_human_message(message_id="missing")
+
+    signal = assistant._wake_queue.get_nowait()
+    assert signal.reason == "message"
+    assert signal.payload["message"]["content"] == "queued message"
+
+
+def test_retry_human_message_rolls_back_when_persist_fails(monkeypatch):
+    assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
+    assistant.history.extend(
+        [
+            ReceivedMessage(
+                content="Retry this request",
+                from_id="human",
+                message_id="msg-2",
+            ),
+            AssistantText(content="Discard this reply"),
+        ]
+    )
+    persist_calls = 0
+
+    def fake_persist() -> None:
+        nonlocal persist_calls
+        persist_calls += 1
+        if persist_calls == 1:
+            raise RuntimeError("persist failed")
+
+    monkeypatch.setattr(assistant, "_persist_workspace_node", fake_persist)
+
+    with pytest.raises(RuntimeError, match="persist failed"):
+        assistant.retry_human_message(message_id="msg-2")
+
+    history = assistant.get_history_snapshot()
+    assert any(
+        isinstance(entry, ReceivedMessage) and entry.message_id == "msg-2"
+        for entry in history
+    )
+    assert any(
+        isinstance(entry, AssistantText) and entry.content == "Discard this reply"
+        for entry in history
     )
 
 

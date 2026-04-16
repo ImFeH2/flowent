@@ -261,7 +261,10 @@ describe("HomePage", () => {
     useAgentHistoryRuntimeMock.mockReturnValue({
       agentHistories: new Map(),
       clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
       historyClearedAt: new Map(),
+      historySnapshots: new Map(),
       streamingDeltas: new Map(),
     });
     useAgentDetailMock.mockReturnValue({

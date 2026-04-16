@@ -60,7 +60,10 @@ interface AgentRuntimeContextValue {
   connected: boolean;
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
+  clearHistorySnapshot: (agentId: string) => void;
+  historyInvalidatedAt: Map<string, number>;
   historyClearedAt: Map<string, number>;
+  historySnapshots: Map<string, HistoryEntry[]>;
   streamingDeltas: Map<string, StreamingDelta[]>;
   activeMessages: ActiveMessage[];
   activeToolCalls: Map<string, string>;
@@ -81,7 +84,10 @@ interface AgentConnectionContextValue {
 interface AgentHistoryContextValue {
   agentHistories: Map<string, HistoryEntry[]>;
   clearAgentHistory: (agentId: string) => void;
+  clearHistorySnapshot: (agentId: string) => void;
+  historyInvalidatedAt: Map<string, number>;
   historyClearedAt: Map<string, number>;
+  historySnapshots: Map<string, HistoryEntry[]>;
   streamingDeltas: Map<string, StreamingDelta[]>;
 }
 
@@ -148,6 +154,12 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [historyClearedAt, setHistoryClearedAt] = useState<Map<string, number>>(
     () => new Map(),
   );
+  const [historyInvalidatedAt, setHistoryInvalidatedAt] = useState<
+    Map<string, number>
+  >(() => new Map());
+  const [historySnapshots, setHistorySnapshots] = useState<
+    Map<string, HistoryEntry[]>
+  >(() => new Map());
   const [activeMessages, setActiveMessages] = useState<ActiveMessage[]>([]);
   const [activeToolCalls, setActiveToolCalls] = useState<Map<string, string>>(
     () => new Map(),
@@ -239,6 +251,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   const clearAgentHistory = useCallback((agentId: string) => {
     setAgentHistories((prev) => deleteMapEntry(prev, agentId));
+  }, []);
+
+  const clearHistorySnapshot = useCallback((agentId: string) => {
+    setHistorySnapshots((prev) => deleteMapEntry(prev, agentId));
   }, []);
 
   const onDisplayEvent = useCallback(() => {}, []);
@@ -367,9 +383,44 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       if (event.type === "history_cleared") {
         const agentId = event.agent_id;
         const clearedAt = normalizeEventTimestampMs(event.timestamp);
+        setHistoryInvalidatedAt((prev) => {
+          const next = new Map(prev);
+          next.set(agentId, clearedAt);
+          return next;
+        });
         setHistoryClearedAt((prev) => {
           const next = new Map(prev);
           next.set(agentId, clearedAt);
+          return next;
+        });
+        setHistorySnapshots((prev) => deleteMapEntry(prev, agentId));
+        setAgentHistories((prev) => deleteMapEntry(prev, agentId));
+        setStreamingDeltas((prev) => deleteMapEntry(prev, agentId));
+        setActiveToolCalls((prev) => deleteMapEntry(prev, agentId));
+        setRecentActivities((prev) =>
+          prev.filter((activity) => activity.agentId !== agentId),
+        );
+        setPendingAssistantMessages([]);
+      }
+
+      if (event.type === "history_replaced") {
+        const agentId = event.agent_id;
+        const invalidatedAt = normalizeEventTimestampMs(event.timestamp);
+        setHistoryInvalidatedAt((prev) => {
+          const next = new Map(prev);
+          next.set(agentId, invalidatedAt);
+          return next;
+        });
+        setHistorySnapshots((prev) => {
+          const next = new Map(prev);
+          const history = Array.isArray(event.data.history)
+            ? (event.data.history as HistoryEntry[])
+            : null;
+          if (history) {
+            next.set(agentId, history);
+          } else {
+            next.delete(agentId);
+          }
           return next;
         });
         setAgentHistories((prev) => deleteMapEntry(prev, agentId));
@@ -569,10 +620,21 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     () => ({
       agentHistories,
       clearAgentHistory,
+      clearHistorySnapshot,
+      historyInvalidatedAt,
       historyClearedAt,
+      historySnapshots,
       streamingDeltas,
     }),
-    [agentHistories, clearAgentHistory, historyClearedAt, streamingDeltas],
+    [
+      agentHistories,
+      clearAgentHistory,
+      clearHistorySnapshot,
+      historyInvalidatedAt,
+      historyClearedAt,
+      historySnapshots,
+      streamingDeltas,
+    ],
   );
 
   const activityValue = useMemo(
@@ -684,7 +746,10 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
   const {
     agentHistories,
     clearAgentHistory,
+    clearHistorySnapshot,
+    historyInvalidatedAt,
     historyClearedAt,
+    historySnapshots,
     streamingDeltas,
   } = useAgentHistoryRuntime();
   const { activeMessages, activeToolCalls } = useAgentActivityRuntime();
@@ -696,7 +761,10 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
       connected,
       agentHistories,
       clearAgentHistory,
+      clearHistorySnapshot,
+      historyInvalidatedAt,
       historyClearedAt,
+      historySnapshots,
       streamingDeltas,
       activeMessages,
       activeToolCalls,
@@ -707,7 +775,10 @@ export function useAgentRuntime(): AgentRuntimeContextValue {
       connected,
       agentHistories,
       clearAgentHistory,
+      clearHistorySnapshot,
+      historyInvalidatedAt,
       historyClearedAt,
+      historySnapshots,
       streamingDeltas,
       activeMessages,
       activeToolCalls,

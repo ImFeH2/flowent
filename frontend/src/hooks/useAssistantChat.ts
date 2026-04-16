@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import {
   clearAssistantChatRequest,
   fetchNodeDetail,
+  interruptNode,
+  retryAssistantMessageRequest,
   uploadImageAssetRequest,
 } from "@/lib/api";
 import {
@@ -108,7 +110,10 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const {
     agentHistories,
     clearAgentHistory,
+    clearHistorySnapshot,
+    historyInvalidatedAt,
     historyClearedAt,
+    historySnapshots,
     streamingDeltas,
   } = useAgentHistoryRuntime();
   const { activeToolCalls } = useAgentActivityRuntime();
@@ -118,6 +123,9 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const [input, setInput] = useState("");
   const [draftImages, setDraftImages] = useState<DraftAssistantImage[]>([]);
   const [clearing, setClearing] = useState(false);
+  const [retryingMessageId, setRetryingMessageId] = useState<string | null>(
+    null,
+  );
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
@@ -131,6 +139,12 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const assistantHistoryClearedAt = assistantId
     ? (historyClearedAt.get(assistantId) ?? 0)
     : 0;
+  const assistantHistoryInvalidatedAt = assistantId
+    ? (historyInvalidatedAt.get(assistantId) ?? 0)
+    : 0;
+  const assistantHistorySnapshot = assistantId
+    ? (historySnapshots.get(assistantId) ?? null)
+    : null;
   const hasUploadingImages = draftImages.some(
     (image) => image.status === "uploading",
   );
@@ -167,6 +181,22 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   }, [assistantHistoryClearedAt]);
 
   useEffect(() => {
+    if (!assistantHistoryInvalidatedAt || !assistantHistorySnapshot) {
+      return;
+    }
+
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            history: assistantHistorySnapshot,
+          }
+        : current,
+    );
+    setFetchedAt(Date.now());
+  }, [assistantHistoryInvalidatedAt, assistantHistorySnapshot]);
+
+  useEffect(() => {
     if (!connected || !assistantId) {
       setDetail(null);
       return;
@@ -184,6 +214,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
         }
         setDetail(data);
         setFetchedAt(Date.now());
+        clearHistorySnapshot(assistantId);
       } catch {
         if (!cancelled && !controller.signal.aborted) {
           toast.error("Failed to load Assistant history");
@@ -197,12 +228,19 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       cancelled = true;
       controller.abort();
     };
-  }, [assistantHistoryClearedAt, assistantId, clearAgentHistory, connected]);
+  }, [
+    assistantHistoryClearedAt,
+    assistantHistoryInvalidatedAt,
+    assistantId,
+    clearAgentHistory,
+    clearHistorySnapshot,
+    connected,
+  ]);
 
   const timelineItems = useMemo<AssistantChatItem[]>(() => {
     const history = assistantId
       ? mergeHistoryWithDeltas({
-          history: detail?.history ?? [],
+          history: assistantHistorySnapshot ?? detail?.history ?? [],
           incremental: agentHistories.get(assistantId),
           deltas: streamingDeltas.get(assistantId),
           fetchedAt: fetchedAt || Date.now(),
@@ -215,6 +253,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     ];
   }, [
     agentHistories,
+    assistantHistorySnapshot,
     detail,
     fetchedAt,
     pendingAssistantMessages,
@@ -462,6 +501,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       const data = await fetchNodeDetail(assistantId);
       setDetail(data);
       setFetchedAt(Date.now());
+      clearHistorySnapshot(assistantId);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -470,6 +510,71 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       );
     } finally {
       setClearing(false);
+    }
+  };
+
+  const waitForAssistantRetryInterrupt = useCallback(async () => {
+    if (!assistantId) {
+      return;
+    }
+
+    if (
+      assistantNode?.state !== "running" &&
+      assistantNode?.state !== "sleeping"
+    ) {
+      return;
+    }
+
+    await interruptNode(assistantId);
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const data = await fetchNodeDetail(assistantId);
+      if (!data) {
+        break;
+      }
+      setDetail(data);
+      setFetchedAt(Date.now());
+      if (data.state !== "running" && data.state !== "sleeping") {
+        return;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+    }
+
+    throw new Error("Assistant did not stop in time");
+  }, [assistantId, assistantNode?.state]);
+
+  const retryMessage = async (messageId: string) => {
+    if (!assistantId || !messageId || retryingMessageId) {
+      return;
+    }
+
+    setRetryingMessageId(messageId);
+    try {
+      try {
+        await waitForAssistantRetryInterrupt();
+        await retryAssistantMessageRequest(messageId);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to retry Assistant message",
+        );
+        return;
+      }
+
+      clearAgentHistory(assistantId);
+      try {
+        const data = await fetchNodeDetail(assistantId);
+        if (data) {
+          setDetail(data);
+          setFetchedAt(Date.now());
+          clearHistorySnapshot(assistantId);
+        }
+      } catch {
+        return;
+      }
+    } finally {
+      setRetryingMessageId(null);
     }
   };
 
@@ -489,6 +594,8 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     input,
     onMessagesScroll,
     removeImage,
+    retryMessage,
+    retryingMessageId,
     scrollRef,
     clearing,
     sending,

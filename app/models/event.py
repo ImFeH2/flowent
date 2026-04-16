@@ -21,6 +21,7 @@ class EventType(StrEnum):
     ASSISTANT_CONTENT = "assistant_content"
     TOOL_CALLED = "tool_called"
     HISTORY_CLEARED = "history_cleared"
+    HISTORY_REPLACED = "history_replaced"
     HISTORY_ENTRY_ADDED = "history_entry_added"
     HISTORY_ENTRY_DELTA = "history_entry_delta"
 

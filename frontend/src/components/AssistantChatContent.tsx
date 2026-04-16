@@ -16,6 +16,7 @@ import {
   ChevronRight,
   LoaderCircle,
   MessageSquare,
+  RotateCcw,
   Send,
   Square,
   Sparkles,
@@ -54,7 +55,10 @@ interface AssistantChatMessagesProps {
   scrollRef: RefObject<HTMLDivElement | null>;
   items: AssistantChatItem[];
   nodes?: Map<string, Node>;
+  onRetryHumanMessage?: (messageId: string) => void;
   onScroll: UIEventHandler<HTMLDivElement>;
+  retryImageInputEnabled?: boolean;
+  retryingMessageId?: string | null;
   runningHint?: {
     label: string;
     toolName?: string | null;
@@ -91,7 +95,10 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
   scrollRef,
   items,
   nodes,
+  onRetryHumanMessage,
   onScroll,
+  retryImageInputEnabled = true,
+  retryingMessageId = null,
   runningHint = null,
   variant,
 }: AssistantChatMessagesProps) {
@@ -128,7 +135,14 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
           key={getTimelineItemKey(item, index)}
           className="[content-visibility:auto] [contain-intrinsic-size:auto_100px]"
         >
-          <TimelineItem item={item} nodes={nodes} variant={variant} />
+          <TimelineItem
+            item={item}
+            nodes={nodes}
+            onRetryHumanMessage={onRetryHumanMessage}
+            retryImageInputEnabled={retryImageInputEnabled}
+            retryingMessageId={retryingMessageId}
+            variant={variant}
+          />
         </div>
       ))}
 
@@ -595,10 +609,16 @@ function PendingImagePreviewTile({
 const TimelineItem = memo(function TimelineItem({
   item,
   nodes,
+  onRetryHumanMessage,
+  retryImageInputEnabled,
+  retryingMessageId,
   variant,
 }: {
   item: AssistantChatItem;
   nodes?: Map<string, Node>;
+  onRetryHumanMessage?: (messageId: string) => void;
+  retryImageInputEnabled?: boolean;
+  retryingMessageId?: string | null;
   variant: AssistantChatVariant;
 }) {
   if (item.type === "PendingHumanMessage") {
@@ -606,6 +626,7 @@ const TimelineItem = memo(function TimelineItem({
       <HumanBubble
         content={item.content}
         parts={item.parts}
+        retrying={false}
         variant={variant}
         pending
       />
@@ -618,10 +639,27 @@ const TimelineItem = memo(function TimelineItem({
         return null;
       }
       if (item.from_id === "human") {
+        const messageParts = normalizeContentParts(item.parts, item.content);
+        const retryBlocked =
+          messageParts.some((part) => part.type === "image") &&
+          !retryImageInputEnabled;
         return (
           <HumanBubble
             content={contentPartsToText(item.parts, item.content)}
+            retryDisabled={retryBlocked}
+            retryDisabledReason={
+              retryBlocked
+                ? "Current model does not support image input"
+                : undefined
+            }
+            messageId={item.message_id ?? null}
+            onRetry={
+              item.message_id && onRetryHumanMessage && !retryBlocked
+                ? () => onRetryHumanMessage(item.message_id as string)
+                : undefined
+            }
             parts={item.parts}
+            retrying={retryingMessageId === item.message_id}
             variant={variant}
           />
         );
@@ -700,16 +738,28 @@ const TimelineItem = memo(function TimelineItem({
 
 function HumanBubble({
   content,
+  messageId,
+  onRetry,
   parts,
+  retryDisabled,
+  retryDisabledReason,
+  retrying,
   variant,
   pending = false,
 }: {
   content: string;
+  messageId?: string | null;
+  onRetry?: () => void;
   parts?: ContentPart[] | null;
+  retryDisabled?: boolean;
+  retryDisabledReason?: string;
+  retrying?: boolean;
   variant: AssistantChatVariant;
   pending?: boolean;
 }) {
   const isWorkspace = variant === "workspace";
+  const showRetry =
+    !pending && Boolean(messageId) && (Boolean(onRetry) || retryDisabled);
 
   return (
     <div className="group mt-2 flex min-w-0 flex-col items-end">
@@ -738,8 +788,27 @@ function HumanBubble({
           ) : null}
         </div>
       </div>
-      <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <CopyButton text={content} />
+        {showRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={retrying || retryDisabled}
+            title={retryDisabledReason}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/64 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-45",
+              isWorkspace ? "bg-white/[0.04]" : "bg-white/[0.03]",
+            )}
+          >
+            {retrying ? (
+              <LoaderCircle className="size-3 animate-spin" />
+            ) : (
+              <RotateCcw className="size-3" />
+            )}
+            <span>{retrying ? "Retrying..." : "Retry"}</span>
+          </button>
+        ) : null}
       </div>
     </div>
   );

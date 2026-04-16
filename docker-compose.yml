@@ -2,7 +2,7 @@ services:
   autopoe:
     image: ${AUTOPOE_IMAGE:-imfeh2/autopoe:latest}
     ports:
-      - "${AUTOPOE_PORT:-8000}:8000"
+      - "${AUTOPOE_PORT:-6873}:6873"
     volumes:
       - autopoe-data:/data
     restart: unless-stopped

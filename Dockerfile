@@ -54,9 +54,9 @@ COPY --from=backend-build /src/.venv /src/.venv
 
 VOLUME ["/data"]
 
-EXPOSE 8000
+EXPOSE 6873
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:6873/health').read()" || exit 1
 
 ENTRYPOINT ["autopoe"]
-CMD ["--host", "0.0.0.0", "--port", "8000"]
+CMD ["--host", "0.0.0.0", "--port", "6873"]

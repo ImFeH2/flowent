@@ -20,7 +20,7 @@ To run Autopoe in Docker, download `docker-compose.yml` and run:
 docker compose up -d
 ```
 
-Autopoe will be available at `http://localhost:8000`.
+Autopoe will be available at `http://localhost:6873`.
 
 ## Prerequisites
 

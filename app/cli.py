@@ -17,8 +17,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--port",
         type=int,
-        default=8000,
-        help="Bind port (default: 8000)",
+        default=6873,
+        help="Bind port (default: 6873)",
     )
     parser.add_argument(
         "--version",

@@ -1,11 +1,12 @@
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SWRConfig } from "swr";
 import { ProvidersPage } from "@/pages/ProvidersPage";
 import type { Provider } from "@/types";
@@ -88,7 +89,34 @@ describe("ProvidersPage", () => {
     vi.clearAllMocks();
   });
 
-  it("fetches provider models into the draft and saves the merged catalog", async () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("loads the selected provider draft into the editor", async () => {
+    fetchProvidersMock.mockResolvedValue([
+      buildProvider({
+        id: "provider-1",
+        name: "Primary",
+        base_url: "https://api.example.com/v1",
+      }),
+    ]);
+
+    renderPage();
+
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Primary" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("https://api.example.com/v1"),
+    ).toBeInTheDocument();
+  });
+
+  it("fetches discovered models into the current provider draft", async () => {
     fetchProvidersMock.mockResolvedValue([
       buildProvider({ id: "provider-1", name: "Primary" }),
     ]);
@@ -100,6 +128,39 @@ describe("ProvidersPage", () => {
         input_image: true,
         output_image: false,
       },
+    ]);
+
+    renderPage();
+
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Fetch Models" }));
+
+    expect(await screen.findByText("gpt-5")).toBeInTheDocument();
+    expect(fetchProviderCatalogPreviewMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider_id: "provider-1",
+        type: "openai_compatible",
+      }),
+    );
+  });
+
+  it("adds a manual model and submits the updated catalog", async () => {
+    fetchProvidersMock.mockResolvedValue([
+      buildProvider({
+        id: "provider-1",
+        name: "Primary",
+        models: [
+          {
+            model: "gpt-5",
+            source: "discovered",
+            context_window_tokens: 128000,
+            input_image: true,
+            output_image: false,
+          },
+        ],
+      }),
     ]);
     updateProviderMock.mockResolvedValue(
       buildProvider({
@@ -126,25 +187,19 @@ describe("ProvidersPage", () => {
 
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Primary/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Fetch Models" }));
-
-    await screen.findByText("gpt-5");
-    expect(fetchProviderCatalogPreviewMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider_id: "provider-1",
-        type: "openai_compatible",
-      }),
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
     );
-
     fireEvent.click(screen.getByRole("button", { name: "Add Model" }));
+
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Model ID"), {
       target: { value: "manual-model" },
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Add Model" }));
 
-    await screen.findByText("manual-model");
+    expect(await screen.findByText("manual-model")).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() =>
@@ -189,8 +244,10 @@ describe("ProvidersPage", () => {
 
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Primary/i }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Test" })[0]);
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Test" }));
 
     expect(testProviderModelRequestMock).toHaveBeenCalledWith(
       expect.objectContaining({

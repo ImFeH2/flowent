@@ -36,7 +36,44 @@ function expectDocumentOrder(
 }
 
 describe("AssistantChatMessages", () => {
-  it("renders idle tool calls before and after the result is available", () => {
+  it("renders thinking and assistant text timeline items", () => {
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "AssistantThinking",
+            content:
+              "First, decide whether this needs a dedicated planning worker.",
+            timestamp: 2,
+            streaming: true,
+          },
+          {
+            type: "AssistantText",
+            content: "Here is a draft plan with priorities and next steps.",
+            timestamp: 5,
+          },
+        ]}
+        nodes={new Map()}
+        onScroll={() => {}}
+        scrollRef={createRef<HTMLDivElement>()}
+        variant="workspace"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Thinking/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "First, decide whether this needs a dedicated planning worker.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Here is a draft plan with priorities and next steps."),
+    ).toBeInTheDocument();
+  });
+
+  it("renders tool call disclosures and idle results", () => {
     const nodes = new Map<string, Node>([
       [
         "worker-1",
@@ -53,20 +90,6 @@ describe("AssistantChatMessages", () => {
       ],
     ]);
     const items: AssistantChatItem[] = [
-      {
-        type: "PendingHumanMessage",
-        id: "pending-1",
-        from: "human",
-        content: "Plan a weekend trip",
-        timestamp: 1,
-      },
-      {
-        type: "AssistantThinking",
-        content:
-          "First, decide whether this needs a dedicated planning worker.",
-        timestamp: 2,
-        streaming: true,
-      },
       {
         type: "ToolCall",
         tool_name: "create_root",
@@ -93,23 +116,6 @@ describe("AssistantChatMessages", () => {
         timestamp: 4,
         streaming: false,
       },
-      {
-        type: "AssistantText",
-        content: "Here is a draft plan with priorities and next steps.",
-        timestamp: 5,
-      },
-      {
-        type: "ReceivedMessage",
-        from_id: "worker-1",
-        content: "I have inspected the project root.",
-        timestamp: 5.5,
-      },
-      {
-        type: "SentMessage",
-        content: "Worker, continue the task.",
-        to_ids: ["worker-1"],
-        timestamp: 6,
-      },
     ];
 
     render(
@@ -122,14 +128,6 @@ describe("AssistantChatMessages", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: /Thinking/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "First, decide whether this needs a dedicated planning worker.",
-      ),
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Create Root/i }),
     ).toBeInTheDocument();
@@ -156,9 +154,48 @@ describe("AssistantChatMessages", () => {
     ).not.toBeInTheDocument();
     fireEvent.click(idleButtons[1]!);
     expect(screen.getByText("idle 1.25s")).toBeInTheDocument();
-    expect(
-      screen.getByText("Here is a draft plan with priorities and next steps."),
-    ).toBeInTheDocument();
+  });
+
+  it("keeps message activity content collapsed until opened", () => {
+    const nodes = new Map<string, Node>([
+      [
+        "worker-1",
+        {
+          id: "worker-1",
+          node_type: "agent",
+          is_leader: false,
+          state: "running",
+          connections: [],
+          name: "Project Analyst",
+          todos: [],
+          role_name: "Worker",
+        },
+      ],
+    ]);
+
+    render(
+      <AssistantChatMessages
+        items={[
+          {
+            type: "ReceivedMessage",
+            from_id: "worker-1",
+            content: "I have inspected the project root.",
+            timestamp: 5.5,
+          },
+          {
+            type: "SentMessage",
+            content: "Worker, continue the task.",
+            to_ids: ["worker-1"],
+            timestamp: 6,
+          },
+        ]}
+        nodes={nodes}
+        onScroll={() => {}}
+        scrollRef={createRef<HTMLDivElement>()}
+        variant="workspace"
+      />,
+    );
+
     expect(screen.getByText("From Project Analyst")).toBeInTheDocument();
     expect(screen.getByText("To Project Analyst")).toBeInTheDocument();
     expect(
@@ -179,7 +216,7 @@ describe("AssistantChatMessages", () => {
       screen.getByText("I have inspected the project root."),
     ).toBeInTheDocument();
     expect(screen.getByText("Worker, continue the task.")).toBeInTheDocument();
-  }, 10000);
+  });
 
   it("applies bottom inset space for an overlay composer", () => {
     const scrollRef = createRef<HTMLDivElement>();

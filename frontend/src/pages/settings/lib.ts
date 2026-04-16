@@ -1,0 +1,202 @@
+import type {
+  ModelCapabilities,
+  ModelParams,
+  Provider,
+  RetryPolicy,
+  Role,
+} from "@/types";
+
+export const DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS = 1024;
+export const DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024;
+
+export type TriStateCapability = "auto" | "enabled" | "disabled";
+
+export interface UserSettings {
+  assistant: {
+    role_name: string;
+    allow_network: boolean;
+    write_dirs: string[];
+  };
+  leader: {
+    role_name: string;
+  };
+  model: {
+    active_provider_id: string;
+    active_model: string;
+    input_image: boolean | null;
+    output_image: boolean | null;
+    context_window_tokens: number | null;
+    capabilities: ModelCapabilities | null;
+    resolved_context_window_tokens: number | null;
+    timeout_ms: number;
+    retry_policy: RetryPolicy;
+    max_retries: number;
+    retry_initial_delay_seconds: number;
+    retry_max_delay_seconds: number;
+    retry_backoff_cap_retries: number;
+    auto_compact_token_limit: number | null;
+    params: ModelParams;
+  };
+}
+
+export interface SettingsBootstrapData {
+  settings: UserSettings;
+  providers: Provider[];
+  roles: Role[];
+  version: string | null;
+}
+
+export function triStateFromNullableBool(
+  value: boolean | null,
+): TriStateCapability {
+  if (value === true) {
+    return "enabled";
+  }
+  if (value === false) {
+    return "disabled";
+  }
+  return "auto";
+}
+
+export function nullableBoolFromTriState(
+  value: TriStateCapability,
+): boolean | null {
+  if (value === "enabled") {
+    return true;
+  }
+  if (value === "disabled") {
+    return false;
+  }
+  return null;
+}
+
+export function normalizeWriteDirs(writeDirs: string[]): string[] {
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  for (const rawDir of writeDirs) {
+    const trimmed = rawDir.trim();
+    if (!trimmed) {
+      continue;
+    }
+    const normalizedDir = trimmed.replace(/\/+$/u, "") || "/";
+    if (seen.has(normalizedDir)) {
+      continue;
+    }
+    seen.add(normalizedDir);
+    normalized.push(normalizedDir);
+  }
+  return normalized;
+}
+
+export function findProviderById(
+  providers: Provider[],
+  providerId: string,
+): Provider | null {
+  return providers.find((provider) => provider.id === providerId) ?? null;
+}
+
+export function findRoleByName(roles: Role[], roleName: string): Role | null {
+  return roles.find((role) => role.name === roleName) ?? null;
+}
+
+export function getActiveProviderModels(activeProvider: Provider | null) {
+  return activeProvider?.models ?? [];
+}
+
+export function getSelectedCatalogModel(
+  activeProviderModels: Provider["models"],
+  activeModel: string,
+) {
+  if (!activeModel) {
+    return null;
+  }
+  return (
+    activeProviderModels.find((model) => model.model === activeModel) ?? null
+  );
+}
+
+export function getEffectiveContextWindowTokens(
+  settings: UserSettings,
+  selectedCatalogModel: Provider["models"][number] | null,
+) {
+  return (
+    settings.model.context_window_tokens ??
+    selectedCatalogModel?.context_window_tokens ??
+    settings.model.resolved_context_window_tokens ??
+    null
+  );
+}
+
+export function getEffectiveModelCapabilities(
+  settings: UserSettings,
+  selectedCatalogModel: Provider["models"][number] | null,
+): ModelCapabilities {
+  return {
+    input_image:
+      settings.model.input_image ??
+      selectedCatalogModel?.input_image ??
+      settings.model.capabilities?.input_image ??
+      false,
+    output_image:
+      settings.model.output_image ??
+      selectedCatalogModel?.output_image ??
+      settings.model.capabilities?.output_image ??
+      false,
+  };
+}
+
+export function getKnownSafeInputTokens(
+  effectiveContextWindowTokens: number | null,
+  params: ModelParams,
+) {
+  if (!effectiveContextWindowTokens) {
+    return null;
+  }
+  const outputBudget =
+    params.max_output_tokens ?? DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS;
+  return Math.max(
+    1,
+    effectiveContextWindowTokens -
+      outputBudget -
+      DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS,
+  );
+}
+
+export function validateAutoCompactTokenLimit(
+  autoCompactTokenLimit: number | null,
+  knownSafeInputTokens: number | null,
+) {
+  if (
+    autoCompactTokenLimit !== null &&
+    knownSafeInputTokens !== null &&
+    autoCompactTokenLimit >= knownSafeInputTokens
+  ) {
+    return "Automatic Compact token limit must stay below the known safe input window";
+  }
+  return null;
+}
+
+export function buildSettingsSavePayload(settings: UserSettings) {
+  return {
+    assistant: {
+      ...settings.assistant,
+      write_dirs: normalizeWriteDirs(settings.assistant.write_dirs),
+    },
+    leader: settings.leader,
+    model: {
+      active_provider_id: settings.model.active_provider_id,
+      active_model: settings.model.active_model,
+      input_image: settings.model.input_image,
+      output_image: settings.model.output_image,
+      context_window_tokens: settings.model.context_window_tokens,
+      timeout_ms: settings.model.timeout_ms,
+      retry_policy: settings.model.retry_policy,
+      max_retries: settings.model.max_retries,
+      retry_initial_delay_seconds: settings.model.retry_initial_delay_seconds,
+      retry_max_delay_seconds: settings.model.retry_max_delay_seconds,
+      retry_backoff_cap_retries: settings.model.retry_backoff_cap_retries,
+      auto_compact_token_limit: settings.model.auto_compact_token_limit,
+      params: settings.model.params,
+    },
+  };
+}

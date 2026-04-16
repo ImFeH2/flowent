@@ -19,84 +19,28 @@ import {
 import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
-import type { ModelCapabilities, ModelParams, RetryPolicy } from "@/types";
+import {
+  buildSettingsSavePayload,
+  findProviderById,
+  findRoleByName,
+  getActiveProviderModels,
+  getEffectiveContextWindowTokens,
+  getEffectiveModelCapabilities,
+  getKnownSafeInputTokens,
+  getSelectedCatalogModel,
+  nullableBoolFromTriState,
+  triStateFromNullableBool,
+  type TriStateCapability,
+  type UserSettings,
+  validateAutoCompactTokenLimit,
+} from "@/pages/settings/lib";
+import type { RetryPolicy } from "@/types";
 
 const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
   { value: "no_retry", label: "No retry" },
   { value: "limited", label: "Limited" },
   { value: "unlimited", label: "Unlimited" },
 ];
-
-const DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS = 1024;
-const DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024;
-
-type TriStateCapability = "auto" | "enabled" | "disabled";
-
-interface UserSettings {
-  assistant: {
-    role_name: string;
-    allow_network: boolean;
-    write_dirs: string[];
-  };
-  leader: {
-    role_name: string;
-  };
-  model: {
-    active_provider_id: string;
-    active_model: string;
-    input_image: boolean | null;
-    output_image: boolean | null;
-    context_window_tokens: number | null;
-    capabilities: ModelCapabilities | null;
-    resolved_context_window_tokens: number | null;
-    timeout_ms: number;
-    retry_policy: RetryPolicy;
-    max_retries: number;
-    retry_initial_delay_seconds: number;
-    retry_max_delay_seconds: number;
-    retry_backoff_cap_retries: number;
-    auto_compact_token_limit: number | null;
-    params: ModelParams;
-  };
-}
-
-function triStateFromNullableBool(value: boolean | null): TriStateCapability {
-  if (value === true) {
-    return "enabled";
-  }
-  if (value === false) {
-    return "disabled";
-  }
-  return "auto";
-}
-
-function nullableBoolFromTriState(value: TriStateCapability): boolean | null {
-  if (value === "enabled") {
-    return true;
-  }
-  if (value === "disabled") {
-    return false;
-  }
-  return null;
-}
-
-function normalizeWriteDirs(writeDirs: string[]): string[] {
-  const normalized: string[] = [];
-  const seen = new Set<string>();
-  for (const rawDir of writeDirs) {
-    const trimmed = rawDir.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const normalizedDir = trimmed.replace(/\/+$/u, "") || "/";
-    if (seen.has(normalizedDir)) {
-      continue;
-    }
-    seen.add(normalizedDir);
-    normalized.push(normalizedDir);
-  }
-  return normalized;
-}
 
 export function SettingsPage() {
   const {
@@ -119,7 +63,6 @@ export function SettingsPage() {
   );
   const appVersion = bootstrapData?.version ?? null;
 
-  // Sync local settings when bootstrap data loads
   useEffect(() => {
     if (bootstrapData?.settings && !localSettings) {
       setLocalSettings(bootstrapData.settings);
@@ -130,18 +73,17 @@ export function SettingsPage() {
 
   const activeProvider = useMemo(() => {
     if (!settings) return null;
-    return (
-      providers.find((p) => p.id === settings.model.active_provider_id) ?? null
-    );
+    return findProviderById(providers, settings.model.active_provider_id);
   }, [providers, settings]);
   const assistantRole = useMemo(() => {
     if (!settings) return null;
-    return (
-      roles.find((role) => role.name === settings.assistant.role_name) ?? null
-    );
+    return findRoleByName(roles, settings.assistant.role_name);
   }, [roles, settings]);
 
-  const activeProviderModels = activeProvider?.models ?? [];
+  const activeProviderModels = useMemo(
+    () => getActiveProviderModels(activeProvider),
+    [activeProvider],
+  );
   const filteredActiveProviderModels = useMemo(() => {
     const normalizedQuery = providerModelQuery.trim().toLowerCase();
     if (!normalizedQuery) {
@@ -152,61 +94,39 @@ export function SettingsPage() {
     );
   }, [activeProviderModels, providerModelQuery]);
   const selectedCatalogModel = useMemo(() => {
-    if (!settings?.model.active_model) {
+    if (!settings) {
       return null;
     }
-    return (
-      activeProviderModels.find(
-        (model) => model.model === settings.model.active_model,
-      ) ?? null
+    return getSelectedCatalogModel(
+      activeProviderModels,
+      settings.model.active_model,
     );
-  }, [activeProviderModels, settings?.model.active_model]);
-  const effectiveContextWindowTokens =
-    settings?.model.context_window_tokens ??
-    selectedCatalogModel?.context_window_tokens ??
-    settings?.model.resolved_context_window_tokens ??
-    null;
+  }, [activeProviderModels, settings]);
+  const effectiveContextWindowTokens = useMemo(() => {
+    if (!settings) {
+      return null;
+    }
+    return getEffectiveContextWindowTokens(settings, selectedCatalogModel);
+  }, [selectedCatalogModel, settings]);
   const effectiveModelCapabilities = useMemo(
-    () => ({
-      input_image:
-        settings?.model.input_image ??
-        selectedCatalogModel?.input_image ??
-        settings?.model.capabilities?.input_image ??
-        false,
-      output_image:
-        settings?.model.output_image ??
-        selectedCatalogModel?.output_image ??
-        settings?.model.capabilities?.output_image ??
-        false,
-    }),
-    [
-      selectedCatalogModel?.input_image,
-      selectedCatalogModel?.output_image,
-      settings?.model.capabilities?.input_image,
-      settings?.model.capabilities?.output_image,
-      settings?.model.input_image,
-      settings?.model.output_image,
-    ],
+    () =>
+      settings
+        ? getEffectiveModelCapabilities(settings, selectedCatalogModel)
+        : { input_image: false, output_image: false },
+    [selectedCatalogModel, settings],
   );
   const knownSafeInputTokens = useMemo(() => {
-    if (!effectiveContextWindowTokens) {
+    if (!settings) {
       return null;
     }
-    const outputBudget =
-      settings?.model.params.max_output_tokens ??
-      DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS;
-    return Math.max(
-      1,
-      effectiveContextWindowTokens -
-        outputBudget -
-        DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS,
+    return getKnownSafeInputTokens(
+      effectiveContextWindowTokens,
+      settings.model.params,
     );
-  }, [effectiveContextWindowTokens, settings?.model.params.max_output_tokens]);
+  }, [effectiveContextWindowTokens, settings]);
   const leaderRole = useMemo(() => {
     if (!settings) return null;
-    return (
-      roles.find((role) => role.name === settings.leader.role_name) ?? null
-    );
+    return findRoleByName(roles, settings.leader.role_name);
   }, [roles, settings]);
 
   const handleSave = async () => {
@@ -218,41 +138,17 @@ export function SettingsPage() {
       toast.error("Max Delay must be greater than or equal to Initial Delay");
       return;
     }
-    if (
-      settings.model.auto_compact_token_limit !== null &&
-      knownSafeInputTokens !== null &&
-      settings.model.auto_compact_token_limit >= knownSafeInputTokens
-    ) {
-      toast.error(
-        "Automatic Compact token limit must stay below the known safe input window",
-      );
+    const autoCompactTokenLimitError = validateAutoCompactTokenLimit(
+      settings.model.auto_compact_token_limit,
+      knownSafeInputTokens,
+    );
+    if (autoCompactTokenLimitError) {
+      toast.error(autoCompactTokenLimitError);
       return;
     }
     setSaving(true);
     try {
-      const modelPayload = {
-        active_provider_id: settings.model.active_provider_id,
-        active_model: settings.model.active_model,
-        input_image: settings.model.input_image,
-        output_image: settings.model.output_image,
-        context_window_tokens: settings.model.context_window_tokens,
-        timeout_ms: settings.model.timeout_ms,
-        retry_policy: settings.model.retry_policy,
-        max_retries: settings.model.max_retries,
-        retry_initial_delay_seconds: settings.model.retry_initial_delay_seconds,
-        retry_max_delay_seconds: settings.model.retry_max_delay_seconds,
-        retry_backoff_cap_retries: settings.model.retry_backoff_cap_retries,
-        auto_compact_token_limit: settings.model.auto_compact_token_limit,
-        params: settings.model.params,
-      };
-      const payload = {
-        assistant: {
-          ...settings.assistant,
-          write_dirs: normalizeWriteDirs(settings.assistant.write_dirs),
-        },
-        leader: settings.leader,
-        model: modelPayload,
-      };
+      const payload = buildSettingsSavePayload(settings);
       const savedSettings = await saveSettings<UserSettings>(payload);
 
       setLocalSettings(savedSettings);

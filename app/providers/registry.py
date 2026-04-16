@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Protocol
 
 from app.providers import LLMProvider
 from app.providers.base_url import resolve_provider_base_url
@@ -13,6 +14,111 @@ class ProviderType(StrEnum):
     GEMINI = "gemini"
 
 
+class ProviderFactory(Protocol):
+    def __call__(
+        self,
+        *,
+        provider_name: str,
+        api_base_url: str,
+        api_key: str,
+        headers: dict[str, str],
+        model: str,
+        request_timeout_seconds: float,
+    ) -> LLMProvider: ...
+
+
+def _build_openai_compatible_provider(
+    *,
+    provider_name: str,
+    api_base_url: str,
+    api_key: str,
+    headers: dict[str, str],
+    model: str,
+    request_timeout_seconds: float,
+) -> LLMProvider:
+    from app.providers.openai import OpenAIProvider
+
+    return OpenAIProvider(
+        provider_name=provider_name,
+        api_base_url=api_base_url,
+        api_key=api_key,
+        headers=headers,
+        model=model,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+
+
+def _build_openai_responses_provider(
+    *,
+    provider_name: str,
+    api_base_url: str,
+    api_key: str,
+    headers: dict[str, str],
+    model: str,
+    request_timeout_seconds: float,
+) -> LLMProvider:
+    from app.providers.openai_responses import OpenAIResponsesProvider
+
+    return OpenAIResponsesProvider(
+        provider_name=provider_name,
+        api_base_url=api_base_url,
+        api_key=api_key,
+        headers=headers,
+        model=model,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+
+
+def _build_anthropic_provider(
+    *,
+    provider_name: str,
+    api_base_url: str,
+    api_key: str,
+    headers: dict[str, str],
+    model: str,
+    request_timeout_seconds: float,
+) -> LLMProvider:
+    from app.providers.anthropic import AnthropicProvider
+
+    return AnthropicProvider(
+        provider_name=provider_name,
+        api_base_url=api_base_url,
+        api_key=api_key,
+        headers=headers,
+        model=model,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+
+
+def _build_gemini_provider(
+    *,
+    provider_name: str,
+    api_base_url: str,
+    api_key: str,
+    headers: dict[str, str],
+    model: str,
+    request_timeout_seconds: float,
+) -> LLMProvider:
+    from app.providers.gemini import GeminiProvider
+
+    return GeminiProvider(
+        provider_name=provider_name,
+        api_base_url=api_base_url,
+        api_key=api_key,
+        headers=headers,
+        model=model,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+
+
+PROVIDER_FACTORIES: dict[ProviderType, ProviderFactory] = {
+    ProviderType.OPENAI_COMPATIBLE: _build_openai_compatible_provider,
+    ProviderType.OPENAI_RESPONSES: _build_openai_responses_provider,
+    ProviderType.ANTHROPIC: _build_anthropic_provider,
+    ProviderType.GEMINI: _build_gemini_provider,
+}
+
+
 def create_provider(
     provider_type: str,
     base_url: str,
@@ -22,55 +128,17 @@ def create_provider(
     provider_name: str = "",
     request_timeout_seconds: float = 120.0,
 ) -> LLMProvider:
-    pt = provider_type.lower()
-    resolved_base_url = resolve_provider_base_url(pt, base_url)
+    try:
+        normalized_type = ProviderType(provider_type.lower())
+    except ValueError as exc:
+        raise ValueError(f"Unknown provider type: {provider_type}") from exc
 
-    if pt == ProviderType.OPENAI_COMPATIBLE:
-        from app.providers.openai import OpenAIProvider
-
-        return OpenAIProvider(
-            provider_name=provider_name,
-            api_base_url=resolved_base_url,
-            api_key=api_key,
-            headers=headers or {},
-            model=model,
-            request_timeout_seconds=request_timeout_seconds,
-        )
-
-    if pt == ProviderType.OPENAI_RESPONSES:
-        from app.providers.openai_responses import OpenAIResponsesProvider
-
-        return OpenAIResponsesProvider(
-            provider_name=provider_name,
-            api_base_url=resolved_base_url,
-            api_key=api_key,
-            headers=headers or {},
-            model=model,
-            request_timeout_seconds=request_timeout_seconds,
-        )
-
-    if pt == ProviderType.ANTHROPIC:
-        from app.providers.anthropic import AnthropicProvider
-
-        return AnthropicProvider(
-            provider_name=provider_name,
-            api_base_url=resolved_base_url,
-            api_key=api_key,
-            headers=headers or {},
-            model=model,
-            request_timeout_seconds=request_timeout_seconds,
-        )
-
-    if pt == ProviderType.GEMINI:
-        from app.providers.gemini import GeminiProvider
-
-        return GeminiProvider(
-            provider_name=provider_name,
-            api_base_url=resolved_base_url,
-            api_key=api_key,
-            headers=headers or {},
-            model=model,
-            request_timeout_seconds=request_timeout_seconds,
-        )
-
-    raise ValueError(f"Unknown provider type: {provider_type}")
+    resolved_base_url = resolve_provider_base_url(normalized_type, base_url)
+    return PROVIDER_FACTORIES[normalized_type](
+        provider_name=provider_name,
+        api_base_url=resolved_base_url,
+        api_key=api_key,
+        headers=headers or {},
+        model=model,
+        request_timeout_seconds=request_timeout_seconds,
+    )

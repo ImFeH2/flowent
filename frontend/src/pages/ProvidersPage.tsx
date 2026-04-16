@@ -26,10 +26,7 @@ import {
   SectionHeader,
   SettingsRow,
 } from "@/components/layout/PageScaffold";
-import {
-  formatProviderHeaders,
-  parseProviderHeadersInput,
-} from "@/lib/providerHeaders";
+import { parseProviderHeadersInput } from "@/lib/providerHeaders";
 import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
 import { buildProviderRequestPreview } from "@/lib/providerUrls";
 import type { Provider, ProviderModelCatalogEntry } from "@/types";
@@ -62,179 +59,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-type TriStateCapability = "auto" | "enabled" | "disabled";
-
-type ProviderDraft = Omit<Provider, "id" | "headers"> & {
-  headers_text: string;
-};
-
-type ProviderModelEditorDraft = {
-  model: string;
-  context_window_tokens: string;
-  input_image: TriStateCapability;
-  output_image: TriStateCapability;
-  source: "discovered" | "manual";
-};
-
-type ProviderModelEditorState = {
-  mode: "create" | "edit";
-  originalModel: string | null;
-} | null;
-
-type ProviderModelTestState =
-  | {
-      state: "running";
-    }
-  | {
-      state: "success";
-      duration_ms: number;
-    }
-  | {
-      state: "error";
-      error_summary: string;
-    };
-
-function triStateFromNullableBool(value: boolean | null): TriStateCapability {
-  if (value === true) {
-    return "enabled";
-  }
-  if (value === false) {
-    return "disabled";
-  }
-  return "auto";
-}
-
-function nullableBoolFromTriState(value: TriStateCapability): boolean | null {
-  if (value === "enabled") {
-    return true;
-  }
-  if (value === "disabled") {
-    return false;
-  }
-  return null;
-}
-
-function createProviderDraft(provider?: Provider | null): ProviderDraft {
-  if (!provider) {
-    return {
-      name: "",
-      type: "openai_compatible",
-      base_url: "",
-      api_key: "",
-      headers_text: "",
-      retry_429_delay_seconds: 0,
-      models: [],
-    };
-  }
-  return {
-    name: provider.name,
-    type: provider.type,
-    base_url: provider.base_url,
-    api_key: provider.api_key,
-    headers_text: formatProviderHeaders(provider.headers),
-    retry_429_delay_seconds: provider.retry_429_delay_seconds,
-    models: provider.models.map((entry) => ({ ...entry })),
-  };
-}
-
-function createProviderModelEditorDraft(
-  entry?: ProviderModelCatalogEntry | null,
-): ProviderModelEditorDraft {
-  return {
-    model: entry?.model ?? "",
-    context_window_tokens:
-      entry?.context_window_tokens === null ||
-      entry?.context_window_tokens === undefined
-        ? ""
-        : String(entry.context_window_tokens),
-    input_image: triStateFromNullableBool(entry?.input_image ?? null),
-    output_image: triStateFromNullableBool(entry?.output_image ?? null),
-    source: entry?.source ?? "manual",
-  };
-}
-
-function serializeProviderDraft(draft: ProviderDraft): string {
-  return JSON.stringify({
-    name: draft.name,
-    type: draft.type,
-    base_url: draft.base_url,
-    api_key: draft.api_key,
-    headers_text: draft.headers_text,
-    retry_429_delay_seconds: draft.retry_429_delay_seconds,
-    models: draft.models,
-  });
-}
-
-function buildProviderPayload(
-  draft: ProviderDraft,
-  headers: Record<string, string>,
-): Omit<Provider, "id"> {
-  return {
-    name: draft.name,
-    type: draft.type,
-    base_url: draft.base_url,
-    api_key: draft.api_key,
-    headers,
-    retry_429_delay_seconds: draft.retry_429_delay_seconds,
-    models: draft.models,
-  };
-}
-
-function mergeFetchedModelsIntoDraft(
-  existing: ProviderModelCatalogEntry[],
-  fetched: ProviderModelCatalogEntry[],
-): ProviderModelCatalogEntry[] {
-  const existingByModel = new Map(
-    existing.map((entry) => [entry.model, entry]),
-  );
-  const fetchedByModel = new Map(fetched.map((entry) => [entry.model, entry]));
-  const merged: ProviderModelCatalogEntry[] = [];
-
-  for (const entry of existing) {
-    const discoveredEntry = fetchedByModel.get(entry.model);
-    if (!discoveredEntry) {
-      merged.push(entry);
-      continue;
-    }
-    if (entry.source === "manual") {
-      merged.push({
-        ...entry,
-        context_window_tokens:
-          entry.context_window_tokens ?? discoveredEntry.context_window_tokens,
-        input_image: entry.input_image ?? discoveredEntry.input_image,
-        output_image: entry.output_image ?? discoveredEntry.output_image,
-      });
-      fetchedByModel.delete(entry.model);
-      continue;
-    }
-    merged.push(discoveredEntry);
-    fetchedByModel.delete(entry.model);
-  }
-
-  for (const entry of fetched) {
-    if (existingByModel.has(entry.model)) {
-      continue;
-    }
-    merged.push(entry);
-  }
-
-  return merged;
-}
-
-function buildModelSummary(entry: ProviderModelCatalogEntry): string {
-  const parts: string[] = [];
-  if (entry.context_window_tokens !== null) {
-    parts.push(`${entry.context_window_tokens.toLocaleString()} tokens`);
-  }
-  if (entry.input_image !== null) {
-    parts.push(`input_image=${entry.input_image ? "true" : "false"}`);
-  }
-  if (entry.output_image !== null) {
-    parts.push(`output_image=${entry.output_image ? "true" : "false"}`);
-  }
-  return parts.length > 0 ? parts.join(" · ") : "No capability metadata";
-}
+import {
+  buildModelSummary,
+  buildProviderDraftRequestPayload,
+  buildProviderModelEntry,
+  buildProviderPayload,
+  createProviderDraft,
+  createProviderModelEditorDraft,
+  findDuplicateModelId,
+  mergeFetchedModelsIntoDraft,
+  serializeProviderDraft,
+  validateProviderModelEditorDraft,
+  type ProviderDraft,
+  type ProviderModelEditorDraft,
+  type ProviderModelEditorState,
+  type ProviderModelTestState,
+  type TriStateCapability,
+} from "@/pages/providers/lib";
 
 export function ProvidersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -350,13 +191,10 @@ export function ProvidersPage() {
       return;
     }
 
-    const duplicateModels = new Set<string>();
-    for (const entry of draft.models) {
-      if (duplicateModels.has(entry.model.trim())) {
-        toast.error(`Model ID '${entry.model}' is duplicated`);
-        return;
-      }
-      duplicateModels.add(entry.model.trim());
+    const duplicateModelId = findDuplicateModelId(draft.models);
+    if (duplicateModelId) {
+      toast.error(`Model ID '${duplicateModelId}' is duplicated`);
+      return;
     }
 
     const payload = buildProviderPayload(draft, parsedHeaders.headers);
@@ -430,11 +268,13 @@ export function ProvidersPage() {
   };
 
   const handleSaveModel = () => {
-    const modelId = modelEditorDraft.model.trim();
-    if (!modelId) {
-      toast.error("Model ID is required");
+    const validationError = validateProviderModelEditorDraft(modelEditorDraft);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
+
+    const modelId = modelEditorDraft.model.trim();
     if (
       draft.models.some(
         (entry) =>
@@ -445,23 +285,7 @@ export function ProvidersPage() {
       toast.error(`Model ID '${modelId}' already exists in this provider`);
       return;
     }
-    if (
-      modelEditorDraft.context_window_tokens &&
-      !/^\d+$/.test(modelEditorDraft.context_window_tokens)
-    ) {
-      toast.error("Context Window must be a positive integer");
-      return;
-    }
-
-    const nextEntry: ProviderModelCatalogEntry = {
-      model: modelId,
-      source: modelEditorDraft.source,
-      context_window_tokens: modelEditorDraft.context_window_tokens
-        ? Number.parseInt(modelEditorDraft.context_window_tokens, 10)
-        : null,
-      input_image: nullableBoolFromTriState(modelEditorDraft.input_image),
-      output_image: nullableBoolFromTriState(modelEditorDraft.output_image),
-    };
+    const nextEntry = buildProviderModelEntry(modelEditorDraft);
 
     setDraft((current) => {
       if (modelEditorState?.mode === "edit" && modelEditorState.originalModel) {
@@ -520,15 +344,13 @@ export function ProvidersPage() {
 
     setFetchingModels(true);
     try {
-      const fetchedModels = await fetchProviderCatalogPreview({
-        provider_id: selectedId ?? undefined,
-        name: draft.name,
-        type: draft.type,
-        base_url: draft.base_url,
-        api_key: draft.api_key,
-        headers: parsedHeaders.headers,
-        retry_429_delay_seconds: draft.retry_429_delay_seconds,
-      });
+      const fetchedModels = await fetchProviderCatalogPreview(
+        buildProviderDraftRequestPayload(
+          draft,
+          parsedHeaders.headers,
+          selectedId ?? undefined,
+        ),
+      );
       setDraft((current) => ({
         ...current,
         models: mergeFetchedModelsIntoDraft(current.models, fetchedModels),
@@ -562,13 +384,11 @@ export function ProvidersPage() {
 
     try {
       const result = await testProviderModelRequest({
-        provider_id: selectedId ?? undefined,
-        name: draft.name,
-        type: draft.type,
-        base_url: draft.base_url,
-        api_key: draft.api_key,
-        headers: parsedHeaders.headers,
-        retry_429_delay_seconds: draft.retry_429_delay_seconds,
+        ...buildProviderDraftRequestPayload(
+          draft,
+          parsedHeaders.headers,
+          selectedId ?? undefined,
+        ),
         model: entry.model,
       });
       setModelTestStates((current) => ({

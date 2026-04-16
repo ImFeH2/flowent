@@ -9,38 +9,18 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from app.agent import Agent
-    from app.settings import ProviderConfig
 
-from app.providers.base_url import resolve_provider_base_url
+from app.providers.configuration import (
+    apply_provider_update,
+    build_provider_config,
+    serialize_discovered_model_catalog_entry,
+    serialize_provider,
+)
 from app.settings import (
-    ProviderModelCatalogEntry,
     build_provider_headers,
     build_provider_retry_429_delay_seconds,
-    serialize_provider_model_catalog_entry,
 )
 from app.tools import Tool, re_raise_interrupt
-
-
-def _serialize_provider(provider: ProviderConfig) -> dict[str, object]:
-    return {
-        "id": provider.id,
-        "name": provider.name,
-        "type": provider.type,
-        "base_url": provider.base_url,
-        "headers": dict(provider.headers),
-        "retry_429_delay_seconds": provider.retry_429_delay_seconds,
-        "models": [
-            serialize_provider_model_catalog_entry(entry) for entry in provider.models
-        ],
-    }
-
-
-def _validate_provider_base_url_input(provider_type: str, base_url: str) -> str:
-    raw_base_url = base_url.strip()
-    if not raw_base_url:
-        raise ValueError("base_url is required")
-    resolve_provider_base_url(provider_type, raw_base_url)
-    return raw_base_url
 
 
 class ManageProvidersTool(Tool):
@@ -93,7 +73,6 @@ class ManageProvidersTool(Tool):
     def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str:
         from app.providers.gateway import gateway
         from app.settings import (
-            ProviderConfig,
             clear_provider_references,
             get_settings,
             save_settings,
@@ -141,7 +120,10 @@ class ManageProvidersTool(Tool):
 
         if action == "list":
             return json.dumps(
-                [_serialize_provider(provider) for provider in settings.providers]
+                [
+                    serialize_provider(provider, include_api_key=False)
+                    for provider in settings.providers
+                ]
             )
 
         if action == "create":
@@ -152,30 +134,26 @@ class ManageProvidersTool(Tool):
             if not isinstance(base_url, str) or not base_url.strip():
                 return json.dumps({"error": "base_url is required"})
             try:
-                raw_base_url = _validate_provider_base_url_input(
-                    provider_type,
-                    base_url,
+                provider = build_provider_config(
+                    provider_id=str(uuid.uuid4()),
+                    name=name,
+                    provider_type=provider_type,
+                    base_url=base_url,
+                    api_key=api_key or "",
+                    raw_headers=headers,
+                    raw_retry_429_delay_seconds=(
+                        retry_429_delay_seconds
+                        if retry_429_delay_seconds is not None
+                        else 0
+                    ),
+                    base_url_required_message="base_url is required",
                 )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
-
-            provider = ProviderConfig(
-                id=str(uuid.uuid4()),
-                name=name,
-                type=provider_type,
-                base_url=raw_base_url,
-                api_key=api_key or "",
-                headers=headers or {},
-                retry_429_delay_seconds=build_provider_retry_429_delay_seconds(
-                    retry_429_delay_seconds
-                    if retry_429_delay_seconds is not None
-                    else 0
-                ),
-            )
             settings.providers.append(provider)
             save_settings(settings)
             gateway.invalidate_cache()
-            return json.dumps(_serialize_provider(provider))
+            return json.dumps(serialize_provider(provider, include_api_key=False))
 
         if action == "update":
             if not isinstance(provider_id, str) or not provider_id:
@@ -184,40 +162,21 @@ class ManageProvidersTool(Tool):
             for provider in settings.providers:
                 if provider.id != provider_id:
                     continue
-                next_type = (
-                    provider_type
-                    if isinstance(provider_type, str) and provider_type is not None
-                    else provider.type
-                )
-                next_base_url = (
-                    base_url.strip()
-                    if isinstance(base_url, str) and base_url is not None
-                    else provider.base_url
-                )
                 try:
-                    raw_base_url = _validate_provider_base_url_input(
-                        next_type,
-                        next_base_url,
+                    apply_provider_update(
+                        provider,
+                        name=name,
+                        provider_type=provider_type,
+                        base_url=base_url,
+                        api_key=api_key,
+                        raw_headers=headers,
+                        raw_retry_429_delay_seconds=retry_429_delay_seconds,
                     )
                 except ValueError as exc:
                     return json.dumps({"error": str(exc)})
-                if name is not None:
-                    provider.name = name
-                if provider_type is not None:
-                    provider.type = provider_type
-                if base_url is not None or provider_type is not None:
-                    provider.base_url = raw_base_url
-                if api_key is not None:
-                    provider.api_key = api_key
-                if headers is not None:
-                    provider.headers = headers
-                if retry_429_delay_seconds is not None:
-                    provider.retry_429_delay_seconds = (
-                        build_provider_retry_429_delay_seconds(retry_429_delay_seconds)
-                    )
                 save_settings(settings)
                 gateway.invalidate_cache()
-                return json.dumps(_serialize_provider(provider))
+                return json.dumps(serialize_provider(provider, include_api_key=False))
 
             return json.dumps({"error": f"Provider '{provider_id}' not found"})
 
@@ -251,15 +210,7 @@ class ManageProvidersTool(Tool):
                         on_output(f"{model.id}\n")
                 return json.dumps(
                     [
-                        serialize_provider_model_catalog_entry(
-                            ProviderModelCatalogEntry(
-                                model=model.id,
-                                source="discovered",
-                                context_window_tokens=model.context_window_tokens,
-                                input_image=model.capabilities.input_image,
-                                output_image=model.capabilities.output_image,
-                            )
-                        )
+                        serialize_discovered_model_catalog_entry(model)
                         for model in models
                     ]
                 )

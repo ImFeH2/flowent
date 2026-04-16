@@ -10,23 +10,20 @@ from starlette.concurrency import run_in_threadpool
 
 from app.models import ModelInfo
 from app.network import truncate_text
-from app.providers.base_url import resolve_provider_base_url
+from app.providers.configuration import (
+    apply_provider_update,
+    build_provider_config,
+    coerce_provider_model_catalog,
+    serialize_discovered_model_catalog_entry,
+    serialize_provider,
+)
 from app.providers.registry import create_provider as create_llm_provider
 from app.settings import (
-    PROVIDER_MODEL_SOURCE_OPTIONS,
     ProviderConfig,
-    ProviderModelCatalogEntry,
-    build_model_context_window_tokens,
-    build_model_input_image,
-    build_model_output_image,
-    build_provider_headers,
-    build_provider_retry_429_delay_seconds,
     clear_provider_references,
     find_provider,
     get_settings,
     save_settings,
-    serialize_provider,
-    serialize_provider_model_catalog_entry,
 )
 
 router = APIRouter()
@@ -77,75 +74,6 @@ class ProviderModelTestRequest(ProviderDraftRequest):
     model: str
 
 
-def _validate_provider_base_url_input(provider_type: str, base_url: str) -> str:
-    raw_base_url = base_url.strip()
-    if not raw_base_url:
-        raise ValueError("provider base_url is required")
-    resolve_provider_base_url(provider_type, raw_base_url)
-    return raw_base_url
-
-
-def _build_provider_model_entry(
-    req: ProviderModelRequest,
-) -> ProviderModelCatalogEntry:
-    model = req.model.strip()
-    if not model:
-        raise ValueError("models[].model must not be empty")
-
-    source = req.source.strip().lower()
-    if source not in PROVIDER_MODEL_SOURCE_OPTIONS:
-        raise ValueError("models[].source must be one of: discovered, manual")
-
-    return ProviderModelCatalogEntry(
-        model=model,
-        source=source,
-        context_window_tokens=build_model_context_window_tokens(
-            req.context_window_tokens,
-            field_name="models[].context_window_tokens",
-        ),
-        input_image=build_model_input_image(
-            req.input_image,
-            field_name="models[].input_image",
-        ),
-        output_image=build_model_output_image(
-            req.output_image,
-            field_name="models[].output_image",
-        ),
-    )
-
-
-def _coerce_provider_models(
-    payload: list[ProviderModelRequest] | None,
-) -> list[ProviderModelCatalogEntry]:
-    entries: list[ProviderModelCatalogEntry] = []
-    seen_models: set[str] = set()
-    for item in payload or []:
-        entry = _build_provider_model_entry(item)
-        if entry.model in seen_models:
-            raise ValueError(f"models[].model '{entry.model}' is duplicated")
-        seen_models.add(entry.model)
-        entries.append(entry)
-    return entries
-
-
-def _serialize_discovered_model_entry(
-    model: str,
-    *,
-    context_window_tokens: int | None,
-    input_image: bool,
-    output_image: bool,
-) -> dict[str, object]:
-    return serialize_provider_model_catalog_entry(
-        ProviderModelCatalogEntry(
-            model=model,
-            source="discovered",
-            context_window_tokens=context_window_tokens,
-            input_image=input_image,
-            output_image=output_image,
-        )
-    )
-
-
 def _has_draft_provider_fields(req: ProviderDraftRequest) -> bool:
     return any(
         value is not None
@@ -194,42 +122,45 @@ def _resolve_provider_from_request(req: ProviderDraftRequest) -> ProviderConfig:
         raise HTTPException(status_code=400, detail="provider base_url is required")
 
     try:
-        raw_base_url = _validate_provider_base_url_input(provider_type, base_url)
-        headers = build_provider_headers(
-            req.headers
-            if req.headers is not None
-            else saved_provider.headers
-            if saved_provider is not None
-            else {},
-            field_name="headers",
+        return build_provider_config(
+            provider_id=(
+                saved_provider.id
+                if saved_provider is not None
+                else req.provider_id or ""
+            ),
+            name=(
+                req.name
+                if isinstance(req.name, str)
+                else saved_provider.name
+                if saved_provider is not None
+                else ""
+            ),
+            provider_type=provider_type,
+            base_url=base_url,
+            api_key=(
+                req.api_key
+                if isinstance(req.api_key, str)
+                else saved_provider.api_key
+                if saved_provider is not None
+                else ""
+            ),
+            raw_headers=(
+                req.headers
+                if req.headers is not None
+                else saved_provider.headers
+                if saved_provider is not None
+                else {}
+            ),
+            raw_retry_429_delay_seconds=(
+                saved_provider.retry_429_delay_seconds
+                if saved_provider is not None
+                else 0
+            ),
+            models=list(saved_provider.models) if saved_provider is not None else [],
+            base_url_required_message="provider base_url is required",
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    return ProviderConfig(
-        id=saved_provider.id if saved_provider is not None else req.provider_id or "",
-        name=(
-            req.name
-            if isinstance(req.name, str)
-            else saved_provider.name
-            if saved_provider is not None
-            else ""
-        ),
-        type=provider_type,
-        base_url=raw_base_url,
-        api_key=(
-            req.api_key
-            if isinstance(req.api_key, str)
-            else saved_provider.api_key
-            if saved_provider is not None
-            else ""
-        ),
-        headers=headers,
-        retry_429_delay_seconds=(
-            saved_provider.retry_429_delay_seconds if saved_provider is not None else 0
-        ),
-        models=list(saved_provider.models) if saved_provider is not None else [],
-    )
 
 
 def _list_models_with_provider(provider: ProviderConfig) -> list[ModelInfo]:
@@ -301,24 +232,18 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
 
     settings = get_settings()
     try:
-        raw_base_url = _validate_provider_base_url_input(req.type, req.base_url)
-        headers = build_provider_headers(req.headers)
-        retry_429_delay_seconds = build_provider_retry_429_delay_seconds(
-            req.retry_429_delay_seconds
+        provider = build_provider_config(
+            provider_id=str(uuid.uuid4()),
+            name=req.name,
+            provider_type=req.type,
+            base_url=req.base_url,
+            api_key=req.api_key,
+            raw_headers=req.headers,
+            raw_retry_429_delay_seconds=req.retry_429_delay_seconds,
+            models=coerce_provider_model_catalog(req.models),
         )
-        models = _coerce_provider_models(req.models)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    provider = ProviderConfig(
-        id=str(uuid.uuid4()),
-        name=req.name,
-        type=req.type,
-        base_url=raw_base_url,
-        api_key=req.api_key,
-        headers=headers,
-        retry_429_delay_seconds=retry_429_delay_seconds,
-        models=models,
-    )
     settings.providers.append(provider)
     save_settings(settings)
     gateway.invalidate_cache()
@@ -335,44 +260,23 @@ async def update_provider(
     for provider in settings.providers:
         if provider.id != provider_id:
             continue
-        next_name = req.name if req.name is not None else provider.name
-        next_type = req.type if req.type is not None else provider.type
-        next_base_url = (
-            req.base_url.strip() if req.base_url is not None else provider.base_url
-        )
         try:
-            raw_base_url = _validate_provider_base_url_input(next_type, next_base_url)
-            next_headers = (
-                build_provider_headers(req.headers)
-                if req.headers is not None
-                else dict(provider.headers)
-            )
-            next_retry_429_delay_seconds = (
-                build_provider_retry_429_delay_seconds(req.retry_429_delay_seconds)
-                if req.retry_429_delay_seconds is not None
-                else provider.retry_429_delay_seconds
-            )
-            next_models = (
-                _coerce_provider_models(req.models)
-                if req.models is not None
-                else list(provider.models)
+            apply_provider_update(
+                provider,
+                name=req.name,
+                provider_type=req.type,
+                base_url=req.base_url,
+                api_key=req.api_key,
+                raw_headers=req.headers,
+                raw_retry_429_delay_seconds=req.retry_429_delay_seconds,
+                models=(
+                    coerce_provider_model_catalog(req.models)
+                    if req.models is not None
+                    else None
+                ),
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if req.name is not None:
-            provider.name = next_name
-        if req.type is not None:
-            provider.type = next_type
-        if req.base_url is not None or req.type is not None:
-            provider.base_url = raw_base_url
-        if req.api_key is not None:
-            provider.api_key = req.api_key
-        if req.headers is not None:
-            provider.headers = next_headers
-        if req.retry_429_delay_seconds is not None:
-            provider.retry_429_delay_seconds = next_retry_429_delay_seconds
-        if req.models is not None:
-            provider.models = next_models
         save_settings(settings)
         gateway.invalidate_cache()
         return serialize_provider(provider)
@@ -403,13 +307,7 @@ async def list_provider_models(req: ListModelsRequest) -> dict[str, object]:
             models = await run_in_threadpool(gateway.list_models_for, req.provider_id)
             return {
                 "models": [
-                    _serialize_discovered_model_entry(
-                        model=model.id,
-                        context_window_tokens=model.context_window_tokens,
-                        input_image=model.capabilities.input_image,
-                        output_image=model.capabilities.output_image,
-                    )
-                    for model in models
+                    serialize_discovered_model_catalog_entry(model) for model in models
                 ]
             }
         except Exception as exc:
@@ -429,13 +327,7 @@ async def list_provider_models(req: ListModelsRequest) -> dict[str, object]:
         models = await run_in_threadpool(_list_models_with_provider, provider)
         return {
             "models": [
-                _serialize_discovered_model_entry(
-                    model=model.id,
-                    context_window_tokens=model.context_window_tokens,
-                    input_image=model.capabilities.input_image,
-                    output_image=model.capabilities.output_image,
-                )
-                for model in models
+                serialize_discovered_model_catalog_entry(model) for model in models
             ]
         }
     except Exception as exc:

@@ -94,9 +94,11 @@ export function RolesPage() {
     [providers],
   );
   const activeProviderId = draft.model?.provider_id ?? "";
-  const activeProviderModelOptions = activeProviderId
-    ? (providersById[activeProviderId]?.models ?? [])
-    : [];
+  const activeProviderModelOptions = useMemo(
+    () =>
+      activeProviderId ? (providersById[activeProviderId]?.models ?? []) : [],
+    [activeProviderId, providersById],
+  );
   const filteredActiveProviderModelOptions = useMemo(() => {
     const normalizedQuery = providerModelQuery.trim().toLowerCase();
     if (!normalizedQuery) {

@@ -48,10 +48,12 @@ pnpm dev
 
 ## Docker
 
-To run Autopoe in Docker:
+To run Autopoe in Docker, download `docker-compose.yml` and run:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+
+The compose file pulls the prebuilt `imfeh2/autopoe:latest` image from Docker Hub, so a source checkout is not required.
 
 Autopoe will be available at `http://localhost:8000`.

@@ -1,9 +1,6 @@
 services:
   autopoe:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ${AUTOPOE_IMAGE:-autopoe:local}
+    image: ${AUTOPOE_IMAGE:-imfeh2/autopoe:latest}
     ports:
       - "${AUTOPOE_PORT:-8000}:8000"
     volumes:

@@ -12,7 +12,15 @@ uv tool install autopoe           # install via uv
 pip install autopoe               # install via pip
 ```
 
-To run from source, see [Development](#development).
+## Docker
+
+To run Autopoe in Docker, download `docker-compose.yml` and run:
+
+```bash
+docker compose up -d
+```
+
+Autopoe will be available at `http://localhost:8000`.
 
 ## Prerequisites
 
@@ -38,22 +46,10 @@ cd autopoe
 
 # Backend (hot reload)
 uv sync
-uv run fastapi dev app/main.py
+uv run fastapi dev
 
 # Frontend (hot reload, separate terminal)
 cd frontend
 pnpm install
 pnpm dev
 ```
-
-## Docker
-
-To run Autopoe in Docker, download `docker-compose.yml` and run:
-
-```bash
-docker compose up -d
-```
-
-The compose file pulls the prebuilt `imfeh2/autopoe:latest` image from Docker Hub, so a source checkout is not required.
-
-Autopoe will be available at `http://localhost:8000`.

@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsPage } from "@/pages/SettingsPage";
 import type { Provider, Role } from "@/types";
@@ -21,6 +22,24 @@ const { fetchSettingsBootstrap, saveSettings, toastError, toastSuccess } =
 vi.mock("@/lib/api", () => ({
   fetchSettingsBootstrap,
   saveSettings,
+}));
+
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SelectContent: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  SelectItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SelectTrigger: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  SelectValue: ({ placeholder }: { placeholder?: string }) => (
+    <span>{placeholder ?? null}</span>
+  ),
+}));
+
+vi.mock("@/components/ModelParamsFields", () => ({
+  ModelParamsFields: () => <div data-testid="model-params-fields" />,
 }));
 
 vi.mock("sonner", () => ({
@@ -171,12 +190,12 @@ describe("SettingsPage", () => {
         assistant: {
           role_name: "Steward",
           allow_network: false,
-          write_dirs: ["./tmp"],
+          write_dirs: ["/workspace/project"],
         },
         model: {
           active_provider_id: "provider-1",
           active_model: "gpt-5.2",
-          input_image: true,
+          input_image: null,
           output_image: null,
           capabilities: { input_image: true, output_image: false },
           context_window_tokens: 64000,
@@ -203,22 +222,13 @@ describe("SettingsPage", () => {
 
     const timeoutInput = await screen.findByLabelText("Request Timeout");
     const contextWindowInput = screen.getByLabelText("Context Window");
-    const inputImageSelect = screen.getByRole("combobox", {
-      name: /Input Image/i,
-    });
     const networkAccessSwitch = screen.getByRole("switch", {
       name: "Network Access",
     });
-    const writeDirsTextarea = screen.getByLabelText("Write Dirs");
 
     fireEvent.change(timeoutInput, { target: { value: "15000" } });
     fireEvent.change(contextWindowInput, { target: { value: "64000" } });
-    fireEvent.click(inputImageSelect);
-    fireEvent.click(screen.getByRole("option", { name: "Enabled" }));
     fireEvent.click(networkAccessSwitch);
-    fireEvent.change(writeDirsTextarea, {
-      target: { value: " ./tmp \n./tmp/\n" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await waitFor(() =>
@@ -226,13 +236,13 @@ describe("SettingsPage", () => {
         assistant: {
           role_name: "Steward",
           allow_network: false,
-          write_dirs: ["./tmp"],
+          write_dirs: ["/workspace/project"],
         },
         leader: { role_name: "Conductor" },
         model: {
           active_provider_id: "provider-1",
           active_model: "gpt-5.2",
-          input_image: true,
+          input_image: null,
           output_image: null,
           context_window_tokens: 64000,
           timeout_ms: 15000,

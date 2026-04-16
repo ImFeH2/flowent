@@ -7,7 +7,9 @@ import {
   getEffectiveModelCapabilities,
   getKnownSafeInputTokens,
   getSelectedCatalogModel,
+  nullableBoolFromTriState,
   normalizeWriteDirs,
+  triStateFromNullableBool,
   validateAutoCompactTokenLimit,
   type UserSettings,
 } from "@/pages/settings/lib";
@@ -83,6 +85,15 @@ function buildRole(
 }
 
 describe("settings lib", () => {
+  it("converts between tri-state capability values and nullable booleans", () => {
+    expect(triStateFromNullableBool(true)).toBe("enabled");
+    expect(triStateFromNullableBool(false)).toBe("disabled");
+    expect(triStateFromNullableBool(null)).toBe("auto");
+    expect(nullableBoolFromTriState("enabled")).toBe(true);
+    expect(nullableBoolFromTriState("disabled")).toBe(false);
+    expect(nullableBoolFromTriState("auto")).toBeNull();
+  });
+
   it("normalizes write dirs by trimming, deduplicating, and dropping empties", () => {
     expect(normalizeWriteDirs([" ./tmp ", "./tmp/", "", " / "])).toEqual([
       "./tmp",

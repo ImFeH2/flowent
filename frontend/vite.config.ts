@@ -65,5 +65,6 @@ export default defineConfig({
     css: true,
     clearMocks: true,
     restoreMocks: true,
+    fileParallelism: false,
   },
 });

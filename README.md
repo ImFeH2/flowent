@@ -54,8 +54,8 @@ To run Autopoe in Docker:
 docker-compose up -d --build
 ```
 
+Autopoe will be available at `http://localhost:8000`.
+
 The container stores runtime data in `/data`, including `settings.json`, `workspace.json`, `image-assets/`, and `logs/`. The bundled `docker-compose.yml` mounts that path as a named volume so your settings and workspaces survive container restarts.
 
 Autopoe relies on `bubblewrap` for sandboxed command execution. The image includes `bwrap`, but whether sandboxed agent execution works depends on the host container runtime allowing the required namespace features.
-
-Pushing a release tag like `v0.2.13` publishes Docker images tagged as `0.2.13` and `latest`.

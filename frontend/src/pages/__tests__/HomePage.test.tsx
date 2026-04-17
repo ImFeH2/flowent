@@ -421,6 +421,21 @@ describe("HomePage", () => {
     expect(toastSuccessMock).toHaveBeenCalledWith("Blueprint saved to library");
   });
 
+  it("keeps the workspace toolbar centered while constraining overflow inside the background", () => {
+    render(<HomePage />);
+
+    const toolbars = screen.getAllByTestId("workspace-toolbar");
+
+    expect(toolbars.length).toBeGreaterThan(0);
+    for (const toolbar of toolbars) {
+      expect(toolbar).toHaveClass("inline-flex");
+      expect(toolbar).toHaveClass("max-w-full");
+      expect(toolbar).toHaveClass("overflow-x-auto");
+      expect(toolbar.parentElement).toHaveClass("inset-x-3");
+      expect(toolbar.parentElement).toHaveClass("justify-center");
+    }
+  });
+
   it("adds an agent through the custom dialog", async () => {
     createTabNodeRequestMock.mockResolvedValue(undefined);
 

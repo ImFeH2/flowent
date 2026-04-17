@@ -784,51 +784,56 @@ export function HomePage() {
             </BadgeChip>
           </div>
 
-          <div className="pointer-events-auto absolute bottom-4 left-1/2 z-40 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center rounded-[14px] border border-white/10 bg-[rgba(12,12,13,0.76)] p-0.5 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md">
-            <ToolbarButton
-              disabled={!activeTabId || !graphHistory.canUndo(activeTabId)}
-              onClick={() => {
-                void graphHistory.undo(activeTabId);
-              }}
+          <div className="pointer-events-none absolute inset-x-3 bottom-4 z-40 flex justify-center">
+            <div
+              data-testid="workspace-toolbar"
+              className="pointer-events-auto inline-flex max-w-full items-center overflow-x-auto rounded-[14px] border border-white/10 bg-[rgba(12,12,13,0.76)] p-0.5 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md scrollbar-none"
             >
-              <Undo2 className="size-4 opacity-70" />
-              Undo
-            </ToolbarButton>
-            <ToolbarDivider />
-            <ToolbarButton
-              disabled={!activeTabId || !graphHistory.canRedo(activeTabId)}
-              onClick={() => {
-                void graphHistory.redo(activeTabId);
-              }}
-            >
-              <Redo2 className="size-4 opacity-70" />
-              Redo
-            </ToolbarButton>
-            <ToolbarDivider />
-            <ToolbarButton
-              disabled={!activeTabId || regularTabAgents.length === 0}
-              onClick={openSaveBlueprintDialog}
-            >
-              <Save className="size-4 opacity-70" />
-              Save as Blueprint
-            </ToolbarButton>
-            <ToolbarDivider />
-            <ToolbarButton
-              disabled={!activeTabId}
-              onClick={openCreateAgentDialog}
-            >
-              <Plus className="size-4 opacity-70" />
-              Add Agent
-            </ToolbarButton>
-            <ToolbarDivider />
-            <ToolbarButton
-              disabled={!activeTabId || tabAgentOptions.length < 2}
-              active={graphConnectMode}
-              onClick={() => graphRef.current?.enterConnectMode()}
-            >
-              <Link2 className="size-4 opacity-70" />
-              Connect
-            </ToolbarButton>
+              <ToolbarButton
+                disabled={!activeTabId || !graphHistory.canUndo(activeTabId)}
+                onClick={() => {
+                  void graphHistory.undo(activeTabId);
+                }}
+              >
+                <Undo2 className="size-4 opacity-70" />
+                Undo
+              </ToolbarButton>
+              <ToolbarDivider />
+              <ToolbarButton
+                disabled={!activeTabId || !graphHistory.canRedo(activeTabId)}
+                onClick={() => {
+                  void graphHistory.redo(activeTabId);
+                }}
+              >
+                <Redo2 className="size-4 opacity-70" />
+                Redo
+              </ToolbarButton>
+              <ToolbarDivider />
+              <ToolbarButton
+                disabled={!activeTabId || regularTabAgents.length === 0}
+                onClick={openSaveBlueprintDialog}
+              >
+                <Save className="size-4 opacity-70" />
+                Save as Blueprint
+              </ToolbarButton>
+              <ToolbarDivider />
+              <ToolbarButton
+                disabled={!activeTabId}
+                onClick={openCreateAgentDialog}
+              >
+                <Plus className="size-4 opacity-70" />
+                Add Agent
+              </ToolbarButton>
+              <ToolbarDivider />
+              <ToolbarButton
+                disabled={!activeTabId || tabAgentOptions.length < 2}
+                active={graphConnectMode}
+                onClick={() => graphRef.current?.enterConnectMode()}
+              >
+                <Link2 className="size-4 opacity-70" />
+                Connect
+              </ToolbarButton>
+            </div>
           </div>
         </div>
 
@@ -1550,7 +1555,7 @@ function ToolbarButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-white/68 transition-[background-color,border-color,color] duration-150 hover:border-white/8 hover:bg-white/[0.04] hover:text-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:bg-transparent",
+        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-white/68 transition-[background-color,border-color,color] duration-150 hover:border-white/8 hover:bg-white/[0.04] hover:text-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:bg-transparent",
         active && "border-white/12 bg-white/[0.06] text-white",
       )}
     >

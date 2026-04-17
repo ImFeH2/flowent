@@ -23,6 +23,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
     handleKeyDown,
     hasUploadingImages = false,
     input,
+    isBrowsingInputHistory,
+    navigateInputHistory,
     onMessagesScroll,
     removeImage = () => {},
     retryMessage,
@@ -91,10 +93,12 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
             input={input}
             onAddImages={(files) => void addImages(files)}
             onChange={setInput}
+            onNavigateHistory={navigateInputHistory}
             onKeyDown={handleKeyDown}
             onRemoveImage={removeImage}
             onSend={() => void sendMessage()}
             overlay
+            suppressCommandNavigation={isBrowsingInputHistory}
             variant={chatVariant}
           />
         </div>

@@ -81,6 +81,14 @@ interface AssistantChatComposerProps {
   input: string;
   onAddImages?: (files: FileList | File[]) => void;
   onChange: (value: string) => void;
+  onNavigateHistory?: (
+    direction: -1 | 1,
+    selection: {
+      start: number | null;
+      end: number | null;
+    },
+  ) => boolean;
+  suppressCommandNavigation?: boolean;
   onKeyDown: KeyboardEventHandler<HTMLTextAreaElement>;
   onRemoveImage?: (imageId: string) => void;
   onSend: () => void;
@@ -180,12 +188,14 @@ export function AssistantChatComposer({
   input,
   onAddImages = () => {},
   onChange,
+  onNavigateHistory,
   onKeyDown,
   onRemoveImage = () => {},
   onSend,
   onStop,
   overlay = false,
   stopping = false,
+  suppressCommandNavigation = false,
   variant,
 }: AssistantChatComposerProps) {
   const isWorkspace = variant === "workspace";
@@ -277,6 +287,31 @@ export function AssistantChatComposer({
   const handleComposerKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (
     event,
   ) => {
+    if (
+      (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+      onNavigateHistory
+    ) {
+      const direction = event.key === "ArrowUp" ? -1 : 1;
+      const handled = onNavigateHistory(direction, {
+        start: event.currentTarget.selectionStart,
+        end: event.currentTarget.selectionEnd,
+      });
+
+      if (handled) {
+        event.preventDefault();
+        return;
+      }
+    }
+
+    if (
+      suppressCommandNavigation &&
+      commandPanelVisible &&
+      (event.key === "ArrowUp" || event.key === "ArrowDown")
+    ) {
+      onKeyDown(event);
+      return;
+    }
+
     if (commandPanelVisible) {
       const completionCommand =
         commandOptions.length > 0 &&

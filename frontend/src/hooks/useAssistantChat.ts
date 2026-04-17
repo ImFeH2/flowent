@@ -1,4 +1,5 @@
 import {
+  useSyncExternalStore,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 import {
   clearAssistantChatRequest,
   fetchNodeDetail,
+  getImageAssetUrl,
   interruptNode,
   retryAssistantMessageRequest,
   uploadImageAssetRequest,
@@ -29,8 +31,15 @@ import {
   mergeHistoryWithDeltas,
 } from "@/lib/history";
 import { contentPartsToText, normalizeContentParts } from "@/lib/contentParts";
+import {
+  appendAssistantInputHistoryEntry,
+  getAssistantInputHistorySnapshot,
+  subscribeAssistantInputHistory,
+} from "@/lib/assistantInputHistory";
 import type {
   AssistantChatItem,
+  AssistantInputHistoryEntry,
+  AssistantInputHistoryImage,
   ContentPart,
   HistoryEntry,
   NodeDetail,
@@ -74,6 +83,61 @@ function revokeDraftImageUrls(images: DraftAssistantImage[]) {
   for (const image of images) {
     revokeDraftImageUrl(image);
   }
+}
+
+function toInputHistoryImages(
+  images: DraftAssistantImage[],
+): AssistantInputHistoryImage[] {
+  return images
+    .filter(
+      (image): image is DraftAssistantImage & { assetId: string } =>
+        image.status === "ready" && Boolean(image.assetId),
+    )
+    .map((image) => ({
+      assetId: image.assetId,
+      mimeType: image.mimeType,
+      width: image.width,
+      height: image.height,
+      name: image.name,
+    }));
+}
+
+function toDraftImagesFromHistory(
+  entry: AssistantInputHistoryEntry,
+): DraftAssistantImage[] {
+  return entry.images.map((image, index) => ({
+    id: `history-${entry.timestamp}-${index}`,
+    assetId: image.assetId,
+    previewUrl: getImageAssetUrl(image.assetId),
+    mimeType: image.mimeType,
+    width: image.width,
+    height: image.height,
+    name: image.name,
+    status: "ready",
+  }));
+}
+
+function draftImagesMatchHistoryEntry(
+  images: DraftAssistantImage[],
+  entry: AssistantInputHistoryEntry,
+) {
+  if (images.length !== entry.images.length) {
+    return false;
+  }
+
+  return entry.images.every((image, index) => {
+    const draft = images[index];
+
+    return (
+      Boolean(draft) &&
+      draft?.status === "ready" &&
+      draft.assetId === image.assetId &&
+      draft.mimeType === image.mimeType &&
+      draft.width === image.width &&
+      draft.height === image.height &&
+      draft.name === image.name
+    );
+  });
 }
 
 function readImageSize(
@@ -120,8 +184,9 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const { pendingAssistantMessages, sendAssistantMessage } = useAgentUI();
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
-  const [input, setInput] = useState("");
+  const [input, setInputState] = useState("");
   const [draftImages, setDraftImages] = useState<DraftAssistantImage[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<number | null>(null);
   const [clearing, setClearing] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(
     null,
@@ -152,6 +217,33 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     (image): image is DraftAssistantImage & { assetId: string } =>
       image.status === "ready" && Boolean(image.assetId),
   );
+  const inputHistoryEntries = useSyncExternalStore(
+    subscribeAssistantInputHistory,
+    getAssistantInputHistorySnapshot,
+    getAssistantInputHistorySnapshot,
+  );
+  const currentHistoryEntry =
+    historyCursor !== null
+      ? (inputHistoryEntries[historyCursor] ?? null)
+      : null;
+  const isBrowsingInputHistory =
+    currentHistoryEntry !== null &&
+    input === currentHistoryEntry.text &&
+    draftImagesMatchHistoryEntry(draftImages, currentHistoryEntry);
+
+  const restoreHistoryEntry = useCallback(
+    (entry: AssistantInputHistoryEntry | null, cursor: number | null) => {
+      setHistoryCursor(cursor);
+      setInputState(entry?.text ?? "");
+      setDraftImages(entry ? toDraftImagesFromHistory(entry) : []);
+    },
+    [],
+  );
+
+  const setInput = useCallback((value: string) => {
+    setHistoryCursor(null);
+    setInputState(value);
+  }, []);
 
   useEffect(() => {
     draftImagesRef.current = draftImages;
@@ -384,8 +476,11 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
 
     const previousInput = input;
     const previousDraftImages = draftImages;
+    const previousHistoryCursor = historyCursor;
+    const submittedAt = Date.now();
     setSending(true);
-    setInput("");
+    setHistoryCursor(null);
+    setInputState("");
     setDraftImages([]);
 
     try {
@@ -393,10 +488,16 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
         content: content || contentPartsToText(parts),
         parts,
       });
+      appendAssistantInputHistoryEntry({
+        text: previousInput,
+        images: toInputHistoryImages(previousDraftImages),
+        timestamp: submittedAt,
+      });
       revokeDraftImageUrls(previousDraftImages);
     } catch (error) {
-      setInput(previousInput);
+      setInputState(previousInput);
       setDraftImages(previousDraftImages);
+      setHistoryCursor(previousHistoryCursor);
       toast.error(
         error instanceof Error ? error.message : "Failed to send message",
       );
@@ -407,6 +508,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
 
   const addImages = useCallback(
     async (files: FileList | File[]) => {
+      setHistoryCursor(null);
       if (!supportsInputImage) {
         toast.error("Current model does not support image input");
         return;
@@ -480,6 +582,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   );
 
   const removeImage = useCallback((imageId: string) => {
+    setHistoryCursor(null);
     setDraftImages((current) => {
       const image = current.find((item) => item.id === imageId);
       if (image) {
@@ -488,6 +591,71 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       return current.filter((item) => item.id !== imageId);
     });
   }, []);
+
+  const navigateInputHistory = useCallback(
+    (
+      direction: -1 | 1,
+      selection: {
+        start: number | null;
+        end: number | null;
+      },
+    ) => {
+      if (inputHistoryEntries.length === 0) {
+        return false;
+      }
+
+      const selectionStart = selection.start;
+      const selectionEnd = selection.end;
+      const isBlankDraft = input.length === 0 && draftImages.length === 0;
+      const isBoundarySelection =
+        typeof selectionStart === "number" &&
+        typeof selectionEnd === "number" &&
+        selectionStart === selectionEnd &&
+        (selectionStart === 0 || selectionStart === input.length);
+      const canContinueHistory =
+        currentHistoryEntry !== null &&
+        isBrowsingInputHistory &&
+        isBoundarySelection;
+
+      if (!isBlankDraft && !canContinueHistory) {
+        return false;
+      }
+
+      if (historyCursor === null) {
+        if (direction !== -1) {
+          return false;
+        }
+
+        const nextIndex = inputHistoryEntries.length - 1;
+        restoreHistoryEntry(inputHistoryEntries[nextIndex] ?? null, nextIndex);
+        return true;
+      }
+
+      if (direction === -1) {
+        const nextIndex = Math.max(historyCursor - 1, 0);
+        restoreHistoryEntry(inputHistoryEntries[nextIndex] ?? null, nextIndex);
+        return true;
+      }
+
+      if (historyCursor >= inputHistoryEntries.length - 1) {
+        restoreHistoryEntry(null, null);
+        return true;
+      }
+
+      const nextIndex = historyCursor + 1;
+      restoreHistoryEntry(inputHistoryEntries[nextIndex] ?? null, nextIndex);
+      return true;
+    },
+    [
+      currentHistoryEntry,
+      draftImages,
+      historyCursor,
+      input,
+      inputHistoryEntries,
+      isBrowsingInputHistory,
+      restoreHistoryEntry,
+    ],
+  );
 
   const clearChat = async () => {
     if (!assistantId || clearing) {
@@ -592,6 +760,8 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     handleKeyDown,
     hasUploadingImages,
     input,
+    isBrowsingInputHistory,
+    navigateInputHistory,
     onMessagesScroll,
     removeImage,
     retryMessage,

@@ -1876,6 +1876,8 @@ function AssistantChatPanel({
     handleKeyDown,
     hasUploadingImages = false,
     input,
+    isBrowsingInputHistory,
+    navigateInputHistory,
     onMessagesScroll,
     removeImage = () => {},
     retryMessage,
@@ -1958,11 +1960,13 @@ function AssistantChatPanel({
             input={input}
             onAddImages={(files) => void addImages(files)}
             onChange={setInput}
+            onNavigateHistory={navigateInputHistory}
             onKeyDown={handleKeyDown}
             onRemoveImage={removeImage}
             onSend={() => void sendMessage()}
             onStop={onInterrupt}
             overlay
+            suppressCommandNavigation={isBrowsingInputHistory}
             stopping={interrupting}
             variant="workspace"
           />

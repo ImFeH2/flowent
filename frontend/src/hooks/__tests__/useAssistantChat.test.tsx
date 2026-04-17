@@ -9,9 +9,14 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAssistantChat } from "@/hooks/useAssistantChat";
+import {
+  clearAssistantInputHistoryForTests,
+  resetAssistantInputHistorySessionForTests,
+} from "@/lib/assistantInputHistory";
 import type { HistoryEntry, Node, NodeDetail } from "@/types";
 
 const clearAssistantChatRequestMock = vi.fn();
+const getImageAssetUrlMock = vi.fn();
 const interruptNodeMock = vi.fn();
 const retryAssistantMessageRequestMock = vi.fn();
 const toastErrorMock = vi.fn();
@@ -42,6 +47,7 @@ vi.mock("@/lib/api", () => ({
   clearAssistantChatRequest: (...args: unknown[]) =>
     clearAssistantChatRequestMock(...args),
   fetchNodeDetail: (...args: unknown[]) => fetchNodeDetailMock(...args),
+  getImageAssetUrl: (...args: unknown[]) => getImageAssetUrlMock(...args),
   interruptNode: (...args: unknown[]) => interruptNodeMock(...args),
   retryAssistantMessageRequest: (...args: unknown[]) =>
     retryAssistantMessageRequestMock(...args),
@@ -169,6 +175,7 @@ function mockScrollableElement(
 describe("useAssistantChat", () => {
   beforeEach(() => {
     clearAssistantChatRequestMock.mockReset();
+    getImageAssetUrlMock.mockReset();
     interruptNodeMock.mockReset();
     retryAssistantMessageRequestMock.mockReset();
     toastErrorMock.mockReset();
@@ -196,6 +203,10 @@ describe("useAssistantChat", () => {
       pendingAssistantMessages: [],
       sendAssistantMessage: vi.fn(),
     });
+    getImageAssetUrlMock.mockImplementation(
+      (assetId: string) => `/api/image-assets/${assetId}`,
+    );
+    clearAssistantInputHistoryForTests();
     resizeObservers.splice(0, resizeObservers.length);
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -611,6 +622,396 @@ describe("useAssistantChat", () => {
 
     expect(retryAssistantMessageRequestMock).toHaveBeenCalledWith("msg-old");
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+
+  it("records submitted inputs and browses them with ArrowUp and ArrowDown", async () => {
+    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("idle")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentUIMock.mockReturnValue({
+      pendingAssistantMessages: [],
+      sendAssistantMessage: sendAssistantMessageMock,
+    });
+    fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(fetchNodeDetailMock).toHaveBeenCalled();
+    });
+
+    act(() => {
+      result.current.setInput("first request");
+    });
+
+    await act(async () => {
+      await result.current.sendMessage();
+    });
+
+    act(() => {
+      result.current.setInput("/help ");
+    });
+
+    await act(async () => {
+      await result.current.sendMessage();
+    });
+
+    expect(sendAssistantMessageMock).toHaveBeenNthCalledWith(1, {
+      content: "first request",
+      parts: [{ type: "text", text: "first request" }],
+    });
+    expect(sendAssistantMessageMock).toHaveBeenNthCalledWith(2, {
+      content: "/help",
+      parts: [{ type: "text", text: "/help" }],
+    });
+
+    act(() => {
+      expect(
+        result.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+      ).toBe(true);
+    });
+
+    expect(result.current.input).toBe("/help ");
+
+    act(() => {
+      expect(
+        result.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+      ).toBe(true);
+    });
+
+    expect(result.current.input).toBe("first request");
+
+    act(() => {
+      expect(result.current.navigateInputHistory(1, { start: 0, end: 0 })).toBe(
+        true,
+      );
+    });
+
+    expect(result.current.input).toBe("/help ");
+
+    act(() => {
+      expect(result.current.navigateInputHistory(1, { start: 6, end: 6 })).toBe(
+        true,
+      );
+    });
+
+    expect(result.current.input).toBe("");
+    expect(result.current.draftImages).toEqual([]);
+  });
+
+  it("restores recalled images in the same session and reloads only text history after a new session", async () => {
+    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const originalImage = globalThis.Image;
+    let objectUrlCounter = 0;
+
+    class ImageMock {
+      naturalWidth = 1280;
+      naturalHeight = 720;
+      onload: null | (() => void) = null;
+      onerror: null | (() => void) = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+    }
+
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => `blob:image-${objectUrlCounter++}`),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(globalThis, "Image", {
+      configurable: true,
+      value: ImageMock,
+    });
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([
+        [
+          "assistant",
+          {
+            ...buildAssistantNode("idle"),
+            capabilities: {
+              input_image: true,
+              output_image: false,
+            },
+          },
+        ],
+      ]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentUIMock.mockReturnValue({
+      pendingAssistantMessages: [],
+      sendAssistantMessage: sendAssistantMessageMock,
+    });
+    fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
+    uploadImageAssetRequestMock.mockResolvedValue({
+      id: "asset-1",
+      mime_type: "image/png",
+      width: 1280,
+      height: 720,
+    });
+
+    try {
+      const { result, unmount } = renderHook(() => useAssistantChat());
+
+      await waitFor(() => {
+        expect(fetchNodeDetailMock).toHaveBeenCalled();
+      });
+
+      act(() => {
+        result.current.setInput("review this image");
+      });
+
+      await act(async () => {
+        await result.current.addImages([
+          new File(["image"], "diagram.png", { type: "image/png" }),
+        ]);
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      act(() => {
+        expect(
+          result.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+        ).toBe(true);
+      });
+
+      expect(result.current.input).toBe("review this image");
+      expect(result.current.draftImages).toHaveLength(1);
+      expect(result.current.draftImages[0]).toMatchObject({
+        assetId: "asset-1",
+        name: "diagram.png",
+        previewUrl: "/api/image-assets/asset-1",
+        status: "ready",
+      });
+
+      unmount();
+      resetAssistantInputHistorySessionForTests();
+
+      const { result: refreshed } = renderHook(() => useAssistantChat());
+
+      await waitFor(() => {
+        expect(fetchNodeDetailMock).toHaveBeenCalledTimes(2);
+      });
+
+      act(() => {
+        expect(
+          refreshed.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+        ).toBe(true);
+      });
+
+      expect(refreshed.current.input).toBe("review this image");
+      expect(refreshed.current.draftImages).toEqual([]);
+    } finally {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        value: originalCreateObjectURL,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        configurable: true,
+        value: originalRevokeObjectURL,
+      });
+      Object.defineProperty(globalThis, "Image", {
+        configurable: true,
+        value: originalImage,
+      });
+    }
+  });
+
+  it("does not persist a blank history slot for image-only messages across sessions", async () => {
+    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    const originalImage = globalThis.Image;
+    let objectUrlCounter = 0;
+
+    class ImageMock {
+      naturalWidth = 1280;
+      naturalHeight = 720;
+      onload: null | (() => void) = null;
+      onerror: null | (() => void) = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+    }
+
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => `blob:image-only-${objectUrlCounter++}`),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(globalThis, "Image", {
+      configurable: true,
+      value: ImageMock,
+    });
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([
+        [
+          "assistant",
+          {
+            ...buildAssistantNode("idle"),
+            capabilities: {
+              input_image: true,
+              output_image: false,
+            },
+          },
+        ],
+      ]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentUIMock.mockReturnValue({
+      pendingAssistantMessages: [],
+      sendAssistantMessage: sendAssistantMessageMock,
+    });
+    fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
+    uploadImageAssetRequestMock.mockResolvedValue({
+      id: "asset-image-only",
+      mime_type: "image/png",
+      width: 1280,
+      height: 720,
+    });
+
+    try {
+      const { result, unmount } = renderHook(() => useAssistantChat());
+
+      await waitFor(() => {
+        expect(fetchNodeDetailMock).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        await result.current.addImages([
+          new File(["image"], "diagram-only.png", { type: "image/png" }),
+        ]);
+      });
+
+      await act(async () => {
+        await result.current.sendMessage();
+      });
+
+      act(() => {
+        expect(
+          result.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+        ).toBe(true);
+      });
+
+      expect(result.current.input).toBe("");
+      expect(result.current.draftImages).toHaveLength(1);
+
+      unmount();
+      resetAssistantInputHistorySessionForTests();
+
+      const { result: refreshed } = renderHook(() => useAssistantChat());
+
+      await waitFor(() => {
+        expect(fetchNodeDetailMock).toHaveBeenCalledTimes(2);
+      });
+
+      act(() => {
+        expect(
+          refreshed.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+        ).toBe(false);
+      });
+
+      expect(refreshed.current.input).toBe("");
+      expect(refreshed.current.draftImages).toEqual([]);
+    } finally {
+      Object.defineProperty(URL, "createObjectURL", {
+        configurable: true,
+        value: originalCreateObjectURL,
+      });
+      Object.defineProperty(URL, "revokeObjectURL", {
+        configurable: true,
+        value: originalRevokeObjectURL,
+      });
+      Object.defineProperty(globalThis, "Image", {
+        configurable: true,
+        value: originalImage,
+      });
+    }
+  });
+
+  it("only continues history browsing at text boundaries for recalled entries", async () => {
+    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("idle")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentUIMock.mockReturnValue({
+      pendingAssistantMessages: [],
+      sendAssistantMessage: sendAssistantMessageMock,
+    });
+    fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
+
+    const { result } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(fetchNodeDetailMock).toHaveBeenCalled();
+    });
+
+    act(() => {
+      result.current.setInput("follow up");
+    });
+
+    await act(async () => {
+      await result.current.sendMessage();
+    });
+
+    act(() => {
+      expect(
+        result.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+      ).toBe(true);
+    });
+
+    act(() => {
+      expect(result.current.navigateInputHistory(1, { start: 3, end: 3 })).toBe(
+        false,
+      );
+    });
+
+    expect(result.current.input).toBe("follow up");
+
+    act(() => {
+      result.current.setInput("follow up edited");
+    });
+
+    act(() => {
+      expect(
+        result.current.navigateInputHistory(-1, { start: 0, end: 0 }),
+      ).toBe(false);
+    });
   });
 
   it("keeps following the bottom when the running hint appears without a new timeline item", async () => {

@@ -914,6 +914,74 @@ describe("AssistantChatComposer", () => {
     expect(onKeyDown).not.toHaveBeenCalled();
   });
 
+  it("prioritizes input history browsing over command panel arrow handling", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+    const onNavigateHistory = vi.fn().mockReturnValue(true);
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/"
+        onChange={onChange}
+        onNavigateHistory={onNavigateHistory}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    ) as HTMLTextAreaElement;
+
+    textarea.focus();
+    textarea.setSelectionRange(1, 1);
+    fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    expect(onNavigateHistory).toHaveBeenCalledWith(1, {
+      start: 1,
+      end: 1,
+    });
+    expect(onChange).toHaveBeenCalledWith("/clear ");
+    expect(onKeyDown).not.toHaveBeenCalled();
+  });
+
+  it("keeps command arrows on the native textarea when a recalled history item is no longer at a boundary", () => {
+    const onChange = vi.fn();
+    const onKeyDown = vi.fn();
+    const onNavigateHistory = vi.fn().mockReturnValue(false);
+
+    render(
+      <AssistantChatComposer
+        disabled={false}
+        input="/compact focus"
+        onChange={onChange}
+        onNavigateHistory={onNavigateHistory}
+        onKeyDown={onKeyDown}
+        onSend={() => {}}
+        suppressCommandNavigation
+        variant="workspace"
+      />,
+    );
+
+    const textarea = screen.getByPlaceholderText(
+      "Message Assistant or type / for commands",
+    ) as HTMLTextAreaElement;
+
+    textarea.focus();
+    textarea.setSelectionRange(4, 4);
+    fireEvent.keyDown(textarea, { key: "ArrowDown" });
+
+    expect(onNavigateHistory).toHaveBeenCalledWith(1, {
+      start: 4,
+      end: 4,
+    });
+    expect(onKeyDown).toHaveBeenCalledTimes(1);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("inserts help with a trailing space when completing a non-argument command", () => {
     const onChange = vi.fn();
     const onKeyDown = vi.fn();

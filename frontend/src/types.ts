@@ -74,6 +74,20 @@ export interface PendingAssistantChatMessage extends AssistantChatMessage {
   type: "PendingHumanMessage";
 }
 
+export interface AssistantInputHistoryImage {
+  assetId: string;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  name: string;
+}
+
+export interface AssistantInputHistoryEntry {
+  text: string;
+  images: AssistantInputHistoryImage[];
+  timestamp: number;
+}
+
 export type HistoryEntryType =
   | "SystemEntry"
   | "ReceivedMessage"

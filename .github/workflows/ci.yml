@@ -39,6 +39,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -48,6 +58,14 @@ jobs:
           python-version: "3.12"
 
       - run: uv sync
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build frontend
+        working-directory: frontend
+        run: pnpm build
 
       - name: Install bubblewrap
         run: sudo apt-get update && sudo apt-get install -y bubblewrap

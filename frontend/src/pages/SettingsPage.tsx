@@ -386,9 +386,18 @@ export function SettingsPage() {
                   </SelectContent>
                 </Select>
                 {assistantRole ? (
-                  <p className="mt-2 text-[11px] leading-relaxed text-white/40">
-                    {assistantRole.description}
-                  </p>
+                  <div
+                    data-testid="assistant-role-guidance"
+                    className="mt-2 space-y-2 text-[11px] leading-relaxed text-white/40"
+                  >
+                    <p>{assistantRole.description}</p>
+                    <p>
+                      This role only changes the Assistant&apos;s behavior
+                      template. Regardless of the selected role, Assistant
+                      remains the system default entry and task boundary
+                      manager.
+                    </p>
+                  </div>
                 ) : null}
               </SettingsRow>
 

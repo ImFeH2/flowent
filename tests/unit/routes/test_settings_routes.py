@@ -5,6 +5,10 @@ import pytest
 from fastapi import HTTPException
 
 from app.access import set_access_code, verify_access_code
+from app.agent import Agent
+from app.models import NodeConfig, NodeType, SystemEntry
+from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
+from app.registry import registry
 from app.routes.settings import (
     UpdateSettingsRequest,
     UpdateTelegramSettingsRequest,
@@ -801,6 +805,70 @@ def test_update_settings_persists_assistant_role(monkeypatch):
         "mcp_servers": [],
     }
     assert saved == [settings]
+
+
+def test_update_settings_keeps_live_assistant_entry_semantics_for_non_steward_role(
+    monkeypatch,
+):
+    registry.reset()
+    settings = Settings(
+        roles=[
+            RoleConfig(name="Steward", system_prompt="Default assistant role."),
+            RoleConfig(
+                name="Reviewer",
+                system_prompt="Review carefully.",
+                included_tools=["read"],
+            ),
+        ]
+    )
+    assistant = Agent(
+        NodeConfig(
+            node_type=NodeType.ASSISTANT,
+            role_name="Steward",
+            tools=["create_tab", "delete_tab", "set_permissions", "manage_settings"],
+        )
+    )
+    saved: list[Settings] = []
+
+    registry.register(assistant)
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.graph_service.sync_tab_leaders", lambda reason: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    try:
+        result = asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(assistant={"role_name": "Reviewer"}),
+            )
+        )
+
+        assert result["settings"]["assistant"] == {
+            "role_name": "Reviewer",
+            "allow_network": True,
+            "write_dirs": build_default_assistant_write_dirs(),
+            "mcp_servers": [],
+        }
+        assert assistant.config.role_name == "Reviewer"
+        assert "create_tab" in assistant.config.tools
+        assert "delete_tab" in assistant.config.tools
+        assert "set_permissions" in assistant.config.tools
+        assert "manage_settings" in assistant.config.tools
+        assert "read" in assistant.config.tools
+        system_prompt = next(
+            entry.content
+            for entry in assistant.history
+            if isinstance(entry, SystemEntry)
+        )
+        assert STEWARD_ROLE_SYSTEM_PROMPT in system_prompt
+        assert "## Selected Role Overlay" in system_prompt
+        assert "Review carefully." in system_prompt
+        assert saved == [settings]
+    finally:
+        registry.reset()
 
 
 def test_update_settings_persists_assistant_permissions(monkeypatch):

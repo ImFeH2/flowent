@@ -91,6 +91,26 @@ def build_tools_for_role(
     return final_tools
 
 
+def build_assistant_tools(*, settings=None) -> list[str]:
+    current_settings = settings or settings_module.get_settings()
+    assistant_tools = build_tools_for_role(
+        current_settings.assistant.role_name,
+        settings=current_settings,
+    )
+    final_tools: list[str] = []
+    seen_tools: set[str] = set()
+    for tool_name in [
+        *MINIMUM_TOOLS,
+        *STEWARD_ROLE_INCLUDED_TOOLS,
+        *assistant_tools,
+    ]:
+        if tool_name in seen_tools:
+            continue
+        final_tools.append(tool_name)
+        seen_tools.add(tool_name)
+    return final_tools
+
+
 def resolve_leader_role_name(*, settings=None) -> str:
     current_settings = settings or settings_module.get_settings()
     configured_role_name = current_settings.leader.role_name.strip()
@@ -471,10 +491,7 @@ def sync_assistant_role(*, reason: str) -> None:
         return
     settings = settings_module.get_settings()
     assistant.config.role_name = settings.assistant.role_name
-    assistant.config.tools = build_tools_for_role(
-        settings.assistant.role_name,
-        settings=settings,
-    )
+    assistant.config.tools = build_assistant_tools(settings=settings)
     assistant.config.write_dirs = list(settings.assistant.write_dirs)
     assistant.config.allow_network = settings.assistant.allow_network
     assistant._sync_system_prompt_entry()

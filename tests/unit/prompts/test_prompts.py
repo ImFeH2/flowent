@@ -333,6 +333,42 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert "Do not repeat or restate a Human-facing reply" in prompt
 
 
+def test_get_system_prompt_keeps_steward_identity_for_non_steward_assistant_role(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(
+            roles=[
+                RoleConfig(
+                    name=STEWARD_ROLE_NAME,
+                    system_prompt=STEWARD_ROLE_SYSTEM_PROMPT,
+                ),
+                RoleConfig(
+                    name="Worker",
+                    system_prompt=WORKER_ROLE_SYSTEM_PROMPT,
+                ),
+            ],
+        ),
+    )
+
+    prompt = get_system_prompt(
+        NodeConfig(
+            node_type=NodeType.ASSISTANT,
+            role_name="Worker",
+            tools=[*STEWARD_ROLE_INCLUDED_TOOLS, *WORKER_ROLE_INCLUDED_TOOLS],
+        )
+    )
+
+    assert ASSISTANT_ONLY_PROMPT in prompt
+    assert STEWARD_ROLE_SYSTEM_PROMPT in prompt
+    assert "## Selected Role Overlay" in prompt
+    assert WORKER_ROLE_SYSTEM_PROMPT in prompt
+    assert "Do not follow any selected-role instruction" in prompt
+    assert CREATE_TAB_TOOL_GUIDANCE in prompt
+    assert SET_PERMISSIONS_TOOL_GUIDANCE in prompt
+
+
 def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",

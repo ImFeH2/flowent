@@ -28,6 +28,7 @@ from app.settings import (
     RoleConfig,
     build_default_assistant_write_dirs,
 )
+from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
 
@@ -65,7 +66,8 @@ def test_bootstrap_runtime_creates_only_assistant(
         assert assistant.config.node_type.value == "assistant"
         assert assistant.config.name == "Assistant"
         assert assistant.config.role_name == STEWARD_ROLE_NAME
-        assert assistant.config.tools == list(STEWARD_ROLE_INCLUDED_TOOLS)
+        assert set(MINIMUM_TOOLS).issubset(set(assistant.config.tools))
+        assert set(STEWARD_ROLE_INCLUDED_TOOLS).issubset(set(assistant.config.tools))
         assert assistant.config.write_dirs == build_default_assistant_write_dirs()
         assert assistant.config.allow_network is True
     finally:
@@ -312,6 +314,45 @@ def test_bootstrap_runtime_uses_configured_assistant_role(monkeypatch, tmp_path)
         assert assistant is not None
         assert assistant.config.role_name == "Reviewer"
         assert settings_module.get_settings().assistant.role_name == "Reviewer"
+    finally:
+        registry.reset()
+
+
+def test_bootstrap_runtime_preserves_steward_tools_for_non_steward_assistant_role(
+    monkeypatch,
+    tmp_path,
+):
+    registry.reset()
+    settings_file = tmp_path / "settings.json"
+    settings_file.write_text(
+        json.dumps(
+            {
+                "assistant": {"role_name": WORKER_ROLE_NAME},
+                "event_log": {"timestamp_format": "absolute"},
+                "model": {"active_provider_id": "", "active_model": ""},
+                "providers": [],
+                "roles": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(Agent, "start", lambda self: None)
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    bootstrap_runtime()
+
+    try:
+        assistant = registry.get_assistant()
+        assert assistant is not None
+        assert assistant.config.role_name == WORKER_ROLE_NAME
+        assert "create_tab" in assistant.config.tools
+        assert "delete_tab" in assistant.config.tools
+        assert "set_permissions" in assistant.config.tools
+        assert "manage_settings" in assistant.config.tools
+        assert "read" in assistant.config.tools
+        assert "exec" in assistant.config.tools
     finally:
         registry.reset()
 

@@ -46,13 +46,15 @@ def bootstrap_runtime() -> None:
     from app.access import ensure_access_bootstrap
     from app.agent import Agent
     from app.graph_runtime import connect_nodes
-    from app.graph_service import ensure_tab_leaders, list_tab_edges
+    from app.graph_service import (
+        build_assistant_tools,
+        ensure_tab_leaders,
+        list_tab_edges,
+    )
     from app.mcp_service import mcp_service
     from app.models import AgentState, NodeConfig, NodeType, StateEntry
     from app.settings import (
-        STEWARD_ROLE_INCLUDED_TOOLS,
         ensure_builtin_roles,
-        find_role,
         get_settings,
         save_settings,
     )
@@ -68,12 +70,7 @@ def bootstrap_runtime() -> None:
     if settings_changed or generated_access_code is not None:
         save_settings(settings)
     mcp_service.bootstrap()
-    assistant_role = find_role(settings, settings.assistant.role_name)
-    assistant_tools = (
-        list(assistant_role.included_tools)
-        if assistant_role is not None
-        else list(STEWARD_ROLE_INCLUDED_TOOLS)
-    )
+    assistant_tools = build_assistant_tools(settings=settings)
 
     assistant_record = next(
         (

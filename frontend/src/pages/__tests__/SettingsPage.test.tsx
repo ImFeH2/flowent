@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SWRConfig } from "swr";
 import { SettingsPage } from "@/pages/SettingsPage";
 import type { Provider, Role } from "@/types";
 import type { SettingsBootstrapData, UserSettings } from "@/pages/settings/lib";
@@ -172,6 +173,14 @@ function buildBootstrapData(
   };
 }
 
+function renderSettingsPage() {
+  return render(
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+      <SettingsPage />
+    </SWRConfig>,
+  );
+}
+
 describe("SettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -185,7 +194,7 @@ describe("SettingsPage", () => {
   it("loads bootstrap metadata and shows derived model details", async () => {
     fetchSettingsBootstrap.mockResolvedValue(buildBootstrapData());
 
-    render(<SettingsPage />);
+    renderSettingsPage();
 
     expect(await screen.findByLabelText("Request Timeout")).toHaveValue(
       "10000",
@@ -194,12 +203,58 @@ describe("SettingsPage", () => {
     expect(
       screen.getByText("Capabilities: input_image=true, output_image=false"),
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText("Human-facing assistant role").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByTestId("assistant-role-guidance")).toHaveTextContent(
+      "Human-facing assistant role",
+    );
+    expect(screen.getByTestId("assistant-role-guidance")).toHaveTextContent(
+      /behavior template/i,
+    );
+    expect(screen.getByTestId("assistant-role-guidance")).toHaveTextContent(
+      /system default entry/i,
+    );
     expect(screen.getAllByText("Default leader role").length).toBeGreaterThan(
       0,
     );
+  });
+
+  it("keeps assistant identity guidance visible for a non-Steward selected role", async () => {
+    fetchSettingsBootstrap.mockResolvedValue(
+      buildBootstrapData({
+        settings: buildSettings({
+          assistant: {
+            role_name: "Designer",
+            allow_network: true,
+            write_dirs: ["/workspace/project"],
+            mcp_servers: [],
+          },
+        }),
+        roles: [
+          buildRole({
+            name: "Steward",
+            description: "Human-facing assistant role",
+          }),
+          buildRole({
+            name: "Designer",
+            description: "Visual-first system behavior",
+            system_prompt: "Design.",
+            is_builtin: true,
+          }),
+          buildRole({
+            name: "Conductor",
+            description: "Default leader role",
+            system_prompt: "Lead.",
+          }),
+        ],
+      }),
+    );
+
+    renderSettingsPage();
+
+    const guidance = await screen.findByTestId("assistant-role-guidance");
+
+    expect(guidance).toHaveTextContent("Visual-first system behavior");
+    expect(guidance).toHaveTextContent(/behavior template/i);
+    expect(guidance).toHaveTextContent(/system default entry/i);
   });
 
   it("saves normalized settings payload after focused edits", async () => {
@@ -239,7 +294,7 @@ describe("SettingsPage", () => {
       reauthRequired: false,
     });
 
-    render(<SettingsPage />);
+    renderSettingsPage();
 
     const timeoutInput = await screen.findByLabelText("Request Timeout");
     const contextWindowInput = screen.getByLabelText("Context Window");
@@ -292,7 +347,7 @@ describe("SettingsPage", () => {
   it("blocks saving a compact token limit that reaches the known safe window", async () => {
     fetchSettingsBootstrap.mockResolvedValue(buildBootstrapData());
 
-    render(<SettingsPage />);
+    renderSettingsPage();
 
     const autoCompactTokenLimitInput = await screen.findByLabelText(
       "Automatic Compact Token Limit",

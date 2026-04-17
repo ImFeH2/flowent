@@ -44,14 +44,14 @@ Settings are saved to `settings.json` and can be changed at runtime without rest
 git clone https://github.com/ImFeH2/autopoe.git
 cd autopoe
 
-# Backend (API + WebSocket only)
+# Backend (API + WebSocket only, http://localhost:8000)
 uv sync
 uv run fastapi dev app/dev.py
 
-# Frontend (hot reload, separate terminal)
+# Frontend (hot reload, http://localhost:6873, separate terminal)
 cd frontend
 pnpm install
 pnpm dev
 ```
 
-In development, open `http://localhost:5173`. In production, the backend serves the built frontend from `app/static`.
+In development, open `http://localhost:6873`. The Vite dev server proxies `/api` and `/ws` to the backend on `http://localhost:8000`. In production, the backend serves the built frontend from `app/static` on `http://localhost:6873`.

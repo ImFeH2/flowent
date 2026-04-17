@@ -49,13 +49,15 @@ export default defineConfig({
     },
   },
   server: {
+    port: 6873,
+    strictPort: true,
     proxy: {
       "/api": {
-        target: "http://localhost:6873",
+        target: "http://localhost:8000",
         changeOrigin: true,
       },
       "/ws": {
-        target: "ws://localhost:6873",
+        target: "ws://localhost:8000",
         ws: true,
       },
     },

@@ -197,6 +197,18 @@ def reset_local_access() -> str:
     )
 
 
+def refresh_local_access() -> str:
+    from app.events import event_bus
+
+    settings = get_settings()
+    next_code = generate_access_code()
+    set_access_code(settings, next_code)
+    save_settings(settings)
+    initialize_live_access_signature()
+    event_bus.close_all_connections(code=4001, reason="Access session refreshed")
+    return f"Generated new access code: {next_code}"
+
+
 __all__ = [
     "ACCESS_SESSION_KEY",
     "AccessControlMiddleware",
@@ -208,6 +220,7 @@ __all__ = [
     "is_access_configured",
     "is_authenticated_session",
     "refresh_live_access_signature",
+    "refresh_local_access",
     "reset_local_access",
     "set_access_code",
     "verify_access_code",

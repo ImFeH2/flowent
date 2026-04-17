@@ -50,7 +50,6 @@ export default defineConfig({
   },
   server: {
     port: 6873,
-    strictPort: true,
     proxy: {
       "/api": {
         target: "http://localhost:8000",

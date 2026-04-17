@@ -9,12 +9,26 @@ from curl_cffi.requests.exceptions import RequestException
 DEFAULT_BROWSER_IMPERSONATE: Literal["chrome"] = "chrome"
 
 
-def create_http_session(*, timeout: float) -> Session:
-    return Session(timeout=timeout, impersonate=DEFAULT_BROWSER_IMPERSONATE)
+def create_http_session(
+    *,
+    timeout: float,
+    impersonate_browser: bool = False,
+) -> Session:
+    kwargs: dict[str, Any] = {"timeout": timeout}
+    if impersonate_browser:
+        kwargs["impersonate"] = DEFAULT_BROWSER_IMPERSONATE
+    return Session(**kwargs)
 
 
-def create_async_http_session(*, timeout: float) -> AsyncSession:
-    return AsyncSession(timeout=timeout, impersonate=DEFAULT_BROWSER_IMPERSONATE)
+def create_async_http_session(
+    *,
+    timeout: float,
+    impersonate_browser: bool = False,
+) -> AsyncSession:
+    kwargs: dict[str, Any] = {"timeout": timeout}
+    if impersonate_browser:
+        kwargs["impersonate"] = DEFAULT_BROWSER_IMPERSONATE
+    return AsyncSession(**kwargs)
 
 
 def is_success_status(status_code: int) -> bool:

@@ -22,8 +22,12 @@ class _FakeResponse:
 
 
 class _FakeClient:
-    def __init__(self, *, timeout: float):
+    last_impersonate_browser: bool | None = None
+
+    def __init__(self, *, timeout: float, impersonate_browser: bool = False):
         self.timeout = timeout
+        self.impersonate_browser = impersonate_browser
+        type(self).last_impersonate_browser = impersonate_browser
 
     def __enter__(self):
         return self
@@ -44,6 +48,7 @@ def test_fetch_tool_streams_response_body_chunks(monkeypatch):
         NodeConfig(node_type=NodeType.AGENT, tools=["fetch"], allow_network=True)
     )
     chunks: list[str] = []
+    _FakeClient.last_impersonate_browser = None
 
     monkeypatch.setattr("app.tools.fetch.create_http_session", _FakeClient)
 
@@ -57,3 +62,4 @@ def test_fetch_tool_streams_response_body_chunks(monkeypatch):
 
     assert result == {"status_code": 200, "body": "hello world"}
     assert "".join(chunks) == "GET https://example.com/data\nHTTP 200\n\nhello world"
+    assert _FakeClient.last_impersonate_browser is True

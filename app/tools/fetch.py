@@ -41,7 +41,7 @@ class FetchTool(Tool):
         logger.debug("HTTP {} {}", method, url)
         try:
             with (
-                create_http_session(timeout=30.0) as client,
+                create_http_session(timeout=30.0, impersonate_browser=True) as client,
                 client.stream(
                     method,
                     url,

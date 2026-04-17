@@ -12,7 +12,6 @@ class Tab:
     title: str
     goal: str = ""
     leader_id: str | None = None
-    mcp_servers: list[str] = field(default_factory=list)
     network_blueprint_id: str | None = None
     network_blueprint_name: str | None = None
     network_blueprint_version: int | None = None
@@ -27,7 +26,6 @@ class Tab:
             "title": self.title,
             "goal": self.goal,
             "leader_id": self.leader_id,
-            "mcp_servers": list(self.mcp_servers),
             "network_blueprint_source": (
                 {
                     "blueprint_id": self.network_blueprint_id,
@@ -68,13 +66,6 @@ class Tab:
             leader_id=str(data["leader_id"])
             if isinstance(data.get("leader_id"), str)
             else None,
-            mcp_servers=[
-                str(item)
-                for item in raw_mcp_servers
-                if isinstance(item, str) and str(item).strip()
-            ]
-            if isinstance((raw_mcp_servers := data.get("mcp_servers")), list)
-            else [],
             network_blueprint_id=(
                 str(network_blueprint_source["blueprint_id"])
                 if isinstance(network_blueprint_source.get("blueprint_id"), str)

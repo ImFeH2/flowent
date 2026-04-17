@@ -17,12 +17,10 @@ from curl_cffi import requests as curl_requests
 
 from app.settings import (
     MCPServerConfig,
-    build_mcp_server_mounts,
     find_mcp_server,
     get_settings,
     save_settings,
 )
-from app.workspace_store import workspace_store
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -950,8 +948,6 @@ class MCPService:
 
     def list_server_payloads(self) -> list[dict[str, object]]:
         settings = get_settings()
-        assistant_mounts = set(settings.assistant.mcp_servers)
-        tabs = workspace_store.list_tabs()
         payloads: list[dict[str, object]] = []
         for server in settings.mcp_servers:
             snapshot = self._get_snapshot(server.name)
@@ -967,6 +963,7 @@ class MCPService:
                     "disabled_tools": list(server.disabled_tools),
                     "scopes": list(server.scopes),
                     "oauth_resource": server.oauth_resource,
+                    "launcher": server.launcher,
                     "command": server.command,
                     "args": list(server.args),
                     "env": dict(server.env),
@@ -987,16 +984,9 @@ class MCPService:
                     if server.transport == "stdio"
                     else "not_logged_in",
                 ).serialize(),
-                "mounts": {
-                    "assistant": server.name in assistant_mounts,
-                    "tabs": [
-                        {
-                            "tab_id": tab.id,
-                            "tab_title": tab.title,
-                            "mounted": server.name in tab.mcp_servers,
-                        }
-                        for tab in tabs
-                    ],
+                "visibility": {
+                    "scope": "global",
+                    "active": snapshot is not None and snapshot.status == "connected",
                 },
                 "activity": [
                     activity.serialize()
@@ -1111,14 +1101,6 @@ class MCPService:
         existing = find_mcp_server(settings, next_name)
         if existing is not None and existing.name != current_name:
             raise MCPError(f"MCP server '{next_name}' already exists")
-        try:
-            mcp_servers = build_mcp_server_mounts(
-                [item.name for item in settings.mcp_servers],
-                field_name="mcp_servers",
-            )
-        except ValueError:
-            mcp_servers = [item.name for item in settings.mcp_servers]
-        _ = mcp_servers
         from app.settings import _build_mcp_server_config
 
         server_config, migrated = _build_mcp_server_config(config_data)
@@ -1126,21 +1108,9 @@ class MCPService:
         if server_config is None:
             raise MCPError("Invalid MCP server config")
         if current_name is not None and current_name != next_name:
-            for mounted_name in settings.assistant.mcp_servers:
-                if mounted_name == current_name:
-                    mounted_name = next_name
-            settings.assistant.mcp_servers = [
-                next_name if mounted_name == current_name else mounted_name
-                for mounted_name in settings.assistant.mcp_servers
-            ]
-            for tab in workspace_store.list_tabs():
-                if current_name not in tab.mcp_servers:
-                    continue
-                tab.mcp_servers = [
-                    next_name if mounted_name == current_name else mounted_name
-                    for mounted_name in tab.mcp_servers
-                ]
-                workspace_store.upsert_tab(tab)
+            with self._lock:
+                self._snapshots.pop(current_name, None)
+                self._logged_out_servers.discard(current_name)
         replaced = False
         for index, existing_server in enumerate(settings.mcp_servers):
             if existing_server.name != (current_name or next_name):
@@ -1176,21 +1146,7 @@ class MCPService:
         settings.mcp_servers = [
             server for server in settings.mcp_servers if server.name != server_name
         ]
-        settings.assistant.mcp_servers = [
-            mounted_name
-            for mounted_name in settings.assistant.mcp_servers
-            if mounted_name != server_name
-        ]
         save_settings(settings)
-        for tab in workspace_store.list_tabs():
-            if server_name not in tab.mcp_servers:
-                continue
-            tab.mcp_servers = [
-                mounted_name
-                for mounted_name in tab.mcp_servers
-                if mounted_name != server_name
-            ]
-            workspace_store.upsert_tab(tab)
         with self._lock:
             self._snapshots.pop(server_name, None)
             self._logged_out_servers.discard(server_name)
@@ -1255,68 +1211,18 @@ class MCPService:
         )
         return snapshot.serialize()
 
-    def set_assistant_mount(self, *, server_name: str, mounted: bool) -> list[str]:
-        settings = get_settings()
-        server = find_mcp_server(settings, server_name)
-        if server is None:
-            raise MCPError(f"MCP server '{server_name}' not found")
-        if mounted and not server.enabled:
-            raise MCPError(f"MCP server '{server_name}' is disabled")
-        names = [name for name in settings.assistant.mcp_servers if name != server_name]
-        if mounted:
-            names.append(server_name)
-        settings.assistant.mcp_servers = build_mcp_server_mounts(
-            names,
-            field_name="assistant.mcp_servers",
-        )
-        save_settings(settings)
-        return list(settings.assistant.mcp_servers)
-
-    def set_tab_mount(
-        self, *, server_name: str, tab_id: str, mounted: bool
-    ) -> dict[str, object]:
-        settings = get_settings()
-        server = find_mcp_server(settings, server_name)
-        if server is None:
-            raise MCPError(f"MCP server '{server_name}' not found")
-        if mounted and not server.enabled:
-            raise MCPError(f"MCP server '{server_name}' is disabled")
-        tab = workspace_store.get_tab(tab_id)
-        if tab is None:
-            raise MCPError(f"Tab '{tab_id}' not found")
-        next_mounts = [name for name in tab.mcp_servers if name != server_name]
-        if mounted:
-            next_mounts.append(server_name)
-        from app.graph_service import set_tab_mcp_servers
-
-        payload, error = set_tab_mcp_servers(
-            tab_id=tab_id,
-            mcp_servers=next_mounts,
-            actor_id="assistant",
-        )
-        if error is not None or payload is None:
-            raise MCPError(error or "Failed to update tab MCP mounts")
-        return payload
-
     def _visible_server_names_for_agent(self, agent: Agent) -> list[str]:
         settings = get_settings()
-        if agent.config.node_type.value == "assistant":
-            mounted_names = list(settings.assistant.mcp_servers)
-        elif agent.config.tab_id:
-            tab = workspace_store.get_tab(agent.config.tab_id)
-            mounted_names = list(tab.mcp_servers) if tab is not None else []
-        else:
-            mounted_names = []
         visible_names: list[str] = []
         seen: set[str] = set()
-        for server_name in mounted_names:
-            if server_name in seen:
+        for server in settings.mcp_servers:
+            if server.name in seen or not server.enabled:
                 continue
-            server = find_mcp_server(settings, server_name)
-            if server is None or not server.enabled:
+            snapshot = self._get_snapshot(server.name)
+            if snapshot is None or snapshot.status != "connected":
                 continue
-            seen.add(server_name)
-            visible_names.append(server_name)
+            seen.add(server.name)
+            visible_names.append(server.name)
         return visible_names
 
     def _visible_snapshots_for_agent(self, agent: Agent) -> list[MCPDiscoverySnapshot]:
@@ -1400,9 +1306,7 @@ class MCPService:
 
     def _get_server_for_agent(self, agent: Agent, server_name: str) -> MCPServerConfig:
         if server_name not in self._visible_server_names_for_agent(agent):
-            raise MCPError(
-                f"MCP server '{server_name}' is not mounted in the current boundary"
-            )
+            raise MCPError(f"MCP server '{server_name}' is not globally available")
         server = find_mcp_server(get_settings(), server_name)
         if server is None or not server.enabled:
             raise MCPError(f"MCP server '{server_name}' is unavailable")

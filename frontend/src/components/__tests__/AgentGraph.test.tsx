@@ -254,7 +254,6 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     title: "Research Task",
     goal: "Inspect the repository",
     leader_id: "leader-1",
-    mcp_servers: [],
     created_at: 1,
     updated_at: 1,
     network_source: {

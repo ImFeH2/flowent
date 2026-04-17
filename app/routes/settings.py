@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.access import initialize_live_access_signature, set_access_code
 from app.events import event_bus
@@ -19,7 +19,6 @@ from app.settings import (
     build_assistant_allow_network,
     build_assistant_write_dirs,
     build_default_model_params,
-    build_mcp_server_mounts,
     build_model_auto_compact_token_limit,
     build_model_context_window_tokens,
     build_model_input_image,
@@ -64,6 +63,7 @@ async def get_settings_api() -> dict[str, object]:
 
 
 class UpdateSettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     access: dict[str, object] | None = None
     assistant: dict[str, object] | None = None
     event_log: dict[str, object] | None = None
@@ -72,6 +72,7 @@ class UpdateSettingsRequest(BaseModel):
 
 
 class UpdateTelegramSettingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     bot_token: str | None = None
 
 
@@ -113,6 +114,16 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             next_access_code = new_code
 
     if req.assistant is not None:
+        assistant_unknown_fields = sorted(
+            set(req.assistant) - {"role_name", "allow_network", "write_dirs"}
+        )
+        if assistant_unknown_fields:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Unknown assistant fields: " + ", ".join(assistant_unknown_fields)
+                ),
+            )
         role_name = req.assistant.get("role_name", current.assistant.role_name)
         next_role_name = (
             role_name if isinstance(role_name, str) else current.assistant.role_name
@@ -140,20 +151,10 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
-        next_mcp_servers = list(current.assistant.mcp_servers)
-        if "mcp_servers" in req.assistant:
-            try:
-                next_mcp_servers = build_mcp_server_mounts(
-                    req.assistant.get("mcp_servers"),
-                    field_name="assistant.mcp_servers",
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
         current.assistant = AssistantSettings(
             role_name=next_role_name,
             allow_network=next_allow_network,
             write_dirs=next_write_dirs,
-            mcp_servers=next_mcp_servers,
         )
 
     if req.leader is not None:

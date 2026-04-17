@@ -24,8 +24,6 @@ const {
   previewMcpPromptMock,
   refreshAllMcpServersMock,
   refreshMcpServerMock,
-  setAssistantMcpMountMock,
-  setTabMcpMountMock,
   toastErrorMock,
   toastSuccessMock,
   updateMcpServerMock,
@@ -38,8 +36,6 @@ const {
   previewMcpPromptMock: vi.fn(),
   refreshAllMcpServersMock: vi.fn(),
   refreshMcpServerMock: vi.fn(),
-  setAssistantMcpMountMock: vi.fn(),
-  setTabMcpMountMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   updateMcpServerMock: vi.fn(),
@@ -55,9 +51,6 @@ vi.mock("@/lib/api", () => ({
   refreshAllMcpServers: (...args: unknown[]) =>
     refreshAllMcpServersMock(...args),
   refreshMcpServer: (...args: unknown[]) => refreshMcpServerMock(...args),
-  setAssistantMcpMount: (...args: unknown[]) =>
-    setAssistantMcpMountMock(...args),
-  setTabMcpMount: (...args: unknown[]) => setTabMcpMountMock(...args),
   updateMcpServer: (...args: unknown[]) => updateMcpServerMock(...args),
 }));
 
@@ -82,6 +75,7 @@ function buildConfig(
     disabled_tools: overrides.disabled_tools ?? [],
     scopes: overrides.scopes ?? [],
     oauth_resource: overrides.oauth_resource ?? "",
+    launcher: overrides.launcher ?? "",
     command: overrides.command ?? "npx",
     args: overrides.args ?? ["-y", "demo-mcp"],
     env: overrides.env ?? {},
@@ -157,22 +151,16 @@ function buildServer(
         prompts: 0,
       },
     },
-    mounts: overrides.mounts ?? {
-      assistant: false,
-      tabs: [],
+    visibility: overrides.visibility ?? {
+      scope: "global",
+      active: true,
     },
     activity: overrides.activity ?? [],
   };
 }
 
 function buildState(servers: MCPServerRecord[]): MCPStatePayload {
-  return {
-    assistant_mcp_servers: servers
-      .filter((server) => server.mounts.assistant)
-      .map((server) => server.config.name),
-    tabs: [],
-    servers,
-  };
+  return { servers };
 }
 
 function renderPage() {
@@ -236,6 +224,9 @@ describe("McpPage", () => {
     expect(screen.getAllByText("Error").length).toBeGreaterThan(0);
     expect(screen.queryByText("Autopoe MCP Server")).not.toBeInTheDocument();
     expect(
+      screen.getByPlaceholderText("npx @playwright/mcp@latest"),
+    ).toBeInTheDocument();
+    expect(
       screen.getByPlaceholderText("Search MCP servers"),
     ).toBeInTheDocument();
   });
@@ -271,26 +262,84 @@ describe("McpPage", () => {
     expect(screen.getByText("github")).toBeInTheDocument();
   });
 
-  it("shows mounted summaries, filters tab mounts, and filters activity categories", async () => {
+  it("parses a Quick Add launcher and submits the derived server config", async () => {
     fetchMcpStateMock.mockResolvedValue(
       buildState([
         buildServer({
           config: buildConfig({ name: "filesystem" }),
-          mounts: {
-            assistant: true,
-            tabs: [
-              {
-                tab_id: "tab-release-1234",
-                tab_title: "Release Plan",
-                mounted: true,
-              },
-              {
-                tab_id: "tab-ops-5678",
-                tab_title: "Operations",
-                mounted: false,
-              },
-            ],
-          },
+        }),
+      ]),
+    );
+    let resolveCreate: (value: Record<string, unknown>) => void = () => {};
+    createMcpServerMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCreate = resolve as (value: Record<string, unknown>) => void;
+        }),
+    );
+
+    renderPage();
+
+    await screen.findByText("Configured");
+    fireEvent.change(
+      screen.getByPlaceholderText("npx @playwright/mcp@latest"),
+      {
+        target: { value: "npx @playwright/mcp@latest" },
+      },
+    );
+    fireEvent.click(screen.getAllByRole("button", { name: "Quick Add" })[1]);
+
+    await waitFor(() =>
+      expect(screen.getAllByText("playwright-mcp").length).toBeGreaterThan(1),
+    );
+
+    await waitFor(() =>
+      expect(createMcpServerMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "playwright-mcp",
+          transport: "stdio",
+          launcher: "npx @playwright/mcp@latest",
+          command: "npx",
+          args: ["@playwright/mcp@latest"],
+        }),
+      ),
+    );
+
+    resolveCreate({
+      server_name: "playwright-mcp",
+      transport: "stdio",
+      status: "connected",
+      auth_status: "unsupported",
+      last_auth_result: null,
+      last_refresh_at: 1710000000,
+      last_refresh_result: "success",
+      last_error: null,
+      tools: [],
+      resources: [],
+      resource_templates: [],
+      prompts: [],
+      capability_counts: {
+        tools: 0,
+        resources: 0,
+        resource_templates: 0,
+        prompts: 0,
+      },
+    });
+
+    await waitFor(() =>
+      expect(toastSuccessMock).toHaveBeenCalledWith("MCP server added"),
+    );
+  });
+
+  it("shows global availability, launcher mapping, and filters activity categories", async () => {
+    fetchMcpStateMock.mockResolvedValue(
+      buildState([
+        buildServer({
+          config: buildConfig({
+            name: "filesystem",
+            launcher: "npx @modelcontextprotocol/server-filesystem /workspace",
+            args: ["/workspace"],
+          }),
           activity: [
             buildActivity({
               id: "activity-refresh",
@@ -320,20 +369,9 @@ describe("McpPage", () => {
 
     renderPage();
 
-    expect(
-      (await screen.findAllByText("Assistant + 1 Tab")).length,
-    ).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "Mounts" }));
-    fireEvent.change(
-      screen.getByPlaceholderText("Search tabs by title or ID"),
-      {
-        target: { value: "release" },
-      },
-    );
-
-    expect(await screen.findByText(/Release Plan/)).toBeInTheDocument();
-    expect(screen.queryByText(/Operations/)).not.toBeInTheDocument();
+    expect((await screen.findAllByText("Global")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Original Launcher")).toBeInTheDocument();
+    expect(screen.getByText("Parsed Result")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Activity" }));
     fireEvent.click(screen.getByRole("button", { name: "Tool" }));

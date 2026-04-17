@@ -225,6 +225,7 @@ class MCPServerConfig:
     disabled_tools: list[str] = field(default_factory=list)
     scopes: list[str] = field(default_factory=list)
     oauth_resource: str = ""
+    launcher: str = ""
     command: str = ""
     args: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
@@ -258,7 +259,6 @@ class AssistantSettings:
     role_name: str = STEWARD_ROLE_NAME
     allow_network: bool = DEFAULT_ASSISTANT_ALLOW_NETWORK
     write_dirs: list[str] = field(default_factory=build_default_assistant_write_dirs)
-    mcp_servers: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -900,6 +900,7 @@ def serialize_mcp_server(server: MCPServerConfig) -> dict[str, object]:
         "disabled_tools": list(server.disabled_tools),
         "scopes": list(server.scopes),
         "oauth_resource": server.oauth_resource,
+        "launcher": server.launcher,
         "command": server.command,
         "args": list(server.args),
         "env": dict(server.env),
@@ -1380,6 +1381,12 @@ def _build_mcp_server_config(
     oauth_resource = (
         raw_oauth_resource.strip() if isinstance(raw_oauth_resource, str) else ""
     )
+    raw_launcher = raw_server.get("launcher")
+    launcher = raw_launcher.strip() if isinstance(raw_launcher, str) else ""
+    if isinstance(raw_launcher, str) and launcher != raw_launcher:
+        migrated = True
+    if raw_launcher not in {None, ""} and not isinstance(raw_launcher, str):
+        migrated = True
     raw_command = raw_server.get("command")
     command = raw_command.strip() if isinstance(raw_command, str) else ""
     cwd_raw = raw_server.get("cwd")
@@ -1451,6 +1458,7 @@ def _build_mcp_server_config(
             disabled_tools=disabled_tools,
             scopes=scopes,
             oauth_resource=oauth_resource,
+            launcher=launcher,
             command=command,
             args=args,
             env=env,
@@ -1687,17 +1695,14 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
                 continue
             seen_assistant_write_dirs.add(normalized_item)
             assistant_write_dirs.append(normalized_item)
-    assistant_mcp_servers, assistant_mcp_servers_migrated = _normalize_mcp_mount_list(
-        assistant_data.get("mcp_servers")
-    )
-    migrated = migrated or assistant_mcp_servers_migrated
+    if "mcp_servers" in assistant_data:
+        migrated = True
     assistant = AssistantSettings(
         role_name=assistant_role_name.strip()
         if isinstance(assistant_role_name, str) and assistant_role_name.strip()
         else STEWARD_ROLE_NAME,
         allow_network=assistant_allow_network,
         write_dirs=assistant_write_dirs,
-        mcp_servers=assistant_mcp_servers,
     )
     if assistant.role_name == STEWARD_ROLE_NAME and (
         not isinstance(assistant_role_name, str) or not assistant_role_name.strip()

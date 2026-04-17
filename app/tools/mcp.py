@@ -56,7 +56,7 @@ class ListMCPResourcesTool(Tool):
         "properties": {
             "server_name": {
                 "type": "string",
-                "description": "Optional mounted MCP server name filter",
+                "description": "Optional globally available MCP server name filter",
             }
         },
         "required": [],
@@ -83,7 +83,7 @@ class ListMCPResourceTemplatesTool(Tool):
         "properties": {
             "server_name": {
                 "type": "string",
-                "description": "Optional mounted MCP server name filter",
+                "description": "Optional globally available MCP server name filter",
             }
         },
         "required": [],
@@ -102,13 +102,13 @@ class ListMCPResourceTemplatesTool(Tool):
 
 class ReadMCPResourceTool(Tool):
     name = "read_mcp_resource"
-    description = "Read an MCP resource from a mounted server."
+    description = "Read an MCP resource from a globally available server."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "server_name": {
                 "type": "string",
-                "description": "Mounted MCP server name",
+                "description": "Globally available MCP server name",
             },
             "uri": {
                 "type": "string",
@@ -141,7 +141,7 @@ class ListMCPPromptsTool(Tool):
         "properties": {
             "server_name": {
                 "type": "string",
-                "description": "Optional mounted MCP server name filter",
+                "description": "Optional globally available MCP server name filter",
             }
         },
         "required": [],
@@ -160,13 +160,13 @@ class ListMCPPromptsTool(Tool):
 
 class GetMCPPromptTool(Tool):
     name = "get_mcp_prompt"
-    description = "Get an MCP prompt from a mounted server."
+    description = "Get an MCP prompt from a globally available server."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
             "server_name": {
                 "type": "string",
-                "description": "Mounted MCP server name",
+                "description": "Globally available MCP server name",
             },
             "name": {
                 "type": "string",

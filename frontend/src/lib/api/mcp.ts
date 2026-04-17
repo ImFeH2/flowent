@@ -127,31 +127,3 @@ export async function previewMcpPrompt(
     },
   });
 }
-
-export async function setAssistantMcpMount(
-  serverName: string,
-  mounted: boolean,
-): Promise<string[]> {
-  return requestJson<{ assistant_mcp_servers?: string[] }, string[]>(
-    `/api/mcp/servers/${serverName}/assistant-mount`,
-    {
-      method: "POST",
-      body: { mounted },
-      errorMessage: "Failed to update Assistant MCP mounts",
-      fallback: [],
-      map: (data) => data?.assistant_mcp_servers ?? [],
-    },
-  );
-}
-
-export async function setTabMcpMount(
-  serverName: string,
-  tabId: string,
-  mounted: boolean,
-): Promise<void> {
-  await requestVoid(`/api/mcp/servers/${serverName}/tabs/${tabId}/mount`, {
-    method: "POST",
-    body: { mounted },
-    errorMessage: "Failed to update tab MCP mounts",
-  });
-}

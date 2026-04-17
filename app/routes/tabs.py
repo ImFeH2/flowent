@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.graph_service import (
     create_agent_node,
@@ -22,11 +22,11 @@ router = APIRouter()
 
 
 class CreateTabRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     title: str
     goal: str = ""
     allow_network: bool = False
     write_dirs: list[str] = []
-    mcp_servers: list[str] = []
     blueprint_id: str | None = None
 
 
@@ -60,7 +60,6 @@ async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
             goal=req.goal,
             allow_network=req.allow_network,
             write_dirs=req.write_dirs,
-            mcp_servers=req.mcp_servers,
             blueprint_id=req.blueprint_id,
         )
     except ValueError as exc:

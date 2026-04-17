@@ -6,7 +6,7 @@ import {
   useState,
 } from "react";
 import useSWR from "swr";
-import { Plus, RefreshCw, Search, ShieldAlert, Unplug, X } from "lucide-react";
+import { Plus, RefreshCw, Search, Unplug, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   createMcpServer,
@@ -17,8 +17,6 @@ import {
   previewMcpPrompt,
   refreshAllMcpServers,
   refreshMcpServer,
-  setAssistantMcpMount,
-  setTabMcpMount,
   updateMcpServer,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -43,7 +41,7 @@ import type {
   MCPServerRecord,
 } from "@/types";
 
-type DetailTab = "overview" | "capabilities" | "mounts" | "activity";
+type DetailTab = "overview" | "capabilities" | "activity";
 type CapabilityTab = "tools" | "resources" | "resource_templates" | "prompts";
 type ServerStatusFilter =
   | "all"
@@ -71,6 +69,7 @@ const EMPTY_SERVER_DRAFT: MCPServerConfig = {
   disabled_tools: [],
   scopes: [],
   oauth_resource: "",
+  launcher: "",
   command: "",
   args: [],
   env: {},
@@ -234,21 +233,170 @@ function capabilitySummary(record: MCPServerRecord) {
   return `${counts.tools} tools · ${counts.resources} resources · ${counts.prompts} prompts`;
 }
 
-function mountedSummary(record: MCPServerRecord) {
-  const mountedTabs = record.mounts.tabs.filter(
-    (entry) => entry.mounted,
-  ).length;
-  const parts: string[] = [];
-  if (record.mounts.assistant) {
-    parts.push("Assistant");
-  }
-  if (mountedTabs > 0) {
-    parts.push(`${mountedTabs} Tab${mountedTabs === 1 ? "" : "s"}`);
-  }
-  if (parts.length === 0) {
+function globalAvailabilityLabel(record: MCPServerRecord) {
+  if (!record.visibility.active) {
     return null;
   }
-  return parts.join(" + ");
+  return "Global";
+}
+
+function stripShellQuotes(token: string) {
+  if (token.length < 2) {
+    return token;
+  }
+  if (
+    (token.startsWith('"') && token.endsWith('"')) ||
+    (token.startsWith("'") && token.endsWith("'"))
+  ) {
+    return token.slice(1, -1);
+  }
+  return token;
+}
+
+function tokenizeLauncher(value: string) {
+  const matches = value.match(/'[^']*'|"[^"]*"|\S+/g);
+  return (matches ?? []).map((token) => stripShellQuotes(token));
+}
+
+function normalizeSuggestedName(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+function deriveNameFromPackageToken(token: string) {
+  const withoutVersion = token.startsWith("@")
+    ? token.replace(/@[^/@]+$/u, "")
+    : token.replace(/@[^/]+$/u, "");
+  const segments = withoutVersion.split("/").filter(Boolean);
+  return normalizeSuggestedName(segments.join("-"));
+}
+
+function deriveNameFromUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const candidates = url.hostname
+      .replace(/^www\./u, "")
+      .split(".")
+      .filter((segment) => segment && !["mcp", "api"].includes(segment));
+    return normalizeSuggestedName(candidates[0] ?? url.hostname);
+  } catch {
+    return "";
+  }
+}
+
+function suggestServerName(input: string, tokens: string[]) {
+  if (/^https?:\/\//u.test(input)) {
+    return deriveNameFromUrl(input);
+  }
+  const runner = tokens[0] ?? "";
+  const packageTokenStart =
+    runner === "pnpm" || runner === "yarn" ? 2 : runner === "npm" ? 3 : 1;
+  const packageToken = tokens
+    .slice(packageTokenStart)
+    .find((token) => token && !token.startsWith("-"));
+  if (packageToken) {
+    const derived = deriveNameFromPackageToken(packageToken);
+    if (derived) {
+      return derived;
+    }
+  }
+  if (!runner) {
+    return "";
+  }
+  return normalizeSuggestedName(runner.split("/").pop() ?? runner);
+}
+
+function buildQuickAddDraft(
+  input: string,
+  name: string,
+): { draft: MCPServerConfig | null; error: string | null } {
+  const trimmedInput = input.trim();
+  const trimmedName = normalizeSuggestedName(name);
+  if (!trimmedInput) {
+    return { draft: null, error: "Enter a launcher command or URL." };
+  }
+  if (!trimmedName) {
+    return { draft: null, error: "Quick Add needs a valid server name." };
+  }
+  if (/^https?:\/\//u.test(trimmedInput)) {
+    try {
+      const normalizedUrl = new URL(trimmedInput).toString();
+      return {
+        draft: {
+          ...EMPTY_SERVER_DRAFT,
+          name: trimmedName,
+          transport: "streamable_http",
+          launcher: trimmedInput,
+          url: normalizedUrl,
+        },
+        error: null,
+      };
+    } catch {
+      return { draft: null, error: "Quick Add URL is not valid." };
+    }
+  }
+  const tokens = tokenizeLauncher(trimmedInput);
+  if (tokens.length === 0) {
+    return {
+      draft: null,
+      error: "Quick Add needs a single-line launcher command.",
+    };
+  }
+  return {
+    draft: {
+      ...EMPTY_SERVER_DRAFT,
+      name: trimmedName,
+      transport: "stdio",
+      launcher: trimmedInput,
+      command: tokens[0],
+      args: tokens.slice(1),
+    },
+    error: null,
+  };
+}
+
+function parsedLauncherSummary(record: MCPServerRecord) {
+  if (record.config.transport === "streamable_http") {
+    return record.config.url.trim() || "No URL configured";
+  }
+  return [record.config.command, ...record.config.args]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function buildPendingServerRecord(config: MCPServerConfig): MCPServerRecord {
+  return {
+    config,
+    snapshot: {
+      server_name: config.name,
+      transport: config.transport,
+      status: "connecting",
+      auth_status:
+        config.transport === "stdio" ? "unsupported" : "not_logged_in",
+      last_auth_result: null,
+      last_refresh_at: null,
+      last_refresh_result: "never",
+      last_error: null,
+      tools: [],
+      resources: [],
+      resource_templates: [],
+      prompts: [],
+      capability_counts: {
+        tools: 0,
+        resources: 0,
+        resource_templates: 0,
+        prompts: 0,
+      },
+    },
+    visibility: {
+      scope: "global",
+      active: false,
+    },
+    activity: [],
+  };
 }
 
 function toolFilterSummary(record: MCPServerRecord) {
@@ -364,14 +512,14 @@ function matchesServerFilter(
   if (!query) {
     return true;
   }
-  const mounted = mountedSummary(record);
+  const visibility = globalAvailabilityLabel(record);
   const haystack = [
     record.config.name,
     record.config.transport,
     statusLabel(record.snapshot.status),
     formatAuthStatus(record.snapshot.auth_status),
     capabilitySummary(record),
-    mounted ?? "",
+    visibility ?? "",
     record.snapshot.last_error ?? "",
   ]
     .join(" ")
@@ -556,6 +704,20 @@ function ServerDialog({
           </Select>
         </WorkspaceDialogField>
       </div>
+
+      <WorkspaceDialogField label="Launcher Command" hint="optional">
+        <Input
+          value={draft.launcher}
+          onChange={(event) =>
+            onChange({ ...draft, launcher: event.target.value })
+          }
+          placeholder={
+            draft.transport === "streamable_http"
+              ? "https://mcp.example.com"
+              : "npx @playwright/mcp@latest"
+          }
+        />
+      </WorkspaceDialogField>
 
       <div className="grid gap-4 md:grid-cols-2">
         <MountToggle
@@ -801,14 +963,43 @@ export function McpPage() {
   const [serverSearch, setServerSearch] = useState("");
   const [serverStatusFilter, setServerStatusFilter] =
     useState<ServerStatusFilter>("all");
-  const [tabSearch, setTabSearch] = useState("");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [quickAddInput, setQuickAddInput] = useState("");
+  const [quickAddName, setQuickAddName] = useState("");
+  const [quickAddNameDirty, setQuickAddNameDirty] = useState(false);
+  const [quickAddPending, setQuickAddPending] = useState(false);
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
 
   const deferredServerSearch = useDeferredValue(
     serverSearch.trim().toLowerCase(),
   );
-  const deferredTabSearch = useDeferredValue(tabSearch.trim().toLowerCase());
-  const servers = useMemo(() => data?.servers ?? [], [data]);
+  const quickAddTokens = useMemo(
+    () => tokenizeLauncher(quickAddInput.trim()),
+    [quickAddInput],
+  );
+  const quickAddSuggestedName = useMemo(
+    () => suggestServerName(quickAddInput.trim(), quickAddTokens),
+    [quickAddInput, quickAddTokens],
+  );
+  const quickAddNameValue = quickAddNameDirty
+    ? quickAddName
+    : quickAddSuggestedName;
+  const quickAddParse = useMemo(
+    () => buildQuickAddDraft(quickAddInput, quickAddNameValue),
+    [quickAddInput, quickAddNameValue],
+  );
+  const servers = useMemo(() => {
+    const base = data?.servers ?? [];
+    if (!quickAddPending || quickAddParse.draft === null) {
+      return base;
+    }
+    if (
+      base.some((record) => record.config.name === quickAddParse.draft?.name)
+    ) {
+      return base;
+    }
+    return [buildPendingServerRecord(quickAddParse.draft), ...base];
+  }, [data, quickAddParse.draft, quickAddPending]);
 
   const filteredServers = useMemo(
     () =>
@@ -844,9 +1035,15 @@ export function McpPage() {
     setPromptPreview(null);
     setPromptPreviewLoading(false);
     setPromptPreviewArgumentsText("{}");
-    setTabSearch("");
     setActivityFilter("all");
   }, [selectedServer?.config.name]);
+
+  useEffect(() => {
+    if (quickAddNameDirty) {
+      return;
+    }
+    setQuickAddName(quickAddSuggestedName);
+  }, [quickAddNameDirty, quickAddSuggestedName]);
 
   const summaryCounts = useMemo(
     () => ({
@@ -871,20 +1068,6 @@ export function McpPage() {
     [selectedPromptName, selectedServer],
   );
 
-  const filteredTabMounts = useMemo(() => {
-    if (!selectedServer) {
-      return [];
-    }
-    return selectedServer.mounts.tabs.filter((entry) => {
-      if (!deferredTabSearch) {
-        return true;
-      }
-      const haystack =
-        `${entry.tab_title} ${entry.tab_id.slice(0, 8)}`.toLowerCase();
-      return haystack.includes(deferredTabSearch);
-    });
-  }, [deferredTabSearch, selectedServer]);
-
   const filteredActivity = useMemo(() => {
     if (!selectedServer) {
       return [];
@@ -901,6 +1084,10 @@ export function McpPage() {
     setEditingServerName(null);
     setDraft(EMPTY_SERVER_DRAFT);
     setDialogOpen(true);
+  };
+
+  const focusQuickAdd = () => {
+    document.getElementById("mcp-quick-add-input")?.focus();
   };
 
   const openEditDialog = (record: MCPServerRecord) => {
@@ -948,6 +1135,40 @@ export function McpPage() {
       );
     } finally {
       setPending(false);
+    }
+  };
+
+  const handleQuickAdd = async () => {
+    if (quickAddParse.error || quickAddParse.draft === null) {
+      setQuickAddError(quickAddParse.error ?? "Quick Add is not ready yet.");
+      return;
+    }
+    setQuickAddPending(true);
+    setQuickAddError(null);
+    setSelectedServerName(quickAddParse.draft.name);
+    try {
+      await createMcpServer(quickAddParse.draft);
+      await mutate();
+      setSelectedServerName(quickAddParse.draft.name);
+      setQuickAddInput("");
+      setQuickAddName("");
+      setQuickAddNameDirty(false);
+      toast.success("MCP server added");
+    } catch (quickAddFailure) {
+      await mutate();
+      setSelectedServerName(quickAddParse.draft.name);
+      setQuickAddError(
+        quickAddFailure instanceof Error
+          ? quickAddFailure.message
+          : "Failed to add MCP server",
+      );
+      toast.error(
+        quickAddFailure instanceof Error
+          ? quickAddFailure.message
+          : "Failed to add MCP server",
+      );
+    } finally {
+      setQuickAddPending(false);
     }
   };
 
@@ -1023,38 +1244,6 @@ export function McpPage() {
     }
   };
 
-  const handleAssistantMount = async (serverName: string, mounted: boolean) => {
-    try {
-      await setAssistantMcpMount(serverName, mounted);
-      await mutate();
-      toast.success("Assistant mounts updated");
-    } catch (mountError) {
-      toast.error(
-        mountError instanceof Error
-          ? mountError.message
-          : "Failed to update Assistant mount",
-      );
-    }
-  };
-
-  const handleTabMount = async (
-    serverName: string,
-    tabId: string,
-    mounted: boolean,
-  ) => {
-    try {
-      await setTabMcpMount(serverName, tabId, mounted);
-      await mutate();
-      toast.success("Tab mounts updated");
-    } catch (mountError) {
-      toast.error(
-        mountError instanceof Error
-          ? mountError.message
-          : "Failed to update tab mount",
-      );
-    }
-  };
-
   const handlePreviewPrompt = async (
     serverName: string,
     promptName: string,
@@ -1098,6 +1287,131 @@ export function McpPage() {
     void handlePreviewPrompt(serverName, promptName, initialArguments);
   };
 
+  const quickAddPanel = (
+    <SoftPanel className="mt-4 bg-black/20">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+              Quick Add
+            </p>
+            <p className="mt-2 max-w-3xl text-[13px] leading-6 text-white/46">
+              Paste a single-line launcher such as{" "}
+              <span className="font-mono text-white/68">
+                npx @playwright/mcp@latest
+              </span>{" "}
+              or a single{" "}
+              <span className="font-mono text-white/68">streamable_http</span>{" "}
+              URL. Connected servers become visible to every agent
+              automatically.
+            </p>
+          </div>
+          {quickAddParse.draft ? (
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
+                statusClassName(
+                  quickAddParse.draft.transport === "streamable_http"
+                    ? "connected"
+                    : "connecting",
+                ),
+              )}
+            >
+              {quickAddParse.draft.transport === "streamable_http"
+                ? "URL"
+                : "Launcher"}
+            </span>
+          ) : null}
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.6fr)]">
+          <WorkspaceDialogField label="Launcher or URL">
+            <Input
+              id="mcp-quick-add-input"
+              value={quickAddInput}
+              onChange={(event) => {
+                setQuickAddInput(event.target.value);
+                setQuickAddError(null);
+              }}
+              placeholder="npx @playwright/mcp@latest"
+            />
+          </WorkspaceDialogField>
+          <WorkspaceDialogField label="Name">
+            <Input
+              value={quickAddNameValue}
+              onChange={(event) => {
+                setQuickAddNameDirty(true);
+                setQuickAddName(event.target.value);
+                setQuickAddError(null);
+              }}
+              placeholder="playwright-mcp"
+            />
+          </WorkspaceDialogField>
+        </div>
+        {quickAddParse.draft ? (
+          <div className="grid gap-3 xl:grid-cols-3">
+            <SoftPanel className="bg-white/[0.02]">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                Transport
+              </p>
+              <p className="mt-2 text-[14px] font-medium text-white">
+                {quickAddParse.draft.transport}
+              </p>
+            </SoftPanel>
+            <SoftPanel className="bg-white/[0.02]">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                Parsed Name
+              </p>
+              <p className="mt-2 text-[14px] font-medium text-white">
+                {quickAddParse.draft.name}
+              </p>
+            </SoftPanel>
+            <SoftPanel className="bg-white/[0.02] xl:col-span-1">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                Parsed Result
+              </p>
+              <p className="mt-2 break-all font-mono text-[12px] text-white/68">
+                {quickAddParse.draft.transport === "streamable_http"
+                  ? quickAddParse.draft.url
+                  : [
+                      quickAddParse.draft.command,
+                      ...quickAddParse.draft.args,
+                    ].join(" ")}
+              </p>
+            </SoftPanel>
+          </div>
+        ) : null}
+        {quickAddError || (quickAddInput.trim() && quickAddParse.error) ? (
+          <p className="text-[13px] text-red-200">
+            {quickAddError ?? quickAddParse.error}
+          </p>
+        ) : (
+          <p className="text-[12px] text-white/42">
+            Package-runner launchers download and start in one path. If first
+            startup is slow, the server will stay visible as Connecting until
+            refresh finishes.
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            disabled={quickAddPending || quickAddParse.draft === null}
+            onClick={() => void handleQuickAdd()}
+          >
+            {quickAddPending ? "Adding..." : "Quick Add"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+            onClick={openCreateDialog}
+          >
+            Advanced Add
+          </Button>
+        </div>
+      </div>
+    </SoftPanel>
+  );
+
   return (
     <PageScaffold>
       <div className="flex h-full min-h-0 flex-col px-8 py-8">
@@ -1107,8 +1421,8 @@ export function McpPage() {
               MCP
             </h1>
             <p className="mt-2 max-w-3xl text-[13px] leading-6 text-white/42">
-              Manage external MCP servers, Assistant and Tab mounts, connection
-              status, capability discovery, and recent MCP activity.
+              Quickly connect external MCP servers, inspect capabilities, and
+              review recent MCP activity from one global control plane.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1121,9 +1435,18 @@ export function McpPage() {
               <RefreshCw className="mr-2 size-4" />
               Refresh
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+              onClick={focusQuickAdd}
+            >
+              <Plus className="mr-2 size-4" />
+              Quick Add
+            </Button>
             <Button type="button" onClick={openCreateDialog}>
               <Plus className="mr-2 size-4" />
-              Add MCP Server
+              Advanced Add
             </Button>
           </div>
         </div>
@@ -1149,22 +1472,21 @@ export function McpPage() {
               Failed to load MCP state.
             </SoftPanel>
           ) : servers.length === 0 ? (
-            <SoftPanel className="flex h-full flex-col items-center justify-center text-center">
-              <div className="flex size-14 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.02] text-white/52">
-                <Unplug className="size-6" />
-              </div>
-              <h2 className="mt-5 text-[16px] font-medium text-white/88">
-                No MCP servers
-              </h2>
-              <p className="mt-2 max-w-lg text-[13px] leading-6 text-white/42">
-                Add your first external MCP server to start mounting tools,
-                resources, and prompts into Assistant or task tabs.
-              </p>
-              <Button className="mt-5" onClick={openCreateDialog}>
-                <Plus className="mr-2 size-4" />
-                Add MCP Server
-              </Button>
-            </SoftPanel>
+            <div className="flex h-full min-h-0 flex-col">
+              {quickAddPanel}
+              <SoftPanel className="mt-4 flex h-full flex-col items-center justify-center text-center">
+                <div className="flex size-14 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.02] text-white/52">
+                  <Unplug className="size-6" />
+                </div>
+                <h2 className="mt-5 text-[16px] font-medium text-white/88">
+                  No MCP servers
+                </h2>
+                <p className="mt-2 max-w-lg text-[13px] leading-6 text-white/42">
+                  Start with Quick Add to connect one server that every agent
+                  can use after the first successful refresh.
+                </p>
+              </SoftPanel>
+            </div>
           ) : (
             <div className="flex h-full min-h-0 flex-col">
               <SoftPanel>
@@ -1184,6 +1506,8 @@ export function McpPage() {
                   <SummaryCard label="Error" value={summaryCounts.error} />
                 </div>
               </SoftPanel>
+
+              {quickAddPanel}
 
               <SoftPanel className="mt-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1243,7 +1567,7 @@ export function McpPage() {
                         {filteredServers.map((record) => {
                           const isSelected =
                             selectedServer?.config.name === record.config.name;
-                          const mounted = mountedSummary(record);
+                          const visibility = globalAvailabilityLabel(record);
                           return (
                             <div
                               key={record.config.name}
@@ -1273,9 +1597,9 @@ export function McpPage() {
                                         required
                                       </span>
                                     ) : null}
-                                    {mounted ? (
+                                    {visibility ? (
                                       <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200">
-                                        Mounted
+                                        {visibility}
                                       </span>
                                     ) : null}
                                   </div>
@@ -1292,7 +1616,7 @@ export function McpPage() {
                                       )}
                                     </p>
                                     <p>{capabilitySummary(record)}</p>
-                                    {mounted ? <p>{mounted}</p> : null}
+                                    {visibility ? <p>{visibility}</p> : null}
                                   </div>
                                   {record.snapshot.last_error ? (
                                     <p className="mt-3 line-clamp-2 text-[12px] leading-5 text-red-200">
@@ -1392,9 +1716,9 @@ export function McpPage() {
                                 >
                                   {statusLabel(selectedServer.snapshot.status)}
                                 </span>
-                                {mountedSummary(selectedServer) ? (
+                                {globalAvailabilityLabel(selectedServer) ? (
                                   <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200">
-                                    {mountedSummary(selectedServer)}
+                                    {globalAvailabilityLabel(selectedServer)}
                                   </span>
                                 ) : null}
                               </div>
@@ -1475,7 +1799,6 @@ export function McpPage() {
                               [
                                 "overview",
                                 "capabilities",
-                                "mounts",
                                 "activity",
                               ] as DetailTab[]
                             ).map((tab) => (
@@ -1505,6 +1828,20 @@ export function McpPage() {
                                     {formatAuthStatus(
                                       selectedServer.snapshot.auth_status,
                                     )}
+                                  </p>
+                                </SoftPanel>
+
+                                <SoftPanel className="bg-black/20">
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    Visibility
+                                  </p>
+                                  <p className="mt-3 text-[22px] font-medium text-white">
+                                    {globalAvailabilityLabel(selectedServer) ??
+                                      "Pending"}
+                                  </p>
+                                  <p className="mt-2 text-[13px] text-white/42">
+                                    Connected servers become available to all
+                                    agents without per-tab setup.
                                   </p>
                                 </SoftPanel>
 
@@ -1580,6 +1917,27 @@ export function McpPage() {
                                     ))}
                                   </div>
                                 </SoftPanel>
+
+                                {selectedServer.config.launcher ? (
+                                  <SoftPanel className="bg-black/20 xl:col-span-2">
+                                    <div className="grid gap-4 xl:grid-cols-2">
+                                      <ReadonlyBlock
+                                        label="Original Launcher"
+                                        value={readonlyText(
+                                          selectedServer.config.launcher,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="Parsed Result"
+                                        value={parsedLauncherSummary(
+                                          selectedServer,
+                                        )}
+                                        mono
+                                      />
+                                    </div>
+                                  </SoftPanel>
+                                ) : null}
 
                                 {selectedServer.config.transport === "stdio" ? (
                                   <SoftPanel className="bg-black/20 xl:col-span-2">
@@ -1973,89 +2331,6 @@ export function McpPage() {
                               </div>
                             ) : null}
 
-                            {detailTab === "mounts" ? (
-                              <div className="space-y-5">
-                                {selectedServer.snapshot.status !==
-                                "connected" ? (
-                                  <SoftPanel className="flex items-start gap-3 bg-amber-400/[0.06] text-[13px] text-amber-100">
-                                    <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-                                    <p>
-                                      This server is not connected yet. Mounts
-                                      stay visible, but the server cannot safely
-                                      expose active capabilities until
-                                      connection checks succeed.
-                                    </p>
-                                  </SoftPanel>
-                                ) : null}
-
-                                <div className="space-y-3">
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                    Assistant Mounts
-                                  </p>
-                                  <MountToggle
-                                    checked={selectedServer.mounts.assistant}
-                                    disabled={
-                                      selectedServer.snapshot.status !==
-                                      "connected"
-                                    }
-                                    label="Mount on Assistant"
-                                    onChange={(nextValue) =>
-                                      handleAssistantMount(
-                                        selectedServer.config.name,
-                                        nextValue,
-                                      )
-                                    }
-                                  />
-                                </div>
-
-                                <div className="space-y-3">
-                                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                      Tab Mounts
-                                    </p>
-                                    <div className="relative w-full max-w-sm">
-                                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/28" />
-                                      <Input
-                                        value={tabSearch}
-                                        onChange={(event) =>
-                                          startTransition(() =>
-                                            setTabSearch(event.target.value),
-                                          )
-                                        }
-                                        placeholder="Search tabs by title or ID"
-                                        className="pl-10"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  {filteredTabMounts.length === 0 ? (
-                                    <SoftPanel className="bg-black/20 text-[13px] text-white/42">
-                                      No matching tabs.
-                                    </SoftPanel>
-                                  ) : (
-                                    filteredTabMounts.map((entry) => (
-                                      <MountToggle
-                                        key={entry.tab_id}
-                                        checked={entry.mounted}
-                                        disabled={
-                                          selectedServer.snapshot.status !==
-                                          "connected"
-                                        }
-                                        label={`${entry.tab_title} · ${entry.tab_id.slice(0, 8)}`}
-                                        onChange={(nextValue) =>
-                                          handleTabMount(
-                                            selectedServer.config.name,
-                                            entry.tab_id,
-                                            nextValue,
-                                          )
-                                        }
-                                      />
-                                    ))
-                                  )}
-                                </div>
-                              </div>
-                            ) : null}
-
                             {detailTab === "activity" ? (
                               <div className="space-y-4">
                                 <div className="flex flex-wrap gap-2">
@@ -2160,7 +2435,9 @@ export function McpPage() {
         onChange={setDraft}
         open={dialogOpen}
         pending={pending}
-        title={editingServerName ? "Edit MCP Server" : "Add MCP Server"}
+        title={
+          editingServerName ? "Edit MCP Server" : "Advanced Add MCP Server"
+        }
         onOpenChange={setDialogOpen}
         onSubmit={handleSaveServer}
       />

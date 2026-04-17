@@ -25,7 +25,6 @@ function buildSettings(overrides: Partial<UserSettings> = {}): UserSettings {
       role_name: "Steward",
       allow_network: true,
       write_dirs: ["/workspace/project"],
-      mcp_servers: [],
       ...(overrides.assistant ?? {}),
     },
     leader: {
@@ -194,7 +193,6 @@ describe("settings lib", () => {
           role_name: "Steward",
           allow_network: false,
           write_dirs: [" ./tmp ", "./tmp/", ""],
-          mcp_servers: [],
         },
         model: {
           active_provider_id: "provider-1",
@@ -227,7 +225,6 @@ describe("settings lib", () => {
         role_name: "Steward",
         allow_network: false,
         write_dirs: ["./tmp"],
-        mcp_servers: [],
       },
       leader: { role_name: "Conductor" },
       model: {

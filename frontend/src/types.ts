@@ -209,7 +209,6 @@ export interface TaskTab {
   title: string;
   goal: string;
   leader_id?: string | null;
-  mcp_servers: string[];
   created_at: number;
   updated_at: number;
   network_source: NetworkSource;
@@ -301,6 +300,7 @@ export interface MCPServerConfig {
   disabled_tools: string[];
   scopes: string[];
   oauth_resource: string;
+  launcher: string;
   command: string;
   args: string[];
   env: Record<string, string>;
@@ -392,29 +392,19 @@ export interface MCPActivityRecord {
   approval_result?: string | null;
 }
 
-export interface MCPMountEntry {
-  tab_id: string;
-  tab_title: string;
-  mounted: boolean;
+export interface MCPVisibility {
+  scope: "global";
+  active: boolean;
 }
 
 export interface MCPServerRecord {
   config: MCPServerConfig;
   snapshot: MCPSnapshot;
-  mounts: {
-    assistant: boolean;
-    tabs: MCPMountEntry[];
-  };
+  visibility: MCPVisibility;
   activity: MCPActivityRecord[];
 }
 
 export interface MCPStatePayload {
-  assistant_mcp_servers: string[];
-  tabs: Array<{
-    id: string;
-    title: string;
-    mcp_servers: string[];
-  }>;
   servers: MCPServerRecord[];
 }
 

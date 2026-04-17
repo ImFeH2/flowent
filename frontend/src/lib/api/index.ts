@@ -61,8 +61,6 @@ export {
   previewMcpPrompt,
   refreshAllMcpServers,
   refreshMcpServer,
-  setAssistantMcpMount,
-  setTabMcpMount,
   updateMcpServer,
 } from "./mcp";
 export { fetchAppMeta, fetchTools, type ToolInfo } from "./meta";

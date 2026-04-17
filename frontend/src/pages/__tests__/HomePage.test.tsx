@@ -15,7 +15,6 @@ const {
   createBlueprintRequestMock,
   fetchRolesMock,
   fetchBlueprintsMock,
-  fetchMcpStateMock,
   createTabRequestMock,
   createTabNodeRequestMock,
   deleteTabRequestMock,
@@ -32,7 +31,6 @@ const {
   createBlueprintRequestMock: vi.fn(),
   fetchRolesMock: vi.fn(),
   fetchBlueprintsMock: vi.fn(),
-  fetchMcpStateMock: vi.fn(),
   createTabRequestMock: vi.fn(),
   createTabNodeRequestMock: vi.fn(),
   deleteTabRequestMock: vi.fn(),
@@ -69,7 +67,6 @@ vi.mock("@/lib/api", () => ({
     createBlueprintRequestMock(...args),
   fetchRoles: (...args: unknown[]) => fetchRolesMock(...args),
   fetchBlueprints: (...args: unknown[]) => fetchBlueprintsMock(...args),
-  fetchMcpState: (...args: unknown[]) => fetchMcpStateMock(...args),
   createTabRequest: (...args: unknown[]) => createTabRequestMock(...args),
   createTabNodeRequest: (...args: unknown[]) =>
     createTabNodeRequestMock(...args),
@@ -185,7 +182,6 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     title: overrides.title ?? "Example Tab",
     goal: overrides.goal ?? "Ship the workspace polish",
     leader_id: overrides.leader_id ?? "leader-1",
-    mcp_servers: overrides.mcp_servers ?? [],
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 1,
     network_source: overrides.network_source ?? {
@@ -223,7 +219,6 @@ describe("HomePage", () => {
     createBlueprintRequestMock.mockReset();
     fetchRolesMock.mockReset();
     fetchBlueprintsMock.mockReset();
-    fetchMcpStateMock.mockReset();
     createTabRequestMock.mockReset();
     createTabNodeRequestMock.mockReset();
     deleteTabRequestMock.mockReset();
@@ -290,11 +285,6 @@ describe("HomePage", () => {
       buildRole({ name: "Designer", description: "Frontend design role" }),
     ]);
     fetchBlueprintsMock.mockResolvedValue([]);
-    fetchMcpStateMock.mockResolvedValue({
-      assistant_mcp_servers: [],
-      tabs: [],
-      servers: [],
-    });
 
     globalThis.ResizeObserver = class {
       observe() {}
@@ -341,7 +331,6 @@ describe("HomePage", () => {
         "Release Prep",
         "Coordinate the launch work",
         false,
-        [],
         [],
         undefined,
       ),

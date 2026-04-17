@@ -1,23 +1,7 @@
 from fastapi.testclient import TestClient
 
-from app.settings import AssistantSettings, MCPServerConfig, Settings
-
 
 def test_mcp_api_returns_only_external_server_state(client: TestClient, monkeypatch):
-    settings = Settings(
-        assistant=AssistantSettings(mcp_servers=["filesystem"]),
-        mcp_servers=[
-            MCPServerConfig(
-                name="filesystem",
-                transport="stdio",
-                command="npx",
-                args=["-y", "demo-mcp"],
-            )
-        ],
-    )
-
-    monkeypatch.setattr("app.routes.mcp.get_settings", lambda: settings)
-    monkeypatch.setattr("app.routes.mcp.workspace_store.list_tabs", lambda: [])
     monkeypatch.setattr(
         "app.routes.mcp.mcp_service.list_server_payloads",
         lambda: [
@@ -33,6 +17,7 @@ def test_mcp_api_returns_only_external_server_state(client: TestClient, monkeypa
                     "disabled_tools": [],
                     "scopes": [],
                     "oauth_resource": "",
+                    "launcher": "",
                     "command": "npx",
                     "args": ["-y", "demo-mcp"],
                     "env": {},
@@ -63,9 +48,9 @@ def test_mcp_api_returns_only_external_server_state(client: TestClient, monkeypa
                         "prompts": 0,
                     },
                 },
-                "mounts": {
-                    "assistant": True,
-                    "tabs": [],
+                "visibility": {
+                    "scope": "global",
+                    "active": True,
                 },
                 "activity": [],
             }
@@ -76,8 +61,6 @@ def test_mcp_api_returns_only_external_server_state(client: TestClient, monkeypa
 
     assert response.status_code == 200
     assert response.json() == {
-        "assistant_mcp_servers": ["filesystem"],
-        "tabs": [],
         "servers": [
             {
                 "config": {
@@ -91,6 +74,7 @@ def test_mcp_api_returns_only_external_server_state(client: TestClient, monkeypa
                     "disabled_tools": [],
                     "scopes": [],
                     "oauth_resource": "",
+                    "launcher": "",
                     "command": "npx",
                     "args": ["-y", "demo-mcp"],
                     "env": {},
@@ -121,9 +105,9 @@ def test_mcp_api_returns_only_external_server_state(client: TestClient, monkeypa
                         "prompts": 0,
                     },
                 },
-                "mounts": {
-                    "assistant": True,
-                    "tabs": [],
+                "visibility": {
+                    "scope": "global",
+                    "active": True,
                 },
                 "activity": [],
             }

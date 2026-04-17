@@ -37,12 +37,11 @@ export async function createTabRequest(
   goal = "",
   allow_network = false,
   write_dirs: string[] = [],
-  mcp_servers: string[] = [],
   blueprint_id?: string | null,
 ): Promise<TaskTab> {
   return requestJson<TaskTab, TaskTab>("/api/tabs", {
     method: "POST",
-    body: { title, goal, allow_network, write_dirs, mcp_servers, blueprint_id },
+    body: { title, goal, allow_network, write_dirs, blueprint_id },
     errorMessage: "Failed to create tab",
   });
 }

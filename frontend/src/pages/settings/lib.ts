@@ -20,7 +20,6 @@ export interface UserSettings {
     role_name: string;
     allow_network: boolean;
     write_dirs: string[];
-    mcp_servers: string[];
   };
   leader: {
     role_name: string;
@@ -200,7 +199,8 @@ export function buildSettingsSavePayload(
   return {
     ...(accessPayload ? { access: accessPayload } : {}),
     assistant: {
-      ...settings.assistant,
+      role_name: settings.assistant.role_name,
+      allow_network: settings.assistant.allow_network,
       write_dirs: normalizeWriteDirs(settings.assistant.write_dirs),
     },
     leader: settings.leader,

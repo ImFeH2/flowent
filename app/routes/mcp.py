@@ -4,8 +4,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.mcp_service import MCPError, mcp_service
-from app.settings import get_settings
-from app.workspace_store import workspace_store
 
 router = APIRouter()
 
@@ -21,6 +19,7 @@ class MCPServerMutationRequest(BaseModel):
     disabled_tools: list[str] = []
     scopes: list[str] = []
     oauth_resource: str = ""
+    launcher: str = ""
     command: str = ""
     args: list[str] = []
     env: dict[str, str] = {}
@@ -32,10 +31,6 @@ class MCPServerMutationRequest(BaseModel):
     env_http_headers: list[str] = []
 
 
-class MCPMountRequest(BaseModel):
-    mounted: bool
-
-
 class MCPPromptPreviewRequest(BaseModel):
     name: str
     arguments: dict[str, object] = {}
@@ -43,19 +38,7 @@ class MCPPromptPreviewRequest(BaseModel):
 
 @router.get("/api/mcp")
 async def get_mcp_state() -> dict[str, object]:
-    settings = get_settings()
-    return {
-        "assistant_mcp_servers": list(settings.assistant.mcp_servers),
-        "tabs": [
-            {
-                "id": tab.id,
-                "title": tab.title,
-                "mcp_servers": list(tab.mcp_servers),
-            }
-            for tab in workspace_store.list_tabs()
-        ],
-        "servers": mcp_service.list_server_payloads(),
-    }
+    return {"servers": mcp_service.list_server_payloads()}
 
 
 @router.post("/api/mcp/refresh")
@@ -124,38 +107,6 @@ async def logout_mcp_server(server_name: str) -> dict[str, object]:
     except MCPError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"snapshot": snapshot}
-
-
-@router.post("/api/mcp/servers/{server_name}/assistant-mount")
-async def update_assistant_mcp_mount(
-    server_name: str,
-    req: MCPMountRequest,
-) -> dict[str, object]:
-    try:
-        mounts = mcp_service.set_assistant_mount(
-            server_name=server_name,
-            mounted=req.mounted,
-        )
-    except MCPError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"assistant_mcp_servers": mounts}
-
-
-@router.post("/api/mcp/servers/{server_name}/tabs/{tab_id}/mount")
-async def update_tab_mcp_mount(
-    server_name: str,
-    tab_id: str,
-    req: MCPMountRequest,
-) -> dict[str, object]:
-    try:
-        tab = mcp_service.set_tab_mount(
-            server_name=server_name,
-            tab_id=tab_id,
-            mounted=req.mounted,
-        )
-    except MCPError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"tab": tab}
 
 
 @router.post("/api/mcp/servers/{server_name}/prompt-preview")

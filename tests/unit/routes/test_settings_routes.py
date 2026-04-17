@@ -45,7 +45,6 @@ def test_get_settings_returns_assistant_configuration(monkeypatch):
         "role_name": "Steward",
         "allow_network": True,
         "write_dirs": build_default_assistant_write_dirs(),
-        "mcp_servers": [],
     }
     assert result["leader"] == {"role_name": "Conductor"}
 
@@ -83,7 +82,6 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "role_name": "Steward",
                 "allow_network": True,
                 "write_dirs": build_default_assistant_write_dirs(),
-                "mcp_servers": [],
             },
             "leader": {"role_name": "Conductor"},
             "telegram": {
@@ -802,7 +800,6 @@ def test_update_settings_persists_assistant_role(monkeypatch):
         "role_name": "Reviewer",
         "allow_network": True,
         "write_dirs": build_default_assistant_write_dirs(),
-        "mcp_servers": [],
     }
     assert saved == [settings]
 
@@ -850,7 +847,6 @@ def test_update_settings_keeps_live_assistant_entry_semantics_for_non_steward_ro
             "role_name": "Reviewer",
             "allow_network": True,
             "write_dirs": build_default_assistant_write_dirs(),
-            "mcp_servers": [],
         }
         assert assistant.config.role_name == "Reviewer"
         assert "create_tab" in assistant.config.tools
@@ -901,7 +897,6 @@ def test_update_settings_persists_assistant_permissions(monkeypatch):
         "role_name": "Steward",
         "allow_network": False,
         "write_dirs": expected_write_dirs,
-        "mcp_servers": [],
     }
     assert saved == [settings]
 
@@ -966,6 +961,24 @@ def test_update_settings_rejects_invalid_assistant_allow_network(monkeypatch):
 
     assert excinfo.value.status_code == 400
     assert excinfo.value.detail == "assistant.allow_network must be a boolean"
+
+
+def test_update_settings_rejects_removed_assistant_mcp_servers(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(assistant={"mcp_servers": ["filesystem"]}),
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "Unknown assistant fields: mcp_servers"
 
 
 def test_update_settings_rejects_unknown_leader_role(monkeypatch):

@@ -28,8 +28,6 @@ from app.settings import (
     DESIGNER_ROLE_NAME,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
-    build_mcp_server_mounts,
-    find_mcp_server,
     find_role,
 )
 from app.tools import MINIMUM_TOOLS
@@ -352,7 +350,6 @@ def serialize_tab_summary(tab: Tab) -> dict[str, object]:
         "title": tab.title,
         "goal": tab.goal,
         "leader_id": tab.leader_id,
-        "mcp_servers": list(tab.mcp_servers),
         "created_at": tab.created_at,
         "updated_at": tab.updated_at,
         "network_source": serialize_network_source(tab),
@@ -658,23 +655,9 @@ def create_tab(
     goal: str = "",
     allow_network: bool = False,
     write_dirs: list[str] | None = None,
-    mcp_servers: list[str] | None = None,
     blueprint_id: str | None = None,
 ) -> Tab:
     settings = settings_module.get_settings()
-    try:
-        normalized_mcp_servers = build_mcp_server_mounts(
-            mcp_servers or [],
-            field_name="mcp_servers",
-        )
-    except ValueError as exc:
-        raise ValueError(str(exc)) from exc
-    for server_name in normalized_mcp_servers:
-        server = find_mcp_server(settings, server_name)
-        if server is None:
-            raise ValueError(f"MCP server '{server_name}' not found")
-        if not server.enabled:
-            raise ValueError(f"MCP server '{server_name}' is disabled")
     blueprint = None
     if isinstance(blueprint_id, str) and blueprint_id.strip():
         blueprint = workspace_store.get_blueprint(blueprint_id.strip())
@@ -689,7 +672,6 @@ def create_tab(
         title=title.strip(),
         goal=goal.strip(),
         leader_id=leader_id,
-        mcp_servers=normalized_mcp_servers,
         network_blueprint_id=blueprint.id if blueprint is not None else None,
         network_blueprint_name=blueprint.name if blueprint is not None else None,
         network_blueprint_version=blueprint.version if blueprint is not None else None,
@@ -721,46 +703,6 @@ def create_tab(
         )
     )
     return tab
-
-
-def set_tab_mcp_servers(
-    *,
-    tab_id: str,
-    mcp_servers: list[str],
-    actor_id: str,
-) -> tuple[dict[str, object] | None, str | None]:
-    settings = settings_module.get_settings()
-    tab = workspace_store.get_tab(tab_id)
-    if tab is None:
-        return None, f"Tab '{tab_id}' not found"
-    try:
-        normalized_mcp_servers = build_mcp_server_mounts(
-            mcp_servers,
-            field_name="mcp_servers",
-        )
-    except ValueError as exc:
-        return None, str(exc)
-
-    for server_name in normalized_mcp_servers:
-        server = find_mcp_server(settings, server_name)
-        if server is None:
-            return None, f"MCP server '{server_name}' not found"
-        if not server.enabled:
-            return None, f"MCP server '{server_name}' is disabled"
-
-    if tab.mcp_servers == normalized_mcp_servers:
-        return serialize_tab_summary(tab), None
-
-    tab.mcp_servers = normalized_mcp_servers
-    workspace_store.upsert_tab(tab)
-    event_bus.emit(
-        Event(
-            type=EventType.TAB_UPDATED,
-            agent_id=actor_id,
-            data=serialize_tab_summary(tab),
-        )
-    )
-    return serialize_tab_summary(tab), None
 
 
 def _is_path_within_boundary(path: str, boundary_dirs: list[str]) -> bool:

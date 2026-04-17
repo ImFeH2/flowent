@@ -17,9 +17,6 @@ def main(argv: list[str] | None = None) -> None:
         help="Generate and persist a new admin access code",
     )
     access_subparsers.add_parser("reset", help="Clear the persisted admin access code")
-    mcp_parser = subparsers.add_parser("mcp", help="Autopoe MCP server commands")
-    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command")
-    mcp_subparsers.add_parser("serve", help="Run the Autopoe MCP stdio server")
     parser.add_argument(
         "--host",
         default="127.0.0.1",
@@ -48,12 +45,6 @@ def main(argv: list[str] | None = None) -> None:
         from app.access import reset_local_access
 
         print(reset_local_access())
-        return
-
-    if args.command == "mcp" and args.mcp_command == "serve":
-        from app.mcp_stdio_server import serve_stdio
-
-        serve_stdio()
         return
 
     if args.version:

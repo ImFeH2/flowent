@@ -206,10 +206,6 @@ def build_fully_qualified_tool_id(server_name: str, tool_name: str) -> str:
     )
 
 
-def build_autopoe_server_command() -> str:
-    return "uv run autopoe mcp serve"
-
-
 def _build_root_uri(path: str) -> str:
     return Path(path).resolve().as_uri()
 
@@ -776,25 +772,6 @@ class MCPService:
             except MCPError as exc:
                 if server.required:
                     raise RuntimeError(str(exc)) from exc
-
-    def get_autopoe_server_summary(self) -> dict[str, object]:
-        try:
-            import app.mcp_stdio_server  # noqa: F401
-        except Exception as exc:
-            return {
-                "name": "Autopoe MCP Server",
-                "status": "error",
-                "transport": "stdio",
-                "command": build_autopoe_server_command(),
-                "last_error": str(exc),
-            }
-        return {
-            "name": "Autopoe MCP Server",
-            "status": "available",
-            "transport": "stdio",
-            "command": build_autopoe_server_command(),
-            "last_error": None,
-        }
 
     def _prune_activities_locked(self, now: float) -> None:
         min_timestamp = now - ACTIVITY_RETENTION_SECONDS

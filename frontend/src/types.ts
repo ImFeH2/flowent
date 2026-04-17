@@ -408,14 +408,6 @@ export interface MCPServerRecord {
   activity: MCPActivityRecord[];
 }
 
-export interface AutopoeMCPServerSummary {
-  name: string;
-  status: string;
-  transport: string;
-  command: string;
-  last_error?: string | null;
-}
-
 export interface MCPStatePayload {
   assistant_mcp_servers: string[];
   tabs: Array<{
@@ -424,7 +416,6 @@ export interface MCPStatePayload {
     mcp_servers: string[];
   }>;
   servers: MCPServerRecord[];
-  autopoe_server: AutopoeMCPServerSummary;
 }
 
 export interface ModelOption {

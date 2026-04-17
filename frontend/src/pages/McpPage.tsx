@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import useSWR from "swr";
 import {
-  Copy,
-  Plus,
-  RefreshCw,
-  Server,
-  ShieldAlert,
-  Unplug,
-} from "lucide-react";
+  startTransition,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import useSWR from "swr";
+import { Plus, RefreshCw, Search, ShieldAlert, Unplug, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   createMcpServer,
@@ -38,10 +37,28 @@ import {
   WorkspaceDialogField,
 } from "@/components/WorkspaceCommandDialog";
 import { cn } from "@/lib/utils";
-import type { MCPServerConfig, MCPServerRecord } from "@/types";
+import type {
+  MCPActivityRecord,
+  MCPServerConfig,
+  MCPServerRecord,
+} from "@/types";
 
 type DetailTab = "overview" | "capabilities" | "mounts" | "activity";
 type CapabilityTab = "tools" | "resources" | "resource_templates" | "prompts";
+type ServerStatusFilter =
+  | "all"
+  | "connected"
+  | "auth_required"
+  | "error"
+  | "disabled"
+  | "connecting";
+type ActivityFilter =
+  | "all"
+  | "refresh"
+  | "auth"
+  | "tool"
+  | "resource"
+  | "prompt";
 
 const EMPTY_SERVER_DRAFT: MCPServerConfig = {
   name: "",
@@ -65,12 +82,73 @@ const EMPTY_SERVER_DRAFT: MCPServerConfig = {
   env_http_headers: [],
 };
 
+const SERVER_FILTER_OPTIONS: Array<{
+  value: ServerStatusFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All" },
+  { value: "connected", label: "Connected" },
+  { value: "auth_required", label: "Auth Required" },
+  { value: "error", label: "Error" },
+  { value: "disabled", label: "Disabled" },
+  { value: "connecting", label: "Connecting" },
+];
+
+const ACTIVITY_FILTER_OPTIONS: Array<{
+  value: ActivityFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All" },
+  { value: "refresh", label: "Refresh" },
+  { value: "auth", label: "Auth" },
+  { value: "tool", label: "Tool" },
+  { value: "resource", label: "Resource" },
+  { value: "prompt", label: "Prompt" },
+];
+
 function formatTimestamp(value?: number | null) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return "Never";
   }
   const normalized = value > 1e12 ? value : value * 1000;
   return new Date(normalized).toLocaleString();
+}
+
+function formatSentenceCase(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatAuthStatus(value: string) {
+  switch (value) {
+    case "unsupported":
+      return "Unsupported";
+    case "not_logged_in":
+      return "Not logged in";
+    case "logging_in":
+      return "Logging in";
+    case "connected":
+      return "Connected";
+    case "error":
+      return "Error";
+    default:
+      return formatSentenceCase(value);
+  }
+}
+
+function formatTimestampShort(value?: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "Never";
+  }
+  const normalized = value > 1e12 ? value : value * 1000;
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(normalized));
 }
 
 function parseStringList(value: string) {
@@ -140,9 +218,47 @@ function statusClassName(status: string) {
   }
 }
 
+function resultClassName(result: string) {
+  switch (result) {
+    case "success":
+      return "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-200";
+    case "rejected":
+      return "border-amber-400/20 bg-amber-400/[0.08] text-amber-200";
+    default:
+      return "border-red-400/20 bg-red-400/[0.08] text-red-200";
+  }
+}
+
 function capabilitySummary(record: MCPServerRecord) {
   const counts = record.snapshot.capability_counts;
   return `${counts.tools} tools · ${counts.resources} resources · ${counts.prompts} prompts`;
+}
+
+function mountedSummary(record: MCPServerRecord) {
+  const mountedTabs = record.mounts.tabs.filter(
+    (entry) => entry.mounted,
+  ).length;
+  const parts: string[] = [];
+  if (record.mounts.assistant) {
+    parts.push("Assistant");
+  }
+  if (mountedTabs > 0) {
+    parts.push(`${mountedTabs} Tab${mountedTabs === 1 ? "" : "s"}`);
+  }
+  if (parts.length === 0) {
+    return null;
+  }
+  return parts.join(" + ");
+}
+
+function toolFilterSummary(record: MCPServerRecord) {
+  if (record.config.enabled_tools.length > 0) {
+    return `Enabled tools limited to ${record.config.enabled_tools.length} entries`;
+  }
+  if (record.config.disabled_tools.length > 0) {
+    return `${record.config.disabled_tools.length} tools excluded`;
+  }
+  return "All discovered tools remain available";
 }
 
 function authActionLabel(record: MCPServerRecord) {
@@ -154,6 +270,179 @@ function authActionLabel(record: MCPServerRecord) {
 
 function authActionDisabled(record: MCPServerRecord) {
   return record.config.transport === "stdio";
+}
+
+function readonlyText(value: string | null | undefined, fallback = "Not set") {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed || fallback;
+}
+
+function readonlyList(values: string[], fallback = "None") {
+  if (values.length === 0) {
+    return fallback;
+  }
+  return values.join("\n");
+}
+
+function readonlyMapKeys(values: Record<string, string>, fallback = "None") {
+  const keys = Object.keys(values);
+  if (keys.length === 0) {
+    return fallback;
+  }
+  return keys.join("\n");
+}
+
+function isAuthRelatedActivity(record: MCPActivityRecord) {
+  if (record.action === "login" || record.action === "logout") {
+    return true;
+  }
+  if (record.action !== "refresh") {
+    return false;
+  }
+  const haystack = `${record.summary} ${record.target ?? ""}`.toLowerCase();
+  return [
+    "auth",
+    "authentication",
+    "oauth",
+    "token",
+    "bearer",
+    "login",
+    "logged out",
+    "env var",
+  ].some((keyword) => haystack.includes(keyword));
+}
+
+function activityFilterForRecord(record: MCPActivityRecord): ActivityFilter {
+  if (isAuthRelatedActivity(record)) {
+    return "auth";
+  }
+  switch (record.action) {
+    case "refresh":
+      return "refresh";
+    case "login":
+    case "logout":
+      return "auth";
+    case "tool_call":
+      return "tool";
+    case "resource_read":
+      return "resource";
+    case "prompt_get":
+      return "prompt";
+    default:
+      return "all";
+  }
+}
+
+function activityCategoryLabel(record: MCPActivityRecord) {
+  switch (activityFilterForRecord(record)) {
+    case "refresh":
+      return "Refresh";
+    case "auth":
+      return "Auth";
+    case "tool":
+      return "Tool";
+    case "resource":
+      return "Resource";
+    case "prompt":
+      return "Prompt";
+    default:
+      return formatSentenceCase(record.action);
+  }
+}
+
+function matchesServerFilter(
+  record: MCPServerRecord,
+  query: string,
+  statusFilter: ServerStatusFilter,
+) {
+  if (statusFilter !== "all" && record.snapshot.status !== statusFilter) {
+    return false;
+  }
+  if (!query) {
+    return true;
+  }
+  const mounted = mountedSummary(record);
+  const haystack = [
+    record.config.name,
+    record.config.transport,
+    statusLabel(record.snapshot.status),
+    formatAuthStatus(record.snapshot.auth_status),
+    capabilitySummary(record),
+    mounted ?? "",
+    record.snapshot.last_error ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+function renderValueOrFallback(value: string, fallback = "Not set") {
+  return value.trim() ? value : fallback;
+}
+
+function SummaryCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-4 py-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-white/38">
+        {label}
+      </p>
+      <p className="mt-2 text-[26px] font-medium text-white">{value}</p>
+    </div>
+  );
+}
+
+function FilterPill({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+        active
+          ? "bg-white/[0.1] text-white"
+          : "bg-white/[0.03] text-white/52 hover:bg-white/[0.05] hover:text-white/84",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ReadonlyBlock({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+        {label}
+      </p>
+      <pre
+        className={cn(
+          "min-h-[44px] whitespace-pre-wrap break-all rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 text-[12px] leading-6 text-white/74",
+          mono && "font-mono text-[11px]",
+        )}
+      >
+        {value}
+      </pre>
+    </div>
+  );
 }
 
 function MountToggle({
@@ -509,37 +798,70 @@ export function McpPage() {
   const [promptPreviewLoading, setPromptPreviewLoading] = useState(false);
   const [promptPreviewArgumentsText, setPromptPreviewArgumentsText] =
     useState("{}");
+  const [serverSearch, setServerSearch] = useState("");
+  const [serverStatusFilter, setServerStatusFilter] =
+    useState<ServerStatusFilter>("all");
+  const [tabSearch, setTabSearch] = useState("");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
 
+  const deferredServerSearch = useDeferredValue(
+    serverSearch.trim().toLowerCase(),
+  );
+  const deferredTabSearch = useDeferredValue(tabSearch.trim().toLowerCase());
   const servers = useMemo(() => data?.servers ?? [], [data]);
+
+  const filteredServers = useMemo(
+    () =>
+      servers.filter((record) =>
+        matchesServerFilter(record, deferredServerSearch, serverStatusFilter),
+      ),
+    [deferredServerSearch, serverStatusFilter, servers],
+  );
+
   const selectedServer = useMemo(
     () =>
-      servers.find((record) => record.config.name === selectedServerName) ??
-      servers[0] ??
+      filteredServers.find(
+        (record) => record.config.name === selectedServerName,
+      ) ??
+      filteredServers[0] ??
       null,
-    [selectedServerName, servers],
+    [filteredServers, selectedServerName],
   );
 
   useEffect(() => {
-    if (!selectedServer && servers.length > 0) {
-      setSelectedServerName(servers[0].config.name);
-      return;
-    }
     if (
-      selectedServer &&
-      !servers.some(
-        (record) => record.config.name === selectedServer.config.name,
+      filteredServers.length > 0 &&
+      !filteredServers.some(
+        (record) => record.config.name === selectedServerName,
       )
     ) {
-      setSelectedServerName(servers[0]?.config.name ?? null);
+      setSelectedServerName(filteredServers[0]?.config.name ?? null);
     }
-  }, [selectedServer, servers]);
+  }, [filteredServers, selectedServerName]);
 
   useEffect(() => {
     setSelectedPromptName(null);
     setPromptPreview(null);
     setPromptPreviewLoading(false);
     setPromptPreviewArgumentsText("{}");
+    setTabSearch("");
+    setActivityFilter("all");
   }, [selectedServer?.config.name]);
+
+  const summaryCounts = useMemo(
+    () => ({
+      configured: servers.length,
+      connected: servers.filter(
+        (record) => record.snapshot.status === "connected",
+      ).length,
+      authRequired: servers.filter(
+        (record) => record.snapshot.status === "auth_required",
+      ).length,
+      error: servers.filter((record) => record.snapshot.status === "error")
+        .length,
+    }),
+    [servers],
+  );
 
   const selectedPrompt = useMemo(
     () =>
@@ -548,6 +870,32 @@ export function McpPage() {
       ) ?? null,
     [selectedPromptName, selectedServer],
   );
+
+  const filteredTabMounts = useMemo(() => {
+    if (!selectedServer) {
+      return [];
+    }
+    return selectedServer.mounts.tabs.filter((entry) => {
+      if (!deferredTabSearch) {
+        return true;
+      }
+      const haystack =
+        `${entry.tab_title} ${entry.tab_id.slice(0, 8)}`.toLowerCase();
+      return haystack.includes(deferredTabSearch);
+    });
+  }, [deferredTabSearch, selectedServer]);
+
+  const filteredActivity = useMemo(() => {
+    if (!selectedServer) {
+      return [];
+    }
+    return selectedServer.activity.filter((entry) => {
+      if (activityFilter === "all") {
+        return true;
+      }
+      return activityFilterForRecord(entry) === activityFilter;
+    });
+  }, [activityFilter, selectedServer]);
 
   const openCreateDialog = () => {
     setEditingServerName(null);
@@ -559,6 +907,11 @@ export function McpPage() {
     setEditingServerName(record.config.name);
     setDraft(record.config);
     setDialogOpen(true);
+  };
+
+  const clearServerFilters = () => {
+    setServerSearch("");
+    setServerStatusFilter("all");
   };
 
   const handleRefreshAll = async () => {
@@ -584,6 +937,7 @@ export function McpPage() {
         await createMcpServer(draft);
       }
       await mutate();
+      setSelectedServerName(draft.name.trim());
       setDialogOpen(false);
       toast.success("MCP server saved");
     } catch (saveError) {
@@ -701,15 +1055,6 @@ export function McpPage() {
     }
   };
 
-  const handleCopyCommand = async () => {
-    try {
-      await navigator.clipboard.writeText(data?.autopoe_server.command ?? "");
-      toast.success("Command copied");
-    } catch {
-      toast.error("Failed to copy command");
-    }
-  };
-
   const handlePreviewPrompt = async (
     serverName: string,
     promptName: string,
@@ -783,58 +1128,6 @@ export function McpPage() {
           </div>
         </div>
 
-        <SoftPanel className="mt-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-white/72">
-                  <Server className="size-4.5" />
-                </div>
-                <div>
-                  <h2 className="text-[15px] font-medium text-white/88">
-                    Autopoe MCP Server
-                  </h2>
-                  <p className="mt-1 text-[12px] text-white/42">
-                    Stable transport {data?.autopoe_server.transport ?? "stdio"}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-4 text-[12px] leading-6 text-white/46">
-                Startup command
-              </p>
-              <code className="mt-2 block rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 text-[12px] text-white/80">
-                {data?.autopoe_server.command ?? "uv run autopoe mcp serve"}
-              </code>
-              {data?.autopoe_server.last_error ? (
-                <p className="mt-3 text-[12px] text-red-200">
-                  {data.autopoe_server.last_error}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={cn(
-                  "rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em]",
-                  data?.autopoe_server.status === "available"
-                    ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-200"
-                    : "border-red-400/20 bg-red-400/[0.08] text-red-200",
-                )}
-              >
-                {data?.autopoe_server.status ?? "available"}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
-                onClick={handleCopyCommand}
-              >
-                <Copy className="mr-2 size-4" />
-                Copy Command
-              </Button>
-            </div>
-          </div>
-        </SoftPanel>
-
         <div className="mt-6 min-h-0 flex-1 overflow-hidden">
           {isLoading ? (
             <div className="grid h-full gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -873,100 +1166,293 @@ export function McpPage() {
               </Button>
             </SoftPanel>
           ) : (
-            <div className="grid h-full gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-              <div className="min-h-0 overflow-y-auto pr-1 scrollbar-none">
-                <div className="space-y-3">
-                  {servers.map((record) => {
-                    const isSelected =
-                      selectedServer?.config.name === record.config.name;
-                    return (
-                      <div
-                        key={record.config.name}
-                        className={cn(
-                          "rounded-2xl border p-4 transition-colors",
-                          isSelected
-                            ? "border-white/[0.12] bg-white/[0.04]"
-                            : "border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.03]",
-                        )}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedServerName(record.config.name)
-                            }
-                            className="min-w-0 flex-1 text-left"
-                          >
-                            <div className="flex items-center gap-2">
-                              <p className="text-[14px] font-medium text-white/88">
-                                {record.config.name}
-                              </p>
-                              {record.config.required ? (
-                                <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-amber-200">
-                                  required
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="mt-1 text-[12px] text-white/42">
-                              {record.config.transport}
-                            </p>
-                            <p className="mt-3 text-[12px] text-white/42">
-                              Auth {record.snapshot.auth_status}
-                            </p>
-                            <p className="mt-2 text-[12px] text-white/46">
-                              {capabilitySummary(record)}
-                            </p>
-                            {record.snapshot.last_error ? (
-                              <p className="mt-3 line-clamp-2 text-[12px] leading-5 text-red-200">
-                                {record.snapshot.last_error}
-                              </p>
-                            ) : null}
-                          </button>
-                          <div className="flex shrink-0 flex-col items-end gap-1.5">
-                            <span
+            <div className="flex h-full min-h-0 flex-col">
+              <SoftPanel>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <SummaryCard
+                    label="Configured"
+                    value={summaryCounts.configured}
+                  />
+                  <SummaryCard
+                    label="Connected"
+                    value={summaryCounts.connected}
+                  />
+                  <SummaryCard
+                    label="Auth Required"
+                    value={summaryCounts.authRequired}
+                  />
+                  <SummaryCard label="Error" value={summaryCounts.error} />
+                </div>
+              </SoftPanel>
+
+              <SoftPanel className="mt-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="relative w-full max-w-xl">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/28" />
+                    <Input
+                      value={serverSearch}
+                      onChange={(event) =>
+                        startTransition(() =>
+                          setServerSearch(event.target.value),
+                        )
+                      }
+                      placeholder="Search MCP servers"
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {SERVER_FILTER_OPTIONS.map((option) => (
+                      <FilterPill
+                        key={option.value}
+                        active={serverStatusFilter === option.value}
+                        label={option.label}
+                        onClick={() => setServerStatusFilter(option.value)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </SoftPanel>
+
+              <div className="mt-4 min-h-0 flex-1 overflow-hidden">
+                {filteredServers.length === 0 ? (
+                  <SoftPanel className="flex h-full flex-col items-center justify-center text-center">
+                    <div className="flex size-14 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.02] text-white/52">
+                      <Search className="size-6" />
+                    </div>
+                    <h2 className="mt-5 text-[16px] font-medium text-white/88">
+                      No matching MCP servers
+                    </h2>
+                    <p className="mt-2 max-w-lg text-[13px] leading-6 text-white/42">
+                      Adjust the search term or status filter to see matching
+                      servers again.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-5 border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                      onClick={clearServerFilters}
+                    >
+                      <X className="mr-2 size-4" />
+                      Clear Filters
+                    </Button>
+                  </SoftPanel>
+                ) : (
+                  <div className="grid h-full gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+                    <div className="min-h-0 overflow-y-auto pr-1 scrollbar-none">
+                      <div className="space-y-3">
+                        {filteredServers.map((record) => {
+                          const isSelected =
+                            selectedServer?.config.name === record.config.name;
+                          const mounted = mountedSummary(record);
+                          return (
+                            <div
+                              key={record.config.name}
                               className={cn(
-                                "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em]",
-                                statusClassName(record.snapshot.status),
+                                "rounded-2xl border p-4 transition-colors",
+                                isSelected
+                                  ? "border-white/[0.12] bg-white/[0.04]"
+                                  : "border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.03]",
                               )}
                             >
-                              {statusLabel(record.snapshot.status)}
-                            </span>
-                            <div className="flex flex-wrap justify-end gap-1.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    startTransition(() =>
+                                      setSelectedServerName(record.config.name),
+                                    )
+                                  }
+                                  className="min-w-0 flex-1 text-left"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-[14px] font-medium text-white/88">
+                                      {record.config.name}
+                                    </p>
+                                    {record.config.required ? (
+                                      <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-amber-200">
+                                        required
+                                      </span>
+                                    ) : null}
+                                    {mounted ? (
+                                      <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200">
+                                        Mounted
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="mt-3 grid gap-1.5 text-[12px] text-white/48">
+                                    <p>Transport {record.config.transport}</p>
+                                    <p>
+                                      Status{" "}
+                                      {statusLabel(record.snapshot.status)}
+                                    </p>
+                                    <p>
+                                      Auth{" "}
+                                      {formatAuthStatus(
+                                        record.snapshot.auth_status,
+                                      )}
+                                    </p>
+                                    <p>{capabilitySummary(record)}</p>
+                                    {mounted ? <p>{mounted}</p> : null}
+                                  </div>
+                                  {record.snapshot.last_error ? (
+                                    <p className="mt-3 line-clamp-2 text-[12px] leading-5 text-red-200">
+                                      {record.snapshot.last_error}
+                                    </p>
+                                  ) : null}
+                                </button>
+                                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                  <span
+                                    className={cn(
+                                      "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em]",
+                                      statusClassName(record.snapshot.status),
+                                    )}
+                                  >
+                                    {statusLabel(record.snapshot.status)}
+                                  </span>
+                                  <div className="flex flex-wrap justify-end gap-1.5">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      onClick={() =>
+                                        handleToggleEnabled(record)
+                                      }
+                                    >
+                                      {record.config.enabled
+                                        ? "Disable"
+                                        : "Enable"}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      disabled={authActionDisabled(record)}
+                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      onClick={() =>
+                                        record.snapshot.auth_status ===
+                                        "connected"
+                                          ? handleLogout(record.config.name)
+                                          : handleLogin(record.config.name)
+                                      }
+                                    >
+                                      {authActionLabel(record)}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      onClick={() => openEditDialog(record)}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      onClick={() =>
+                                        handleRefreshServer(record.config.name)
+                                      }
+                                    >
+                                      Refresh
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="h-7 border-red-400/20 bg-red-400/[0.06] px-2 text-[11px] text-red-100 hover:bg-red-400/[0.12]"
+                                      onClick={() =>
+                                        handleDeleteServer(record.config.name)
+                                      }
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="min-h-0 overflow-hidden">
+                      {selectedServer ? (
+                        <SoftPanel className="flex h-full min-h-0 flex-col">
+                          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/[0.06] pb-4">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-3">
+                                <h2 className="text-[18px] font-medium text-white/90">
+                                  {selectedServer.config.name}
+                                </h2>
+                                <span
+                                  className={cn(
+                                    "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
+                                    statusClassName(
+                                      selectedServer.snapshot.status,
+                                    ),
+                                  )}
+                                >
+                                  {statusLabel(selectedServer.snapshot.status)}
+                                </span>
+                                {mountedSummary(selectedServer) ? (
+                                  <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200">
+                                    {mountedSummary(selectedServer)}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="mt-2 text-[13px] text-white/42">
+                                {selectedServer.config.transport} · Auth{" "}
+                                {formatAuthStatus(
+                                  selectedServer.snapshot.auth_status,
+                                )}
+                              </p>
+                              {selectedServer.snapshot.last_error ? (
+                                <p className="mt-2 max-w-3xl text-[13px] leading-6 text-red-200">
+                                  {selectedServer.snapshot.last_error}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
-                                onClick={() => handleToggleEnabled(record)}
-                              >
-                                {record.config.enabled ? "Disable" : "Enable"}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                disabled={authActionDisabled(record)}
-                                className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
                                 onClick={() =>
-                                  record.snapshot.auth_status === "connected"
-                                    ? handleLogout(record.config.name)
-                                    : handleLogin(record.config.name)
+                                  handleToggleEnabled(selectedServer)
                                 }
                               >
-                                {authActionLabel(record)}
+                                {selectedServer.config.enabled
+                                  ? "Disable"
+                                  : "Enable"}
                               </Button>
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
-                                onClick={() => openEditDialog(record)}
+                                disabled={authActionDisabled(selectedServer)}
+                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                onClick={() =>
+                                  selectedServer.snapshot.auth_status ===
+                                  "connected"
+                                    ? handleLogout(selectedServer.config.name)
+                                    : handleLogin(selectedServer.config.name)
+                                }
+                              >
+                                {authActionLabel(selectedServer)}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                onClick={() => openEditDialog(selectedServer)}
                               >
                                 Edit
                               </Button>
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
                                 onClick={() =>
-                                  handleRefreshServer(record.config.name)
+                                  handleRefreshServer(
+                                    selectedServer.config.name,
+                                  )
                                 }
                               >
                                 Refresh
@@ -974,602 +1460,694 @@ export function McpPage() {
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="h-7 border-red-400/20 bg-red-400/[0.06] px-2 text-[11px] text-red-100 hover:bg-red-400/[0.12]"
+                                className="border-red-400/20 bg-red-400/[0.06] text-red-100 hover:bg-red-400/[0.12]"
                                 onClick={() =>
-                                  handleDeleteServer(record.config.name)
+                                  handleDeleteServer(selectedServer.config.name)
                                 }
                               >
                                 Remove
                               </Button>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
 
-              <div className="min-h-0 overflow-hidden">
-                {selectedServer ? (
-                  <SoftPanel className="flex h-full min-h-0 flex-col">
-                    <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/[0.06] pb-4">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <h2 className="text-[18px] font-medium text-white/90">
-                            {selectedServer.config.name}
-                          </h2>
-                          <span
-                            className={cn(
-                              "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
-                              statusClassName(selectedServer.snapshot.status),
-                            )}
-                          >
-                            {statusLabel(selectedServer.snapshot.status)}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-[13px] text-white/42">
-                          {selectedServer.config.transport}
-                          {selectedServer.snapshot.last_error
-                            ? ` · ${selectedServer.snapshot.last_error}`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
-                          onClick={() => handleToggleEnabled(selectedServer)}
-                        >
-                          {selectedServer.config.enabled ? "Disable" : "Enable"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={authActionDisabled(selectedServer)}
-                          className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
-                          onClick={() =>
-                            selectedServer.snapshot.auth_status === "connected"
-                              ? handleLogout(selectedServer.config.name)
-                              : handleLogin(selectedServer.config.name)
-                          }
-                        >
-                          {authActionLabel(selectedServer)}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
-                          onClick={() => openEditDialog(selectedServer)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
-                          onClick={() =>
-                            handleRefreshServer(selectedServer.config.name)
-                          }
-                        >
-                          Refresh
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-red-400/20 bg-red-400/[0.06] text-red-100 hover:bg-red-400/[0.12]"
-                          onClick={() =>
-                            handleDeleteServer(selectedServer.config.name)
-                          }
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {(
-                        [
-                          "overview",
-                          "capabilities",
-                          "mounts",
-                          "activity",
-                        ] as DetailTab[]
-                      ).map((tab) => (
-                        <button
-                          key={tab}
-                          type="button"
-                          onClick={() => setDetailTab(tab)}
-                          className={cn(
-                            "rounded-full px-3 py-1.5 text-[12px] font-medium capitalize transition-colors",
-                            detailTab === tab
-                              ? "bg-white/[0.08] text-white"
-                              : "bg-white/[0.03] text-white/52 hover:text-white/84",
-                          )}
-                        >
-                          {tab}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-none">
-                      {detailTab === "overview" ? (
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <SoftPanel className="bg-black/20">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                              Status
-                            </p>
-                            <p className="mt-3 text-[22px] font-medium text-white">
-                              {statusLabel(selectedServer.snapshot.status)}
-                            </p>
-                            <p className="mt-2 text-[13px] text-white/42">
-                              Auth {selectedServer.snapshot.auth_status}
-                            </p>
-                          </SoftPanel>
-                          <SoftPanel className="bg-black/20">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                              Last Refresh
-                            </p>
-                            <p className="mt-3 text-[15px] font-medium text-white">
-                              {formatTimestamp(
-                                selectedServer.snapshot.last_refresh_at,
-                              )}
-                            </p>
-                            <p className="mt-2 text-[13px] text-white/42">
-                              {selectedServer.snapshot.last_refresh_result}
-                            </p>
-                          </SoftPanel>
-                          {selectedServer.config.transport ===
-                          "streamable_http" ? (
-                            <SoftPanel className="bg-black/20 md:col-span-2">
-                              <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                Recent Auth Result
-                              </p>
-                              <p className="mt-3 text-[15px] font-medium text-white">
-                                {selectedServer.snapshot.last_auth_result ??
-                                  "No login action yet"}
-                              </p>
-                              <p className="mt-2 text-[13px] text-white/42">
-                                Current auth status{" "}
-                                {selectedServer.snapshot.auth_status}
-                              </p>
-                            </SoftPanel>
-                          ) : null}
-                          <SoftPanel className="bg-black/20 md:col-span-2">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                              Capability Summary
-                            </p>
-                            <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                              {Object.entries(
-                                selectedServer.snapshot.capability_counts,
-                              ).map(([key, value]) => (
-                                <div
-                                  key={key}
-                                  className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
-                                >
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                    {key.replaceAll("_", " ")}
-                                  </p>
-                                  <p className="mt-2 text-xl font-medium text-white">
-                                    {value}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                          </SoftPanel>
-                        </div>
-                      ) : null}
-
-                      {detailTab === "capabilities" ? (
-                        <div className="space-y-4">
-                          <div className="flex flex-wrap gap-2">
+                          <div className="mt-4 flex flex-wrap gap-2">
                             {(
                               [
-                                "tools",
-                                "resources",
-                                "resource_templates",
-                                "prompts",
-                              ] as CapabilityTab[]
+                                "overview",
+                                "capabilities",
+                                "mounts",
+                                "activity",
+                              ] as DetailTab[]
                             ).map((tab) => (
-                              <button
+                              <FilterPill
                                 key={tab}
-                                type="button"
-                                onClick={() => setCapabilityTab(tab)}
-                                className={cn(
-                                  "rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
-                                  capabilityTab === tab
-                                    ? "bg-white/[0.08] text-white"
-                                    : "bg-white/[0.03] text-white/52 hover:text-white/84",
-                                )}
-                              >
-                                {tab === "resource_templates"
-                                  ? "Resource Templates"
-                                  : tab}
-                              </button>
-                            ))}
-                          </div>
-
-                          {capabilityTab === "tools" ? (
-                            <div className="space-y-3">
-                              {selectedServer.snapshot.tools.length === 0 ? (
-                                <SoftPanel className="bg-black/20 text-[13px] text-white/42">
-                                  No tools discovered.
-                                </SoftPanel>
-                              ) : (
-                                selectedServer.snapshot.tools.map((tool) => (
-                                  <SoftPanel
-                                    key={tool.fully_qualified_id}
-                                    className="bg-black/20"
-                                  >
-                                    <div className="flex flex-wrap items-start justify-between gap-3">
-                                      <div>
-                                        <p className="font-mono text-[13px] text-white/90">
-                                          {tool.tool_name}
-                                        </p>
-                                        {tool.title ? (
-                                          <p className="mt-2 text-[13px] text-white/62">
-                                            {tool.title}
-                                          </p>
-                                        ) : null}
-                                        <p className="mt-1 text-[12px] text-white/42">
-                                          {tool.fully_qualified_id}
-                                        </p>
-                                      </div>
-                                      <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.14em]">
-                                        {tool.read_only_hint ? (
-                                          <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-1 text-sky-200">
-                                            readOnly
-                                          </span>
-                                        ) : null}
-                                        {tool.destructive_hint ? (
-                                          <span className="rounded-full border border-red-400/20 bg-red-400/[0.08] px-2 py-1 text-red-200">
-                                            destructive
-                                          </span>
-                                        ) : null}
-                                        {tool.open_world_hint ? (
-                                          <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-1 text-amber-200">
-                                            openWorld
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                    {tool.description ? (
-                                      <p className="mt-3 text-[13px] leading-6 text-white/48">
-                                        {tool.description}
-                                      </p>
-                                    ) : null}
-                                    <pre className="mt-4 max-h-48 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
-                                      {JSON.stringify(
-                                        tool.parameters ?? {},
-                                        null,
-                                        2,
-                                      )}
-                                    </pre>
-                                  </SoftPanel>
-                                ))
-                              )}
-                            </div>
-                          ) : null}
-
-                          {capabilityTab === "resources" ? (
-                            <div className="space-y-3">
-                              {selectedServer.snapshot.resources.length ===
-                              0 ? (
-                                <SoftPanel className="bg-black/20 text-[13px] text-white/42">
-                                  No resources discovered.
-                                </SoftPanel>
-                              ) : (
-                                selectedServer.snapshot.resources.map(
-                                  (resource) => (
-                                    <SoftPanel
-                                      key={resource.uri}
-                                      className="bg-black/20"
-                                    >
-                                      <p className="text-[14px] font-medium text-white/88">
-                                        {resource.name}
-                                      </p>
-                                      <p className="mt-1 font-mono text-[12px] text-white/42">
-                                        {resource.uri}
-                                      </p>
-                                      <p className="mt-3 text-[13px] text-white/48">
-                                        {resource.mime_type ?? "Unknown MIME"}
-                                      </p>
-                                      {resource.description ? (
-                                        <p className="mt-2 text-[13px] leading-6 text-white/42">
-                                          {resource.description}
-                                        </p>
-                                      ) : null}
-                                    </SoftPanel>
-                                  ),
-                                )
-                              )}
-                            </div>
-                          ) : null}
-
-                          {capabilityTab === "resource_templates" ? (
-                            <div className="space-y-3">
-                              {selectedServer.snapshot.resource_templates
-                                .length === 0 ? (
-                                <SoftPanel className="bg-black/20 text-[13px] text-white/42">
-                                  No resource templates discovered.
-                                </SoftPanel>
-                              ) : (
-                                selectedServer.snapshot.resource_templates.map(
-                                  (template) => (
-                                    <SoftPanel
-                                      key={template.uri_template}
-                                      className="bg-black/20"
-                                    >
-                                      <p className="text-[14px] font-medium text-white/88">
-                                        {template.name}
-                                      </p>
-                                      <p className="mt-1 font-mono text-[12px] text-white/42">
-                                        {template.uri_template}
-                                      </p>
-                                      {template.description ? (
-                                        <p className="mt-3 text-[13px] leading-6 text-white/42">
-                                          {template.description}
-                                        </p>
-                                      ) : null}
-                                    </SoftPanel>
-                                  ),
-                                )
-                              )}
-                            </div>
-                          ) : null}
-
-                          {capabilityTab === "prompts" ? (
-                            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                              <div className="space-y-3">
-                                {selectedServer.snapshot.prompts.length ===
-                                0 ? (
-                                  <SoftPanel className="bg-black/20 text-[13px] text-white/42">
-                                    No prompts discovered.
-                                  </SoftPanel>
-                                ) : (
-                                  selectedServer.snapshot.prompts.map(
-                                    (prompt) => (
-                                      <button
-                                        key={prompt.name}
-                                        type="button"
-                                        onClick={() =>
-                                          handleSelectPrompt(
-                                            selectedServer.config.name,
-                                            prompt.name,
-                                          )
-                                        }
-                                        className={cn(
-                                          "block w-full rounded-xl border border-white/[0.06] bg-black/20 p-5 text-left transition-colors",
-                                          selectedPromptName === prompt.name
-                                            ? "border-white/[0.16] bg-white/[0.04]"
-                                            : "hover:bg-white/[0.03]",
-                                        )}
-                                      >
-                                        <p className="text-[14px] font-medium text-white/88">
-                                          {prompt.name}
-                                        </p>
-                                        {prompt.description ? (
-                                          <p className="mt-2 text-[13px] leading-6 text-white/42">
-                                            {prompt.description}
-                                          </p>
-                                        ) : null}
-                                        <pre className="mt-4 max-h-48 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
-                                          {JSON.stringify(
-                                            prompt.arguments ?? [],
-                                            null,
-                                            2,
-                                          )}
-                                        </pre>
-                                      </button>
-                                    ),
-                                  )
-                                )}
-                              </div>
-                              <SoftPanel className="bg-black/20">
-                                <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                  Prompt Preview
-                                </p>
-                                {selectedPromptName ? (
-                                  <>
-                                    <p className="mt-3 text-[15px] font-medium text-white">
-                                      {selectedPromptName}
-                                    </p>
-                                    <p className="mt-4 text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                      Arguments
-                                    </p>
-                                    <Textarea
-                                      value={promptPreviewArgumentsText}
-                                      onChange={(event) =>
-                                        setPromptPreviewArgumentsText(
-                                          event.target.value,
-                                        )
-                                      }
-                                      className="mt-2 min-h-[120px] border-white/[0.06] bg-black/30 font-mono text-[11px] text-white/75"
-                                    />
-                                    <div className="mt-3 flex items-center justify-between gap-3">
-                                      <p className="text-[12px] text-white/42">
-                                        Edit argument JSON, then refresh the
-                                        preview.
-                                      </p>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
-                                        onClick={() => {
-                                          try {
-                                            const parsed = JSON.parse(
-                                              promptPreviewArgumentsText,
-                                            ) as Record<string, unknown>;
-                                            void handlePreviewPrompt(
-                                              selectedServer.config.name,
-                                              selectedPromptName,
-                                              parsed,
-                                            );
-                                          } catch {
-                                            setPromptPreview({
-                                              error:
-                                                "Arguments must be valid JSON",
-                                            });
-                                          }
-                                        }}
-                                      >
-                                        Preview
-                                      </Button>
-                                    </div>
-                                    {selectedPrompt?.arguments?.length ? (
-                                      <pre className="mt-4 max-h-40 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
-                                        {JSON.stringify(
-                                          selectedPrompt.arguments,
-                                          null,
-                                          2,
-                                        )}
-                                      </pre>
-                                    ) : null}
-                                    <pre className="mt-4 max-h-[420px] overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
-                                      {promptPreviewLoading
-                                        ? "Loading preview..."
-                                        : JSON.stringify(
-                                            promptPreview ?? {},
-                                            null,
-                                            2,
-                                          )}
-                                    </pre>
-                                  </>
-                                ) : (
-                                  <p className="mt-4 text-[13px] leading-6 text-white/42">
-                                    Select a prompt to preview its parameter
-                                    structure and template result.
-                                  </p>
-                                )}
-                              </SoftPanel>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {detailTab === "mounts" ? (
-                        <div className="space-y-5">
-                          {selectedServer.snapshot.status !== "connected" ? (
-                            <SoftPanel className="flex items-start gap-3 bg-amber-400/[0.06] text-[13px] text-amber-100">
-                              <ShieldAlert className="mt-0.5 size-4 shrink-0" />
-                              <p>
-                                This server is not fully connected yet. Mounts
-                                stay configurable, but the server will not
-                                surface active capabilities until refresh
-                                succeeds.
-                              </p>
-                            </SoftPanel>
-                          ) : null}
-
-                          <div className="space-y-3">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                              Assistant Mounts
-                            </p>
-                            <MountToggle
-                              checked={selectedServer.mounts.assistant}
-                              disabled={
-                                selectedServer.snapshot.status !== "connected"
-                              }
-                              label="Mount on Assistant"
-                              onChange={(nextValue) =>
-                                handleAssistantMount(
-                                  selectedServer.config.name,
-                                  nextValue,
-                                )
-                              }
-                            />
-                          </div>
-
-                          <div className="space-y-3">
-                            <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                              Tab Mounts
-                            </p>
-                            {selectedServer.mounts.tabs.map((entry) => (
-                              <MountToggle
-                                key={entry.tab_id}
-                                checked={entry.mounted}
-                                disabled={
-                                  selectedServer.snapshot.status !== "connected"
-                                }
-                                label={`${entry.tab_title} · ${entry.tab_id.slice(0, 8)}`}
-                                onChange={(nextValue) =>
-                                  handleTabMount(
-                                    selectedServer.config.name,
-                                    entry.tab_id,
-                                    nextValue,
-                                  )
-                                }
+                                active={detailTab === tab}
+                                label={formatSentenceCase(tab)}
+                                onClick={() => setDetailTab(tab)}
                               />
                             ))}
                           </div>
-                        </div>
-                      ) : null}
 
-                      {detailTab === "activity" ? (
-                        <div className="space-y-3">
-                          {selectedServer.activity.length === 0 ? (
-                            <SoftPanel className="bg-black/20 text-[13px] text-white/42">
-                              No recent MCP activity.
-                            </SoftPanel>
-                          ) : (
-                            selectedServer.activity.map((entry) => (
-                              <SoftPanel key={entry.id} className="bg-black/20">
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div>
-                                    <p className="text-[14px] font-medium text-white/88">
-                                      {entry.action}
-                                    </p>
-                                    <p className="mt-1 text-[12px] text-white/42">
-                                      {formatTimestamp(entry.started_at)}
-                                    </p>
-                                  </div>
-                                  <span
-                                    className={cn(
-                                      "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
-                                      entry.result === "success"
-                                        ? "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-200"
-                                        : entry.result === "rejected"
-                                          ? "border-amber-400/20 bg-amber-400/[0.08] text-amber-200"
-                                          : "border-red-400/20 bg-red-400/[0.08] text-red-200",
+                          <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-none">
+                            {detailTab === "overview" ? (
+                              <div className="grid gap-4 xl:grid-cols-2">
+                                <SoftPanel className="bg-black/20">
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    Status
+                                  </p>
+                                  <p className="mt-3 text-[22px] font-medium text-white">
+                                    {statusLabel(
+                                      selectedServer.snapshot.status,
                                     )}
-                                  >
-                                    {entry.result}
-                                  </span>
+                                  </p>
+                                  <p className="mt-2 text-[13px] text-white/42">
+                                    Auth{" "}
+                                    {formatAuthStatus(
+                                      selectedServer.snapshot.auth_status,
+                                    )}
+                                  </p>
+                                </SoftPanel>
+
+                                <SoftPanel className="bg-black/20">
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    Last Refresh
+                                  </p>
+                                  <p className="mt-3 text-[15px] font-medium text-white">
+                                    {formatTimestamp(
+                                      selectedServer.snapshot.last_refresh_at,
+                                    )}
+                                  </p>
+                                  <p className="mt-2 text-[13px] text-white/42">
+                                    Result{" "}
+                                    {formatSentenceCase(
+                                      selectedServer.snapshot
+                                        .last_refresh_result,
+                                    )}
+                                  </p>
+                                </SoftPanel>
+
+                                <SoftPanel className="bg-black/20">
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    Timeouts
+                                  </p>
+                                  <p className="mt-3 text-[15px] font-medium text-white">
+                                    Startup{" "}
+                                    {selectedServer.config.startup_timeout_sec}s
+                                  </p>
+                                  <p className="mt-2 text-[13px] text-white/42">
+                                    Tool{" "}
+                                    {selectedServer.config.tool_timeout_sec}s
+                                  </p>
+                                </SoftPanel>
+
+                                <SoftPanel className="bg-black/20">
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    Tool Filters
+                                  </p>
+                                  <p className="mt-3 text-[15px] font-medium text-white">
+                                    {toolFilterSummary(selectedServer)}
+                                  </p>
+                                  <p className="mt-2 text-[13px] text-white/42">
+                                    Enabled{" "}
+                                    {selectedServer.config.enabled_tools.length}
+                                    {" · "}Disabled{" "}
+                                    {
+                                      selectedServer.config.disabled_tools
+                                        .length
+                                    }
+                                  </p>
+                                </SoftPanel>
+
+                                <SoftPanel className="bg-black/20 xl:col-span-2">
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    Capability Summary
+                                  </p>
+                                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    {Object.entries(
+                                      selectedServer.snapshot.capability_counts,
+                                    ).map(([key, value]) => (
+                                      <div
+                                        key={key}
+                                        className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+                                      >
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                          {key.replaceAll("_", " ")}
+                                        </p>
+                                        <p className="mt-2 text-xl font-medium text-white">
+                                          {value}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </SoftPanel>
+
+                                {selectedServer.config.transport === "stdio" ? (
+                                  <SoftPanel className="bg-black/20 xl:col-span-2">
+                                    <div className="grid gap-4 xl:grid-cols-2">
+                                      <ReadonlyBlock
+                                        label="Command"
+                                        value={readonlyText(
+                                          selectedServer.config.command,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="Cwd"
+                                        value={readonlyText(
+                                          selectedServer.config.cwd,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="Args"
+                                        value={readonlyList(
+                                          selectedServer.config.args,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="Env Vars"
+                                        value={readonlyList(
+                                          selectedServer.config.env_vars,
+                                        )}
+                                        mono
+                                      />
+                                    </div>
+                                  </SoftPanel>
+                                ) : (
+                                  <SoftPanel className="bg-black/20 xl:col-span-2">
+                                    <div className="grid gap-4 xl:grid-cols-2">
+                                      <ReadonlyBlock
+                                        label="URL"
+                                        value={readonlyText(
+                                          selectedServer.config.url,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="OAuth Resource"
+                                        value={readonlyText(
+                                          selectedServer.config.oauth_resource,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="Bearer Token Env Var"
+                                        value={readonlyText(
+                                          selectedServer.config
+                                            .bearer_token_env_var,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="Scopes"
+                                        value={readonlyList(
+                                          selectedServer.config.scopes,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="HTTP Headers"
+                                        value={readonlyMapKeys(
+                                          selectedServer.config.http_headers,
+                                        )}
+                                        mono
+                                      />
+                                      <ReadonlyBlock
+                                        label="Env HTTP Headers"
+                                        value={readonlyList(
+                                          selectedServer.config
+                                            .env_http_headers,
+                                        )}
+                                        mono
+                                      />
+                                    </div>
+                                    <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                        Recent Auth Result
+                                      </p>
+                                      <p className="mt-2 text-[14px] font-medium text-white">
+                                        {renderValueOrFallback(
+                                          selectedServer.snapshot
+                                            .last_auth_result ?? "",
+                                          "No login action yet",
+                                        )}
+                                      </p>
+                                      <p className="mt-2 text-[13px] text-white/42">
+                                        Current auth status{" "}
+                                        {formatAuthStatus(
+                                          selectedServer.snapshot.auth_status,
+                                        )}
+                                      </p>
+                                    </div>
+                                  </SoftPanel>
+                                )}
+                              </div>
+                            ) : null}
+
+                            {detailTab === "capabilities" ? (
+                              <div className="space-y-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {(
+                                    [
+                                      "tools",
+                                      "resources",
+                                      "resource_templates",
+                                      "prompts",
+                                    ] as CapabilityTab[]
+                                  ).map((tab) => (
+                                    <FilterPill
+                                      key={tab}
+                                      active={capabilityTab === tab}
+                                      label={
+                                        tab === "resource_templates"
+                                          ? "Resource Templates"
+                                          : formatSentenceCase(tab)
+                                      }
+                                      onClick={() => setCapabilityTab(tab)}
+                                    />
+                                  ))}
                                 </div>
-                                <p className="mt-3 text-[13px] leading-6 text-white/46">
-                                  {entry.summary}
-                                </p>
-                                <div className="mt-3 flex flex-wrap gap-4 text-[12px] text-white/42">
-                                  {entry.actor_node_id ? (
-                                    <span>
-                                      Node {entry.actor_node_id.slice(0, 8)}
-                                    </span>
-                                  ) : null}
-                                  {entry.tab_id ? (
-                                    <span>Tab {entry.tab_id.slice(0, 8)}</span>
-                                  ) : null}
-                                  {entry.tool_name ? (
-                                    <span>Tool {entry.tool_name}</span>
-                                  ) : null}
-                                  {entry.target ? (
-                                    <span>Target {entry.target}</span>
-                                  ) : null}
-                                  <span>
-                                    {Math.round(entry.duration_ms)} ms
-                                  </span>
+
+                                {capabilityTab === "tools" ? (
+                                  <div className="space-y-3">
+                                    {selectedServer.snapshot.tools.length ===
+                                    0 ? (
+                                      <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                        No tools discovered.
+                                      </SoftPanel>
+                                    ) : (
+                                      selectedServer.snapshot.tools.map(
+                                        (tool) => (
+                                          <SoftPanel
+                                            key={tool.fully_qualified_id}
+                                            className="bg-black/20"
+                                          >
+                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                              <div>
+                                                <p className="font-mono text-[13px] text-white/90">
+                                                  {tool.tool_name}
+                                                </p>
+                                                {tool.title ? (
+                                                  <p className="mt-2 text-[13px] text-white/62">
+                                                    {tool.title}
+                                                  </p>
+                                                ) : null}
+                                                <p className="mt-1 text-[12px] text-white/42">
+                                                  {tool.fully_qualified_id}
+                                                </p>
+                                              </div>
+                                              <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.14em]">
+                                                {tool.read_only_hint ? (
+                                                  <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-1 text-sky-200">
+                                                    readOnly
+                                                  </span>
+                                                ) : null}
+                                                {tool.destructive_hint ? (
+                                                  <span className="rounded-full border border-red-400/20 bg-red-400/[0.08] px-2 py-1 text-red-200">
+                                                    destructive
+                                                  </span>
+                                                ) : null}
+                                                {tool.open_world_hint ? (
+                                                  <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-1 text-amber-200">
+                                                    openWorld
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                            </div>
+                                            {tool.description ? (
+                                              <p className="mt-3 text-[13px] leading-6 text-white/48">
+                                                {tool.description}
+                                              </p>
+                                            ) : null}
+                                            <pre className="mt-4 max-h-48 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                              {JSON.stringify(
+                                                tool.parameters ?? {},
+                                                null,
+                                                2,
+                                              )}
+                                            </pre>
+                                          </SoftPanel>
+                                        ),
+                                      )
+                                    )}
+                                  </div>
+                                ) : null}
+
+                                {capabilityTab === "resources" ? (
+                                  <div className="space-y-3">
+                                    {selectedServer.snapshot.resources
+                                      .length === 0 ? (
+                                      <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                        No resources discovered.
+                                      </SoftPanel>
+                                    ) : (
+                                      selectedServer.snapshot.resources.map(
+                                        (resource) => (
+                                          <SoftPanel
+                                            key={resource.uri}
+                                            className="bg-black/20"
+                                          >
+                                            <p className="text-[14px] font-medium text-white/88">
+                                              {resource.name}
+                                            </p>
+                                            <p className="mt-1 font-mono text-[12px] text-white/42">
+                                              {resource.uri}
+                                            </p>
+                                            <p className="mt-3 text-[13px] text-white/48">
+                                              {resource.mime_type ??
+                                                "Unknown MIME"}
+                                            </p>
+                                            {resource.description ? (
+                                              <p className="mt-2 text-[13px] leading-6 text-white/42">
+                                                {resource.description}
+                                              </p>
+                                            ) : null}
+                                          </SoftPanel>
+                                        ),
+                                      )
+                                    )}
+                                  </div>
+                                ) : null}
+
+                                {capabilityTab === "resource_templates" ? (
+                                  <div className="space-y-3">
+                                    {selectedServer.snapshot.resource_templates
+                                      .length === 0 ? (
+                                      <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                        No resource templates discovered.
+                                      </SoftPanel>
+                                    ) : (
+                                      selectedServer.snapshot.resource_templates.map(
+                                        (template) => (
+                                          <SoftPanel
+                                            key={template.uri_template}
+                                            className="bg-black/20"
+                                          >
+                                            <p className="text-[14px] font-medium text-white/88">
+                                              {template.name}
+                                            </p>
+                                            <p className="mt-1 font-mono text-[12px] text-white/42">
+                                              {template.uri_template}
+                                            </p>
+                                            {template.description ? (
+                                              <p className="mt-3 text-[13px] leading-6 text-white/42">
+                                                {template.description}
+                                              </p>
+                                            ) : null}
+                                          </SoftPanel>
+                                        ),
+                                      )
+                                    )}
+                                  </div>
+                                ) : null}
+
+                                {capabilityTab === "prompts" ? (
+                                  <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                                    <div className="space-y-3">
+                                      {selectedServer.snapshot.prompts
+                                        .length === 0 ? (
+                                        <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                          No prompts discovered.
+                                        </SoftPanel>
+                                      ) : (
+                                        selectedServer.snapshot.prompts.map(
+                                          (prompt) => (
+                                            <button
+                                              key={prompt.name}
+                                              type="button"
+                                              onClick={() =>
+                                                handleSelectPrompt(
+                                                  selectedServer.config.name,
+                                                  prompt.name,
+                                                )
+                                              }
+                                              className={cn(
+                                                "block w-full rounded-xl border border-white/[0.06] bg-black/20 p-5 text-left transition-colors",
+                                                selectedPromptName ===
+                                                  prompt.name
+                                                  ? "border-white/[0.16] bg-white/[0.04]"
+                                                  : "hover:bg-white/[0.03]",
+                                              )}
+                                            >
+                                              <p className="text-[14px] font-medium text-white/88">
+                                                {prompt.name}
+                                              </p>
+                                              {prompt.description ? (
+                                                <p className="mt-2 text-[13px] leading-6 text-white/42">
+                                                  {prompt.description}
+                                                </p>
+                                              ) : null}
+                                              <pre className="mt-4 max-h-48 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                                {JSON.stringify(
+                                                  prompt.arguments ?? [],
+                                                  null,
+                                                  2,
+                                                )}
+                                              </pre>
+                                            </button>
+                                          ),
+                                        )
+                                      )}
+                                    </div>
+                                    <SoftPanel className="bg-black/20">
+                                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                        Prompt Preview
+                                      </p>
+                                      {selectedPromptName ? (
+                                        <>
+                                          <p className="mt-3 text-[15px] font-medium text-white">
+                                            {selectedPromptName}
+                                          </p>
+                                          <p className="mt-4 text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                            Arguments
+                                          </p>
+                                          <Textarea
+                                            value={promptPreviewArgumentsText}
+                                            onChange={(event) =>
+                                              setPromptPreviewArgumentsText(
+                                                event.target.value,
+                                              )
+                                            }
+                                            className="mt-2 min-h-[120px] border-white/[0.06] bg-black/30 font-mono text-[11px] text-white/75"
+                                          />
+                                          <div className="mt-3 flex items-center justify-between gap-3">
+                                            <p className="text-[12px] text-white/42">
+                                              Edit argument JSON, then refresh
+                                              the preview.
+                                            </p>
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                              onClick={() => {
+                                                try {
+                                                  const parsed = JSON.parse(
+                                                    promptPreviewArgumentsText,
+                                                  ) as Record<string, unknown>;
+                                                  void handlePreviewPrompt(
+                                                    selectedServer.config.name,
+                                                    selectedPromptName,
+                                                    parsed,
+                                                  );
+                                                } catch {
+                                                  setPromptPreview({
+                                                    error:
+                                                      "Arguments must be valid JSON",
+                                                  });
+                                                }
+                                              }}
+                                            >
+                                              Preview
+                                            </Button>
+                                          </div>
+                                          {selectedPrompt?.arguments?.length ? (
+                                            <pre className="mt-4 max-h-40 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                              {JSON.stringify(
+                                                selectedPrompt.arguments,
+                                                null,
+                                                2,
+                                              )}
+                                            </pre>
+                                          ) : null}
+                                          <pre className="mt-4 max-h-[420px] overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                            {promptPreviewLoading
+                                              ? "Loading preview..."
+                                              : JSON.stringify(
+                                                  promptPreview ?? {},
+                                                  null,
+                                                  2,
+                                                )}
+                                          </pre>
+                                        </>
+                                      ) : (
+                                        <p className="mt-4 text-[13px] leading-6 text-white/42">
+                                          Select a prompt to preview its
+                                          parameter structure and template
+                                          result.
+                                        </p>
+                                      )}
+                                    </SoftPanel>
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            {detailTab === "mounts" ? (
+                              <div className="space-y-5">
+                                {selectedServer.snapshot.status !==
+                                "connected" ? (
+                                  <SoftPanel className="flex items-start gap-3 bg-amber-400/[0.06] text-[13px] text-amber-100">
+                                    <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+                                    <p>
+                                      This server is not connected yet. Mounts
+                                      stay visible, but the server cannot safely
+                                      expose active capabilities until
+                                      connection checks succeed.
+                                    </p>
+                                  </SoftPanel>
+                                ) : null}
+
+                                <div className="space-y-3">
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    Assistant Mounts
+                                  </p>
+                                  <MountToggle
+                                    checked={selectedServer.mounts.assistant}
+                                    disabled={
+                                      selectedServer.snapshot.status !==
+                                      "connected"
+                                    }
+                                    label="Mount on Assistant"
+                                    onChange={(nextValue) =>
+                                      handleAssistantMount(
+                                        selectedServer.config.name,
+                                        nextValue,
+                                      )
+                                    }
+                                  />
                                 </div>
-                              </SoftPanel>
-                            ))
-                          )}
-                        </div>
-                      ) : null}
+
+                                <div className="space-y-3">
+                                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                    <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                      Tab Mounts
+                                    </p>
+                                    <div className="relative w-full max-w-sm">
+                                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/28" />
+                                      <Input
+                                        value={tabSearch}
+                                        onChange={(event) =>
+                                          startTransition(() =>
+                                            setTabSearch(event.target.value),
+                                          )
+                                        }
+                                        placeholder="Search tabs by title or ID"
+                                        className="pl-10"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {filteredTabMounts.length === 0 ? (
+                                    <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                      No matching tabs.
+                                    </SoftPanel>
+                                  ) : (
+                                    filteredTabMounts.map((entry) => (
+                                      <MountToggle
+                                        key={entry.tab_id}
+                                        checked={entry.mounted}
+                                        disabled={
+                                          selectedServer.snapshot.status !==
+                                          "connected"
+                                        }
+                                        label={`${entry.tab_title} · ${entry.tab_id.slice(0, 8)}`}
+                                        onChange={(nextValue) =>
+                                          handleTabMount(
+                                            selectedServer.config.name,
+                                            entry.tab_id,
+                                            nextValue,
+                                          )
+                                        }
+                                      />
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {detailTab === "activity" ? (
+                              <div className="space-y-4">
+                                <div className="flex flex-wrap gap-2">
+                                  {ACTIVITY_FILTER_OPTIONS.map((option) => (
+                                    <FilterPill
+                                      key={option.value}
+                                      active={activityFilter === option.value}
+                                      label={option.label}
+                                      onClick={() =>
+                                        setActivityFilter(option.value)
+                                      }
+                                    />
+                                  ))}
+                                </div>
+
+                                {filteredActivity.length === 0 ? (
+                                  <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                    {selectedServer.activity.length === 0
+                                      ? "No recent MCP activity."
+                                      : "No activity matches the current filter."}
+                                  </SoftPanel>
+                                ) : (
+                                  filteredActivity.map((entry) => (
+                                    <SoftPanel
+                                      key={entry.id}
+                                      className="bg-black/20"
+                                    >
+                                      <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/66">
+                                              {activityCategoryLabel(entry)}
+                                            </span>
+                                            <p className="text-[14px] font-medium text-white/88">
+                                              {formatSentenceCase(entry.action)}
+                                            </p>
+                                          </div>
+                                          <p className="mt-2 text-[12px] text-white/42">
+                                            {formatTimestamp(entry.started_at)}
+                                          </p>
+                                        </div>
+                                        <span
+                                          className={cn(
+                                            "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
+                                            resultClassName(entry.result),
+                                          )}
+                                        >
+                                          {entry.result}
+                                        </span>
+                                      </div>
+                                      <p className="mt-3 text-[13px] leading-6 text-white/46">
+                                        {entry.summary}
+                                      </p>
+                                      <div className="mt-3 flex flex-wrap gap-4 text-[12px] text-white/42">
+                                        {entry.actor_node_id ? (
+                                          <span>
+                                            Node{" "}
+                                            {entry.actor_node_id.slice(0, 8)}
+                                          </span>
+                                        ) : null}
+                                        {entry.tab_id ? (
+                                          <span>
+                                            Tab {entry.tab_id.slice(0, 8)}
+                                          </span>
+                                        ) : null}
+                                        {entry.tool_name ? (
+                                          <span>Tool {entry.tool_name}</span>
+                                        ) : null}
+                                        {entry.target ? (
+                                          <span>Target {entry.target}</span>
+                                        ) : null}
+                                        <span>
+                                          {Math.round(entry.duration_ms)} ms
+                                        </span>
+                                        <span>
+                                          {formatTimestampShort(entry.ended_at)}
+                                        </span>
+                                      </div>
+                                    </SoftPanel>
+                                  ))
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        </SoftPanel>
+                      ) : (
+                        <SoftPanel className="flex h-full items-center justify-center text-center text-white/46">
+                          Select an MCP server to inspect details.
+                        </SoftPanel>
+                      )}
                     </div>
-                  </SoftPanel>
-                ) : (
-                  <SoftPanel className="flex h-full items-center justify-center text-center text-white/46">
-                    Select an MCP server to inspect details.
-                  </SoftPanel>
+                  </div>
                 )}
               </div>
             </div>

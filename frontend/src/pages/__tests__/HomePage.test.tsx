@@ -294,13 +294,6 @@ describe("HomePage", () => {
       assistant_mcp_servers: [],
       tabs: [],
       servers: [],
-      autopoe_server: {
-        name: "Autopoe MCP Server",
-        status: "available",
-        transport: "stdio",
-        command: "uv run autopoe mcp serve",
-        last_error: null,
-      },
     });
 
     globalThis.ResizeObserver = class {

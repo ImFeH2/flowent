@@ -55,7 +55,6 @@ async def get_mcp_state() -> dict[str, object]:
             for tab in workspace_store.list_tabs()
         ],
         "servers": mcp_service.list_server_payloads(),
-        "autopoe_server": mcp_service.get_autopoe_server_summary(),
     }
 
 

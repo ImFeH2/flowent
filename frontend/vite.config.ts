@@ -4,6 +4,11 @@ import tailwindcss from "@tailwindcss/vite";
 import { availableParallelism } from "os";
 import path from "path";
 
+const devProxyTarget =
+  process.env.VITE_DEV_PROXY_TARGET ?? "http://localhost:8000";
+const devProxyWsTarget =
+  process.env.VITE_DEV_PROXY_WS_TARGET ?? devProxyTarget.replace(/^http/, "ws");
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -52,11 +57,11 @@ export default defineConfig({
     port: 6873,
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: devProxyTarget,
         changeOrigin: true,
       },
       "/ws": {
-        target: "ws://localhost:8000",
+        target: devProxyWsTarget,
         ws: true,
       },
     },

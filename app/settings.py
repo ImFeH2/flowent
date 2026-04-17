@@ -148,6 +148,13 @@ class EventLogSettings:
 
 
 @dataclass
+class AccessSettings:
+    code_hash: str = ""
+    code_salt: str = ""
+    session_generation: int = 0
+
+
+@dataclass
 class ProviderModelCatalogEntry:
     model: str
     source: str = "manual"
@@ -286,6 +293,7 @@ class TelegramSettings:
 @dataclass
 class Settings:
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
+    access: AccessSettings = field(default_factory=AccessSettings)
     assistant: AssistantSettings = field(default_factory=AssistantSettings)
     leader: LeaderSettings = field(default_factory=LeaderSettings)
     telegram: TelegramSettings = field(default_factory=TelegramSettings)
@@ -964,6 +972,11 @@ def serialize_settings(
         settings.telegram,
         mask_token=mask_telegram_token,
     )
+    data["access"] = {
+        "configured": bool(
+            settings.access.code_hash.strip() and settings.access.code_salt.strip()
+        )
+    }
     data["mcp_servers"] = [
         serialize_mcp_server(server) for server in settings.mcp_servers
     ]
@@ -1589,6 +1602,47 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         event_log_data = {}
     event_log = EventLogSettings(**event_log_data)
 
+    access_data = data.get("access", {})
+    if access_data is None:
+        access_data = {}
+    if not isinstance(access_data, dict):
+        access_data = {}
+        migrated = True
+    raw_access_code_hash = access_data.get("code_hash", "")
+    raw_access_code_salt = access_data.get("code_salt", "")
+    raw_access_session_generation = access_data.get("session_generation", 0)
+    access_code_hash = (
+        raw_access_code_hash.strip() if isinstance(raw_access_code_hash, str) else ""
+    )
+    access_code_salt = (
+        raw_access_code_salt.strip() if isinstance(raw_access_code_salt, str) else ""
+    )
+    if raw_access_code_hash is not None and not isinstance(raw_access_code_hash, str):
+        migrated = True
+    if raw_access_code_salt is not None and not isinstance(raw_access_code_salt, str):
+        migrated = True
+    if isinstance(raw_access_session_generation, bool) or not isinstance(
+        raw_access_session_generation,
+        int,
+    ):
+        access_session_generation = 0
+        if "session_generation" in access_data:
+            migrated = True
+    else:
+        access_session_generation = max(raw_access_session_generation, 0)
+        if access_session_generation != raw_access_session_generation:
+            migrated = True
+    if not access_code_hash or not access_code_salt:
+        if access_code_hash or access_code_salt:
+            migrated = True
+        access_code_hash = ""
+        access_code_salt = ""
+    access = AccessSettings(
+        code_hash=access_code_hash,
+        code_salt=access_code_salt,
+        session_generation=access_session_generation,
+    )
+
     assistant_data = data.get("assistant", {})
     if not isinstance(assistant_data, dict):
         assistant_data = {}
@@ -1943,6 +1997,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     return (
         Settings(
             event_log=event_log,
+            access=access,
             assistant=assistant,
             leader=leader,
             telegram=telegram,

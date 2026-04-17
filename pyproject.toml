@@ -10,6 +10,7 @@ dependencies = [
     "curl-cffi>=0.15.0",
     "fastapi[standard]",
     "httpx>=0.28.0",
+    "itsdangerous>=2.2.0",
     "loguru>=0.7.0",
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",

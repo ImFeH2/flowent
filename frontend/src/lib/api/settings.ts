@@ -8,6 +8,11 @@ export interface SettingsBootstrap<TSettings> {
   version: string | null;
 }
 
+export interface SaveSettingsResponse<TSettings> {
+  settings: TSettings;
+  reauthRequired: boolean;
+}
+
 export async function fetchSettings<T>(): Promise<T> {
   return requestJson<T>("/api/settings", {
     errorMessage: "Failed to fetch settings",
@@ -22,8 +27,13 @@ export async function fetchSettingsBootstrap<T>(): Promise<
   });
 }
 
-export async function saveSettings<T>(settings: unknown): Promise<T> {
-  return requestJson<{ status: string; settings: T }, T>("/api/settings", {
+export async function saveSettings<T>(
+  settings: unknown,
+): Promise<SaveSettingsResponse<T>> {
+  return requestJson<
+    { status: string; settings: T; reauth_required?: boolean },
+    SaveSettingsResponse<T>
+  >("/api/settings", {
     method: "POST",
     body: settings,
     errorMessage: "Failed to save settings",
@@ -31,7 +41,10 @@ export async function saveSettings<T>(settings: unknown): Promise<T> {
       if (!data) {
         throw new Error("Failed to save settings");
       }
-      return data.settings;
+      return {
+        settings: data.settings,
+        reauthRequired: data.reauth_required === true,
+      };
     },
   });
 }

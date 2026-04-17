@@ -47,6 +47,37 @@ class EventBus:
     def disconnect_updates(self, ws: WebSocket) -> None:
         self._disconnect(ws, self._update_connections, "Update")
 
+    async def close_all(
+        self, *, code: int = 1008, reason: str = "Access revoked"
+    ) -> None:
+        display_connections = tuple(self._display_connections)
+        update_connections = tuple(self._update_connections)
+
+        for ws in display_connections:
+            try:
+                await ws.close(code=code, reason=reason)
+            finally:
+                self.disconnect_display(ws)
+
+        for ws in update_connections:
+            try:
+                await ws.close(code=code, reason=reason)
+            finally:
+                self.disconnect_updates(ws)
+
+    def close_all_connections(
+        self,
+        *,
+        code: int = 1008,
+        reason: str = "Access revoked",
+    ) -> None:
+        if self._loop is None or self._loop.is_closed():
+            return
+        asyncio.run_coroutine_threadsafe(
+            self.close_all(code=code, reason=reason),
+            self._loop,
+        )
+
     async def _connect(
         self,
         ws: WebSocket,

@@ -17,6 +17,10 @@ import type { Provider, Role } from "@/types";
 
 function buildSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
+    access: {
+      configured: true,
+      ...(overrides.access ?? {}),
+    },
     assistant: {
       role_name: "Steward",
       allow_network: true,

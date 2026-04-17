@@ -4,6 +4,7 @@ import {
   useAgentUI,
   type PageId,
 } from "@/context/AgentContext";
+import { useAccess } from "@/context/useAccess";
 import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
@@ -11,6 +12,7 @@ import {
   BookCopy,
   LayoutDashboard,
   ChartNoAxesCombined,
+  LogOut,
   PlugZap,
   Server,
   Users,
@@ -51,6 +53,7 @@ export function Sidebar({
 }: SidebarProps) {
   const { connected } = useAgentConnectionRuntime();
   const { currentPage, setCurrentPage } = useAgentUI();
+  const { logout } = useAccess();
 
   const { isDragging, startDrag } = usePanelDrag(width, onWidthChange, "right");
   const widthProgress = Math.max(0, Math.min(1, (width - 180) / 220));
@@ -98,7 +101,7 @@ export function Sidebar({
                   )}
                 />
                 <span className="text-[9px] font-medium uppercase tracking-wider text-white/50">
-                  {connected ? "Live" : "Wait"}
+                  {connected ? "Connected" : "Reconnecting"}
                 </span>
               </div>
             </div>
@@ -137,6 +140,16 @@ export function Sidebar({
         </nav>
 
         <div className="shrink-0 border-t border-white/[0.04] px-4 py-3 bg-black/20">
+          <button
+            type="button"
+            onClick={() => {
+              void logout();
+            }}
+            className="mb-3 flex w-full items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left text-[12px] font-medium text-white/72 transition-colors hover:bg-white/[0.05] hover:text-white"
+          >
+            <span>Logout</span>
+            <LogOut className="size-3.5" />
+          </button>
           <SidebarActivityTicker width={width} />
         </div>
       </div>

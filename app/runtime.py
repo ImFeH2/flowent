@@ -43,6 +43,7 @@ def restart_telegram_channel() -> None:
 
 
 def bootstrap_runtime() -> None:
+    from app.access import ensure_access_bootstrap
     from app.agent import Agent
     from app.graph_runtime import connect_nodes
     from app.graph_service import ensure_tab_leaders, list_tab_edges
@@ -62,7 +63,9 @@ def bootstrap_runtime() -> None:
     stats_store.reset()
     mcp_service.reset()
     settings = get_settings()
-    if ensure_builtin_roles(settings):
+    settings_changed = ensure_builtin_roles(settings)
+    generated_access_code = ensure_access_bootstrap(settings)
+    if settings_changed or generated_access_code is not None:
         save_settings(settings)
     mcp_service.bootstrap()
     assistant_role = find_role(settings, settings.assistant.role_name)

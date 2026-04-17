@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import time
+from copy import deepcopy
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
+from app.access import initialize_live_access_signature, set_access_code
+from app.events import event_bus
 from app.settings import (
     AssistantSettings,
     EventLogSettings,
@@ -61,6 +64,7 @@ async def get_settings_api() -> dict[str, object]:
 
 
 class UpdateSettingsRequest(BaseModel):
+    access: dict[str, object] | None = None
     assistant: dict[str, object] | None = None
     event_log: dict[str, object] | None = None
     leader: dict[str, object] | None = None
@@ -76,7 +80,37 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
     from app.graph_service import sync_assistant_role, sync_tab_leaders
     from app.providers.gateway import gateway
 
-    current = get_settings()
+    source_settings = get_settings()
+    current = deepcopy(source_settings)
+    next_access_code: str | None = None
+    reauth_required = False
+
+    if req.access is not None:
+        raw_new_code = req.access.get("new_code", "")
+        raw_confirm_code = req.access.get("confirm_code", "")
+        if raw_new_code is not None and not isinstance(raw_new_code, str):
+            raise HTTPException(
+                status_code=400, detail="access.new_code must be a string"
+            )
+        if raw_confirm_code is not None and not isinstance(raw_confirm_code, str):
+            raise HTTPException(
+                status_code=400,
+                detail="access.confirm_code must be a string",
+            )
+        new_code = raw_new_code if isinstance(raw_new_code, str) else ""
+        confirm_code = raw_confirm_code if isinstance(raw_confirm_code, str) else ""
+        if new_code or confirm_code:
+            if not new_code.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="access.new_code must not be empty",
+                )
+            if confirm_code != new_code:
+                raise HTTPException(
+                    status_code=400,
+                    detail="access.confirm_code must match access.new_code",
+                )
+            next_access_code = new_code
 
     if req.assistant is not None:
         role_name = req.assistant.get("role_name", current.assistant.role_name)
@@ -250,12 +284,28 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
             auto_compact_token_limit=auto_compact_token_limit,
         )
 
+    if next_access_code is not None:
+        set_access_code(current, next_access_code)
+        reauth_required = True
+
     save_settings(current)
-    sync_assistant_role(reason="assistant settings updated")
-    sync_tab_leaders(reason="leader settings updated")
-    gateway.invalidate_cache()
+    source_settings.__dict__.clear()
+    source_settings.__dict__.update(deepcopy(current).__dict__)
+    initialize_live_access_signature()
+    try:
+        sync_assistant_role(reason="assistant settings updated")
+        sync_tab_leaders(reason="leader settings updated")
+        gateway.invalidate_cache()
+    except Exception:
+        logger.exception("Settings saved but runtime synchronization failed")
+    if reauth_required:
+        event_bus.close_all_connections(code=4001, reason="Access code rotated")
     logger.info("Settings updated")
-    return {"status": "saved", "settings": serialize_settings(current)}
+    return {
+        "status": "saved",
+        "settings": serialize_settings(current),
+        "reauth_required": reauth_required,
+    }
 
 
 @router.get("/api/settings/telegram")

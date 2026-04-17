@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
+from app.access import set_access_code, verify_access_code
 from app.routes.settings import (
     UpdateSettingsRequest,
     UpdateTelegramSettingsRequest,
@@ -73,6 +74,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
     assert result == {
         "settings": {
             "event_log": {"timestamp_format": "absolute"},
+            "access": {"configured": False},
             "assistant": {
                 "role_name": "Steward",
                 "allow_network": True,
@@ -474,6 +476,71 @@ def test_update_settings_accepts_xhigh_reasoning_effort(monkeypatch):
     assert settings.model.params.reasoning_effort == "xhigh"
     assert result["settings"]["model"]["params"]["reasoning_effort"] == "xhigh"
     assert saved == [settings]
+
+
+def test_update_settings_rotates_access_code_and_requires_reauth(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    set_access_code(settings, "OLD-ACCESS-CODE")
+    saved: list[Settings] = []
+    closed: list[dict[str, object]] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+    monkeypatch.setattr(
+        "app.routes.settings.event_bus.close_all_connections",
+        lambda **kwargs: closed.append(kwargs),
+    )
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                access={
+                    "new_code": "NEW-ACCESS-CODE",
+                    "confirm_code": "NEW-ACCESS-CODE",
+                }
+            )
+        )
+    )
+
+    assert verify_access_code(settings.access, "NEW-ACCESS-CODE")
+    assert not verify_access_code(settings.access, "OLD-ACCESS-CODE")
+    assert saved == [settings]
+    assert result["reauth_required"] is True
+    assert result["settings"]["access"] == {"configured": True}
+    assert closed == [{"code": 4001, "reason": "Access code rotated"}]
+
+
+def test_update_settings_does_not_mutate_cached_access_when_save_fails(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    set_access_code(settings, "OLD-ACCESS-CODE")
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings",
+        lambda current: (_ for _ in ()).throw(RuntimeError("disk full")),
+    )
+
+    with pytest.raises(RuntimeError, match="disk full"):
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(
+                    access={
+                        "new_code": "NEW-ACCESS-CODE",
+                        "confirm_code": "NEW-ACCESS-CODE",
+                    }
+                )
+            )
+        )
+
+    assert verify_access_code(settings.access, "OLD-ACCESS-CODE")
+    assert not verify_access_code(settings.access, "NEW-ACCESS-CODE")
 
 
 def test_update_settings_accepts_model_max_retries(monkeypatch):

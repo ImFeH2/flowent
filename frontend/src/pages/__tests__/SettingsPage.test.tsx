@@ -11,17 +11,29 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import type { Provider, Role } from "@/types";
 import type { SettingsBootstrapData, UserSettings } from "@/pages/settings/lib";
 
-const { fetchSettingsBootstrap, saveSettings, toastError, toastSuccess } =
-  vi.hoisted(() => ({
-    fetchSettingsBootstrap: vi.fn(),
-    saveSettings: vi.fn(),
-    toastError: vi.fn(),
-    toastSuccess: vi.fn(),
-  }));
+const {
+  fetchSettingsBootstrap,
+  saveSettings,
+  toastError,
+  toastSuccess,
+  requireReauth,
+} = vi.hoisted(() => ({
+  fetchSettingsBootstrap: vi.fn(),
+  saveSettings: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  requireReauth: vi.fn(),
+}));
 
 vi.mock("@/lib/api", () => ({
   fetchSettingsBootstrap,
   saveSettings,
+}));
+
+vi.mock("@/context/useAccess", () => ({
+  useAccess: () => ({
+    requireReauth,
+  }),
 }));
 
 vi.mock("@/components/ui/select", () => ({
@@ -81,6 +93,10 @@ function buildRole(
 
 function buildSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
+    access: {
+      configured: true,
+      ...(overrides.access ?? {}),
+    },
     assistant: {
       role_name: "Steward",
       allow_network: true,
@@ -159,6 +175,7 @@ function buildBootstrapData(
 describe("SettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireReauth.mockReset();
   });
 
   afterEach(() => {
@@ -187,8 +204,8 @@ describe("SettingsPage", () => {
 
   it("saves normalized settings payload after focused edits", async () => {
     fetchSettingsBootstrap.mockResolvedValue(buildBootstrapData());
-    saveSettings.mockResolvedValue(
-      buildSettings({
+    saveSettings.mockResolvedValue({
+      settings: buildSettings({
         assistant: {
           role_name: "Steward",
           allow_network: false,
@@ -219,7 +236,8 @@ describe("SettingsPage", () => {
           },
         },
       }),
-    );
+      reauthRequired: false,
+    });
 
     render(<SettingsPage />);
 

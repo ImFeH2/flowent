@@ -158,6 +158,7 @@ export function HomePage() {
     title: string;
     nodeCount?: number;
   } | null>(null);
+  const previousCompactWorkspaceRef = useRef<boolean | null>(null);
   const graphRef = useRef<AgentGraphHandle | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const graphHistory = useTabGraphHistory();
@@ -215,7 +216,12 @@ export function HomePage() {
   }, [panelWidth, setPanelWidth]);
 
   useEffect(() => {
-    if (isCompactWorkspace) {
+    const previousCompactWorkspace = previousCompactWorkspaceRef.current;
+    previousCompactWorkspaceRef.current = isCompactWorkspace;
+    if (previousCompactWorkspace === null) {
+      return;
+    }
+    if (!previousCompactWorkspace && isCompactWorkspace) {
       setPanelOpen(false);
     }
   }, [isCompactWorkspace]);

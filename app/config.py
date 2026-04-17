@@ -6,6 +6,9 @@ class Config(BaseSettings):
 
     APP_NAME: str = "Autopoe"
     DEBUG: bool = False
+    SESSION_SECRET: str = ""
+    SESSION_COOKIE_NAME: str = "autopoe_admin_session"
+    SESSION_MAX_AGE_SECONDS: int = 604800
 
     LOG_LEVEL: str = "INFO"
     LOG_DIR: str = "logs"

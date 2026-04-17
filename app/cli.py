@@ -10,6 +10,9 @@ def main(argv: list[str] | None = None) -> None:
         description="Autopoe — multi-agent collaboration framework",
     )
     subparsers = parser.add_subparsers(dest="command")
+    access_parser = subparsers.add_parser("access", help="Autopoe access commands")
+    access_subparsers = access_parser.add_subparsers(dest="access_command")
+    access_subparsers.add_parser("reset", help="Clear the persisted admin access code")
     mcp_parser = subparsers.add_parser("mcp", help="Autopoe MCP server commands")
     mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command")
     mcp_subparsers.add_parser("serve", help="Run the Autopoe MCP stdio server")
@@ -30,6 +33,12 @@ def main(argv: list[str] | None = None) -> None:
         help="Show version and exit",
     )
     args = parser.parse_args(argv)
+
+    if args.command == "access" and args.access_command == "reset":
+        from app.access import reset_local_access
+
+        print(reset_local_access())
+        return
 
     if args.command == "mcp" and args.mcp_command == "serve":
         from app.mcp_stdio_server import serve_stdio

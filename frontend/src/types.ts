@@ -1,5 +1,12 @@
 export type NodeType = "assistant" | "agent";
 
+export interface AccessState {
+  authenticated: boolean;
+  configured: boolean;
+  bootstrap_generated: boolean;
+  requires_restart: boolean;
+}
+
 export type AgentState =
   | "initializing"
   | "idle"

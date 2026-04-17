@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Save } from "lucide-react";
+import { Eye, EyeOff, Save } from "lucide-react";
 import { toast } from "sonner";
 import { fetchSettingsBootstrap, saveSettings } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
@@ -34,6 +34,7 @@ import {
   type UserSettings,
   validateAutoCompactTokenLimit,
 } from "@/pages/settings/lib";
+import { useAccess } from "@/context/useAccess";
 import type { RetryPolicy } from "@/types";
 
 const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
@@ -43,6 +44,7 @@ const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
 ];
 
 export function SettingsPage() {
+  const { requireReauth } = useAccess();
   const {
     data: bootstrapData,
     isLoading: loading,
@@ -52,6 +54,12 @@ export function SettingsPage() {
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
   const [providerModelQuery, setProviderModelQuery] = useState("");
   const [saving, setSaving] = useState(false);
+  const [accessDraft, setAccessDraft] = useState({
+    newCode: "",
+    confirmCode: "",
+  });
+  const [showNewAccessCode, setShowNewAccessCode] = useState(false);
+  const [showConfirmAccessCode, setShowConfirmAccessCode] = useState(false);
 
   const providers = useMemo(
     () => bootstrapData?.providers ?? [],
@@ -128,9 +136,25 @@ export function SettingsPage() {
     if (!settings) return null;
     return findRoleByName(roles, settings.leader.role_name);
   }, [roles, settings]);
+  const accessDraftError = useMemo(() => {
+    if (!accessDraft.newCode && !accessDraft.confirmCode) {
+      return null;
+    }
+    if (!accessDraft.newCode.trim()) {
+      return "New Access Code must not be empty.";
+    }
+    if (accessDraft.confirmCode !== accessDraft.newCode) {
+      return "Confirm Access Code must exactly match New Access Code.";
+    }
+    return null;
+  }, [accessDraft.confirmCode, accessDraft.newCode]);
 
   const handleSave = async () => {
     if (!settings) return;
+    if (accessDraftError) {
+      toast.error(accessDraftError);
+      return;
+    }
     if (
       settings.model.retry_max_delay_seconds <
       settings.model.retry_initial_delay_seconds
@@ -148,15 +172,25 @@ export function SettingsPage() {
     }
     setSaving(true);
     try {
-      const payload = buildSettingsSavePayload(settings);
-      const savedSettings = await saveSettings<UserSettings>(payload);
+      const payload = buildSettingsSavePayload(settings, accessDraft);
+      const saveResult = await saveSettings<UserSettings>(payload);
+      const savedSettings = saveResult.settings;
 
       setLocalSettings(savedSettings);
+      setAccessDraft({ newCode: "", confirmCode: "" });
+      setShowNewAccessCode(false);
+      setShowConfirmAccessCode(false);
       void mutateSettings(
         (current) =>
           current ? { ...current, settings: savedSettings } : current,
         false,
       );
+
+      if (saveResult.reauthRequired) {
+        toast.success("Access code updated. Sign in again with the new code.");
+        requireReauth();
+        return;
+      }
 
       toast.success("Settings saved");
     } catch {
@@ -181,11 +215,20 @@ export function SettingsPage() {
     <PageScaffold>
       <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none">
         <div className="mx-auto max-w-[680px] pb-10 pt-8">
-          <div className="mb-8 flex justify-end">
+          <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-[28px] font-medium tracking-[-0.04em] text-white">
+                Settings
+              </h1>
+              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-white/42">
+                Update access, assistant defaults, leader defaults, and
+                system-wide model behavior.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => void handleSave()}
-              disabled={saving}
+              disabled={saving || Boolean(accessDraftError)}
               className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               <Save className="size-4" />
@@ -193,6 +236,121 @@ export function SettingsPage() {
             </button>
           </div>
           <section>
+            <SectionHeader
+              title="Access Configuration"
+              description="Manage the shared admin access code used to unlock the control plane."
+            />
+            <div>
+              <SettingsRow
+                label="Shared Admin Access"
+                description="Autopoe uses one shared admin access code instead of multiple user accounts."
+              >
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="new-access-code"
+                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                    >
+                      New Access Code
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="new-access-code"
+                        type={showNewAccessCode ? "text" : "password"}
+                        value={accessDraft.newCode}
+                        onChange={(event) =>
+                          setAccessDraft((current) => ({
+                            ...current,
+                            newCode: event.target.value,
+                          }))
+                        }
+                        placeholder="Leave empty to keep the current access code"
+                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        aria-label={
+                          showNewAccessCode
+                            ? "Hide new access code"
+                            : "Show new access code"
+                        }
+                        onClick={() =>
+                          setShowNewAccessCode((current) => !current)
+                        }
+                        className="flex size-10 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/68 transition-colors hover:bg-white/[0.05] hover:text-white"
+                      >
+                        {showNewAccessCode ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="confirm-access-code"
+                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                    >
+                      Confirm Access Code
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="confirm-access-code"
+                        type={showConfirmAccessCode ? "text" : "password"}
+                        value={accessDraft.confirmCode}
+                        onChange={(event) =>
+                          setAccessDraft((current) => ({
+                            ...current,
+                            confirmCode: event.target.value,
+                          }))
+                        }
+                        placeholder="Repeat the new access code"
+                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        aria-label={
+                          showConfirmAccessCode
+                            ? "Hide confirmed access code"
+                            : "Show confirmed access code"
+                        }
+                        onClick={() =>
+                          setShowConfirmAccessCode((current) => !current)
+                        }
+                        className="flex size-10 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/68 transition-colors hover:bg-white/[0.05] hover:text-white"
+                      >
+                        {showConfirmAccessCode ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-[11px] leading-relaxed text-white/40">
+                    <p>
+                      Saving a new access code invalidates all current admin
+                      sessions. You will need to unlock the console again with
+                      the new code.
+                    </p>
+                    <p>
+                      The first access code is not created here. When Autopoe
+                      starts without one, it automatically generates a code and
+                      writes it to the local startup log.
+                    </p>
+                    {accessDraftError ? (
+                      <p className="text-red-200">{accessDraftError}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </SettingsRow>
+            </div>
+          </section>
+
+          <section className="mt-8 border-t border-white/6 pt-8">
             <SectionHeader
               title="Assistant Configuration"
               description="Choose the role that powers the system assistant."

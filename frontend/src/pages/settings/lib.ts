@@ -13,6 +13,9 @@ export const DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024;
 export type TriStateCapability = "auto" | "enabled" | "disabled";
 
 export interface UserSettings {
+  access: {
+    configured: boolean;
+  };
   assistant: {
     role_name: string;
     allow_network: boolean;
@@ -179,8 +182,23 @@ export function validateAutoCompactTokenLimit(
   return null;
 }
 
-export function buildSettingsSavePayload(settings: UserSettings) {
+export function buildSettingsSavePayload(
+  settings: UserSettings,
+  accessDraft?: {
+    newCode: string;
+    confirmCode: string;
+  },
+) {
+  const accessPayload =
+    accessDraft && (accessDraft.newCode || accessDraft.confirmCode)
+      ? {
+          new_code: accessDraft.newCode,
+          confirm_code: accessDraft.confirmCode,
+        }
+      : undefined;
+
   return {
+    ...(accessPayload ? { access: accessPayload } : {}),
     assistant: {
       ...settings.assistant,
       write_dirs: normalizeWriteDirs(settings.assistant.write_dirs),

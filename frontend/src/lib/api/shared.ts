@@ -1,3 +1,5 @@
+import { dispatchAccessDeniedEvent } from "@/lib/accessEvents";
+
 interface ApiRequestOptions<TResponse, TResult> extends Omit<
   RequestInit,
   "body"
@@ -80,6 +82,9 @@ export async function requestJson<TResponse, TResult = TResponse>(
   const data = await parseJson<TResponse>(response);
 
   if (!response.ok) {
+    if (response.status === 401 && !url.startsWith("/api/access/")) {
+      dispatchAccessDeniedEvent();
+    }
     if (swallowHttpError && fallback !== undefined) {
       return fallback;
     }

@@ -6,6 +6,9 @@ const { useAgentConnectionRuntime, useAgentUI } = vi.hoisted(() => ({
   useAgentConnectionRuntime: vi.fn(),
   useAgentUI: vi.fn(),
 }));
+const { useAccess } = vi.hoisted(() => ({
+  useAccess: vi.fn(),
+}));
 
 vi.mock("@/context/AgentContext", async () => {
   const actual = await vi.importActual<typeof import("@/context/AgentContext")>(
@@ -18,6 +21,10 @@ vi.mock("@/context/AgentContext", async () => {
   };
 });
 
+vi.mock("@/context/useAccess", () => ({
+  useAccess,
+}));
+
 vi.mock("@/components/PanelResizer", () => ({
   PanelResizer: () => null,
 }));
@@ -28,6 +35,7 @@ vi.mock("@/components/SidebarActivityTicker", () => ({
 
 describe("Sidebar", () => {
   const setCurrentPage = vi.fn();
+  const logout = vi.fn();
 
   afterEach(() => {
     cleanup();
@@ -35,11 +43,13 @@ describe("Sidebar", () => {
 
   beforeEach(() => {
     setCurrentPage.mockReset();
+    logout.mockReset();
     useAgentConnectionRuntime.mockReturnValue({ connected: true });
     useAgentUI.mockReturnValue({
       currentPage: "workspace",
       setCurrentPage,
     });
+    useAccess.mockReturnValue({ logout });
   });
 
   it("renders navigation items in the spec order", () => {
@@ -58,6 +68,7 @@ describe("Sidebar", () => {
       "Channels",
       "Stats",
       "Settings",
+      "Logout",
     ]);
   });
 

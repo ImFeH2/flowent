@@ -57,6 +57,7 @@ import {
   fetchBlueprints,
   createTabRequest,
   deleteTabRequest,
+  fetchMcpState,
   interruptNode,
   saveTabAsBlueprintRequest,
 } from "@/lib/api";
@@ -129,12 +130,22 @@ export function HomePage() {
   const [createTabGoal, setCreateTabGoal] = useState("");
   const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
   const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
+  const [createTabMcpServers, setCreateTabMcpServers] = useState<string[]>([]);
   const [createTabBlueprintId, setCreateTabBlueprintId] = useState("");
   const [createTabBlueprintQuery, setCreateTabBlueprintQuery] = useState("");
+  const [createTabMcpQuery, setCreateTabMcpQuery] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
   const [blueprints, setBlueprints] = useState<AgentBlueprint[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingBlueprints, setLoadingBlueprints] = useState(false);
+  const [availableMcpServers, setAvailableMcpServers] = useState<
+    Array<{
+      name: string;
+      transport: string;
+      status: string;
+      enabled: boolean;
+    }>
+  >([]);
   const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
   const [createAgentRoleQuery, setCreateAgentRoleQuery] = useState("");
   const [createAgentName, setCreateAgentName] = useState("");
@@ -309,6 +320,20 @@ export function HomePage() {
         .includes(query),
     );
   }, [blueprints, createTabBlueprintQuery]);
+  const filteredCreateTabMcpServers = useMemo(() => {
+    const query = createTabMcpQuery.trim().toLowerCase();
+    const mountableServers = availableMcpServers.filter(
+      (server) => server.enabled && server.status === "connected",
+    );
+    if (!query) {
+      return mountableServers;
+    }
+    return mountableServers.filter((server) =>
+      `${server.name} ${server.transport} ${server.status}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [availableMcpServers, createTabMcpQuery]);
 
   const panelVisible = panelOpen || !!selectedAgent;
   const resolvedPanelWidth = useMemo(() => {
@@ -438,9 +463,25 @@ export function HomePage() {
     setCreateTabGoal("");
     setCreateTabAllowNetwork(false);
     setCreateTabWriteDirs("");
+    setCreateTabMcpServers([]);
     setCreateTabBlueprintId("");
     setCreateTabBlueprintQuery("");
+    setCreateTabMcpQuery("");
     setActiveDialog("create-tab");
+    fetchMcpState()
+      .then((state) => {
+        setAvailableMcpServers(
+          state.servers.map((record) => ({
+            name: record.config.name,
+            transport: record.config.transport,
+            status: record.snapshot.status,
+            enabled: record.config.enabled,
+          })),
+        );
+      })
+      .catch(() => {
+        setAvailableMcpServers([]);
+      });
   };
 
   const handleCreateTab = async () => {
@@ -459,6 +500,7 @@ export function HomePage() {
         createTabGoal.trim(),
         createTabAllowNetwork,
         writeDirsArray,
+        createTabMcpServers,
         createTabBlueprintId || undefined,
       );
       setActiveTabId(tab.id);
@@ -467,8 +509,10 @@ export function HomePage() {
       setCreateTabGoal("");
       setCreateTabAllowNetwork(false);
       setCreateTabWriteDirs("");
+      setCreateTabMcpServers([]);
       setCreateTabBlueprintId("");
       setCreateTabBlueprintQuery("");
+      setCreateTabMcpQuery("");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create tab",
@@ -1103,6 +1147,68 @@ export function HomePage() {
             placeholder="/workspace/output&#10;/workspace/cache"
             className="min-h-[80px] rounded-[1rem] border-white/10 bg-black/14 font-mono text-[13px] text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
           />
+        </WorkspaceDialogField>
+        <WorkspaceDialogField
+          label="Initial MCP Mounts"
+          hint="Select the external MCP servers this tab can see at creation time"
+        >
+          <div className="space-y-2 rounded-[1rem] border border-white/10 bg-black/14 p-2">
+            {availableMcpServers.some(
+              (server) => server.enabled && server.status === "connected",
+            ) ? (
+              <Input
+                aria-label="Search MCP servers"
+                value={createTabMcpQuery}
+                onChange={(event) => setCreateTabMcpQuery(event.target.value)}
+                placeholder="Search MCP servers"
+                className="h-10 rounded-[0.95rem] border-white/10 bg-black/12 text-white placeholder:text-white/28"
+              />
+            ) : null}
+            {filteredCreateTabMcpServers.length === 0 ? (
+              <p className="px-2 py-3 text-[12px] text-white/40">
+                No mountable MCP servers are available yet.
+              </p>
+            ) : (
+              filteredCreateTabMcpServers.map((server) => {
+                const checked = createTabMcpServers.includes(server.name);
+                return (
+                  <label
+                    key={server.name}
+                    className={cn(
+                      "flex items-center justify-between gap-4 rounded-[0.9rem] border px-3 py-2.5 text-left",
+                      checked
+                        ? "border-white/18 bg-white/[0.05]"
+                        : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                    )}
+                  >
+                    <div>
+                      <div className="text-[13px] font-medium text-white">
+                        {server.name}
+                      </div>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-white/35">
+                        {server.transport} · {server.status}
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(event) => {
+                        setCreateTabMcpServers((current) => {
+                          if (event.target.checked) {
+                            return Array.from(
+                              new Set([...current, server.name]),
+                            );
+                          }
+                          return current.filter((item) => item !== server.name);
+                        });
+                      }}
+                      className="size-4 rounded border-white/20 bg-black/20"
+                    />
+                  </label>
+                );
+              })
+            )}
+          </div>
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>
 

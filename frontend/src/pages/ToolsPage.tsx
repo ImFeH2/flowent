@@ -78,6 +78,11 @@ function ToolCard({
       <code className="block text-[13px] font-mono font-medium text-white/90">
         {tool.name}
       </code>
+      <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-white/32">
+        {tool.source === "mcp"
+          ? `MCP · ${tool.server_name ?? "unknown"}`
+          : "Builtin"}
+      </p>
       <p className="mt-2 text-[12px] leading-relaxed text-white/40">
         {tool.description}
       </p>
@@ -93,6 +98,39 @@ function ToolCard({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mt-4 border-t border-white/[0.04] pt-4">
+              {tool.source === "mcp" ? (
+                <div className="mb-4 space-y-2 text-[11px] text-white/58">
+                  <div>
+                    Raw Tool Name{" "}
+                    <code className="font-mono text-white/82">
+                      {tool.tool_name ?? "unknown"}
+                    </code>
+                  </div>
+                  <div>
+                    Fully Qualified ID{" "}
+                    <code className="font-mono text-white/82">
+                      {tool.fully_qualified_id ?? tool.name}
+                    </code>
+                  </div>
+                  <div className="flex flex-wrap gap-2 uppercase tracking-[0.14em]">
+                    {tool.read_only_hint ? (
+                      <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-1 text-[10px] text-sky-200">
+                        readOnly
+                      </span>
+                    ) : null}
+                    {tool.destructive_hint ? (
+                      <span className="rounded-full border border-red-400/20 bg-red-400/[0.08] px-2 py-1 text-[10px] text-red-200">
+                        destructive
+                      </span>
+                    ) : null}
+                    {tool.open_world_hint ? (
+                      <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-1 text-[10px] text-amber-200">
+                        openWorld
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
               <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
                 Parameters
               </p>
@@ -119,7 +157,8 @@ export function ToolsPage() {
     return tools.filter(
       (tool) =>
         tool.name.toLowerCase().includes(normalizedQuery) ||
-        tool.description.toLowerCase().includes(normalizedQuery),
+        tool.description.toLowerCase().includes(normalizedQuery) ||
+        (tool.server_name ?? "").toLowerCase().includes(normalizedQuery),
     );
   }, [query, tools]);
 
@@ -138,6 +177,15 @@ export function ToolsPage() {
   return (
     <PageScaffold>
       <div className="flex h-full flex-col pt-8 px-8">
+        <div className="mb-6">
+          <h1 className="text-[28px] font-medium tracking-[-0.04em] text-white">
+            Tools
+          </h1>
+          <p className="mt-2 text-[13px] leading-6 text-white/42">
+            Browse the current tool directory, including built-in tools and
+            discovered MCP tools.
+          </p>
+        </div>
         <div className="mb-6 flex items-center gap-4">
           <div className="relative max-w-md flex-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/40" />

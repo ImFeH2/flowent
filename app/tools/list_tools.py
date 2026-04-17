@@ -19,11 +19,6 @@ class ListToolsTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        from app.tools import build_tool_registry
+        from app.tools import list_agent_visible_tool_descriptors
 
-        registry = build_tool_registry()
-        payload = [
-            {"name": tool.name, "description": tool.description}
-            for tool in registry.list_tools(agent_visible_only=True)
-        ]
-        return json.dumps(payload)
+        return json.dumps(list_agent_visible_tool_descriptors())

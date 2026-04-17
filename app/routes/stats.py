@@ -5,6 +5,7 @@ import time
 from fastapi import APIRouter, HTTPException, Query
 
 from app.graph_service import is_tab_leader
+from app.mcp_service import mcp_service
 from app.registry import registry
 from app.settings import find_provider, find_role, get_settings
 from app.stats_service import stats_store
@@ -200,4 +201,8 @@ async def get_stats(range: str = Query("24h")) -> dict[str, object]:
         "nodes": _serialize_node_snapshots(tab_titles),
         "requests": stats_store.list_requests(since=since),
         "compacts": stats_store.list_compacts(since=since),
+        "mcp_servers": mcp_service.list_server_payloads(),
+        "mcp_activity": [
+            activity.serialize() for activity in mcp_service.list_activities()
+        ],
     }

@@ -9,6 +9,10 @@ def main(argv: list[str] | None = None) -> None:
         prog="autopoe",
         description="Autopoe — multi-agent collaboration framework",
     )
+    subparsers = parser.add_subparsers(dest="command")
+    mcp_parser = subparsers.add_parser("mcp", help="Autopoe MCP server commands")
+    mcp_subparsers = mcp_parser.add_subparsers(dest="mcp_command")
+    mcp_subparsers.add_parser("serve", help="Run the Autopoe MCP stdio server")
     parser.add_argument(
         "--host",
         default="127.0.0.1",
@@ -26,6 +30,12 @@ def main(argv: list[str] | None = None) -> None:
         help="Show version and exit",
     )
     args = parser.parse_args(argv)
+
+    if args.command == "mcp" and args.mcp_command == "serve":
+        from app.mcp_stdio_server import serve_stdio
+
+        serve_stdio()
+        return
 
     if args.version:
         try:

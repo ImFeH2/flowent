@@ -76,6 +76,7 @@ def test_load_settings_migrates_legacy_role_field(monkeypatch, tmp_path):
         "role_name": STEWARD_ROLE_NAME,
         "allow_network": True,
         "write_dirs": build_default_assistant_write_dirs(),
+        "mcp_servers": [],
     }
     assert persisted["leader"] == {"role_name": CONDUCTOR_ROLE_NAME}
     assert persisted["telegram"] == {
@@ -148,6 +149,7 @@ def test_load_settings_defaults_assistant_permissions(monkeypatch, tmp_path):
         "role_name": STEWARD_ROLE_NAME,
         "allow_network": True,
         "write_dirs": build_default_assistant_write_dirs(),
+        "mcp_servers": [],
     }
 
 
@@ -187,6 +189,7 @@ def test_load_settings_normalizes_assistant_write_dirs(monkeypatch, tmp_path):
         "role_name": STEWARD_ROLE_NAME,
         "allow_network": False,
         "write_dirs": expected_write_dirs,
+        "mcp_servers": [],
     }
 
 

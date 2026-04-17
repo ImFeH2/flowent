@@ -16,6 +16,7 @@ from app.settings import (
     build_assistant_allow_network,
     build_assistant_write_dirs,
     build_default_model_params,
+    build_mcp_server_mounts,
     build_model_auto_compact_token_limit,
     build_model_context_window_tokens,
     build_model_input_image,
@@ -105,10 +106,20 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
+        next_mcp_servers = list(current.assistant.mcp_servers)
+        if "mcp_servers" in req.assistant:
+            try:
+                next_mcp_servers = build_mcp_server_mounts(
+                    req.assistant.get("mcp_servers"),
+                    field_name="assistant.mcp_servers",
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
         current.assistant = AssistantSettings(
             role_name=next_role_name,
             allow_network=next_allow_network,
             write_dirs=next_write_dirs,
+            mcp_servers=next_mcp_servers,
         )
 
     if req.leader is not None:

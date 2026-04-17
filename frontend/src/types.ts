@@ -202,6 +202,7 @@ export interface TaskTab {
   title: string;
   goal: string;
   leader_id?: string | null;
+  mcp_servers: string[];
   created_at: number;
   updated_at: number;
   network_source: NetworkSource;
@@ -280,6 +281,143 @@ export interface ProviderModelCatalogEntry {
   context_window_tokens: number | null;
   input_image: boolean | null;
   output_image: boolean | null;
+}
+
+export interface MCPServerConfig {
+  name: string;
+  transport: "stdio" | "streamable_http";
+  enabled: boolean;
+  required: boolean;
+  startup_timeout_sec: number;
+  tool_timeout_sec: number;
+  enabled_tools: string[];
+  disabled_tools: string[];
+  scopes: string[];
+  oauth_resource: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  env_vars: string[];
+  cwd: string;
+  url: string;
+  bearer_token_env_var: string;
+  http_headers: Record<string, string>;
+  env_http_headers: string[];
+}
+
+export interface MCPToolDescriptor {
+  source: "mcp";
+  server_name: string;
+  tool_name: string;
+  fully_qualified_id: string;
+  title?: string | null;
+  description: string;
+  parameters?: Record<string, unknown>;
+  read_only_hint: boolean;
+  destructive_hint: boolean;
+  open_world_hint: boolean;
+}
+
+export interface MCPResourceDescriptor {
+  server_name: string;
+  name: string;
+  uri: string;
+  mime_type?: string | null;
+  description?: string | null;
+}
+
+export interface MCPResourceTemplateDescriptor {
+  server_name: string;
+  name: string;
+  uri_template: string;
+  description?: string | null;
+}
+
+export interface MCPPromptDescriptor {
+  server_name: string;
+  name: string;
+  description?: string | null;
+  arguments: Array<Record<string, unknown>>;
+}
+
+export interface MCPCapabilityCounts {
+  tools: number;
+  resources: number;
+  resource_templates: number;
+  prompts: number;
+}
+
+export interface MCPSnapshot {
+  server_name: string;
+  transport: "stdio" | "streamable_http";
+  status: "disabled" | "connecting" | "connected" | "auth_required" | "error";
+  auth_status:
+    | "unsupported"
+    | "not_logged_in"
+    | "logging_in"
+    | "connected"
+    | "error";
+  last_auth_result?: string | null;
+  last_refresh_at?: number | null;
+  last_refresh_result: "never" | "success" | "error";
+  last_error?: string | null;
+  tools: MCPToolDescriptor[];
+  resources: MCPResourceDescriptor[];
+  resource_templates: MCPResourceTemplateDescriptor[];
+  prompts: MCPPromptDescriptor[];
+  capability_counts: MCPCapabilityCounts;
+}
+
+export interface MCPActivityRecord {
+  id: string;
+  server_name: string;
+  action: string;
+  actor_node_id?: string | null;
+  tab_id?: string | null;
+  started_at: number;
+  ended_at: number;
+  duration_ms: number;
+  result: "success" | "error" | "rejected";
+  summary: string;
+  tool_name?: string | null;
+  fully_qualified_id?: string | null;
+  target?: string | null;
+  approval_result?: string | null;
+}
+
+export interface MCPMountEntry {
+  tab_id: string;
+  tab_title: string;
+  mounted: boolean;
+}
+
+export interface MCPServerRecord {
+  config: MCPServerConfig;
+  snapshot: MCPSnapshot;
+  mounts: {
+    assistant: boolean;
+    tabs: MCPMountEntry[];
+  };
+  activity: MCPActivityRecord[];
+}
+
+export interface AutopoeMCPServerSummary {
+  name: string;
+  status: string;
+  transport: string;
+  command: string;
+  last_error?: string | null;
+}
+
+export interface MCPStatePayload {
+  assistant_mcp_servers: string[];
+  tabs: Array<{
+    id: string;
+    title: string;
+    mcp_servers: string[];
+  }>;
+  servers: MCPServerRecord[];
+  autopoe_server: AutopoeMCPServerSummary;
 }
 
 export interface ModelOption {
@@ -395,4 +533,6 @@ export interface StatsPayload {
   nodes: StatsNodeSnapshot[];
   requests: StatsRequestRecord[];
   compacts: StatsCompactRecord[];
+  mcp_servers?: MCPServerRecord[];
+  mcp_activity?: MCPActivityRecord[];
 }

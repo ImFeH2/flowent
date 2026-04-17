@@ -47,6 +47,7 @@ export type PageId =
   | "workspace"
   | "blueprints"
   | "providers"
+  | "mcp"
   | "roles"
   | "prompts"
   | "tools"

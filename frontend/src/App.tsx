@@ -34,6 +34,7 @@ const ProvidersPage = lazyPage(
   () => import("@/pages/ProvidersPage"),
   "ProvidersPage",
 );
+const McpPage = lazyPage(() => import("@/pages/McpPage"), "McpPage");
 const RolesPage = lazyPage(() => import("@/pages/RolesPage"), "RolesPage");
 const PromptsPage = lazyPage(
   () => import("@/pages/PromptsPage"),
@@ -53,6 +54,7 @@ const lazyPageMap: Record<PageId, ComponentType> = {
   workspace: HomePage,
   blueprints: BlueprintsPage,
   providers: ProvidersPage,
+  mcp: McpPage,
   roles: RolesPage,
   prompts: PromptsPage,
   tools: ToolsPage,

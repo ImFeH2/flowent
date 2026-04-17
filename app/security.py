@@ -9,6 +9,24 @@ if TYPE_CHECKING:
 
 
 def authorize(tool_name: str, agent: Agent, args: dict[str, Any]) -> str | None:
+    if tool_name.startswith("mcp__"):
+        from app.mcp_service import mcp_service
+        from app.settings import find_mcp_server, get_settings
+
+        descriptor = mcp_service.get_dynamic_tool_descriptor(tool_name)
+        if descriptor is None:
+            return f"MCP tool not found: {tool_name}"
+        server = find_mcp_server(get_settings(), descriptor.server_name)
+        if (
+            server is not None
+            and server.transport == "streamable_http"
+            and not agent.config.allow_network
+        ):
+            return "Network access is disabled for this agent"
+        if descriptor.open_world_hint and not agent.config.allow_network:
+            return "Network access is disabled for this agent"
+        return None
+
     if tool_name == "edit":
         write_dirs = agent.config.write_dirs
         if not write_dirs:

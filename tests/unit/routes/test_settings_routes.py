@@ -40,6 +40,7 @@ def test_get_settings_returns_assistant_configuration(monkeypatch):
         "role_name": "Steward",
         "allow_network": True,
         "write_dirs": build_default_assistant_write_dirs(),
+        "mcp_servers": [],
     }
     assert result["leader"] == {"role_name": "Conductor"}
 
@@ -76,6 +77,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                 "role_name": "Steward",
                 "allow_network": True,
                 "write_dirs": build_default_assistant_write_dirs(),
+                "mcp_servers": [],
             },
             "leader": {"role_name": "Conductor"},
             "telegram": {
@@ -131,6 +133,7 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
                     "excluded_tools": [],
                 }
             ],
+            "mcp_servers": [],
         },
         "providers": [
             {
@@ -728,6 +731,7 @@ def test_update_settings_persists_assistant_role(monkeypatch):
         "role_name": "Reviewer",
         "allow_network": True,
         "write_dirs": build_default_assistant_write_dirs(),
+        "mcp_servers": [],
     }
     assert saved == [settings]
 
@@ -762,6 +766,7 @@ def test_update_settings_persists_assistant_permissions(monkeypatch):
         "role_name": "Steward",
         "allow_network": False,
         "write_dirs": expected_write_dirs,
+        "mcp_servers": [],
     }
     assert saved == [settings]
 

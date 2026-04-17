@@ -51,6 +51,19 @@ export {
   fetchTelegramSettings,
   updateTelegramSettings,
 } from "./channels";
+export {
+  createMcpServer,
+  deleteMcpServer,
+  fetchMcpState,
+  loginMcpServer,
+  logoutMcpServer,
+  previewMcpPrompt,
+  refreshAllMcpServers,
+  refreshMcpServer,
+  setAssistantMcpMount,
+  setTabMcpMount,
+  updateMcpServer,
+} from "./mcp";
 export { fetchAppMeta, fetchTools, type ToolInfo } from "./meta";
 export {
   retryAssistantMessageRequest,

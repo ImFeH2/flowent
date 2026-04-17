@@ -220,6 +220,20 @@ async def interrupt_node(node_id: str) -> dict:
     return {"status": "interrupting"}
 
 
+@router.post("/api/nodes/{node_id}/messages/{message_id}/retry")
+async def retry_node_message(node_id: str, message_id: str) -> dict:
+    node = registry.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+    try:
+        retried_message_id = node.retry_received_message(message_id=message_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (RuntimeError, TimeoutError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"status": "retried", "message_id": retried_message_id}
+
+
 @router.post("/api/nodes/{node_id}/clear-chat")
 async def clear_node_chat(node_id: str) -> dict:
     from app.models import NodeType

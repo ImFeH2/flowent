@@ -1,4 +1,5 @@
 import type {
+  MCPServerConfig,
   ModelCapabilities,
   ModelParams,
   Provider,
@@ -16,6 +17,7 @@ export interface UserSettings {
     role_name: string;
     allow_network: boolean;
     write_dirs: string[];
+    mcp_servers: string[];
   };
   leader: {
     role_name: string;
@@ -37,6 +39,7 @@ export interface UserSettings {
     auto_compact_token_limit: number | null;
     params: ModelParams;
   };
+  mcp_servers: MCPServerConfig[];
 }
 
 export interface SettingsBootstrapData {

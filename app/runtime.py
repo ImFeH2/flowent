@@ -46,6 +46,7 @@ def bootstrap_runtime() -> None:
     from app.agent import Agent
     from app.graph_runtime import connect_nodes
     from app.graph_service import ensure_tab_leaders, list_tab_edges
+    from app.mcp_service import mcp_service
     from app.models import AgentState, NodeConfig, NodeType, StateEntry
     from app.settings import (
         STEWARD_ROLE_INCLUDED_TOOLS,
@@ -59,9 +60,11 @@ def bootstrap_runtime() -> None:
 
     workspace_store.reset_cache()
     stats_store.reset()
+    mcp_service.reset()
     settings = get_settings()
     if ensure_builtin_roles(settings):
         save_settings(settings)
+    mcp_service.bootstrap()
     assistant_role = find_role(settings, settings.assistant.role_name)
     assistant_tools = (
         list(assistant_role.included_tools)
@@ -186,10 +189,12 @@ def bootstrap_runtime() -> None:
 
 
 def shutdown_runtime(timeout: float = SYSTEM_NODE_TIMEOUT) -> None:
+    from app.mcp_service import mcp_service
     from app.models import NodeType
 
     logger.info("Shutting down runtime")
     _stop_telegram_channel()
+    mcp_service.reset()
     persistent_agents = []
     for agent in registry.get_all():
         if agent.node_type == NodeType.ASSISTANT or agent.config.tab_id:

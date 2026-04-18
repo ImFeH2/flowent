@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { toast } from "sonner";
+import { dispatchAccessDeniedEvent } from "@/lib/accessEvents";
 import type { AgentEvent } from "@/types";
 
 const INITIAL_DELAY = 1000;
@@ -14,10 +15,18 @@ interface SocketChannelConfig {
   path: string;
   onMessage: MutableRefObject<(event: AgentEvent) => void>;
   setConnected: (connected: boolean) => void;
+  onAccessDenied: () => void;
+}
+
+function isAccessSessionClose(event: CloseEvent) {
+  const reason = event.reason.trim().toLowerCase();
+  return (
+    event.code === 4401 || (event.code === 4001 && reason.startsWith("access "))
+  );
 }
 
 function createSocketChannel(
-  { path, onMessage, setConnected }: SocketChannelConfig,
+  { path, onMessage, setConnected, onAccessDenied }: SocketChannelConfig,
   isDisposed: () => boolean,
 ) {
   let retryDelay = INITIAL_DELAY;
@@ -73,9 +82,13 @@ function createSocketChannel(
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       setConnected(false);
       ws = null;
+      if (isAccessSessionClose(event)) {
+        onAccessDenied();
+        return;
+      }
       if (isDisposed()) return;
       if (wasConnected) {
         toast.error(`Connection lost ${path}, reconnecting...`);
@@ -112,6 +125,7 @@ export function useWebSocket({
   const [updateConnected, setUpdateConnected] = useState(false);
   const onDisplayRef = useRef(onDisplayEvent);
   const onUpdateRef = useRef(onUpdateEvent);
+  const accessDeniedDispatchedRef = useRef(false);
 
   useEffect(() => {
     onDisplayRef.current = onDisplayEvent;
@@ -123,6 +137,13 @@ export function useWebSocket({
 
   useEffect(() => {
     let disposed = false;
+    const handleAccessDenied = () => {
+      if (accessDeniedDispatchedRef.current) {
+        return;
+      }
+      accessDeniedDispatchedRef.current = true;
+      dispatchAccessDeniedEvent();
+    };
 
     const cleanups = [
       createSocketChannel(
@@ -130,6 +151,7 @@ export function useWebSocket({
           path: "/ws/events",
           onMessage: onDisplayRef,
           setConnected: setDisplayConnected,
+          onAccessDenied: handleAccessDenied,
         },
         () => disposed,
       ),
@@ -138,6 +160,7 @@ export function useWebSocket({
           path: "/ws/updates",
           onMessage: onUpdateRef,
           setConnected: setUpdateConnected,
+          onAccessDenied: handleAccessDenied,
         },
         () => disposed,
       ),

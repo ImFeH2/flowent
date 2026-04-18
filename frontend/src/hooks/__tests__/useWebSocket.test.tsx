@@ -3,8 +3,12 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
-const toastSuccessMock = vi.fn();
-const toastErrorMock = vi.fn();
+const { toastSuccessMock, toastErrorMock, dispatchAccessDeniedEventMock } =
+  vi.hoisted(() => ({
+    toastSuccessMock: vi.fn(),
+    toastErrorMock: vi.fn(),
+    dispatchAccessDeniedEventMock: vi.fn(),
+  }));
 
 function expectedSocketUrls() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -19,6 +23,11 @@ vi.mock("sonner", () => ({
     success: (...args: unknown[]) => toastSuccessMock(...args),
     error: (...args: unknown[]) => toastErrorMock(...args),
   },
+}));
+
+vi.mock("@/lib/accessEvents", () => ({
+  dispatchAccessDeniedEvent: (...args: unknown[]) =>
+    dispatchAccessDeniedEventMock(...args),
 }));
 
 class MockWebSocket {
@@ -47,6 +56,11 @@ class MockWebSocket {
     this.readyState = MockWebSocket.OPEN;
     this.onopen?.(new Event("open"));
   }
+
+  emitClose({ code = 1000, reason = "" }: { code?: number; reason?: string }) {
+    this.readyState = MockWebSocket.CLOSED;
+    this.onclose?.({ code, reason } as CloseEvent);
+  }
 }
 
 const originalWebSocket = globalThis.WebSocket;
@@ -57,6 +71,7 @@ describe("useWebSocket", () => {
     vi.useFakeTimers();
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
+    dispatchAccessDeniedEventMock.mockReset();
     MockWebSocket.instances.splice(0, MockWebSocket.instances.length);
     Object.defineProperty(globalThis, "WebSocket", {
       configurable: true,
@@ -143,4 +158,38 @@ describe("useWebSocket", () => {
 
     expect(result.current.connected).toBe(true);
   });
+
+  it.each([
+    { code: 4001, reason: "Access code rotated" },
+    { code: 4401, reason: "Access denied" },
+  ])(
+    "treats access-session socket closes as immediate reauth instead of reconnecting ($reason)",
+    ({ code, reason }) => {
+      renderHook(() =>
+        useWebSocket({
+          onDisplayEvent: vi.fn(),
+          onUpdateEvent: vi.fn(),
+        }),
+      );
+
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+
+      const [eventsSocket] = MockWebSocket.instances;
+
+      act(() => {
+        eventsSocket?.emitOpen();
+        eventsSocket?.emitClose({ code, reason });
+      });
+
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
+
+      expect(dispatchAccessDeniedEventMock).toHaveBeenCalledTimes(1);
+      expect(toastErrorMock).not.toHaveBeenCalled();
+      expect(MockWebSocket.instances).toHaveLength(2);
+    },
+  );
 });

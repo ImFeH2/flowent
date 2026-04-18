@@ -11,6 +11,7 @@ import {
 import {
   ReactFlow,
   Background,
+  ConnectionMode,
   type Connection,
   type Node as FlowNode,
   type Edge as FlowEdge,
@@ -123,7 +124,8 @@ interface AgentNodeData extends Record<string, unknown> {
   selected: boolean;
   toolCall: string | null;
   leaving: boolean;
-  showConnectionHandle: boolean;
+  canConnect: boolean;
+  showConnectionEntryHint: boolean;
   connectionState?: "source" | "valid-target" | "invalid-target" | null;
 }
 
@@ -183,13 +185,13 @@ function getHorizontalHandleIds(
 ) {
   if ((sourcePosition?.x ?? 0) <= (targetPosition?.x ?? 0)) {
     return {
-      sourceHandle: "right-source",
-      targetHandle: "left-target",
+      sourceHandle: "right-entry",
+      targetHandle: "left-entry",
     };
   }
   return {
-    sourceHandle: "left-source",
-    targetHandle: "right-target",
+    sourceHandle: "left-entry",
+    targetHandle: "right-entry",
   };
 }
 
@@ -378,6 +380,14 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         new URL("../lib/layout.worker.ts", import.meta.url),
         { type: "module" },
       );
+      worker.onerror = (event) => {
+        requestedLayoutKey.current = "";
+        console.error("AgentGraph layout worker error", event);
+      };
+      worker.onmessageerror = (event) => {
+        requestedLayoutKey.current = "";
+        console.error("AgentGraph layout worker message error", event);
+      };
       worker.onmessage = (event) => {
         const { positions, key } = event.data;
         if (key !== requestedLayoutKey.current) {
@@ -390,7 +400,11 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         setLayoutState({ key, positions: map });
       };
       layoutWorker.current = worker;
-      return () => worker.terminate();
+      return () => {
+        requestedLayoutKey.current = "";
+        layoutWorker.current = null;
+        worker.terminate();
+      };
     }, []);
 
     const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -539,6 +553,9 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       [visibleAgents],
     );
     const connectPreviewSourceId = dragConnectionSourceId ?? targetPickSourceId;
+    const showConnectionEntryHint =
+      Boolean(activeTabId) &&
+      (connectMode || connecting || Boolean(connectPreviewSourceId));
     const isValidDirectConnection = useCallback(
       (sourceNodeId: string, targetNodeId: string) => {
         if (sourceNodeId === targetNodeId) {
@@ -563,9 +580,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
 
       for (const agent of visibleAgents) {
         const id = agent.id;
-        const hasVisibleConnection = agent.connections.some((targetId) =>
-          visibleAgentIds.has(targetId),
-        );
         const label = getNodeLabel({
           name: agent.name,
           roleName: agent.role_name,
@@ -585,9 +599,8 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
           selected: id === selectedAgentId && selectedEdgeId === null,
           toolCall: activeToolCalls.get(id) ?? null,
           leaving: false,
-          showConnectionHandle:
-            Boolean(activeTabId) &&
-            (hasVisibleConnection || connecting || connectMode),
+          canConnect: Boolean(activeTabId),
+          showConnectionEntryHint,
           connectionState: connectPreviewSourceId
             ? id === connectPreviewSourceId
               ? "source"
@@ -602,12 +615,11 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
     }, [
       activeTabId,
       activeToolCalls,
-      connectMode,
       connectPreviewSourceId,
-      connecting,
       isValidDirectConnection,
       selectedAgentId,
       selectedEdgeId,
+      showConnectionEntryHint,
       visibleAgents,
     ]);
 
@@ -678,16 +690,23 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         requestedLayoutKey.current = "";
         return;
       }
+      if (layoutState.key === structureKey) {
+        return;
+      }
       if (requestedLayoutKey.current === structureKey) {
         return;
       }
-      requestedLayoutKey.current = structureKey;
-      layoutWorker.current?.postMessage({
+      const worker = layoutWorker.current;
+      if (!worker) {
+        return;
+      }
+      worker.postMessage({
         nodes: rawNodes,
         edges: baseEdges,
         key: structureKey,
       });
-    }, [structureKey, rawNodes, baseEdges]);
+      requestedLayoutKey.current = structureKey;
+    }, [baseEdges, layoutState.key, rawNodes, structureKey]);
 
     const graphElements = useMemo(() => {
       const positions = layoutState.positions;
@@ -909,9 +928,11 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
           }
         }
 
-        setConnectMode(false);
+        if (!connectMode) {
+          setConnectMode(false);
+        }
       },
-      [activeTabId, openQuickCreate],
+      [activeTabId, connectMode, openQuickCreate],
     );
 
     const onEdgeClick: EdgeMouseHandler = useCallback(
@@ -1402,6 +1423,8 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
               onConnectEnd={onConnectEnd}
               onMove={handleViewportMove}
               isValidConnection={isValidConnection}
+              connectionMode={ConnectionMode.Loose}
+              connectOnClick={false}
               proOptions={{ hideAttribution: true }}
               nodesDraggable={false}
               nodesConnectable={Boolean(activeTabId)}

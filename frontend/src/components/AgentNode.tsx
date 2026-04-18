@@ -25,35 +25,24 @@ interface AgentNodeData {
   selected: boolean;
   toolCall: string | null;
   leaving: boolean;
-  showConnectionHandle: boolean;
+  canConnect: boolean;
+  showConnectionEntryHint: boolean;
   connectionState?: "source" | "valid-target" | "invalid-target" | null;
   [key: string]: unknown;
 }
 
 const connectionHandles = [
   {
-    id: "left-source",
+    id: "left-entry",
     type: "source" as const,
     position: Position.Left,
-    top: "36%",
+    side: "left" as const,
   },
   {
-    id: "left-target",
-    type: "target" as const,
-    position: Position.Left,
-    top: "64%",
-  },
-  {
-    id: "right-source",
+    id: "right-entry",
     type: "source" as const,
     position: Position.Right,
-    top: "36%",
-  },
-  {
-    id: "right-target",
-    type: "target" as const,
-    position: Position.Right,
-    top: "64%",
+    side: "right" as const,
   },
 ];
 
@@ -66,7 +55,8 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
     latestTodo,
     selected,
     toolCall,
-    showConnectionHandle,
+    canConnect,
+    showConnectionEntryHint,
     connectionState,
   } = data as unknown as AgentNodeData;
   const leaving = Boolean((data as AgentNodeData).leaving);
@@ -115,6 +105,16 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
         : connectionState === "invalid-target"
           ? "opacity-45"
           : "";
+  const showConnectionEntry =
+    showConnectionEntryHint || connectionState === "source";
+  const connectionEntryClass =
+    connectionState === "source"
+      ? "border-graph-selection/75 bg-white/[0.14] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_24px_rgba(255,255,255,0.18)]"
+      : connectionState === "valid-target"
+        ? "border-white/26 bg-white/[0.1] shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_0_18px_rgba(255,255,255,0.14)]"
+        : connectionState === "invalid-target"
+          ? "border-white/8 bg-white/[0.02]"
+          : "border-white/14 bg-white/[0.04]";
 
   return (
     <motion.div
@@ -168,19 +168,30 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
           id={handle.id}
           type={handle.type}
           position={handle.position}
+          isConnectable={canConnect}
+          isConnectableStart={canConnect}
+          isConnectableEnd={canConnect}
           className={cn(
-            "!z-10 !size-4 !-translate-y-1/2 !border !border-graph-handle-border !bg-graph-handle-bg transition-[opacity,transform,box-shadow] duration-150 after:absolute after:-inset-2.5 after:content-['']",
-            !showConnectionHandle && "!pointer-events-none !opacity-0",
-            handle.type === "source" &&
-              connectionState === "source" &&
-              "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
-            handle.type === "target" &&
-              connectionState === "valid-target" &&
-              "!scale-110 !shadow-[0_0_0_3px_rgba(255,255,255,0.08)]",
+            "!z-10 !h-[72%] !w-5 !-translate-y-1/2 !border-0 !bg-transparent !opacity-0 after:absolute after:-inset-3 after:content-['']",
           )}
-          style={{ top: handle.top }}
+          style={{ top: "50%" }}
         />
       ))}
+
+      {showConnectionEntry
+        ? connectionHandles.map((handle) => (
+            <div
+              key={`${handle.id}-entry`}
+              aria-hidden="true"
+              data-testid={`connection-entry-${handle.side}`}
+              className={cn(
+                "pointer-events-none absolute top-1/2 z-10 h-[72%] w-2.5 -translate-y-1/2 rounded-full border transition-[opacity,transform,box-shadow] duration-150",
+                handle.side === "left" ? "-left-1.5" : "-right-1.5",
+                connectionEntryClass,
+              )}
+            />
+          ))
+        : null}
 
       <div
         className={cn(

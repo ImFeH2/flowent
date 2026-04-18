@@ -52,6 +52,7 @@ const VIEWPORT_FIT_PADDING = 0.3;
 const VIEWPORT_FIT_MAX_ZOOM = 1;
 const VIEWPORT_MIN_ZOOM = 0.05;
 const VIEWPORT_MAX_ZOOM = 6;
+const LAYOUT_RETRY_LIMIT = 1;
 
 const nodeTypes: NodeTypes = {
   agent: AgentNode,
@@ -370,29 +371,75 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
     const [submittingQuickCreate, setSubmittingQuickCreate] = useState(false);
     const layoutWorker = useRef<Worker | null>(null);
     const requestedLayoutKey = useRef("");
+    const layoutRetryCounts = useRef(new Map<string, number>());
+    const [layoutRetryNonce, setLayoutRetryNonce] = useState(0);
     const [layoutState, setLayoutState] = useState<{
       key: string;
       positions: Map<string, { x: number; y: number }>;
     }>({ key: "", positions: new Map() });
+
+    const scheduleLayoutRetry = useCallback(
+      (key: string, message: string, detail?: unknown) => {
+        requestedLayoutKey.current = "";
+        console.error(message, detail);
+
+        const retryCount = layoutRetryCounts.current.get(key) ?? 0;
+        if (retryCount >= LAYOUT_RETRY_LIMIT) {
+          return;
+        }
+
+        layoutRetryCounts.current.set(key, retryCount + 1);
+        setLayoutRetryNonce((value) => value + 1);
+      },
+      [],
+    );
 
     useEffect(() => {
       const worker = new Worker(
         new URL("../lib/layout.worker.ts", import.meta.url),
         { type: "module" },
       );
+      const layoutRetryCountMap = layoutRetryCounts.current;
       worker.onerror = (event) => {
-        requestedLayoutKey.current = "";
-        console.error("AgentGraph layout worker error", event);
+        const key = requestedLayoutKey.current;
+        if (!key) {
+          return;
+        }
+        scheduleLayoutRetry(key, "AgentGraph layout worker error", event);
       };
       worker.onmessageerror = (event) => {
-        requestedLayoutKey.current = "";
-        console.error("AgentGraph layout worker message error", event);
+        const key = requestedLayoutKey.current;
+        if (!key) {
+          return;
+        }
+        scheduleLayoutRetry(
+          key,
+          "AgentGraph layout worker message error",
+          event,
+        );
       };
       worker.onmessage = (event) => {
-        const { positions, key } = event.data;
+        const {
+          positions,
+          key,
+          error,
+        }: {
+          positions?: Array<{ id: string; position: { x: number; y: number } }>;
+          key: string;
+          error?: string;
+        } = event.data;
         if (key !== requestedLayoutKey.current) {
           return;
         }
+        if (error || !positions) {
+          scheduleLayoutRetry(
+            key,
+            "AgentGraph layout worker rejected request",
+            error,
+          );
+          return;
+        }
+        layoutRetryCounts.current.delete(key);
         const map = new Map<string, { x: number; y: number }>();
         for (const pos of positions) {
           map.set(pos.id, pos.position);
@@ -402,10 +449,11 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       layoutWorker.current = worker;
       return () => {
         requestedLayoutKey.current = "";
+        layoutRetryCountMap.clear();
         layoutWorker.current = null;
         worker.terminate();
       };
-    }, []);
+    }, [scheduleLayoutRetry]);
 
     const tooltipRef = useRef<HTMLDivElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -688,6 +736,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
     useEffect(() => {
       if (rawNodes.length === 0) {
         requestedLayoutKey.current = "";
+        layoutRetryCounts.current.clear();
         return;
       }
       if (layoutState.key === structureKey) {
@@ -706,7 +755,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         key: structureKey,
       });
       requestedLayoutKey.current = structureKey;
-    }, [baseEdges, layoutState.key, rawNodes, structureKey]);
+    }, [baseEdges, layoutRetryNonce, layoutState.key, rawNodes, structureKey]);
 
     const graphElements = useMemo(() => {
       const positions = layoutState.positions;

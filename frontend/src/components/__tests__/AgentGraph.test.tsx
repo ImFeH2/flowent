@@ -12,7 +12,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Edge as FlowEdge, Node as FlowNode } from "@xyflow/react";
 import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
-import { getLayoutedElements } from "@/lib/layout";
+import { getAgentGraphLayoutedElements } from "@/lib/agentGraphLayout";
 import type { Node, TaskTab } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
@@ -39,17 +39,28 @@ class DeferredWorkerMock {
     this.messages.push(data);
   }
 
-  flush(index: number) {
+  async flush(index: number) {
     const message = this.messages[index];
     if (!message || !this.onmessage) {
       return;
     }
-    const layouted = getLayoutedElements(message.nodes, message.edges);
+    const layouted = await getAgentGraphLayoutedElements(
+      message.nodes,
+      message.edges,
+    );
     const positions = layouted.nodes.map((node) => ({
       id: node.id,
       position: node.position,
     }));
     this.onmessage({ data: { positions, key: message.key } } as MessageEvent);
+  }
+
+  fail(index: number, error = "layout failed") {
+    const message = this.messages[index];
+    if (!message || !this.onmessage) {
+      return;
+    }
+    this.onmessage({ data: { key: message.key, error } } as MessageEvent);
   }
 
   terminate = vi.fn();
@@ -917,8 +928,8 @@ describe("AgentGraph", () => {
     const worker = DeferredWorkerMock.instances[0];
     expect(worker?.messages).toHaveLength(1);
 
-    act(() => {
-      worker?.flush(0);
+    await act(async () => {
+      await worker?.flush(0);
     });
 
     await waitFor(() => {
@@ -936,9 +947,12 @@ describe("AgentGraph", () => {
 
       expect(plannerNode?.position).not.toEqual({ x: 900, y: 700 });
       expect(reviewerNode?.position).not.toEqual({ x: 40, y: 20 });
-      expect(reviewerNode?.position.y ?? 0).toBeGreaterThan(
-        plannerNode?.position.y ?? 0,
-      );
+      expect(
+        Math.hypot(
+          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
+          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
+        ),
+      ).toBeGreaterThan(80);
     });
   });
 
@@ -1011,8 +1025,8 @@ describe("AgentGraph", () => {
       expect(worker?.messages).toHaveLength(2);
     });
 
-    act(() => {
-      worker?.flush(1);
+    await act(async () => {
+      await worker?.flush(1);
     });
 
     await waitFor(() => {
@@ -1027,15 +1041,18 @@ describe("AgentGraph", () => {
       const reviewerNode = latestProps?.nodes.find(
         (node) => node.id === "worker-2",
       );
-      expect(reviewerNode?.position.y ?? 0).toBeGreaterThan(
-        plannerNode?.position.y ?? 0,
-      );
+      expect(
+        Math.hypot(
+          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
+          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
+        ),
+      ).toBeGreaterThan(80);
     });
 
     const renderCountAfterFreshLayout = reactFlowPropsMock.mock.calls.length;
 
-    act(() => {
-      worker?.flush(0);
+    await act(async () => {
+      await worker?.flush(0);
     });
 
     await waitFor(() => {
@@ -1077,6 +1094,66 @@ describe("AgentGraph", () => {
     await waitFor(() => {
       expect(worker?.messages).toHaveLength(1);
     });
+  });
+
+  it("retries a failed layout request once for the same structure", async () => {
+    vi.stubGlobal("Worker", DeferredWorkerMock as unknown as typeof Worker);
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    renderGraph([
+      buildNode({
+        id: "worker-1",
+        role_name: "Planner",
+        connections: ["worker-2"],
+      }),
+      buildNode({
+        id: "worker-2",
+        role_name: "Reviewer",
+        connections: [],
+      }),
+    ]);
+
+    await screen.findByText("Planner");
+
+    const worker = DeferredWorkerMock.instances[0];
+    expect(worker?.messages).toHaveLength(1);
+
+    act(() => {
+      worker?.fail(0);
+    });
+
+    await waitFor(() => {
+      expect(worker?.messages).toHaveLength(2);
+    });
+
+    await act(async () => {
+      await worker?.flush(1);
+    });
+
+    await waitFor(() => {
+      const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
+        | {
+            nodes: Array<{ id: string; position: { x: number; y: number } }>;
+          }
+        | undefined;
+      const plannerNode = latestProps?.nodes.find(
+        (node) => node.id === "worker-1",
+      );
+      const reviewerNode = latestProps?.nodes.find(
+        (node) => node.id === "worker-2",
+      );
+
+      expect(
+        Math.hypot(
+          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
+          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
+        ),
+      ).toBeGreaterThan(80);
+    });
+
+    consoleErrorSpy.mockRestore();
   });
 
   it("reposts layout after StrictMode remount when the first worker is terminated", async () => {
@@ -1124,8 +1201,8 @@ describe("AgentGraph", () => {
     const latestWorker = DeferredWorkerMock.instances.at(-1);
     expect(latestWorker?.messages).toHaveLength(1);
 
-    act(() => {
-      latestWorker?.flush(0);
+    await act(async () => {
+      await latestWorker?.flush(0);
     });
 
     await waitFor(() => {
@@ -1140,9 +1217,12 @@ describe("AgentGraph", () => {
       const reviewerNode = latestProps?.nodes.find(
         (node) => node.id === "worker-2",
       );
-      expect(reviewerNode?.position.y ?? 0).toBeGreaterThan(
-        plannerNode?.position.y ?? 0,
-      );
+      expect(
+        Math.hypot(
+          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
+          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
+        ),
+      ).toBeGreaterThan(80);
     });
   });
 

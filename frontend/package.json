@@ -16,11 +16,11 @@
     "type-check": "tsc -b"
   },
   "dependencies": {
-    "@dagrejs/dagre": "^2.0.4",
     "@tailwindcss/vite": "^4.1.18",
     "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "elkjs": "^0.11.1",
     "lucide-react": "^0.563.0",
     "motion": "^12.34.0",
     "radix-ui": "^1.4.3",
@@ -40,7 +40,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/dagre": "^0.7.53",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

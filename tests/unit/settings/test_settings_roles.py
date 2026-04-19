@@ -1,6 +1,8 @@
 import json
+from dataclasses import asdict
 
 import app.settings as settings_module
+from app.access import set_access_code, verify_access_code
 from app.settings import (
     CONDUCTOR_ROLE_DESCRIPTION,
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
@@ -242,6 +244,71 @@ def test_load_settings_defaults_retry_backoff_fields(monkeypatch, tmp_path):
     assert persisted["model"]["retry_initial_delay_seconds"] == 0.5
     assert persisted["model"]["retry_max_delay_seconds"] == 8.0
     assert persisted["model"]["retry_backoff_cap_retries"] == 5
+
+
+def test_get_settings_reloads_when_settings_file_changes_externally(
+    monkeypatch, tmp_path
+):
+    settings_file = tmp_path / "settings.json"
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+    monkeypatch.setattr(settings_module, "_cached_settings_file_signature", None)
+
+    settings_module.save_settings(Settings(custom_prompt="before"))
+
+    cached = settings_module.get_settings()
+    assert cached.custom_prompt == "before"
+
+    persisted = json.loads(settings_file.read_text(encoding="utf-8"))
+    persisted["custom_prompt"] = "after external update"
+    settings_file.write_text(json.dumps(persisted, indent=2), encoding="utf-8")
+
+    reloaded = settings_module.get_settings()
+
+    assert reloaded.custom_prompt == "after external update"
+
+
+def test_save_settings_preserves_newer_live_access_when_cache_is_stale(
+    monkeypatch, tmp_path
+):
+    settings_file = tmp_path / "settings.json"
+
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+    monkeypatch.setattr(settings_module, "_cached_settings_file_signature", None)
+
+    initial = Settings()
+    set_access_code(initial, "OLD-CODE")
+    settings_module.save_settings(initial)
+
+    cached = settings_module.get_settings()
+    assert verify_access_code(cached.access, "OLD-CODE")
+
+    refreshed, _ = settings_module._read_settings_file()
+    set_access_code(refreshed, "NEW-CODE")
+    settings_file.write_text(
+        json.dumps(asdict(refreshed), indent=2),
+        encoding="utf-8",
+    )
+
+    cached.providers.append(
+        ProviderConfig(
+            id="provider-1",
+            name="Primary",
+            type="openai_compatible",
+            base_url="https://api.example.com/v1",
+            api_key="secret",
+        )
+    )
+    settings_module.save_settings(cached)
+
+    final_settings, _ = settings_module._read_settings_file()
+
+    assert len(final_settings.providers) == 1
+    assert final_settings.providers[0].id == "provider-1"
+    assert verify_access_code(final_settings.access, "NEW-CODE")
+    assert not verify_access_code(final_settings.access, "OLD-CODE")
 
 
 def test_load_settings_defaults_model_timeout_ms(monkeypatch, tmp_path):

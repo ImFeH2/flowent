@@ -393,6 +393,7 @@ class Settings:
 
 
 _cached_settings: Settings | None = None
+_cached_settings_file_signature: tuple[int, int] | None = None
 _settings_lock = threading.Lock()
 
 
@@ -2154,21 +2155,51 @@ def _read_settings_file() -> tuple[Settings, bool]:
     return _build_settings(data)
 
 
+def _get_settings_file_signature() -> tuple[int, int] | None:
+    try:
+        stat_result = _SETTINGS_FILE.stat()
+    except FileNotFoundError:
+        return None
+    return (stat_result.st_mtime_ns, stat_result.st_size)
+
+
+def _preserve_newer_live_access(settings: Settings) -> None:
+    if _get_settings_file_signature() is None:
+        return
+    try:
+        live_settings, _ = _read_settings_file()
+    except Exception as exc:
+        logger.warning(
+            "Failed to read live settings from {} while preserving access: {}",
+            _SETTINGS_FILE,
+            exc,
+        )
+        return
+    if live_settings.access.session_generation > settings.access.session_generation:
+        settings.access = live_settings.access
+
+
 def load_settings() -> Settings:
-    global _cached_settings
+    global _cached_settings, _cached_settings_file_signature
+    current_signature = _get_settings_file_signature()
     with _settings_lock:
-        if _cached_settings is not None:
+        if (
+            _cached_settings is not None
+            and _cached_settings_file_signature == current_signature
+        ):
             return _cached_settings
 
-    if not _SETTINGS_FILE.exists():
+    if current_signature is None:
         loaded_settings = Settings()
+        loaded_signature = None
         with _settings_lock:
-            if _cached_settings is None:
-                _cached_settings = loaded_settings
+            _cached_settings = loaded_settings
+            _cached_settings_file_signature = loaded_signature
             return _cached_settings
 
     try:
         loaded_settings, migrated = _read_settings_file()
+        loaded_signature = _get_settings_file_signature()
     except Exception as exc:
         logger.warning(
             "Failed to load settings from {}: {}. Falling back to defaults.",
@@ -2176,11 +2207,13 @@ def load_settings() -> Settings:
             exc,
         )
         loaded_settings = Settings()
+        loaded_signature = current_signature
         migrated = False
 
     if migrated:
         try:
             save_settings(loaded_settings)
+            loaded_signature = _get_settings_file_signature()
         except Exception as exc:
             logger.warning(
                 "Failed to persist migrated settings to {}: {}",
@@ -2189,15 +2222,16 @@ def load_settings() -> Settings:
             )
 
     with _settings_lock:
-        if _cached_settings is None:
-            _cached_settings = loaded_settings
+        _cached_settings = loaded_settings
+        _cached_settings_file_signature = loaded_signature
         return _cached_settings
 
 
 def save_settings(settings: Settings) -> None:
-    global _cached_settings
+    global _cached_settings, _cached_settings_file_signature
     temp_path: Path | None = None
     _SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _preserve_newer_live_access(settings)
 
     try:
         with tempfile.NamedTemporaryFile(
@@ -2219,8 +2253,10 @@ def save_settings(settings: Settings) -> None:
             temp_path.unlink(missing_ok=True)
         raise
 
+    persisted_signature = _get_settings_file_signature()
     with _settings_lock:
         _cached_settings = settings
+        _cached_settings_file_signature = persisted_signature
 
 
 def get_settings() -> Settings:

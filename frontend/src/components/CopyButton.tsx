@@ -29,13 +29,13 @@ export function CopyButton({
     <button
       onClick={handleCopy}
       className={cn(
-        "rounded p-0.5 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all",
+        "rounded p-0.5 text-muted-foreground opacity-0 transition-all hover:bg-accent/45 hover:text-foreground group-hover:opacity-100",
         className,
       )}
       title="Copy"
     >
       {copied ? (
-        <Check className={cn("size-3 text-white/88", copiedClassName)} />
+        <Check className={cn("size-3 text-foreground", copiedClassName)} />
       ) : (
         <Copy className={cn("size-3", iconClassName)} />
       )}

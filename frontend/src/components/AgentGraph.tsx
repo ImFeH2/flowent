@@ -53,6 +53,14 @@ const VIEWPORT_FIT_MAX_ZOOM = 1;
 const VIEWPORT_MIN_ZOOM = 0.05;
 const VIEWPORT_MAX_ZOOM = 6;
 const LAYOUT_RETRY_LIMIT = 1;
+const graphChromePillClass =
+  "rounded-full border border-border bg-surface-overlay/88 px-3 py-1 text-[11px] font-medium text-foreground/88 shadow-lg backdrop-blur-md";
+const quickCreateInputClass =
+  "h-10 w-full rounded-[0.9rem] border border-input bg-background/55 px-3 text-[13px] text-foreground shadow-xs placeholder:text-muted-foreground transition-[border-color,box-shadow] focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+const quickCreateListClass =
+  "max-h-56 space-y-2 overflow-y-auto rounded-[0.9rem] border border-border bg-background/40 p-2 scrollbar-none";
+const quickCreateButtonClass =
+  "w-full rounded-[0.85rem] border px-3 py-2.5 text-left transition-colors";
 
 const nodeTypes: NodeTypes = {
   agent: AgentNode,
@@ -1432,20 +1440,20 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         <div className="relative flex-1 overflow-hidden">
           {animatedNodes.length === 0 ? (
             <div className="flex h-full items-center justify-center px-5 py-8">
-              <div className="w-full max-w-[22rem] rounded-[18px] border border-white/7 bg-[rgba(12,12,13,0.48)] px-5 py-5 text-center shadow-[0_18px_42px_-32px_rgba(0,0,0,0.72)] backdrop-blur-sm">
-                <div className="mx-auto flex size-10 items-center justify-center rounded-[12px] border border-white/8 bg-white/[0.03] text-white/68">
+              <div className="w-full max-w-[22rem] rounded-[18px] border border-border bg-surface-overlay/60 px-5 py-5 text-center shadow-xl backdrop-blur-sm">
+                <div className="mx-auto flex size-10 items-center justify-center rounded-[12px] border border-border bg-accent/35 text-muted-foreground">
                   <Network className="size-4.5" />
                 </div>
-                <p className="mt-3.5 text-[9px] font-semibold uppercase tracking-[0.28em] text-white/34">
+                <p className="mt-3.5 text-[9px] font-semibold uppercase tracking-[0.28em] text-muted-foreground/75">
                   {emptyState.eyebrow}
                 </p>
-                <p className="mt-2.5 text-[18px] font-semibold leading-tight text-white/92">
+                <p className="mt-2.5 text-[18px] font-semibold leading-tight text-foreground">
                   {emptyState.title}
                 </p>
-                <p className="mt-2 text-[13px] leading-6 text-white/60">
+                <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
                   {emptyState.description}
                 </p>
-                <p className="mt-3 text-[11px] leading-5 text-white/34">
+                <p className="mt-3 text-[11px] leading-5 text-muted-foreground/75">
                   {emptyState.hint}
                 </p>
               </div>
@@ -1545,7 +1553,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         {animatedNodes.length > 0 ? (
           <div className="pointer-events-none absolute bottom-4 left-4 z-30">
             <div
-              className="rounded-full border border-white/10 bg-black/65 px-3 py-1 text-[11px] font-medium text-white/84 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md"
+              className={graphChromePillClass}
               data-testid="agent-graph-zoom-indicator"
             >
               {formatZoomPercentage(viewportZoom)}
@@ -1555,9 +1563,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
 
         {connectHintLabel ? (
           <div className="pointer-events-none absolute right-4 top-4 z-30">
-            <div className="rounded-full border border-white/10 bg-black/65 px-3 py-1 text-[11px] font-medium text-white/84 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md">
-              {connectHintLabel}
-            </div>
+            <div className={graphChromePillClass}>{connectHintLabel}</div>
           </div>
         ) : null}
 
@@ -1689,20 +1695,20 @@ function GraphQuickCreatePopover({
     <ViewportPortal>
       <div
         ref={ref}
-        className="fixed z-[210] w-[min(24rem,calc(100vw-1.5rem))] rounded-[1rem] border border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(12,12,13,0.96))] p-4 shadow-[0_28px_80px_-40px_rgba(0,0,0,0.92)] backdrop-blur-xl"
+        className="fixed z-[210] w-[min(24rem,calc(100vw-1.5rem))] rounded-[1rem] border border-border bg-popover p-4 text-popover-foreground shadow-xl backdrop-blur-xl"
         style={{ left: pos.left, top: pos.top }}
       >
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-[13px] font-medium text-white/90">{title}</p>
-            <p className="mt-1 text-[11px] text-white/44">
+            <p className="text-[13px] font-medium text-foreground">{title}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
               Choose a role and optionally set a display name.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-2 py-1 text-[11px] text-white/46 transition-colors hover:bg-white/[0.06] hover:text-white/84"
+            className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
           >
             Close
           </button>
@@ -1715,15 +1721,15 @@ function GraphQuickCreatePopover({
             value={roleQuery}
             onChange={(event) => onRoleQueryChange(event.target.value)}
             placeholder="Search roles"
-            className="h-10 w-full rounded-[0.9rem] border border-white/10 bg-black/18 px-3 text-[13px] text-white placeholder:text-white/30 focus:border-white/24 focus:outline-none"
+            className={quickCreateInputClass}
           />
-          <div className="max-h-56 space-y-2 overflow-y-auto rounded-[0.9rem] border border-white/10 bg-black/14 p-2 scrollbar-none">
+          <div className={quickCreateListClass}>
             {loadingRoles ? (
-              <p className="px-2 py-3 text-[12px] text-white/42">
+              <p className="px-2 py-3 text-[12px] text-muted-foreground">
                 Loading roles...
               </p>
             ) : filteredRoles.length === 0 ? (
-              <p className="px-2 py-3 text-[12px] text-white/42">
+              <p className="px-2 py-3 text-[12px] text-muted-foreground">
                 No roles match your search.
               </p>
             ) : (
@@ -1733,16 +1739,16 @@ function GraphQuickCreatePopover({
                   type="button"
                   onClick={() => onSelectRole(role.name)}
                   className={cn(
-                    "w-full rounded-[0.85rem] border px-3 py-2.5 text-left transition-colors",
+                    quickCreateButtonClass,
                     selectedRoleName === role.name
-                      ? "border-white/18 bg-white/[0.08]"
-                      : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.04]",
+                      ? "border-border bg-accent/70"
+                      : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
                   )}
                 >
-                  <div className="text-[13px] font-medium text-white/88">
+                  <div className="text-[13px] font-medium text-foreground">
                     {role.name}
                   </div>
-                  <div className="mt-1 text-[11px] leading-relaxed text-white/46">
+                  <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                     {role.description}
                   </div>
                 </button>
@@ -1754,7 +1760,7 @@ function GraphQuickCreatePopover({
             value={displayName}
             onChange={(event) => onDisplayNameChange(event.target.value)}
             placeholder="Optional display name"
-            className="h-10 w-full rounded-[0.9rem] border border-white/10 bg-black/18 px-3 text-[13px] text-white placeholder:text-white/30 focus:border-white/24 focus:outline-none"
+            className={quickCreateInputClass}
           />
         </div>
 
@@ -1762,7 +1768,7 @@ function GraphQuickCreatePopover({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full px-3 py-1.5 text-[12px] font-medium text-white/58 transition-colors hover:text-white/86"
+            className="rounded-full px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
           >
             Cancel
           </button>
@@ -1770,7 +1776,7 @@ function GraphQuickCreatePopover({
             type="button"
             disabled={!selectedRoleName || submitting}
             onClick={onSubmit}
-            className="rounded-full bg-white px-3.5 py-1.5 text-[12px] font-medium text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-primary px-3.5 py-1.5 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Saving..." : title}
           </button>

@@ -190,7 +190,7 @@ const HistoryItem = memo(function HistoryItem({
         <CollapsibleBlock
           label={`From ${getNodeLabel(entry.from_id ?? "", nodes)}`}
           icon={<MessageSquare className="size-3 text-foreground/70" />}
-          className="border-white/10 bg-white/[0.024]"
+          className="border-border bg-accent/20"
           labelClassName="text-foreground/70"
           actions={
             <CopyButton text={contentPartsToText(entry.parts, entry.content)} />
@@ -210,7 +210,7 @@ const HistoryItem = memo(function HistoryItem({
         <CollapsibleBlock
           label="Thinking"
           icon={<Brain className="size-3 text-foreground/72" />}
-          className="border-white/10 bg-white/[0.026]"
+          className="border-border bg-surface-1/28"
           labelClassName="text-foreground/72"
           defaultOpen={false}
         >
@@ -228,7 +228,7 @@ const HistoryItem = memo(function HistoryItem({
         <CollapsibleBlock
           label={entry.state ? `State ${entry.state.toUpperCase()}` : "State"}
           icon={<Workflow className="size-3 text-foreground/62" />}
-          className="border-white/8 bg-white/[0.016]"
+          className="border-border bg-background/28"
           labelClassName="text-foreground/72"
           defaultOpen={false}
         >
@@ -255,7 +255,7 @@ const HistoryItem = memo(function HistoryItem({
         <CollapsibleBlock
           label={`To ${targets.join(", ") || "Unknown"}`}
           icon={<Send className="size-3 text-foreground/58" />}
-          className="border-white/8 bg-white/[0.016]"
+          className="border-border bg-background/24"
           labelClassName="text-foreground/72"
           actions={
             <CopyButton text={contentPartsToText(entry.parts, entry.content)} />
@@ -276,7 +276,7 @@ const HistoryItem = memo(function HistoryItem({
         <CollapsibleBlock
           label={agentLabel}
           icon={<Bot className="size-3 text-foreground/84" />}
-          className="border-white/12 bg-surface-2/62"
+          className="border-border bg-surface-2/62"
           labelClassName="text-foreground/84"
           actions={<CopyButton text={entry.content ?? ""} />}
           defaultOpen={false}
@@ -296,7 +296,7 @@ const HistoryItem = memo(function HistoryItem({
         <CollapsibleBlock
           label={entry.tool_name ?? "tool"}
           icon={<Wrench className="size-3 text-foreground/66" />}
-          className="border-white/8 bg-surface-1/5"
+          className="border-border bg-surface-1/20"
           labelClassName="text-foreground/72"
           defaultOpen={false}
         >
@@ -382,7 +382,7 @@ function CollapsibleBlock({
   return (
     <div
       className={cn(
-        "rounded-xl border transition-colors hover:bg-white/[0.02]",
+        "rounded-xl border transition-colors hover:bg-accent/20",
         className,
       )}
     >
@@ -405,7 +405,7 @@ function CollapsibleBlock({
         <span
           className={cn(
             "flex-1 truncate text-[11px] font-medium uppercase tracking-wide",
-            labelClassName || "text-white/70",
+            labelClassName || "text-muted-foreground",
           )}
         >
           {label}
@@ -420,7 +420,7 @@ function CollapsibleBlock({
         ) : null}
         <ChevronRight
           className={cn(
-            "ml-2 size-3.5 shrink-0 text-white/30 transition-transform duration-200",
+            "ml-2 size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200",
             open && "rotate-90",
           )}
         />

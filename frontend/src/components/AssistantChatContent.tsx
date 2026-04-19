@@ -387,7 +387,7 @@ export function AssistantChatComposer({
         overlay
           ? "w-full pointer-events-auto"
           : cn(
-              "border-t border-white/6",
+              "border-t border-border",
               isWorkspace ? "p-2.5" : "px-3.5 py-2.5",
             ),
       )}
@@ -399,8 +399,8 @@ export function AssistantChatComposer({
           className={cn(
             "pointer-events-auto mb-2 overflow-hidden rounded-[1rem] border backdrop-blur-xl",
             isWorkspace
-              ? "border-white/12 bg-black/[0.74] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.92)]"
-              : "border-white/10 bg-black/[0.78] shadow-[0_20px_44px_-30px_rgba(0,0,0,0.88)]",
+              ? "border-border bg-surface-overlay shadow-xl"
+              : "border-border bg-popover shadow-xl",
           )}
         >
           {commandOptions.length > 0 ? (
@@ -418,17 +418,17 @@ export function AssistantChatComposer({
                   }}
                   className={cn(
                     "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors",
-                    selected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]",
+                    selected ? "bg-accent/60" : "hover:bg-accent/35",
                   )}
                 >
-                  <span className="mt-0.5 shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 font-mono text-[11px] text-white/88">
+                  <span className="mt-0.5 shrink-0 rounded-full border border-border bg-accent/45 px-2 py-0.5 font-mono text-[11px] text-foreground">
                     {command.name}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] font-medium text-white/88">
+                    <span className="block text-[12px] font-medium text-foreground">
                       {command.description}
                     </span>
-                    <span className="mt-1 block font-mono text-[11px] text-white/48">
+                    <span className="mt-1 block font-mono text-[11px] text-muted-foreground">
                       {command.usage}
                     </span>
                   </span>
@@ -436,7 +436,7 @@ export function AssistantChatComposer({
               );
             })
           ) : (
-            <div className="px-3 py-3 text-[12px] text-white/54">
+            <div className="px-3 py-3 text-[12px] text-muted-foreground">
               No matching commands.
             </div>
           )}
@@ -446,12 +446,12 @@ export function AssistantChatComposer({
         className={cn(
           "rounded-[0.8rem] border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
           isWorkspace
-            ? "border-white/14 bg-black/[0.18] shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_14px_30px_-22px_rgba(0,0,0,0.82),0_8px_16px_-14px_rgba(255,255,255,0.06)] hover:border-white/22 focus-within:border-white/28 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_38px_-24px_rgba(0,0,0,0.88),0_10px_20px_-16px_rgba(255,255,255,0.08)]"
-            : "border-white/12 bg-surface-2/90 shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_16px_32px_-24px_rgba(0,0,0,0.72),0_8px_16px_-14px_rgba(255,255,255,0.05)] backdrop-blur-xl hover:border-white/18 focus-within:border-white/24 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_18px_36px_-24px_rgba(0,0,0,0.78),0_9px_18px_-14px_rgba(255,255,255,0.08)]",
+            ? "border-border bg-background/30 shadow-xl hover:border-ring/35 focus-within:border-ring/45 focus-within:ring-[3px] focus-within:ring-ring/35"
+            : "border-border bg-surface-2/90 shadow-xl backdrop-blur-xl hover:border-ring/30 focus-within:border-ring/40 focus-within:ring-[3px] focus-within:ring-ring/30",
         )}
       >
         {images.length > 0 ? (
-          <div className="flex flex-wrap gap-2 border-b border-white/8 px-0.5 py-2">
+          <div className="flex flex-wrap gap-2 border-b border-border px-0.5 py-2">
             {images.map((image) => (
               <PendingImagePreviewTile
                 key={image.id}
@@ -486,10 +486,10 @@ export function AssistantChatComposer({
             disabled={!imageInputEnabled}
             onClick={() => fileInputRef.current?.click()}
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full text-white transition-colors disabled:cursor-not-allowed disabled:opacity-35",
+              "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-35",
               imageInputEnabled
-                ? "bg-white/[0.08] hover:bg-white/[0.14]"
-                : "bg-white/[0.04]",
+                ? "bg-accent/55 text-foreground hover:bg-accent"
+                : "bg-accent/20 text-muted-foreground",
             )}
           >
             <ImagePlus className="size-4" />
@@ -515,13 +515,13 @@ export function AssistantChatComposer({
             className={cn(
               "flex shrink-0 items-center justify-center rounded-full transition-all duration-300 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-30",
               isWorkspace
-                ? "h-8 gap-1.5 px-3.5 bg-white text-black hover:opacity-90"
-                : "size-8 bg-white/[0.1] text-white hover:bg-white/[0.15]",
+                ? "h-8 gap-1.5 bg-primary px-3.5 text-primary-foreground hover:opacity-90"
+                : "size-8 bg-accent/70 text-foreground hover:bg-accent",
               busy && isWorkspace
-                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                ? "bg-destructive/18 text-destructive hover:bg-destructive/24"
                 : "",
               busy && !isWorkspace
-                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                ? "bg-destructive/18 text-destructive hover:bg-destructive/24"
                 : "",
             )}
           >
@@ -537,7 +537,7 @@ export function AssistantChatComposer({
         </div>
       </div>
       {!imageInputEnabled ? (
-        <div className="px-1.5 pt-2 text-[11px] text-white/42">
+        <div className="px-1.5 pt-2 text-[11px] text-muted-foreground">
           Current model does not support image input.
         </div>
       ) : null}
@@ -562,22 +562,22 @@ function AssistantRunningHint({
         className={cn(
           "inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] text-muted-foreground/82",
           isWorkspace
-            ? "border-white/10 bg-white/[0.04]"
-            : "border-white/8 bg-white/[0.03]",
+            ? "border-border bg-accent/25"
+            : "border-border bg-accent/20",
         )}
       >
         <span className="flex items-center gap-1.5">
           {[0, 1, 2].map((index) => (
             <span
               key={index}
-              className="size-1.5 rounded-full bg-white/55 animate-pulse"
+              className="size-1.5 animate-pulse rounded-full bg-muted-foreground/80"
               style={{ animationDelay: `${index * 140}ms` }}
             />
           ))}
         </span>
         <span>{label}</span>
         {toolName ? (
-          <span className="truncate rounded-full border border-white/8 bg-black/[0.16] px-2 py-0.5 font-mono text-[10px] text-white/72">
+          <span className="truncate rounded-full border border-border bg-background/40 px-2 py-0.5 font-mono text-[10px] text-foreground/80">
             {toolName}
           </span>
         ) : null}
@@ -603,7 +603,7 @@ function PendingImagePreviewTile({
 
   return (
     <>
-      <div className="relative overflow-hidden rounded-lg border border-white/10 bg-black/25 transition-colors hover:border-white/16">
+      <div className="relative overflow-hidden rounded-lg border border-border bg-background/35 transition-colors hover:border-ring/35">
         <button
           aria-label={`Preview ${image.name}`}
           className="block text-left"
@@ -623,14 +623,14 @@ function PendingImagePreviewTile({
             className="h-20 w-20 object-cover"
             src={image.previewUrl}
           />
-          <div className="absolute inset-x-0 bottom-0 bg-black/72 px-2 py-1 text-[10px] text-white/84">
+          <div className="absolute inset-x-0 bottom-0 bg-background/80 px-2 py-1 text-[10px] text-foreground/84">
             <div className="truncate">{image.name}</div>
-            <div className="text-white/56">{meta}</div>
+            <div className="text-muted-foreground">{meta}</div>
           </div>
         </button>
         <button
           aria-label={`Remove ${image.name}`}
-          className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded-full bg-black/60 text-white/74 transition-colors hover:bg-black/80 hover:text-white"
+          className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded-full bg-background/72 text-muted-foreground transition-colors hover:bg-background/90 hover:text-foreground"
           onClick={onRemove}
           type="button"
         >
@@ -802,8 +802,8 @@ function HumanBubble({
         className={cn(
           "min-w-0 overflow-hidden px-2.5 py-1.5 text-[13px] [overflow-wrap:anywhere]",
           isWorkspace
-            ? "max-w-[84%] rounded-[10px] border border-white/8 bg-white/[0.1] text-white"
-            : "max-w-[80%] rounded-[12px] border border-white/10 bg-white/[0.08] text-white",
+            ? "max-w-[84%] rounded-[10px] border border-border bg-accent/80 text-accent-foreground"
+            : "max-w-[80%] rounded-[12px] border border-border bg-accent/65 text-accent-foreground",
           pending && "opacity-80",
         )}
       >
@@ -812,11 +812,11 @@ function HumanBubble({
             content={content}
             layout="human-attachments-top"
             parts={parts}
-            markdownClassName="text-sm text-white"
-            preClassName="text-white/90"
+            markdownClassName="text-sm text-accent-foreground"
+            preClassName="text-accent-foreground/90"
           />
           {pending ? (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/80">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/70 px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
               <LoaderCircle className="size-3 animate-spin" />
               Sending
             </span>
@@ -832,8 +832,8 @@ function HumanBubble({
             disabled={retrying || retryDisabled}
             title={retryDisabledReason}
             className={cn(
-              "inline-flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-white/64 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-45",
-              isWorkspace ? "bg-white/[0.04]" : "bg-white/[0.03]",
+              "inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45",
+              isWorkspace ? "bg-accent/35" : "bg-accent/25",
             )}
           >
             {retrying ? (
@@ -898,11 +898,9 @@ function MessageActivityCard({
     <div
       className={cn(
         "min-w-0 w-full px-2 py-1.5",
-        isWorkspace ? "border-l border-white/8 pl-3" : "rounded-[12px]",
-        tone === "received" &&
-          "border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.012))]",
-        tone === "sent" &&
-          "border-white/8 bg-[linear-gradient(180deg,rgba(255,255,255,0.016),rgba(255,255,255,0.006))]",
+        isWorkspace ? "border-l border-border pl-3" : "rounded-[12px]",
+        tone === "received" && "border-border bg-accent/20",
+        tone === "sent" && "border-border bg-background/24",
       )}
     >
       <div
@@ -930,8 +928,8 @@ function MessageActivityCard({
         {streaming ? (
           <span className="inline-flex size-5 items-center justify-center">
             <span className="relative flex size-2.5 items-center justify-center">
-              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-white/28" />
-              <span className="relative inline-flex size-2 rounded-full bg-white/78" />
+              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-ring/28" />
+              <span className="relative inline-flex size-2 rounded-full bg-ring/82" />
             </span>
             <span className="sr-only">Live</span>
           </span>
@@ -999,7 +997,7 @@ function ToolCallCard({
   return (
     <ActivityDisclosure
       label={formatToolLabel(item.tool_name)}
-      icon={<Wrench className="size-3.5 text-white/50" />}
+      icon={<Wrench className="size-3.5 text-muted-foreground" />}
       tone="tool"
       streaming={displayStreaming}
       variant={variant}
@@ -1007,27 +1005,27 @@ function ToolCallCard({
     >
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+          <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
             Arguments
           </div>
-          <pre className="select-text whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/70">
+          <pre className="select-text whitespace-pre-wrap break-words rounded-xl border border-border bg-background/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-foreground/78">
             {formattedArguments}
           </pre>
         </div>
         {item.result || !isIdleTool ? (
           <div className="space-y-1.5">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+            <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
               Result
             </div>
             {item.result ? (
               <RichContentBlock
                 content={formattedResult ?? item.result}
                 streaming={displayStreaming}
-                markdownClassName="text-[12px] text-white/80 leading-relaxed"
-                preClassName="text-white/70"
+                markdownClassName="text-[12px] leading-relaxed text-foreground/80"
+                preClassName="text-foreground/74"
               />
             ) : (
-              <div className="rounded-xl border border-white/[0.04] bg-white/[0.02] px-3.5 py-3 text-[12px] text-white/40 italic">
+              <div className="rounded-xl border border-border bg-accent/15 px-3.5 py-3 text-[12px] italic text-muted-foreground">
                 {displayStreaming ? "Running..." : "No result"}
               </div>
             )}
@@ -1052,33 +1050,33 @@ function CommandResultCard({
       className={cn(
         "min-w-0 w-full space-y-3 px-3 py-2.5",
         isWorkspace
-          ? "border-l border-emerald-400/30 bg-emerald-400/[0.08]"
-          : "rounded-xl border border-emerald-400/18 bg-emerald-400/[0.06]",
+          ? "border-l border-graph-status-running/30 bg-graph-status-running/[0.08]"
+          : "rounded-xl border border-graph-status-running/18 bg-graph-status-running/[0.06]",
       )}
     >
       <div className="flex items-center gap-2">
-        <Sparkles className="size-4 text-emerald-300" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-emerald-200/88">
+        <Sparkles className="size-4 text-graph-status-running" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-graph-status-running/90">
           Command Result
         </span>
         {item.command_name ? (
-          <span className="rounded-full border border-emerald-200/12 bg-black/20 px-2 py-0.5 font-mono text-[10px] text-emerald-100/78">
+          <span className="rounded-full border border-graph-status-running/14 bg-background/35 px-2 py-0.5 font-mono text-[10px] text-graph-status-running/80">
             {item.command_name}
           </span>
         ) : null}
         <span className="ml-auto">
           <CopyButton
             text={item.content ?? ""}
-            className="text-emerald-100/54 hover:bg-emerald-400/10 hover:text-emerald-100/86"
+            className="text-graph-status-running/72 hover:bg-graph-status-running/[0.1] hover:text-graph-status-running"
             iconClassName="text-current"
-            copiedClassName="text-emerald-200"
+            copiedClassName="text-graph-status-running"
           />
         </span>
       </div>
       <RichContentBlock
         content={item.content}
-        markdownClassName="text-[13px] text-emerald-50/92"
-        preClassName="text-emerald-50/88"
+        markdownClassName="text-[13px] text-foreground"
+        preClassName="text-foreground/90"
       />
     </div>
   );
@@ -1098,25 +1096,25 @@ function ErrorCard({
       className={cn(
         "min-w-0 w-full space-y-3 px-3 py-2.5",
         isWorkspace
-          ? "border-l-2 border-red-500/40 bg-red-500/10"
-          : "rounded-xl border border-red-500/20 bg-red-500/5",
+          ? "border-l-2 border-graph-status-error/40 bg-graph-status-error/[0.1]"
+          : "rounded-xl border border-graph-status-error/20 bg-graph-status-error/[0.05]",
       )}
     >
       <div className="flex items-center gap-2">
-        <AlertCircle className="size-4 text-red-400" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-red-400">
+        <AlertCircle className="size-4 text-graph-status-error" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-graph-status-error">
           Error
         </span>
         <span className="ml-auto">
           <CopyButton
             text={content}
-            className="text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
+            className="text-graph-status-error/72 hover:bg-graph-status-error/[0.1] hover:text-graph-status-error"
             iconClassName="text-current"
-            copiedClassName="text-emerald-400"
+            copiedClassName="text-graph-status-error"
           />
         </span>
       </div>
-      <p className="select-text whitespace-pre-wrap break-words text-[13px] leading-relaxed text-red-200">
+      <p className="select-text whitespace-pre-wrap break-words text-[13px] leading-relaxed text-graph-status-error/82">
         {content}
       </p>
     </div>
@@ -1148,10 +1146,10 @@ function ActivityDisclosure({
       className={cn(
         "min-w-0 w-full transition-all duration-300",
         isWorkspace
-          ? "border-l border-white/[0.04] pl-3 py-1.5"
-          : "rounded-xl border border-white/[0.04] bg-white/[0.01] px-3 py-2",
-        tone === "thinking" && !isWorkspace && "hover:bg-white/[0.02]",
-        tone === "tool" && !isWorkspace && "hover:bg-white/[0.02]",
+          ? "border-l border-border pl-3 py-1.5"
+          : "rounded-xl border border-border bg-accent/10 px-3 py-2",
+        tone === "thinking" && !isWorkspace && "hover:bg-accent/20",
+        tone === "tool" && !isWorkspace && "hover:bg-accent/20",
       )}
     >
       <button
@@ -1159,26 +1157,26 @@ function ActivityDisclosure({
         onClick={() => setOpen((current) => !current)}
         className="flex w-full items-center gap-2 text-left"
       >
-        <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-white/50">
+        <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-muted-foreground">
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-white/70">
+          <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </span>
         </span>
         {streaming ? (
           <span className="ml-auto inline-flex size-5 items-center justify-center">
             <span className="relative flex size-2.5 items-center justify-center">
-              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-white/30" />
-              <span className="relative inline-flex size-2 rounded-full bg-white/80" />
+              <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-ring/30" />
+              <span className="relative inline-flex size-2 rounded-full bg-ring/82" />
             </span>
             <span className="sr-only">Live</span>
           </span>
         ) : null}
         <ChevronRight
           className={cn(
-            "size-3.5 shrink-0 text-white/30 transition-transform duration-200",
+            "size-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-200",
             open && "rotate-90",
           )}
         />
@@ -1251,7 +1249,7 @@ function RichContentBlock({
     return (
       <pre
         className={cn(
-          "select-text whitespace-pre-wrap break-words rounded-xl border border-white/[0.04] bg-black/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-white/80",
+          "select-text whitespace-pre-wrap break-words rounded-xl border border-border bg-background/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-foreground/80",
           preClassName,
         )}
       >
@@ -1370,7 +1368,7 @@ function PanelEmptyState({ floating }: { floating: boolean }) {
         <Sparkles
           className={cn(
             "mx-auto size-5",
-            floating ? "text-white/72" : "text-muted-foreground",
+            floating ? "text-foreground/72" : "text-muted-foreground",
           )}
         />
         <p className="text-sm text-muted-foreground">

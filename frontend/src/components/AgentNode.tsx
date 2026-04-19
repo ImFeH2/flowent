@@ -3,13 +3,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { motion } from "motion/react";
 import { useRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
-import {
-  getNodeIconStyle,
-  nodeTypeIcon,
-  stateBorder,
-  stateColor,
-  stateRing,
-} from "@/lib/constants";
+import { nodeTypeIcon, stateColor, stateRing } from "@/lib/constants";
 import type { AgentState, NodeType } from "@/types";
 
 interface AgentNodeData {
@@ -45,6 +39,26 @@ const connectionHandles = [
     side: "right" as const,
   },
 ];
+
+const nodeStateBorderClass: Record<AgentState, string> = {
+  running: "border-graph-status-running/28",
+  idle: "border-graph-node-border",
+  sleeping: "border-graph-status-sleeping/26",
+  initializing: "border-border border-dashed",
+  error: "border-graph-status-error/28 border-double",
+  terminated: "border-border/70",
+};
+
+function getNodeIconClass(nodeType: NodeType, isLeader = false): string {
+  if (nodeType === "assistant") {
+    return "rounded-sm border-graph-node-border bg-accent/60 text-foreground";
+  }
+
+  return cn(
+    "rounded-sm border-graph-node-border bg-surface-3",
+    isLeader ? "text-primary" : "text-foreground/80",
+  );
+}
 
 export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
   const {
@@ -92,7 +106,7 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
 
   const baseBorder = isToolActive
     ? "border-graph-attention/70"
-    : stateBorder[state];
+    : nodeStateBorderClass[state];
 
   const borderClass = selected
     ? "ring-1 ring-graph-selection/25 border-graph-selection/80"
@@ -101,7 +115,7 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
     connectionState === "source"
       ? "ring-2 ring-graph-selection/35 border-graph-selection/90"
       : connectionState === "valid-target"
-        ? "border-graph-selection/55 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]"
+        ? "border-graph-selection/55 shadow-[0_0_0_1px_var(--graph-glow)]"
         : connectionState === "invalid-target"
           ? "opacity-45"
           : "";
@@ -109,12 +123,12 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
     showConnectionEntryHint || connectionState === "source";
   const connectionEntryClass =
     connectionState === "source"
-      ? "border-graph-selection/75 bg-white/[0.14] shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_0_24px_rgba(255,255,255,0.18)]"
+      ? "border-graph-selection/75 bg-graph-selection/14 shadow-[0_0_0_1px_var(--graph-glow),0_0_24px_var(--graph-glow)]"
       : connectionState === "valid-target"
-        ? "border-white/26 bg-white/[0.1] shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_0_18px_rgba(255,255,255,0.14)]"
+        ? "border-graph-selection/45 bg-graph-selection/10 shadow-[0_0_0_1px_var(--graph-glow),0_0_18px_var(--graph-glow)]"
         : connectionState === "invalid-target"
-          ? "border-white/8 bg-white/[0.02]"
-          : "border-white/14 bg-white/[0.04]";
+          ? "border-graph-node-border bg-graph-node-bg/50"
+          : "border-graph-node-border bg-graph-node-bg/72";
 
   return (
     <motion.div
@@ -136,7 +150,7 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
       onMouseLeave={resetMouseEffect}
       className={cn(
         "relative isolate flex h-14 w-max min-w-[100px] max-w-[300px] items-center gap-2 overflow-visible rounded-[10px] border px-2.5 py-2.5",
-        "shadow-[0_10px_24px_rgba(0,0,0,0.24)]",
+        "shadow-[0_10px_24px_var(--shell-scrim)]",
         "bg-graph-node-bg",
         "transition-[border-color] duration-300",
         leaving && "pointer-events-none",
@@ -196,7 +210,7 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
       <div
         className={cn(
           "relative z-10 flex size-8 shrink-0 items-center justify-center border",
-          getNodeIconStyle(node_type, is_leader),
+          getNodeIconClass(node_type, is_leader),
         )}
       >
         <Icon className="size-4.5" />

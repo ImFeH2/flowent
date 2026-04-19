@@ -139,7 +139,7 @@ export const AgentEdge = memo(function AgentEdge(props: EdgeProps) {
           <motion.path
             d={edgePath}
             fill="none"
-            stroke="#ffffff"
+            stroke="var(--graph-attention)"
             strokeWidth="2.5"
             strokeLinecap="round"
             filter="url(#agent-graph-edge-glow)"

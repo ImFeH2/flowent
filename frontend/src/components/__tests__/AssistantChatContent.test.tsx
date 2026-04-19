@@ -322,9 +322,9 @@ describe("AssistantChatMessages", () => {
         ?.parentElement?.parentElement;
     expect(workspaceBubble).not.toBeNull();
     expect(workspaceBubble).toHaveClass(
-      "bg-white/[0.1]",
-      "text-white",
-      "border-white/8",
+      "bg-accent/80",
+      "text-accent-foreground",
+      "border-border",
     );
 
     rerender(
@@ -341,9 +341,9 @@ describe("AssistantChatMessages", () => {
         ?.parentElement?.parentElement;
     expect(panelBubble).not.toBeNull();
     expect(panelBubble).toHaveClass(
-      "bg-white/[0.08]",
-      "text-white",
-      "border-white/10",
+      "bg-accent/65",
+      "text-accent-foreground",
+      "border-border",
     );
   });
 
@@ -795,10 +795,8 @@ describe("AssistantChatComposer", () => {
 
     expect(composerShell).not.toBeNull();
     expect(composerShell).toContainElement(sendButton);
-    expect(composerShell?.className).toContain("border-white/14");
-    expect(composerShell?.className).toContain(
-      "shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_14px_30px_-22px_rgba(0,0,0,0.82),0_8px_16px_-14px_rgba(255,255,255,0.06)]",
-    );
+    expect(composerShell?.className).toContain("border-border");
+    expect(composerShell?.className).toContain("shadow-xl");
 
     const originalGetComputedStyle = window.getComputedStyle;
     const getComputedStyleSpy = vi
@@ -876,7 +874,7 @@ describe("AssistantChatComposer", () => {
 
     const stopButton = screen.getByRole("button", { name: "Stop assistant" });
     expect(stopButton).toHaveTextContent("Stop");
-    expect(stopButton.className).toContain("bg-red-500/20");
+    expect(stopButton.className).toContain("bg-destructive/18");
 
     fireEvent.click(stopButton);
 

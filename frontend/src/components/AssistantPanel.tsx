@@ -44,8 +44,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
       className={cn(
         "relative flex h-full flex-col",
         isFloating
-          ? "overflow-hidden rounded-[1.25rem] border border-white/[0.08] bg-black/60 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_30px_60px_-16px_rgba(0,0,0,0.8)] backdrop-blur-3xl"
-          : "overflow-hidden border-l border-white/[0.04] bg-black/40 text-white shadow-2xl backdrop-blur-2xl",
+          ? "overflow-hidden rounded-[1.25rem] border border-border bg-surface-overlay text-foreground shadow-xl backdrop-blur-3xl"
+          : "overflow-hidden border-l border-border bg-surface-overlay/94 text-foreground shadow-xl backdrop-blur-2xl",
       )}
     >
       <div
@@ -53,7 +53,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
         className={cn(
           "pointer-events-none absolute inset-0 border transition-[opacity,border-color,box-shadow] duration-300",
           assistantActivity.running
-            ? "animate-pulse border-white/[0.12] opacity-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04),0_0_30px_-12px_rgba(255,255,255,0.1)]"
+            ? "animate-pulse border-ring/25 opacity-100 shadow-lg shadow-ring/10"
             : "border-transparent opacity-0",
         )}
       />
@@ -78,8 +78,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
           className={cn(
             "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4",
             isFloating
-              ? "bg-gradient-to-b from-transparent via-black/60 to-black/90 pt-8"
-              : "bg-gradient-to-b from-transparent via-black/80 to-black pt-10",
+              ? "bg-gradient-to-b from-transparent via-background/70 to-background/95 pt-8"
+              : "bg-gradient-to-b from-transparent via-background/80 to-background pt-10",
           )}
         >
           <AssistantChatComposer
@@ -119,11 +119,11 @@ function PanelHeader({
       className={cn(
         "relative z-10 flex items-center justify-between border-b px-4 py-3",
         floating
-          ? "border-white/[0.06] bg-white/[0.02]"
-          : "border-white/[0.04] bg-white/[0.01]",
+          ? "border-border bg-accent/20"
+          : "border-border bg-background/20",
       )}
     >
-      <span className="text-[13px] font-medium tracking-wide text-white/90">
+      <span className="text-[13px] font-medium tracking-wide text-foreground">
         Assistant
       </span>
       <StatusBadge connected={connected} />
@@ -137,8 +137,8 @@ function StatusBadge({ connected }: { connected: boolean }) {
       className={cn(
         "rounded-full border px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-wider transition-colors",
         connected
-          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-          : "border-amber-500/20 bg-amber-500/10 text-amber-400",
+          ? "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running"
+          : "border-graph-status-idle/18 bg-graph-status-idle/[0.12] text-graph-status-idle",
       )}
     >
       {connected ? "Online" : "Connecting"}

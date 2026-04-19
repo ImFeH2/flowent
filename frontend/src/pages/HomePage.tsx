@@ -24,7 +24,13 @@ import {
 } from "lucide-react";
 import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
 import { HistoryView } from "@/components/HistoryView";
-import type { AgentBlueprint, HistoryEntry, Node, Role } from "@/types";
+import type {
+  AgentBlueprint,
+  AgentState,
+  HistoryEntry,
+  Node,
+  Role,
+} from "@/types";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -44,7 +50,7 @@ import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useMeasuredHeight } from "@/hooks/useMeasuredHeight";
 import { useTabGraphHistory } from "@/hooks/useTabGraphHistory";
 import { Badge } from "@/components/ui/badge";
-import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
+import { getNodeLabel } from "@/lib/constants";
 import {
   hasCachedPanelWidth,
   usePanelDrag,
@@ -94,6 +100,29 @@ const MAX_PANEL_WIDTH = 960;
 const DEFAULT_PANEL_RATIO = 0.34;
 const DEFAULT_PANEL_WIDTH = 448;
 const COMPACT_PANEL_MIN_WIDTH = 300;
+
+const workspaceDialogInputClass =
+  "bg-background/40 text-foreground shadow-xs backdrop-blur-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
+const workspaceChoiceCardClass =
+  "rounded-[1rem] border border-border bg-card/40 px-4 py-3";
+const workspaceChoiceListClass =
+  "max-h-56 space-y-2 overflow-y-auto rounded-[1rem] border border-border bg-background/40 p-2 scrollbar-none";
+const workspaceChoiceButtonBaseClass =
+  "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors";
+const workspaceSelectionBadgeClass =
+  "rounded-md bg-accent/45 px-2 py-1 text-xs text-foreground";
+const workspaceStateBadgeClass: Record<AgentState, string> = {
+  running:
+    "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running",
+  idle: "border-graph-status-idle/12 bg-graph-status-idle/[0.06] text-graph-status-idle/78",
+  sleeping:
+    "border-graph-status-sleeping/18 bg-graph-status-sleeping/[0.12] text-graph-status-sleeping",
+  initializing:
+    "border-graph-status-initializing/16 bg-graph-status-initializing/[0.08] text-graph-status-initializing/84",
+  error:
+    "border-graph-status-error/20 bg-graph-status-error/[0.09] text-graph-status-error",
+  terminated: "border-border bg-accent/35 text-muted-foreground",
+};
 
 type WorkspaceDialogKind =
   | "create-tab"
@@ -639,12 +668,18 @@ export function HomePage() {
   return (
     <div
       ref={workspaceRef}
-      className="relative isolate flex h-full overflow-hidden rounded-[0.9rem] border border-white/6 bg-[linear-gradient(180deg,rgba(12,12,13,0.88),rgba(8,8,9,0.84))] shadow-[0_16px_42px_-34px_rgba(0,0,0,0.78)] [contain:paint]"
+      className="relative isolate flex h-full overflow-hidden rounded-[0.9rem] border border-border bg-surface-overlay shadow-xl [contain:paint]"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.018),transparent_14%,transparent_84%,rgba(255,255,255,0.01))]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{ background: "var(--shell-surface-sweep)" }}
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ background: "var(--shell-hairline)" }}
+      />
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <div className="relative z-30 border-b border-white/[0.06] bg-black/40 backdrop-blur-md">
+        <div className="relative z-30 border-b border-border bg-background/45 backdrop-blur-md">
           <div className="pointer-events-auto relative z-10 flex items-center gap-1.5 overflow-x-auto px-3 py-2.5 pr-14 scrollbar-none">
             {Array.from(tabs.values()).map((tab) => (
               <div
@@ -662,10 +697,10 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "relative flex h-9 w-full items-center rounded-[0.7rem] px-3 pr-8 text-left text-[13px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                    "relative flex h-9 w-full items-center rounded-[0.7rem] px-3 pr-8 text-left text-[13px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     activeTabId === tab.id
-                      ? "bg-white/[0.06] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.02),inset_0_-1px_0_0_rgba(255,255,255,0.9)]"
-                      : "bg-transparent text-white/50 hover:bg-white/[0.03] hover:text-white/80",
+                      ? "border border-border bg-accent/80 text-accent-foreground shadow-xs"
+                      : "bg-transparent text-muted-foreground hover:bg-accent/45 hover:text-foreground",
                   )}
                 >
                   <div className="truncate leading-tight">{tab.title}</div>
@@ -679,10 +714,10 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 transition-all duration-200 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20",
+                    "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 transition-all duration-200 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     activeTabId === tab.id
-                      ? "text-white/50 opacity-100"
-                      : "text-white/30 opacity-0 group-hover:opacity-100",
+                      ? "text-muted-foreground opacity-100"
+                      : "text-muted-foreground/60 opacity-0 group-hover:opacity-100",
                   )}
                 >
                   <X className="size-3" />
@@ -695,15 +730,21 @@ export function HomePage() {
               onClick={() => {
                 openCreateTabDialog();
               }}
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-white/40 transition-all duration-200 hover:bg-white/[0.04] hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-accent/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <Plus className="size-4" />
             </button>
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_14%_10%,rgba(255,255,255,0.03),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.01),transparent_22%)]" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-[linear-gradient(90deg,transparent,rgba(8,8,9,0.14))]" />
+        <div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{
+            background:
+              "radial-gradient(circle at 14% 10%, var(--shell-spotlight-primary), transparent 24%), linear-gradient(180deg, color-mix(in srgb, var(--foreground) 1%, transparent), transparent 22%)",
+          }}
+        />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background/28 to-transparent" />
 
         <div className="relative flex-1">
           <AgentGraph
@@ -743,7 +784,7 @@ export function HomePage() {
           <div className="pointer-events-none absolute inset-x-3 bottom-4 z-40 flex justify-center">
             <div
               data-testid="workspace-toolbar"
-              className="pointer-events-auto inline-flex max-w-full items-center overflow-x-auto rounded-[14px] border border-white/10 bg-[rgba(12,12,13,0.76)] p-0.5 shadow-[0_12px_28px_-20px_rgba(0,0,0,0.72)] backdrop-blur-md scrollbar-none"
+              className="pointer-events-auto inline-flex max-w-full items-center overflow-x-auto rounded-[14px] border border-border bg-surface-overlay/92 p-0.5 shadow-xl backdrop-blur-md scrollbar-none"
             >
               <ToolbarButton
                 disabled={!activeTabId || !graphHistory.canUndo(activeTabId)}
@@ -810,7 +851,7 @@ export function HomePage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.18 }}
-                className="absolute inset-0 z-10 bg-black/20 backdrop-blur-[1px]"
+                className="absolute inset-0 z-10 bg-background/40 backdrop-blur-[1px]"
                 onClick={togglePanel}
               />,
               <motion.aside
@@ -819,7 +860,7 @@ export function HomePage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 18 }}
                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-y-2.5 right-2.5 z-20 shrink-0 overflow-hidden rounded-[0.95rem] border border-white/10 bg-[linear-gradient(180deg,rgba(14,14,15,0.94),rgba(11,11,12,0.92))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
+                className="absolute inset-y-2.5 right-2.5 z-20 shrink-0 overflow-hidden rounded-[0.95rem] border border-border bg-surface-overlay shadow-xl backdrop-blur-xl"
                 style={{ width: `${resolvedPanelWidth}px` }}
               >
                 <div
@@ -827,12 +868,18 @@ export function HomePage() {
                   className={cn(
                     "pointer-events-none absolute inset-0 z-20 border transition-[opacity,border-color,box-shadow] duration-300",
                     !selectedAgent && assistantPanelRunning
-                      ? "animate-pulse border-white/12 opacity-100 shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_0_28px_-14px_rgba(255,255,255,0.12)]"
+                      ? "animate-pulse border-ring/25 opacity-100 shadow-lg shadow-ring/10"
                       : "border-transparent opacity-0",
                   )}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),transparent_14%,transparent_82%,rgba(255,255,255,0.012))]" />
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{ background: "var(--shell-surface-sweep)" }}
+                />
+                <div
+                  className="pointer-events-none absolute inset-x-0 top-0 h-px"
+                  style={{ background: "var(--shell-hairline)" }}
+                />
                 <div className="flex h-full flex-col overflow-hidden">
                   <div className="relative flex-1 overflow-hidden">
                     <motion.div
@@ -858,7 +905,7 @@ export function HomePage() {
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 10 }}
                           transition={{ duration: 0.15 }}
-                          className="absolute inset-0 flex h-full flex-col bg-[linear-gradient(180deg,rgba(18,18,19,0.58),rgba(12,12,13,0.48))]"
+                          className="absolute inset-0 flex h-full flex-col bg-background/42"
                         >
                           <AgentDetailPanel
                             agent={selectedAgent}
@@ -878,19 +925,25 @@ export function HomePage() {
               animate={{ width: resolvedPanelWidth, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="relative z-20 shrink-0 border-l border-white/6 bg-[linear-gradient(180deg,rgba(14,14,15,0.92),rgba(11,11,12,0.88))] shadow-[-12px_0_28px_-24px_rgba(0,0,0,0.72)] backdrop-blur-xl"
+              className="relative z-20 shrink-0 border-l border-border bg-surface-overlay shadow-xl backdrop-blur-xl"
             >
               <div
                 aria-hidden="true"
                 className={cn(
                   "pointer-events-none absolute inset-0 z-20 border transition-[opacity,border-color,box-shadow] duration-300",
                   !selectedAgent && assistantPanelRunning
-                    ? "animate-pulse border-white/12 opacity-100 shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_0_28px_-14px_rgba(255,255,255,0.12)]"
+                    ? "animate-pulse border-ring/25 opacity-100 shadow-lg shadow-ring/10"
                     : "border-transparent opacity-0",
                 )}
               />
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.026),transparent_14%,transparent_82%,rgba(255,255,255,0.012))]" />
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{ background: "var(--shell-surface-sweep)" }}
+              />
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 h-px"
+                style={{ background: "var(--shell-hairline)" }}
+              />
               <PanelResizer
                 position="left"
                 isDragging={isDragging}
@@ -924,7 +977,7 @@ export function HomePage() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 10 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute inset-0 flex h-full flex-col bg-[linear-gradient(180deg,rgba(18,18,19,0.58),rgba(12,12,13,0.48))]"
+                        className="absolute inset-0 flex h-full flex-col bg-background/42"
                       >
                         <AgentDetailPanel
                           agent={selectedAgent}
@@ -977,7 +1030,7 @@ export function HomePage() {
             value={createTabTitle}
             onChange={(event) => setCreateTabTitle(event.target.value)}
             placeholder="Release checklist"
-            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
           />
         </WorkspaceDialogField>
         <WorkspaceDialogField label="Goal" hint="Optional">
@@ -986,7 +1039,10 @@ export function HomePage() {
             aria-label="Tab goal"
             onChange={(event) => setCreateTabGoal(event.target.value)}
             placeholder="Summarize the task or outcome this workspace should drive."
-            className="min-h-[116px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            className={cn(
+              "min-h-[116px] rounded-[1rem]",
+              workspaceDialogInputClass,
+            )}
           />
         </WorkspaceDialogField>
         <WorkspaceDialogField label="Blueprint" hint="Optional">
@@ -998,47 +1054,47 @@ export function HomePage() {
                 setCreateTabBlueprintQuery(event.target.value)
               }
               placeholder="Search blueprints"
-              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+              className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
             />
             {selectedCreateTabBlueprint ? (
-              <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] px-4 py-3">
-                <div className="text-[13px] font-medium text-white">
+              <div className={workspaceChoiceCardClass}>
+                <div className="text-[13px] font-medium text-foreground">
                   {selectedCreateTabBlueprint.name}
                 </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                   {selectedCreateTabBlueprint.description || "No description"}
                 </p>
-                <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-white/35">
+                <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
                   {selectedCreateTabBlueprint.node_count} nodes ·{" "}
                   {selectedCreateTabBlueprint.edge_count} edges
                 </p>
               </div>
             ) : null}
-            <div className="max-h-56 space-y-2 overflow-y-auto rounded-[1rem] border border-white/10 bg-black/14 p-2 scrollbar-none">
+            <div className={workspaceChoiceListClass}>
               <button
                 type="button"
                 onClick={() => setCreateTabBlueprintId("")}
                 className={cn(
-                  "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors",
+                  workspaceChoiceButtonBaseClass,
                   !createTabBlueprintId
-                    ? "border-white/20 bg-white/[0.06]"
-                    : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                    ? "border-border bg-accent/70"
+                    : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
                 )}
               >
-                <div className="text-[13px] font-medium text-white">
+                <div className="text-[13px] font-medium text-foreground">
                   Start blank
                 </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                   Create a tab with only its bound Leader. Permissions do not
                   inherit from a blueprint.
                 </p>
               </button>
               {loadingBlueprints ? (
-                <p className="px-2 py-3 text-[12px] text-white/40">
+                <p className="px-2 py-3 text-[12px] text-muted-foreground">
                   Loading blueprints...
                 </p>
               ) : filteredCreateTabBlueprints.length === 0 ? (
-                <p className="px-2 py-3 text-[12px] text-white/40">
+                <p className="px-2 py-3 text-[12px] text-muted-foreground">
                   No blueprints match your search.
                 </p>
               ) : (
@@ -1048,24 +1104,24 @@ export function HomePage() {
                     type="button"
                     onClick={() => setCreateTabBlueprintId(blueprint.id)}
                     className={cn(
-                      "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors",
+                      workspaceChoiceButtonBaseClass,
                       createTabBlueprintId === blueprint.id
-                        ? "border-white/20 bg-white/[0.06]"
-                        : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                        ? "border-border bg-accent/70"
+                        : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[13px] font-medium text-white">
+                      <div className="text-[13px] font-medium text-foreground">
                         {blueprint.name}
                       </div>
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/35">
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">
                         v{blueprint.version}
                       </span>
                     </div>
-                    <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                       {blueprint.description || "No description"}
                     </p>
-                    <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-white/35">
+                    <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
                       {blueprint.node_count} nodes · {blueprint.edge_count}{" "}
                       edges
                     </p>
@@ -1090,15 +1146,15 @@ export function HomePage() {
             aria-checked={createTabAllowNetwork}
             onClick={() => setCreateTabAllowNetwork(!createTabAllowNetwork)}
             className={cn(
-              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 focus-visible:ring-offset-2",
-              createTabAllowNetwork ? "bg-white" : "bg-white/20",
+              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              createTabAllowNetwork ? "bg-primary" : "bg-muted/80",
             )}
           >
             <span className="sr-only">Network Access</span>
             <span
               aria-hidden="true"
               className={cn(
-                "pointer-events-none inline-block size-4 transform rounded-full bg-black shadow ring-0 transition duration-200 ease-in-out",
+                "pointer-events-none inline-block size-4 transform rounded-full bg-background shadow-xs ring-0 transition duration-200 ease-in-out",
                 createTabAllowNetwork ? "translate-x-4" : "translate-x-0",
               )}
             />
@@ -1113,7 +1169,10 @@ export function HomePage() {
             aria-label="Write directories"
             onChange={(event) => setCreateTabWriteDirs(event.target.value)}
             placeholder="/workspace/output&#10;/workspace/cache"
-            className="min-h-[80px] rounded-[1rem] border-white/10 bg-black/14 font-mono text-[13px] text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            className={cn(
+              "min-h-[80px] rounded-[1rem] font-mono text-[13px]",
+              workspaceDialogInputClass,
+            )}
           />
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>
@@ -1159,7 +1218,7 @@ export function HomePage() {
             value={saveBlueprintName}
             onChange={(event) => setSaveBlueprintName(event.target.value)}
             placeholder="Review Pipeline"
-            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
           />
         </WorkspaceDialogField>
         <WorkspaceDialogField label="Description" hint="Optional">
@@ -1170,7 +1229,10 @@ export function HomePage() {
               setSaveBlueprintDescription(event.target.value)
             }
             placeholder="Describe the reusable collaboration architecture."
-            className="min-h-[116px] rounded-[1rem] border-white/10 bg-black/14 text-white placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            className={cn(
+              "min-h-[116px] rounded-[1rem]",
+              workspaceDialogInputClass,
+            )}
           />
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>
@@ -1207,7 +1269,7 @@ export function HomePage() {
       >
         <WorkspaceDialogMeta>
           Adding a regular node to{" "}
-          <span className="font-semibold text-white">
+          <span className="font-semibold text-foreground">
             {activeTab?.title ?? "No active tab"}
           </span>
         </WorkspaceDialogMeta>
@@ -1222,25 +1284,25 @@ export function HomePage() {
               value={createAgentRoleQuery}
               onChange={(event) => setCreateAgentRoleQuery(event.target.value)}
               placeholder="Search roles"
-              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+              className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
             />
             {selectedCreateAgentRole ? (
-              <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] px-4 py-3">
-                <div className="text-[13px] font-medium text-white">
+              <div className={workspaceChoiceCardClass}>
+                <div className="text-[13px] font-medium text-foreground">
                   {selectedCreateAgentRole.name}
                 </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                   {selectedCreateAgentRole.description}
                 </p>
               </div>
             ) : null}
-            <div className="max-h-56 space-y-2 overflow-y-auto rounded-[1rem] border border-white/10 bg-black/14 p-2 scrollbar-none">
+            <div className={workspaceChoiceListClass}>
               {loadingRoles ? (
-                <p className="px-2 py-3 text-[12px] text-white/40">
+                <p className="px-2 py-3 text-[12px] text-muted-foreground">
                   Loading roles...
                 </p>
               ) : filteredCreateAgentRoles.length === 0 ? (
-                <p className="px-2 py-3 text-[12px] text-white/40">
+                <p className="px-2 py-3 text-[12px] text-muted-foreground">
                   No roles match your search.
                 </p>
               ) : (
@@ -1250,16 +1312,16 @@ export function HomePage() {
                     type="button"
                     onClick={() => setCreateAgentRoleName(role.name)}
                     className={cn(
-                      "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors",
+                      workspaceChoiceButtonBaseClass,
                       createAgentRoleName === role.name
-                        ? "border-white/20 bg-white/[0.06]"
-                        : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.03]",
+                        ? "border-border bg-accent/70"
+                        : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
                     )}
                   >
-                    <div className="text-[13px] font-medium text-white">
+                    <div className="text-[13px] font-medium text-foreground">
                       {role.name}
                     </div>
-                    <p className="mt-1 text-[12px] leading-relaxed text-white/50">
+                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                       {role.description}
                     </p>
                   </button>
@@ -1274,7 +1336,7 @@ export function HomePage() {
             aria-label="Agent display name"
             onChange={(event) => setCreateAgentName(event.target.value)}
             placeholder="Docs Worker"
-            className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] placeholder:text-white/28 focus-visible:border-white/24 focus-visible:ring-white/8"
+            className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
           />
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>
@@ -1316,7 +1378,7 @@ export function HomePage() {
           {activeTab ? (
             <>
               Tab{" "}
-              <span className="font-semibold text-white">
+              <span className="font-semibold text-foreground">
                 {activeTab.title}
               </span>{" "}
               · {tabAgentOptions.length} agents available
@@ -1339,11 +1401,14 @@ export function HomePage() {
           >
             <SelectTrigger
               aria-label="Agent A"
-              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
+              className={cn(
+                "h-11 rounded-[1rem] data-[placeholder]:text-muted-foreground",
+                workspaceDialogInputClass,
+              )}
             >
               <SelectValue placeholder="Choose first agent" />
             </SelectTrigger>
-            <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
+            <SelectContent className="rounded-[1rem] border-border bg-popover text-popover-foreground backdrop-blur-2xl">
               {tabAgentOptions.map((agent) => (
                 <SelectItem key={agent.id} value={agent.id}>
                   {agent.label}
@@ -1356,11 +1421,14 @@ export function HomePage() {
           <Select value={connectTargetId} onValueChange={setConnectTargetId}>
             <SelectTrigger
               aria-label="Agent B"
-              className="h-11 rounded-[1rem] border-white/10 bg-black/14 text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] focus-visible:border-white/24 focus-visible:ring-white/8 data-[placeholder]:text-white/28"
+              className={cn(
+                "h-11 rounded-[1rem] data-[placeholder]:text-muted-foreground",
+                workspaceDialogInputClass,
+              )}
             >
               <SelectValue placeholder="Choose second agent" />
             </SelectTrigger>
-            <SelectContent className="rounded-[1rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,18,19,0.98),rgba(11,11,12,0.96))] text-white backdrop-blur-2xl">
+            <SelectContent className="rounded-[1rem] border-border bg-popover text-popover-foreground backdrop-blur-2xl">
               {tabAgentOptions
                 .filter((agent) => agent.id !== connectSourceId)
                 .map((agent) => (
@@ -1381,26 +1449,26 @@ export function HomePage() {
           }
         }}
       >
-        <AlertDialogContent className="max-w-[30rem] rounded-[1.35rem] border border-white/10 bg-[linear-gradient(180deg,rgba(20,20,21,0.98),rgba(13,13,14,0.96))] shadow-[0_30px_90px_-42px_rgba(0,0,0,0.95),0_16px_38px_-28px_rgba(255,255,255,0.08)] backdrop-blur-2xl">
+        <AlertDialogContent className="max-w-[30rem] rounded-[1.35rem] border-border bg-surface-overlay shadow-xl backdrop-blur-2xl">
           <AlertDialogHeader className="gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl border border-white/14 bg-white/[0.05] text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05),0_16px_30px_-22px_rgba(255,255,255,0.12)]">
+              <div className="flex size-11 items-center justify-center rounded-2xl border border-border bg-accent/45 text-foreground shadow-xs">
                 <Trash2 className="size-5" />
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-white/38">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
                   Destructive Action
                 </p>
-                <AlertDialogTitle className="mt-1 text-white">
+                <AlertDialogTitle className="mt-1 text-foreground">
                   Delete tab?
                 </AlertDialogTitle>
               </div>
             </div>
-            <AlertDialogDescription className="text-white/62">
+            <AlertDialogDescription className="text-muted-foreground">
               {deleteTabTarget ? (
                 <>
                   Remove{" "}
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-foreground">
                     {deleteTabTarget.title}
                   </span>{" "}
                   and clean up its persisted agent network.
@@ -1450,8 +1518,8 @@ function ToolbarButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-white/68 transition-[background-color,border-color,color] duration-150 hover:border-white/8 hover:bg-white/[0.04] hover:text-white/88 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:cursor-not-allowed disabled:border-transparent disabled:text-white/28 disabled:hover:bg-transparent",
-        active && "border-white/12 bg-white/[0.06] text-white",
+        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-muted-foreground transition-[background-color,border-color,color] duration-150 hover:border-border hover:bg-accent/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:border-transparent disabled:text-muted-foreground/50 disabled:hover:bg-transparent",
+        active && "border-border bg-accent/70 text-foreground",
       )}
     >
       {children}
@@ -1460,7 +1528,7 @@ function ToolbarButton({
 }
 
 function ToolbarDivider() {
-  return <div aria-hidden="true" className="h-4 w-px shrink-0 bg-white/8" />;
+  return <div aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />;
 }
 
 function BadgeChip({
@@ -1473,10 +1541,8 @@ function BadgeChip({
   return (
     <div
       className={cn(
-        "pointer-events-auto relative isolate flex items-center gap-1.5 rounded-full border border-white/8 bg-[rgba(12,12,13,0.7)] px-2.5 py-1 text-[11px] font-medium text-white/74 backdrop-blur-sm",
-        tone === "primary"
-          ? "border-white/14 bg-white/[0.05] text-white/88"
-          : "",
+        "pointer-events-auto relative isolate flex items-center gap-1.5 rounded-full border border-border bg-surface-overlay/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground backdrop-blur-sm",
+        tone === "primary" ? "border-border bg-accent/60 text-foreground" : "",
       )}
     >
       {children}
@@ -1554,7 +1620,7 @@ function AgentDetailPanel({
 
   return (
     <>
-      <div className="flex items-center justify-between border-b border-white/6 px-3.5 py-2.5">
+      <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">
         <div className="flex items-center gap-3">
           <div className="flex size-7 items-center justify-center rounded-md bg-primary/8">
             {agent.node_type === "assistant" ? (
@@ -1566,11 +1632,11 @@ function AgentDetailPanel({
           <div className="min-w-0 flex flex-wrap items-center gap-2">
             <p className="text-[13px] font-semibold">{label}</p>
             {detailIsLeader ? (
-              <span className="rounded-full border border-amber-300/24 bg-amber-300/[0.08] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-amber-100">
+              <span className="rounded-full border border-accent bg-accent/45 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-accent-foreground">
                 Leader
               </span>
             ) : null}
-            <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] text-muted-foreground/78">
+            <span className="rounded-full border border-border bg-accent/35 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/78">
               {agent.id.slice(0, 8)}
             </span>
           </div>
@@ -1604,7 +1670,7 @@ function AgentDetailPanel({
 
       <div className="flex-1 overflow-y-auto p-3.5">
         <div className="space-y-3.5">
-          <div className="grid gap-3.5 border-b border-white/6 pb-3.5 sm:grid-cols-3">
+          <div className="grid gap-3.5 border-b border-border pb-3.5 sm:grid-cols-3">
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Status
@@ -1612,14 +1678,14 @@ function AgentDetailPanel({
               <div className="mt-2">
                 <Badge
                   variant="outline"
-                  className={stateBadgeColor[detailState]}
+                  className={workspaceStateBadgeClass[detailState]}
                 >
                   {detailState.toUpperCase()}
                 </Badge>
               </div>
             </div>
 
-            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-3.5">
+            <div className="min-w-0 sm:border-l sm:border-border sm:pl-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Contacts
               </p>
@@ -1628,7 +1694,7 @@ function AgentDetailPanel({
               </p>
             </div>
 
-            <div className="min-w-0 sm:border-l sm:border-white/6 sm:pl-3.5">
+            <div className="min-w-0 sm:border-l sm:border-border sm:pl-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Task Tab
               </p>
@@ -1694,13 +1760,13 @@ function AgentDetailPanel({
                   .map((entry) => (
                     <div
                       key={`${entry.timestamp}-${entry.state ?? "unknown"}`}
-                      className="flex items-start justify-between gap-3 rounded-md border border-white/8 bg-white/[0.02] px-3 py-2"
+                      className="flex items-start justify-between gap-3 rounded-md border border-border bg-accent/25 px-3 py-2"
                     >
                       <div className="min-w-0">
                         <Badge
                           variant="outline"
                           className={
-                            stateBadgeColor[entry.state ?? detailState]
+                            workspaceStateBadgeClass[entry.state ?? detailState]
                           }
                         >
                           {(entry.state ?? detailState).toUpperCase()}
@@ -1730,7 +1796,7 @@ function AgentDetailPanel({
                 {contactItems.map((contact) => (
                   <span
                     key={contact.id}
-                    className="select-text rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
+                    className={cn(workspaceSelectionBadgeClass, "select-text")}
                   >
                     {contact.label}
                   </span>
@@ -1747,7 +1813,7 @@ function AgentDetailPanel({
                 {connectionItems.map((connection) => (
                   <span
                     key={connection.id}
-                    className="select-text rounded-md bg-white/[0.04] px-2 py-1 text-xs text-foreground"
+                    className={cn(workspaceSelectionBadgeClass, "select-text")}
                   >
                     {connection.label}
                   </span>
@@ -1766,7 +1832,10 @@ function AgentDetailPanel({
                 {detailTools.map((tool) => (
                   <span
                     key={tool}
-                    className="select-text rounded-md bg-white/[0.04] px-2 py-1 text-xs font-mono text-foreground"
+                    className={cn(
+                      workspaceSelectionBadgeClass,
+                      "select-text font-mono",
+                    )}
                   >
                     {tool}
                   </span>
@@ -1799,7 +1868,10 @@ function AgentDetailPanel({
                     {detailWriteDirs.map((path) => (
                       <p
                         key={path}
-                        className="select-text rounded-md bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-foreground"
+                        className={cn(
+                          workspaceSelectionBadgeClass,
+                          "select-text font-mono text-[11px]",
+                        )}
                       >
                         {path}
                       </p>
@@ -1820,7 +1892,7 @@ function AgentDetailPanel({
                     key={todo.text}
                     className="flex min-w-0 items-center gap-2 text-sm text-foreground"
                   >
-                    <span className="size-2 rounded-full bg-white/40" />
+                    <span className="size-2 rounded-full bg-border" />
                     <span className="min-w-0 break-words [overflow-wrap:anywhere]">
                       {todo.text}
                     </span>
@@ -1830,7 +1902,7 @@ function AgentDetailPanel({
             </div>
           </DetailSection>
 
-          <div className="border-t border-white/6 pt-4">
+          <div className="border-t border-border pt-4">
             <div className="px-0 pb-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 History
@@ -1905,11 +1977,11 @@ function AssistantChatPanel({
 
   return (
     <div className="relative flex h-full flex-col">
-      <div className="flex items-center gap-2.5 border-b border-white/6 px-3.5 py-2.5">
+      <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-2.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <p className="text-[13px] font-semibold">Assistant</p>
           {assistantRoleName ? (
-            <span className="rounded-full border border-white/8 bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+            <span className="rounded-full border border-border bg-accent/35 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
               {assistantRoleName}
             </span>
           ) : null}
@@ -1958,7 +2030,7 @@ function AssistantChatPanel({
           style={{
             paddingBottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
           }}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-[linear-gradient(180deg,transparent_0%,rgba(8,8,9,0.12)_18%,rgba(8,8,9,0.72)_60%,rgba(8,8,9,0.94)_100%)] px-2.5 pt-8"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-b from-transparent via-background/70 to-background/95 px-2.5 pt-8"
         >
           <AssistantChatComposer
             busy={assistantActivity.running}
@@ -2014,7 +2086,7 @@ function PanelToggleButton({
       title={title}
       aria-label={title}
       className={cn(
-        "pointer-events-auto relative isolate flex size-9 items-center justify-center rounded-md border border-white/8 bg-black/[0.16] text-muted-foreground backdrop-blur-lg transition-[background-color,color] duration-150 hover:bg-white/[0.05] hover:text-foreground [contain:paint]",
+        "pointer-events-auto relative isolate flex size-9 items-center justify-center rounded-md border border-border bg-surface-overlay/80 text-muted-foreground backdrop-blur-lg transition-[background-color,color] duration-150 hover:bg-accent/60 hover:text-foreground [contain:paint]",
         className,
       )}
     >
@@ -2040,7 +2112,7 @@ function PanelActionButton({
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-white/[0.045] hover:text-foreground"
+      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent/45 hover:text-foreground"
     >
       {children}
     </button>
@@ -2055,7 +2127,7 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-white/6 pt-3.5">
+    <section className="border-t border-border pt-3.5">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </p>

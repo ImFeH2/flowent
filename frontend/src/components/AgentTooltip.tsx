@@ -2,8 +2,21 @@ import type { CSSProperties, RefObject } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import { ViewportPortal } from "@/components/ViewportPortal";
-import { getNodeLabel, stateBadgeColor } from "@/lib/constants";
-import type { Node } from "@/types";
+import { getNodeLabel } from "@/lib/constants";
+import type { AgentState, Node } from "@/types";
+
+const tooltipStateBadgeClass: Record<AgentState, string> = {
+  running:
+    "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running",
+  idle: "border-graph-status-idle/12 bg-graph-status-idle/[0.06] text-graph-status-idle/78",
+  sleeping:
+    "border-graph-status-sleeping/18 bg-graph-status-sleeping/[0.12] text-graph-status-sleeping",
+  initializing:
+    "border-graph-status-initializing/16 bg-graph-status-initializing/[0.08] text-graph-status-initializing/84",
+  error:
+    "border-graph-status-error/20 bg-graph-status-error/[0.09] text-graph-status-error",
+  terminated: "border-border bg-accent/35 text-muted-foreground",
+};
 
 interface AgentTooltipProps {
   agent: Node | null;
@@ -46,7 +59,7 @@ export function AgentTooltip({
               <span className="text-xs font-medium">{label}</span>
               <Badge
                 variant="outline"
-                className={`text-[10px] ${stateBadgeColor[agent.state]}`}
+                className={`text-[10px] ${tooltipStateBadgeClass[agent.state]}`}
               >
                 {agent.state.toUpperCase()}
               </Badge>
@@ -58,7 +71,7 @@ export function AgentTooltip({
               {agent.is_leader ? (
                 <Badge
                   variant="outline"
-                  className="border-amber-300/24 bg-amber-300/[0.08] text-[10px] text-amber-100"
+                  className="border-accent bg-accent/45 text-[10px] text-accent-foreground"
                 >
                   Leader
                 </Badge>

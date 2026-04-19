@@ -614,7 +614,7 @@ function ImageViewerOverlay({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-[120] bg-black/92 backdrop-blur-md"
+      className="fixed inset-0 z-[120] bg-background/92 backdrop-blur-md"
       role="dialog"
     >
       <div
@@ -629,7 +629,7 @@ function ImageViewerOverlay({
           data-pan-exempt="true"
         >
           <div
-            className="rounded-full border border-white/10 bg-black/45 px-3 py-1 text-[11px] font-medium text-white/84 shadow-[0_22px_48px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl"
+            className="rounded-full border border-border bg-surface-overlay/88 px-3 py-1 text-[11px] font-medium text-foreground/88 shadow-xl backdrop-blur-xl"
             data-pan-exempt="true"
             data-testid="global-image-viewer-zoom"
           >
@@ -646,12 +646,14 @@ function ImageViewerOverlay({
           className="absolute bottom-4 left-1/2 z-20 w-full max-w-3xl -translate-x-1/2 px-2"
           data-pan-exempt="true"
         >
-          <div className="rounded-2xl border border-white/10 bg-black/45 px-4 py-3 text-center shadow-[0_28px_72px_-34px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-            <div className="text-sm font-medium text-white/92">
+          <div className="rounded-2xl border border-border bg-surface-overlay/88 px-4 py-3 text-center shadow-xl backdrop-blur-xl">
+            <div className="text-sm font-medium text-foreground">
               {imageLabel}
             </div>
             {payload.meta ? (
-              <div className="mt-1 text-xs text-white/55">{payload.meta}</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {payload.meta}
+              </div>
             ) : null}
           </div>
         </div>
@@ -678,7 +680,7 @@ function ImageViewerOverlay({
               <img
                 alt={imageLabel}
                 className={cn(
-                  "block h-full w-full select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)]",
+                  "block h-full w-full select-none object-contain shadow-[0_28px_80px_-32px_var(--shell-scrim)]",
                   dragging ? "cursor-grabbing" : "cursor-grab",
                 )}
                 data-testid="global-image-viewer-image"
@@ -691,7 +693,7 @@ function ImageViewerOverlay({
         ) : (
           <img
             alt={imageLabel}
-            className="max-h-[78vh] max-w-[88vw] select-none object-contain shadow-[0_28px_80px_-32px_rgba(0,0,0,0.9)]"
+            className="max-h-[78vh] max-w-[88vw] select-none object-contain shadow-[0_28px_80px_-32px_var(--shell-scrim)]"
             data-testid="global-image-viewer-image"
             draggable={false}
             ref={imageRef}
@@ -715,7 +717,7 @@ function ViewerControlButton({
   return (
     <button
       aria-label={ariaLabel}
-      className="flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/8 text-white/82 shadow-[0_22px_48px_-26px_rgba(0,0,0,0.9)] backdrop-blur-xl transition-colors hover:bg-white/14 hover:text-white"
+      className="flex size-10 items-center justify-center rounded-full border border-border bg-surface-overlay/88 text-foreground/82 shadow-xl backdrop-blur-xl transition-colors hover:bg-accent/60 hover:text-foreground"
       data-pan-exempt="true"
       onClick={onClick}
       type="button"

@@ -46,14 +46,14 @@ export function ImageAssetPreview({
           })
         }
         className={cn(
-          "group block w-full overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] text-left transition-colors hover:border-white/[0.16]",
+          "group block w-full overflow-hidden rounded-xl border border-border bg-accent/20 text-left transition-colors hover:bg-accent/30",
           compact ? "max-w-[240px]" : "max-w-[360px]",
         )}
       >
         <div
           style={aspectRatio ? { aspectRatio } : undefined}
           className={cn(
-            "relative overflow-hidden bg-black/30",
+            "relative overflow-hidden bg-background/45",
             compact ? "min-h-[132px]" : "min-h-[180px]",
           )}
         >
@@ -65,10 +65,10 @@ export function ImageAssetPreview({
           />
         </div>
         <div className="space-y-1 px-3 py-2.5">
-          <div className="text-[12px] font-medium text-white/88">
+          <div className="text-[12px] font-medium text-foreground">
             {alt || "Image"}
           </div>
-          <div className="text-[11px] text-white/52">{meta}</div>
+          <div className="text-[11px] text-muted-foreground">{meta}</div>
         </div>
       </button>
     </>

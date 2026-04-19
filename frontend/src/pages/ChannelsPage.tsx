@@ -10,6 +10,7 @@ import {
   updateTelegramSettings,
 } from "@/lib/api";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
   TelegramApprovedChat,
@@ -168,7 +169,7 @@ export function ChannelsPage() {
                     setTokenDirty(true);
                   }}
                   placeholder={settings.bot_token || "Enter Telegram bot token"}
-                  className="w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 pr-10 font-mono text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50"
+                  className="h-8 w-full rounded-md border border-input bg-background/50 px-3 pr-10 font-mono text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50"
                 />
                 <button
                   type="button"
@@ -222,21 +223,25 @@ export function ChannelsPage() {
                           </div>
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="xs"
                             onClick={() => void handleApprove(chat.chat_id)}
-                            className="flex h-7 items-center gap-1.5 rounded-md bg-primary px-3 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                            className="border-border bg-accent/20 text-foreground hover:bg-accent/35"
                           >
                             <Check className="size-3.5" />
                             Approve
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon-xs"
                             onClick={() => void handleReject(chat.chat_id)}
-                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="size-3.5" />
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -282,13 +287,15 @@ export function ChannelsPage() {
                             </span>
                           </div>
                         </div>
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon-xs"
                           onClick={() => void handleRevoke(chat.chat_id)}
-                          className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
+                          className="shrink-0 text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
                         >
                           <Trash2 className="size-3.5" />
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -297,15 +304,16 @@ export function ChannelsPage() {
             </section>
 
             <div className="flex justify-end border-t border-border pt-6">
-              <button
+              <Button
                 type="button"
+                size="sm"
                 onClick={() => void handleSave()}
                 disabled={saving}
-                className="flex h-9 items-center gap-2 rounded-full bg-primary px-5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="text-[13px]"
               >
                 <Save className="size-4" />
                 {saving ? "Saving..." : "Save Changes"}
-              </button>
+              </Button>
             </div>
           </SoftPanel>
         </div>

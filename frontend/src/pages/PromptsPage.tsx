@@ -11,7 +11,7 @@ const promptCharCountClass =
 const promptEditorSurfaceClass =
   "relative flex min-h-0 flex-1 rounded-xl border border-border bg-card/30 p-1";
 const promptEditorTextareaClass =
-  "min-h-0 w-full flex-1 resize-none select-text rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:bg-background/35 focus:outline-none transition-colors scrollbar-none";
+  "min-h-0 w-full flex-1 resize-none select-text rounded-md bg-transparent p-3 font-mono text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground transition-colors focus:bg-background/35 focus:outline-none scrollbar-none";
 
 export function PromptsPage() {
   const {
@@ -69,7 +69,8 @@ export function PromptsPage() {
             type="button"
             onClick={() => void handleSave()}
             disabled={saving}
-            className="h-9 rounded-full px-5 text-[13px]"
+            size="sm"
+            className="text-[13px]"
           >
             <Save className="size-4" />
             {saving ? "Saving..." : "Save Changes"}

@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { cloneModelParams } from "@/lib/modelParams";
 import { providerTypeLabel } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
@@ -44,15 +45,15 @@ const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
 ];
 
 const settingsInputClass =
-  "w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+  "h-8 w-full rounded-md border border-input bg-background/50 px-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
 const settingsMonoInputClass = `${settingsInputClass} font-mono`;
 const settingsIconButtonClass =
-  "flex size-10 items-center justify-center rounded-lg border border-border bg-accent/20 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
+  "flex size-8 items-center justify-center rounded-md border border-border bg-accent/20 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
 const settingsFieldLabelClass =
   "text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground";
 const settingsHelpTextClass =
   "text-[11px] leading-relaxed text-muted-foreground";
-const settingsSelectTriggerClass = "w-full rounded-md bg-background/50";
+const settingsSelectTriggerClass = "h-8 w-full rounded-md bg-background/50";
 
 export function SettingsPage() {
   const { requireReauth } = useAccess();
@@ -238,15 +239,16 @@ export function SettingsPage() {
                 system-wide model behavior.
               </p>
             </div>
-            <button
+            <Button
               type="button"
+              size="sm"
               onClick={() => void handleSave()}
               disabled={saving || Boolean(accessDraftError)}
-              className="flex h-9 items-center gap-2 rounded-full bg-primary px-5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="text-[13px]"
             >
               <Save className="size-4" />
               {saving ? "Saving..." : "Save Changes"}
-            </button>
+            </Button>
           </div>
           <section>
             <SectionHeader

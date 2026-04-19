@@ -235,7 +235,7 @@ const mcpMetricEyebrowClass =
 const mcpPanelClass = "bg-card/20";
 const mcpPanelTextClass = "text-[13px] text-muted-foreground";
 const mcpMetricCardClass =
-  "rounded-2xl border border-border bg-card/20 px-4 py-4";
+  "rounded-xl border border-border bg-card/20 px-4 py-4";
 const mcpCardSurfaceClass =
   "rounded-xl border border-border bg-card/20 px-4 py-3";
 const mcpReadonlyBlockClass =
@@ -249,9 +249,11 @@ const mcpDestructiveButtonClass =
 const mcpTagClass =
   "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]";
 const mcpInfoIconClass =
-  "flex size-14 items-center justify-center rounded-3xl border border-border bg-accent/20 text-muted-foreground";
+  "flex size-14 items-center justify-center rounded-xl border border-border bg-accent/20 text-muted-foreground";
 const mcpFilterPillBaseClass =
-  "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+  "inline-flex h-8 items-center rounded-full border px-3 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+const mcpLineTabBaseClass =
+  "inline-flex h-8 -mb-px items-center border-b-2 px-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
 function capabilitySummary(record: MCPServerRecord) {
   const counts = record.snapshot.capability_counts;
@@ -569,20 +571,26 @@ function FilterPill({
   active,
   label,
   onClick,
+  variant = "pill",
 }: {
   active: boolean;
   label: string;
   onClick: () => void;
+  variant?: "pill" | "tab";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        mcpFilterPillBaseClass,
-        active
-          ? "border-border bg-card/30 text-foreground"
-          : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25 hover:text-foreground",
+        variant === "pill" ? mcpFilterPillBaseClass : mcpLineTabBaseClass,
+        variant === "pill"
+          ? active
+            ? "border-border bg-card/30 text-foreground"
+            : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25 hover:text-foreground"
+          : active
+            ? "border-primary text-foreground"
+            : "border-transparent text-muted-foreground hover:text-foreground",
       )}
     >
       {label}
@@ -714,10 +722,10 @@ function ServerDialog({
               })
             }
           >
-            <SelectTrigger className="h-10 w-full rounded-md bg-background/50 text-sm text-foreground">
+            <SelectTrigger className="h-8 w-full rounded-md bg-background/50 text-sm text-foreground">
               <SelectValue placeholder="Select transport" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl bg-popover/95 text-popover-foreground backdrop-blur-xl">
+            <SelectContent className="rounded-xl bg-popover text-popover-foreground">
               <SelectItem value="stdio">stdio</SelectItem>
               <SelectItem value="streamable_http">streamable_http</SelectItem>
             </SelectContent>
@@ -1472,14 +1480,14 @@ export function McpPage() {
                 {Array.from({ length: 5 }).map((_, index) => (
                   <div
                     key={index}
-                    className="h-24 rounded-2xl border border-border bg-card/20 skeleton-shimmer"
+                    className="h-24 rounded-xl border border-border bg-card/20 skeleton-shimmer"
                   />
                 ))}
                 <p className="px-2 text-[13px] text-muted-foreground">
                   Loading MCP servers...
                 </p>
               </div>
-              <div className="rounded-2xl border border-border bg-card/20 skeleton-shimmer" />
+              <div className="rounded-xl border border-border bg-card/20 skeleton-shimmer" />
             </div>
           ) : error ? (
             <SoftPanel className="flex h-full items-center justify-center text-center text-muted-foreground">
@@ -1586,7 +1594,7 @@ export function McpPage() {
                             <div
                               key={record.config.name}
                               className={cn(
-                                "rounded-2xl border p-4 transition-colors",
+                                "rounded-xl border p-4 transition-colors",
                                 isSelected
                                   ? "border-border bg-accent/20"
                                   : "border-border bg-card/20 hover:bg-accent/20",
@@ -1823,7 +1831,7 @@ export function McpPage() {
                             </div>
                           </div>
 
-                          <div className="mt-4 flex flex-wrap gap-2">
+                          <div className="mt-4 flex flex-wrap gap-4 border-b border-border">
                             {(
                               [
                                 "overview",
@@ -1836,6 +1844,7 @@ export function McpPage() {
                                 active={detailTab === tab}
                                 label={formatSentenceCase(tab)}
                                 onClick={() => setDetailTab(tab)}
+                                variant="tab"
                               />
                             ))}
                           </div>
@@ -2090,7 +2099,7 @@ export function McpPage() {
 
                             {detailTab === "capabilities" ? (
                               <div className="space-y-4">
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-4 border-b border-border">
                                   {(
                                     [
                                       "tools",
@@ -2108,6 +2117,7 @@ export function McpPage() {
                                           : formatSentenceCase(tab)
                                       }
                                       onClick={() => setCapabilityTab(tab)}
+                                      variant="tab"
                                     />
                                   ))}
                                 </div>

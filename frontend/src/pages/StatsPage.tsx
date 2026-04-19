@@ -73,7 +73,8 @@ const SORT_OPTIONS: Array<{ value: StatsSortKey; label: string }> = [
   { value: "cache_hit_rate", label: "Cache Hit Rate" },
 ];
 
-const statsSelectTriggerClass = "rounded-xl bg-background/50 text-foreground";
+const statsSelectTriggerClass =
+  "h-8 rounded-md bg-background/50 text-foreground";
 const statsFilterLabelClass =
   "text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80";
 
@@ -153,7 +154,7 @@ function StatsLoadingState() {
       </div>
       <SoftPanel className="space-y-4">
         <div className="h-3 w-28 rounded-full skeleton-shimmer" />
-        <div className="h-[220px] rounded-2xl skeleton-shimmer" />
+        <div className="h-[220px] rounded-xl skeleton-shimmer" />
         <p className="text-sm text-muted-foreground">Loading stats...</p>
       </SoftPanel>
     </div>
@@ -163,7 +164,7 @@ function StatsLoadingState() {
 function StatsEmptyState() {
   return (
     <SoftPanel className="flex min-h-[280px] flex-col items-center justify-center text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/20 text-muted-foreground">
+      <div className="flex size-12 items-center justify-center rounded-xl border border-border bg-accent/20 text-muted-foreground">
         <ChartColumnBig className="size-5" />
       </div>
       <h2 className="mt-5 text-xl font-medium text-foreground">No stats yet</h2>
@@ -184,7 +185,7 @@ function StatsErrorState({
 }) {
   return (
     <SoftPanel className="flex min-h-[280px] flex-col items-center justify-center text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10 text-destructive">
+      <div className="flex size-12 items-center justify-center rounded-xl border border-destructive/20 bg-destructive/10 text-destructive">
         <AlertTriangle className="size-5" />
       </div>
       <h2 className="mt-5 text-xl font-medium text-foreground">
@@ -235,7 +236,7 @@ function StatsValueCard({
         </div>
         <div
           className={cn(
-            "flex size-10 items-center justify-center rounded-2xl border border-border bg-accent/20 text-muted-foreground",
+            "flex size-9 items-center justify-center rounded-lg border border-border bg-accent/20 text-muted-foreground",
             accentClassName,
           )}
         >
@@ -263,7 +264,7 @@ function StatsTrendChart({
 
   if (buckets.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-border bg-card/30 text-[13px] text-muted-foreground">
+      <div className="flex h-[220px] items-center justify-center rounded-xl border border-border bg-card/30 text-[13px] text-muted-foreground">
         No trend data in the selected range.
       </div>
     );
@@ -287,7 +288,7 @@ function StatsTrendChart({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border bg-card/30 px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card/30 px-4 py-3">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
@@ -314,7 +315,7 @@ function StatsTrendChart({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card/25 p-4">
+      <div className="rounded-xl border border-border bg-card/25 p-4">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[220px] w-full">
           {Array.from({ length: 5 }).map((_, index) => {
             const y = 20 + (chartHeight / 4) * index;
@@ -488,7 +489,7 @@ function StatsSectionTitle({
 function EventDetail({ event }: { event: StatsEvent }) {
   if (event.kind === "compact") {
     return (
-      <div className="grid gap-3 rounded-2xl border border-border bg-card/30 p-4 text-[12px] text-muted-foreground sm:grid-cols-2">
+      <div className="grid gap-3 rounded-xl border border-border bg-card/30 p-4 text-[12px] text-muted-foreground sm:grid-cols-2">
         <span>Trigger {event.compact.trigger_type}</span>
         <span>Duration {formatDuration(event.compact.duration_ms)}</span>
         <span>Result {event.compact.result}</span>
@@ -499,7 +500,7 @@ function EventDetail({ event }: { event: StatsEvent }) {
 
   const usage = event.request.normalized_usage;
   return (
-    <div className="space-y-3 rounded-2xl border border-border bg-card/30 p-4">
+    <div className="space-y-3 rounded-xl border border-border bg-card/30 p-4">
       <div className="grid gap-3 text-[12px] text-muted-foreground sm:grid-cols-3">
         <span>Duration {formatDuration(event.request.duration_ms)}</span>
         <span>Retries {formatInteger(event.request.retry_count)}</span>
@@ -529,7 +530,7 @@ function EventDetail({ event }: { event: StatsEvent }) {
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Normalized Usage
           </p>
-          <pre className="max-h-[240px] overflow-auto rounded-2xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
+          <pre className="max-h-[240px] overflow-auto rounded-xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
             {JSON.stringify(event.request.normalized_usage ?? null, null, 2)}
           </pre>
         </div>
@@ -537,7 +538,7 @@ function EventDetail({ event }: { event: StatsEvent }) {
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Raw Usage
           </p>
-          <pre className="max-h-[240px] overflow-auto rounded-2xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
+          <pre className="max-h-[240px] overflow-auto rounded-xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
             {JSON.stringify(event.request.raw_usage ?? null, null, 2)}
           </pre>
         </div>
@@ -712,7 +713,7 @@ export function StatsPage() {
             description:
               "Normalized cache creation or write tokens when known.",
             icon: Server,
-            accentClassName: "text-cyan-200",
+            accentClassName: "text-primary",
           },
           {
             title: "Cache Hit Rate",
@@ -720,7 +721,7 @@ export function StatsPage() {
             description:
               "Derived only when both cache-hit tokens and a reliable input denominator are known.",
             icon: Gauge,
-            accentClassName: "text-teal-200",
+            accentClassName: "text-graph-status-running",
           },
         ]
       : []),
@@ -895,7 +896,7 @@ export function StatsPage() {
                 <SoftPanel className="border-destructive/12 bg-destructive/6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex size-9 items-center justify-center rounded-2xl border border-destructive/16 bg-destructive/10 text-destructive">
+                      <div className="flex size-9 items-center justify-center rounded-xl border border-destructive/16 bg-destructive/10 text-destructive">
                         <AlertTriangle className="size-4" />
                       </div>
                       <div>
@@ -968,14 +969,14 @@ export function StatsPage() {
                   />
                   <div className="space-y-4">
                     {providerGroups.length === 0 ? (
-                      <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
+                      <div className="rounded-xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                         No request data matches the current scope.
                       </div>
                     ) : (
                       providerGroups.map((provider) => (
                         <div
                           key={provider.key}
-                          className="rounded-2xl border border-border bg-card/30 p-4"
+                          className="rounded-xl border border-border bg-card/30 p-4"
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
@@ -1006,7 +1007,7 @@ export function StatsPage() {
                             {provider.models.map((model) => (
                               <div
                                 key={model.key}
-                                className="grid gap-2 rounded-2xl border border-border bg-accent/15 px-3.5 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.2fr)_repeat(6,minmax(0,0.8fr))]"
+                                className="grid gap-2 rounded-xl border border-border bg-accent/15 px-3.5 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.2fr)_repeat(6,minmax(0,0.8fr))]"
                               >
                                 <span className="font-medium text-foreground">
                                   {model.model}
@@ -1074,14 +1075,14 @@ export function StatsPage() {
                           Tabs
                         </p>
                         {tabGroups.length === 0 ? (
-                          <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
+                          <div className="rounded-xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                             No matching tab aggregates.
                           </div>
                         ) : (
                           tabGroups.map((tab) => (
                             <div
                               key={tab.key}
-                              className="grid gap-2 rounded-2xl border border-border bg-card/30 px-4 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.15fr)_repeat(6,minmax(0,0.75fr))]"
+                              className="grid gap-2 rounded-xl border border-border bg-card/30 px-4 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.15fr)_repeat(6,minmax(0,0.75fr))]"
                             >
                               <span className="font-medium text-foreground">
                                 {tab.tabTitle}
@@ -1104,14 +1105,14 @@ export function StatsPage() {
                           Agents
                         </p>
                         {agentGroups.length === 0 ? (
-                          <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
+                          <div className="rounded-xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                             No matching agent aggregates.
                           </div>
                         ) : (
                           agentGroups.map((agent) => (
                             <div
                               key={agent.key}
-                              className="grid gap-2 rounded-2xl border border-border bg-card/30 px-4 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.8fr)_repeat(5,minmax(0,0.72fr))]"
+                              className="grid gap-2 rounded-xl border border-border bg-card/30 px-4 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.8fr)_repeat(5,minmax(0,0.72fr))]"
                             >
                               <div className="min-w-0">
                                 <p className="truncate font-medium text-foreground">
@@ -1162,7 +1163,7 @@ export function StatsPage() {
                 />
                 <div className="space-y-2">
                   {recentEvents.length === 0 ? (
-                    <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
+                    <div className="rounded-xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                       No recent events match the current scope.
                     </div>
                   ) : (
@@ -1180,7 +1181,7 @@ export function StatsPage() {
                         <div key={event.key} className="space-y-2">
                           <button
                             type="button"
-                            className="grid w-full gap-3 rounded-2xl border border-border bg-card/30 px-4 py-3 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent/20 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.25fr)]"
+                            className="grid w-full gap-3 rounded-xl border border-border bg-card/30 px-4 py-3 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent/20 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.25fr)]"
                             onClick={() =>
                               setExpandedEventId((current) =>
                                 current === event.key ? null : event.key,

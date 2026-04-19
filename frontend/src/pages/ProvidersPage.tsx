@@ -78,10 +78,10 @@ import {
 } from "@/pages/providers/lib";
 
 const providerInputClass =
-  "w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+  "h-8 w-full rounded-md border border-input bg-background/50 px-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
 const providerMonoInputClass = `${providerInputClass} font-mono`;
 const providerSelectTriggerClass =
-  "w-full rounded-lg bg-background/50 text-[13px]";
+  "h-8 w-full rounded-md bg-background/50 text-[13px]";
 const providerIconButtonClass =
   "flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
 const providerHelpTextClass =
@@ -479,14 +479,15 @@ export function ProvidersPage() {
                 <p className="text-[13px] text-muted-foreground">
                   No providers
                 </p>
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   onClick={handleCreateNew}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-accent/25 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent/40"
+                  className="mt-4"
                 >
                   <Plus className="size-3" />
                   Add your first provider
-                </button>
+                </Button>
               </motion.div>
             ) : (
               <div className="space-y-0.5">
@@ -568,23 +569,24 @@ export function ProvidersPage() {
                 <div className="flex items-center gap-2">
                   {hasChanges ? (
                     <>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={handleCancel}
                         disabled={saving}
-                        className="rounded-full px-4 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
                       >
                         Cancel
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        size="sm"
                         onClick={() => void handleSave()}
                         disabled={saving}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                       >
                         <Check className="size-3.5" />
                         {saving ? "Saving..." : "Save"}
-                      </button>
+                      </Button>
                     </>
                   ) : null}
                 </div>
@@ -617,7 +619,7 @@ export function ProvidersPage() {
                       <SelectTrigger className={providerSelectTriggerClass}>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
+                      <SelectContent className="rounded-xl border-border bg-popover">
                         {providerTypeOptions.map((option) => (
                           <SelectItem
                             key={option.value}
@@ -655,7 +657,7 @@ export function ProvidersPage() {
                     >
                       <div
                         className={cn(
-                          "w-full select-text rounded-lg border px-3.5 py-2.5 text-[12px]",
+                          "w-full select-text rounded-md border px-3 py-2 text-[12px]",
                           endpointPreview.error
                             ? "border-destructive/20 bg-destructive/8 text-destructive"
                             : "border-border bg-card/30 text-foreground/80",
@@ -714,7 +716,7 @@ export function ProvidersPage() {
                           placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
                           spellCheck={false}
                           className={cn(
-                            "min-h-[140px] w-full rounded-lg border px-3.5 py-3 font-mono text-[13px] transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:outline-none",
+                            "min-h-[140px] w-full rounded-md border px-3 py-2.5 font-mono text-[13px] transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:outline-none",
                             parsedHeaders.error
                               ? "border-destructive/30 bg-background/50 text-destructive shadow-xs focus:border-destructive/50"
                               : "border-input bg-background/50 text-foreground shadow-xs focus:border-ring focus:bg-background/65 focus:ring-[3px] focus:ring-ring/50",
@@ -774,7 +776,7 @@ export function ProvidersPage() {
                     description="Manage this provider-scoped model catalog, fetch discovered entries, and run model-level tests against the current draft."
                   />
 
-                  <div className="space-y-4 rounded-2xl border border-border bg-card/30 p-5">
+                  <div className="space-y-4 rounded-xl border border-border bg-card/30 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="text-[13px] font-medium text-foreground/80">
@@ -917,7 +919,7 @@ export function ProvidersPage() {
                 {!isCreating && selectedProvider ? (
                   <div className="border-t border-border pt-8">
                     <SettingsRow label="Provider ID" description="Read-only">
-                      <div className="select-text rounded-lg border border-border bg-card/30 px-3.5 py-2.5 font-mono text-[12px] text-foreground/80">
+                      <div className="select-text rounded-md border border-border bg-card/30 px-3 py-2 font-mono text-[12px] text-foreground/80">
                         {selectedProvider.id}
                       </div>
                     </SettingsRow>
@@ -931,7 +933,7 @@ export function ProvidersPage() {
               animate={{ opacity: 1 }}
               className="flex h-full flex-col items-center justify-center px-6 text-center"
             >
-              <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/20 shadow-sm">
+              <div className="flex size-12 items-center justify-center rounded-xl border border-border bg-accent/20 shadow-sm">
                 <Server className="size-5 text-muted-foreground" />
               </div>
               <h3 className="mt-5 text-[15px] font-medium text-foreground">
@@ -988,7 +990,7 @@ export function ProvidersPage() {
               <label className="text-[13px] font-medium text-foreground/80">
                 Source
               </label>
-              <div className="rounded-lg border border-border bg-card/30 px-3.5 py-2.5 text-[13px] text-foreground/80">
+              <div className="rounded-md border border-border bg-card/30 px-3 py-2 text-[13px] text-foreground/80">
                 {modelEditorDraft.source === "manual" ? "Manual" : "Discovered"}
               </div>
             </div>
@@ -1040,7 +1042,7 @@ export function ProvidersPage() {
                   <SelectTrigger className={providerSelectTriggerClass}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
+                  <SelectContent className="rounded-xl border-border bg-popover">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="enabled">Enabled</SelectItem>
                     <SelectItem value="disabled">Disabled</SelectItem>
@@ -1063,7 +1065,7 @@ export function ProvidersPage() {
                   <SelectTrigger className={providerSelectTriggerClass}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
+                  <SelectContent className="rounded-xl border-border bg-popover">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="enabled">Enabled</SelectItem>
                     <SelectItem value="disabled">Disabled</SelectItem>

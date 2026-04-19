@@ -47,10 +47,14 @@ type PanelMode = "create" | "edit" | "view";
 
 const MINIMUM_TOOLS = new Set(["idle", "sleep", "todo", "contacts"]);
 const roleInputClass =
-  "w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+  "h-8 w-full rounded-md border border-input bg-background/50 px-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
 const roleMonoInputClass = `${roleInputClass} font-mono`;
+const roleTextareaClass =
+  "w-full rounded-md border border-input bg-background/50 px-3 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+const roleMonoTextareaClass = `${roleTextareaClass} font-mono`;
 const roleReadOnlyClass = "cursor-default opacity-60 focus:outline-none";
-const roleSelectTriggerClass = "w-full rounded-lg bg-background/50 text-[13px]";
+const roleSelectTriggerClass =
+  "h-8 w-full rounded-md bg-background/50 text-[13px]";
 const roleIconButtonClass =
   "flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
 
@@ -434,13 +438,15 @@ export function RolesPage() {
                   {panelEyebrow}
                 </span>
               </div>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 onClick={handleCancel}
-                className="flex size-7 items-center justify-center rounded-full bg-accent/25 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
+                className="text-muted-foreground hover:bg-accent/45 hover:text-foreground"
               >
                 <X className="size-3.5" />
-              </button>
+              </Button>
             </div>
 
             <section className="mb-10">
@@ -479,7 +485,7 @@ export function RolesPage() {
                     placeholder="Briefly explain what this role is best suited for"
                     rows={3}
                     className={cn(
-                      `w-full resize-y ${roleInputClass}`,
+                      `w-full resize-y ${roleTextareaClass}`,
                       isReadOnly || lockBuiltinFields ? roleReadOnlyClass : "",
                     )}
                   />
@@ -499,7 +505,7 @@ export function RolesPage() {
                       placeholder="You are a helpful assistant that..."
                       rows={12}
                       className={cn(
-                        `w-full resize-y ${roleMonoInputClass} py-3`,
+                        `w-full resize-y ${roleMonoTextareaClass}`,
                         isReadOnly || lockBuiltinFields
                           ? roleReadOnlyClass
                           : "",
@@ -532,7 +538,7 @@ export function RolesPage() {
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(false)}
                     className={cn(
-                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
+                      "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                       draft.model === null
                         ? "border-border bg-accent/45 text-foreground"
                         : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
@@ -546,7 +552,7 @@ export function RolesPage() {
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(true)}
                     className={cn(
-                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
+                      "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                       draft.model !== null
                         ? "border-border bg-accent/45 text-foreground"
                         : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
@@ -572,7 +578,7 @@ export function RolesPage() {
                           <SelectTrigger className={roleSelectTriggerClass}>
                             <SelectValue placeholder="Select a provider" />
                           </SelectTrigger>
-                          <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
+                          <SelectContent className="rounded-xl border-border bg-popover">
                             {providers.map((provider) => (
                               <SelectItem
                                 key={provider.id}
@@ -621,7 +627,7 @@ export function RolesPage() {
                               }
                             />
                           </SelectTrigger>
-                          <SelectContent className="max-h-[300px] rounded-xl border-border bg-popover backdrop-blur-xl">
+                          <SelectContent className="max-h-[300px] rounded-xl border-border bg-popover">
                             {filteredActiveProviderModelOptions.map(
                               (option) => (
                                 <SelectItem
@@ -713,7 +719,7 @@ export function RolesPage() {
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(false)}
                     className={cn(
-                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
+                      "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                       isEmptyModelParams(draft.model_params)
                         ? "border-border bg-accent/45 text-foreground"
                         : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
@@ -727,7 +733,7 @@ export function RolesPage() {
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(true)}
                     className={cn(
-                      "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
+                      "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                       !isEmptyModelParams(draft.model_params)
                         ? "border-border bg-accent/45 text-foreground"
                         : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
@@ -815,17 +821,19 @@ export function RolesPage() {
             </section>
 
             <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={handleCancel}
                 disabled={saving}
-                className="rounded-full px-5 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
               >
                 Cancel
-              </button>
+              </Button>
               {!isReadOnly && (
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   onClick={() => void handleSave()}
                   disabled={
                     saving ||
@@ -833,23 +841,23 @@ export function RolesPage() {
                     !draft.description.trim() ||
                     !draft.system_prompt.trim()
                   }
-                  className="rounded-full bg-primary px-6 py-2 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {saving
                     ? "Saving..."
                     : panelMode === "create"
                       ? "Create Role"
                       : "Save Changes"}
-                </button>
+                </Button>
               )}
               {isReadOnly && activeRole && !activeRole.is_builtin && (
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => handleEdit(activeRole)}
-                  className="rounded-full bg-accent/45 px-6 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-accent/60"
                 >
                   Edit Role
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -860,7 +868,7 @@ export function RolesPage() {
           animate={{ opacity: 1 }}
           className="flex h-full flex-col items-center justify-center text-center"
         >
-          <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/20 shadow-sm">
+          <div className="flex size-12 items-center justify-center rounded-xl border border-border bg-accent/20 shadow-sm">
             <Users className="size-5 text-muted-foreground" />
           </div>
           <h3 className="mt-5 text-[15px] font-medium text-foreground">
@@ -875,25 +883,27 @@ export function RolesPage() {
           <div className="mx-auto w-full max-w-5xl">
             <div className="mb-6 flex justify-end px-4">
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="icon-sm"
                   onClick={() => void refreshRoles()}
                   disabled={loading}
-                  className="flex size-9 items-center justify-center rounded-lg border border-border bg-accent/20 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
+                  className="bg-accent/20 text-muted-foreground hover:bg-accent/45 hover:text-foreground"
                 >
                   <RefreshCw
                     className={cn("size-4", loading && "animate-spin")}
                   />
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  size="sm"
                   onClick={handleCreate}
                   disabled={isPanelOpen}
-                  className="flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   <Plus className="size-4" />
                   New Role
-                </button>
+                </Button>
               </div>
             </div>
             <div className="mb-2 grid grid-cols-[260px_1fr_120px_100px] gap-4 px-4 pb-3">

@@ -28,9 +28,9 @@ import { PageScaffold } from "@/components/layout/PageScaffold";
 import { cn } from "@/lib/utils";
 
 const toolSearchInputClass =
-  "w-full rounded-full border border-input bg-background/50 py-2.5 pl-10 pr-5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+  "h-8 w-full rounded-md border border-input bg-background/50 pl-10 pr-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
 const toolChipClass =
-  "shrink-0 rounded-full border border-border bg-accent/20 px-3 py-1 text-[11px] font-medium text-muted-foreground";
+  "inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-accent/20 px-2.5 text-[11px] font-medium text-muted-foreground";
 
 const TOOL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   send: Send,
@@ -71,8 +71,8 @@ function ToolCard({
       onClick={onToggle}
       title={tool.description}
       className={cn(
-        "group cursor-pointer rounded-2xl border border-border bg-card/30 p-5 transition-all duration-300 hover:border-ring/25 hover:bg-accent/20 hover:shadow-xl",
-        expanded && "border-border bg-accent/20 shadow-xl",
+        "group cursor-pointer rounded-xl border border-border bg-card/30 p-5 shadow-none transition-colors duration-300 hover:border-ring/25 hover:bg-accent/20 hover:shadow-sm",
+        expanded && "border-border bg-accent/20 shadow-sm",
       )}
     >
       <div className="mb-4 flex size-10 items-center justify-center rounded-xl border border-border bg-accent/25 transition-colors group-hover:bg-accent/40">
@@ -209,7 +209,7 @@ export function ToolsPage() {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="h-36 animate-pulse rounded-2xl border border-border bg-accent/20"
+                  className="h-36 animate-pulse rounded-xl border border-border bg-accent/20"
                 />
               ))}
             </div>
@@ -219,7 +219,7 @@ export function ToolsPage() {
               animate={{ opacity: 1 }}
               className="flex h-full flex-col items-center justify-center text-center"
             >
-              <div className="flex size-14 items-center justify-center rounded-3xl border border-border bg-accent/20 shadow-sm">
+              <div className="flex size-14 items-center justify-center rounded-xl border border-border bg-accent/20 shadow-sm">
                 <Wrench className="size-6 text-muted-foreground" />
               </div>
               <h3 className="mt-5 text-[15px] font-medium text-foreground">

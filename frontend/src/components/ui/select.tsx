@@ -30,7 +30,7 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     data-slot="select-trigger"
     className={cn(
-      "border-input bg-background shadow-xs flex h-9 w-full items-center justify-between rounded-md border px-3 py-2 text-sm outline-none transition-[color,box-shadow]",
+      "border-input bg-background shadow-xs flex h-8 w-full items-center justify-between rounded-md border px-3 py-2 text-sm outline-none transition-[color,box-shadow]",
       "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
       "data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
       className,
@@ -54,7 +54,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       data-slot="select-content"
       className={cn(
-        "bg-popover text-popover-foreground border-border shadow-lg relative z-50 min-w-[8rem] overflow-hidden rounded-md border",
+        "bg-popover text-popover-foreground border-border shadow-md relative z-50 min-w-[8rem] overflow-hidden rounded-md border",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",

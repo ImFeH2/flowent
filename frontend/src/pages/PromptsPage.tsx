@@ -3,7 +3,15 @@ import useSWR from "swr";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageScaffold } from "@/components/layout/PageScaffold";
+import { Button } from "@/components/ui/button";
 import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
+
+const promptCharCountClass =
+  "rounded-full border border-border bg-accent/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground";
+const promptEditorSurfaceClass =
+  "relative flex min-h-0 flex-1 rounded-xl border border-border bg-card/30 p-1";
+const promptEditorTextareaClass =
+  "min-h-0 w-full flex-1 resize-none select-text rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground focus:bg-background/35 focus:outline-none transition-colors scrollbar-none";
 
 export function PromptsPage() {
   const {
@@ -44,8 +52,10 @@ export function PromptsPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-white/[0.05]" />
-          <p className="text-[13px] text-white/40">Loading prompts...</p>
+          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
+          <p className="text-[13px] text-muted-foreground">
+            Loading prompts...
+          </p>
         </div>
       </div>
     );
@@ -55,62 +65,62 @@ export function PromptsPage() {
     <PageScaffold>
       <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-4 pb-10 pt-8">
         <div className="mb-6 flex justify-end">
-          <button
+          <Button
             type="button"
             onClick={() => void handleSave()}
             disabled={saving}
-            className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="h-9 rounded-full px-5 text-[13px]"
           >
             <Save className="size-4" />
             {saving ? "Saving..." : "Save Changes"}
-          </button>
+          </Button>
         </div>
         <div className="grid min-h-0 flex-1 gap-8">
           <div className="flex min-h-0 flex-col">
             <div className="mb-3 flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
-                <h2 className="text-[15px] font-medium text-white/90">
+                <h2 className="text-[15px] font-medium text-foreground">
                   Custom Prompt
                 </h2>
-                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/40">
+                <span className={promptCharCountClass}>
                   {customPrompt.length} chars
                 </span>
               </div>
-              <p className="text-[12px] text-white/40">
+              <p className="text-[12px] text-muted-foreground">
                 Appended to every node's system prompt
               </p>
             </div>
-            <div className="relative flex min-h-0 flex-1 rounded-xl border border-white/[0.04] bg-white/[0.01] p-1">
+            <div className={promptEditorSurfaceClass}>
               <textarea
                 aria-label="Custom Prompt"
                 value={customPrompt}
                 onChange={(event) => setCustomPrompt(event.target.value)}
                 placeholder="Add a custom prompt appended to every agent's system prompt..."
-                className="min-h-0 w-full flex-1 resize-none select-text rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
+                className={promptEditorTextareaClass}
               />
             </div>
           </div>
           <div className="flex min-h-0 flex-col">
             <div className="mb-3 flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
-                <h2 className="text-[15px] font-medium text-white/90">
+                <h2 className="text-[15px] font-medium text-foreground">
                   Runtime Post Prompt
                 </h2>
-                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/40">
+                <span className={promptCharCountClass}>
                   {customPostPrompt.length} chars
                 </span>
               </div>
-              <p className="text-[12px] text-white/40">
+              <p className="text-[12px] text-muted-foreground">
                 Added after the built-in runtime post prompt
               </p>
             </div>
-            <div className="relative flex min-h-0 flex-1 rounded-xl border border-white/[0.04] bg-white/[0.01] p-1">
+            <div className={promptEditorSurfaceClass}>
               <textarea
                 aria-label="Custom Post Prompt"
                 value={customPostPrompt}
                 onChange={(event) => setCustomPostPrompt(event.target.value)}
                 placeholder="Add custom runtime instructions appended after the built-in post prompt..."
-                className="min-h-0 w-full flex-1 resize-none select-text rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed text-white placeholder:text-white/20 focus:bg-white/[0.02] focus:outline-none transition-colors scrollbar-none"
+                className={promptEditorTextareaClass}
               />
             </div>
           </div>

@@ -111,8 +111,10 @@ export function ChannelsPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-white/[0.05]" />
-          <p className="text-[13px] text-white/40">Loading channels...</p>
+          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
+          <p className="text-[13px] text-muted-foreground">
+            Loading channels...
+          </p>
         </div>
       </div>
     );
@@ -125,13 +127,13 @@ export function ChannelsPage() {
           <SoftPanel className="space-y-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-white/30">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/75">
                   Telegram
                 </p>
-                <h2 className="mt-1.5 text-lg font-medium text-white/90">
+                <h2 className="mt-1.5 text-lg font-medium text-foreground">
                   Bot Channel
                 </h2>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-white/40">
+                <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
                   Configure the Telegram bot token and approve or revoke private
                   chats that can talk to the Assistant.
                 </p>
@@ -140,8 +142,8 @@ export function ChannelsPage() {
                 className={cn(
                   "rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
                   configured
-                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                    : "border-amber-500/20 bg-amber-500/10 text-amber-400",
+                    ? "border-graph-status-running/20 bg-graph-status-running/[0.12] text-graph-status-running"
+                    : "border-graph-status-idle/20 bg-graph-status-idle/[0.12] text-graph-status-idle",
                 )}
               >
                 {configured ? "Configured" : "Not configured"}
@@ -150,10 +152,10 @@ export function ChannelsPage() {
 
             <section>
               <div className="flex flex-wrap items-center gap-3">
-                <label className="text-[13px] font-medium text-white/80">
+                <label className="text-[13px] font-medium text-foreground/80">
                   Bot Token
                 </label>
-                <span className="text-[11px] text-white/30">
+                <span className="text-[11px] text-muted-foreground">
                   Leave empty to keep the current token
                 </span>
               </div>
@@ -166,12 +168,12 @@ export function ChannelsPage() {
                     setTokenDirty(true);
                   }}
                   placeholder={settings.bot_token || "Enter Telegram bot token"}
-                  className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 pr-10 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                  className="w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 pr-10 font-mono text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50"
                 />
                 <button
                   type="button"
                   onClick={() => setShowToken((current) => !current)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex size-6 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+                  className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
                 >
                   {showToken ? (
                     <EyeOff className="size-3.5" />
@@ -182,17 +184,17 @@ export function ChannelsPage() {
               </div>
             </section>
 
-            <section className="border-t border-white/[0.04] pt-8">
+            <section className="border-t border-border pt-8">
               <div className="flex flex-wrap items-center gap-3">
-                <label className="text-[13px] font-medium text-white/80">
+                <label className="text-[13px] font-medium text-foreground/80">
                   Pending Private Chats
                 </label>
-                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/40">
+                <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                   {settings.pending_chats.length} waiting
                 </span>
               </div>
               {settings.pending_chats.length === 0 ? (
-                <p className="mt-4 text-[13px] text-white/30">
+                <p className="mt-4 text-[13px] text-muted-foreground">
                   No pending chats.
                 </p>
               ) : (
@@ -200,14 +202,14 @@ export function ChannelsPage() {
                   {settings.pending_chats.map((chat) => (
                     <div
                       key={chat.chat_id}
-                      className="rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-3.5 transition-colors hover:bg-white/[0.025]"
+                      className="rounded-xl border border-border bg-card/30 px-4 py-3.5 transition-colors hover:bg-accent/20"
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-white/90">
+                          <p className="text-[13px] font-medium text-foreground">
                             {getChatLabel(chat)}
                           </p>
-                          <div className="mt-1 flex items-center gap-3 text-[11px] text-white/40">
+                          <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
                             <span className="font-mono">
                               ID: {chat.chat_id}
                             </span>
@@ -223,7 +225,7 @@ export function ChannelsPage() {
                           <button
                             type="button"
                             onClick={() => void handleApprove(chat.chat_id)}
-                            className="flex h-7 items-center gap-1.5 rounded-md bg-white/[0.08] px-3 text-[11px] font-medium text-white transition-colors hover:bg-white/[0.12]"
+                            className="flex h-7 items-center gap-1.5 rounded-md bg-primary px-3 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
                           >
                             <Check className="size-3.5" />
                             Approve
@@ -231,7 +233,7 @@ export function ChannelsPage() {
                           <button
                             type="button"
                             onClick={() => void handleReject(chat.chat_id)}
-                            className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                            className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="size-3.5" />
                           </button>
@@ -243,17 +245,17 @@ export function ChannelsPage() {
               )}
             </section>
 
-            <section className="border-t border-white/[0.04] pt-8">
+            <section className="border-t border-border pt-8">
               <div className="flex flex-wrap items-center gap-3">
-                <label className="text-[13px] font-medium text-white/80">
+                <label className="text-[13px] font-medium text-foreground/80">
                   Approved Private Chats
                 </label>
-                <span className="rounded-full bg-white/[0.04] px-2 py-0.5 text-[10px] font-medium text-white/40">
+                <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                   {settings.approved_chats.length} active
                 </span>
               </div>
               {settings.approved_chats.length === 0 ? (
-                <p className="mt-4 text-[13px] text-white/30">
+                <p className="mt-4 text-[13px] text-muted-foreground">
                   No approved chats yet.
                 </p>
               ) : (
@@ -261,14 +263,14 @@ export function ChannelsPage() {
                   {settings.approved_chats.map((chat) => (
                     <div
                       key={chat.chat_id}
-                      className="group rounded-xl border border-white/[0.04] bg-white/[0.015] px-4 py-3.5 transition-colors hover:bg-white/[0.025]"
+                      className="group rounded-xl border border-border bg-card/30 px-4 py-3.5 transition-colors hover:bg-accent/20"
                     >
                       <div className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-white/90">
+                          <p className="text-[13px] font-medium text-foreground">
                             {getChatLabel(chat)}
                           </p>
-                          <div className="mt-1 flex items-center gap-3 text-[11px] text-white/40">
+                          <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
                             <span className="font-mono">
                               ID: {chat.chat_id}
                             </span>
@@ -283,7 +285,7 @@ export function ChannelsPage() {
                         <button
                           type="button"
                           onClick={() => void handleRevoke(chat.chat_id)}
-                          className="flex size-7 shrink-0 items-center justify-center rounded-md text-white/40 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100 focus:opacity-100"
+                          className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
                         >
                           <Trash2 className="size-3.5" />
                         </button>
@@ -294,12 +296,12 @@ export function ChannelsPage() {
               )}
             </section>
 
-            <div className="flex justify-end border-t border-white/[0.04] pt-6">
+            <div className="flex justify-end border-t border-border pt-6">
               <button
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={saving}
-                className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="flex h-9 items-center gap-2 rounded-full bg-primary px-5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 <Save className="size-4" />
                 {saving ? "Saving..." : "Save Changes"}

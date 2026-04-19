@@ -27,6 +27,11 @@ import { fetchTools, type ToolInfo } from "@/lib/api";
 import { PageScaffold } from "@/components/layout/PageScaffold";
 import { cn } from "@/lib/utils";
 
+const toolSearchInputClass =
+  "w-full rounded-full border border-input bg-background/50 py-2.5 pl-10 pr-5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+const toolChipClass =
+  "shrink-0 rounded-full border border-border bg-accent/20 px-3 py-1 text-[11px] font-medium text-muted-foreground";
+
 const TOOL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   send: Send,
   idle: Clock,
@@ -66,24 +71,23 @@ function ToolCard({
       onClick={onToggle}
       title={tool.description}
       className={cn(
-        "group cursor-pointer rounded-2xl border border-white/[0.04] bg-white/[0.01] p-5 transition-all duration-300 hover:border-white/[0.08] hover:bg-white/[0.03] hover:shadow-lg hover:shadow-black/50",
-        expanded &&
-          "border-white/[0.08] bg-white/[0.03] shadow-lg shadow-black/50",
+        "group cursor-pointer rounded-2xl border border-border bg-card/30 p-5 transition-all duration-300 hover:border-ring/25 hover:bg-accent/20 hover:shadow-xl",
+        expanded && "border-border bg-accent/20 shadow-xl",
       )}
     >
-      <div className="mb-4 flex size-10 items-center justify-center rounded-xl bg-white/[0.03] border border-white/[0.04] transition-colors group-hover:bg-white/[0.06] group-hover:border-white/[0.08]">
-        <Icon className="size-4.5 text-white/80" />
+      <div className="mb-4 flex size-10 items-center justify-center rounded-xl border border-border bg-accent/25 transition-colors group-hover:bg-accent/40">
+        <Icon className="size-4.5 text-foreground/80" />
       </div>
 
-      <code className="block text-[13px] font-mono font-medium text-white/90">
+      <code className="block text-[13px] font-mono font-medium text-foreground">
         {tool.name}
       </code>
-      <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-white/32">
+      <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/75">
         {tool.source === "mcp"
           ? `MCP · ${tool.server_name ?? "unknown"}`
           : "Builtin"}
       </p>
-      <p className="mt-2 text-[12px] leading-relaxed text-white/40">
+      <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
         {tool.description}
       </p>
 
@@ -97,44 +101,44 @@ function ToolCard({
             className="overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mt-4 border-t border-white/[0.04] pt-4">
+            <div className="mt-4 border-t border-border pt-4">
               {tool.source === "mcp" ? (
-                <div className="mb-4 space-y-2 text-[11px] text-white/58">
+                <div className="mb-4 space-y-2 text-[11px] text-muted-foreground">
                   <div>
                     Raw Tool Name{" "}
-                    <code className="font-mono text-white/82">
+                    <code className="font-mono text-foreground/82">
                       {tool.tool_name ?? "unknown"}
                     </code>
                   </div>
                   <div>
                     Fully Qualified ID{" "}
-                    <code className="font-mono text-white/82">
+                    <code className="font-mono text-foreground/82">
                       {tool.fully_qualified_id ?? tool.name}
                     </code>
                   </div>
                   <div className="flex flex-wrap gap-2 uppercase tracking-[0.14em]">
                     {tool.read_only_hint ? (
-                      <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-1 text-[10px] text-sky-200">
+                      <span className="rounded-full border border-primary/15 bg-primary/10 px-2 py-1 text-[10px] text-primary">
                         readOnly
                       </span>
                     ) : null}
                     {tool.destructive_hint ? (
-                      <span className="rounded-full border border-red-400/20 bg-red-400/[0.08] px-2 py-1 text-[10px] text-red-200">
+                      <span className="rounded-full border border-destructive/20 bg-destructive/10 px-2 py-1 text-[10px] text-destructive">
                         destructive
                       </span>
                     ) : null}
                     {tool.open_world_hint ? (
-                      <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-1 text-[10px] text-amber-200">
+                      <span className="rounded-full border border-graph-status-idle/20 bg-graph-status-idle/[0.12] px-2 py-1 text-[10px] text-graph-status-idle">
                         openWorld
                       </span>
                     ) : null}
                   </div>
                 </div>
               ) : null}
-              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-white/30">
+              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/75">
                 Parameters
               </p>
-              <pre className="max-h-48 select-text overflow-auto rounded-xl border border-white/[0.04] bg-black/40 p-3.5 text-[11px] font-mono text-white/60 scrollbar-none">
+              <pre className="max-h-48 select-text overflow-auto rounded-xl border border-border bg-background/50 p-3.5 text-[11px] font-mono text-foreground/70 scrollbar-none">
                 {JSON.stringify(tool.parameters ?? {}, null, 2)}
               </pre>
             </div>
@@ -178,27 +182,25 @@ export function ToolsPage() {
     <PageScaffold>
       <div className="flex h-full flex-col pt-8 px-8">
         <div className="mb-6">
-          <h1 className="text-[28px] font-medium tracking-[-0.04em] text-white">
+          <h1 className="text-[28px] font-medium tracking-[-0.04em] text-foreground">
             Tools
           </h1>
-          <p className="mt-2 text-[13px] leading-6 text-white/42">
+          <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
             Browse the current tool directory, including built-in tools and
             discovered MCP tools.
           </p>
         </div>
         <div className="mb-6 flex items-center gap-4">
           <div className="relative max-w-md flex-1">
-            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-white/40" />
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search tools..."
-              className="w-full rounded-full border border-white/[0.06] bg-white/[0.02] py-2.5 pl-10 pr-5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+              className={toolSearchInputClass}
             />
           </div>
-          <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-3 py-1 text-[11px] font-medium text-white/50">
-            {filteredTools.length} tools
-          </span>
+          <span className={toolChipClass}>{filteredTools.length} tools</span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-2 scrollbar-none">
@@ -207,7 +209,7 @@ export function ToolsPage() {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
-                  className="h-36 animate-pulse rounded-2xl border border-white/[0.04] bg-white/[0.02]"
+                  className="h-36 animate-pulse rounded-2xl border border-border bg-accent/20"
                 />
               ))}
             </div>
@@ -217,13 +219,13 @@ export function ToolsPage() {
               animate={{ opacity: 1 }}
               className="flex h-full flex-col items-center justify-center text-center"
             >
-              <div className="flex size-14 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.02] shadow-sm">
-                <Wrench className="size-6 text-white/40" />
+              <div className="flex size-14 items-center justify-center rounded-3xl border border-border bg-accent/20 shadow-sm">
+                <Wrench className="size-6 text-muted-foreground" />
               </div>
-              <h3 className="mt-5 text-[15px] font-medium text-white/90">
+              <h3 className="mt-5 text-[15px] font-medium text-foreground">
                 No Tools Found
               </h3>
-              <p className="mt-1.5 text-[13px] text-white/40">
+              <p className="mt-1.5 text-[13px] text-muted-foreground">
                 Try adjusting your search criteria.
               </p>
             </motion.div>

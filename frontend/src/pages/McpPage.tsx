@@ -205,28 +205,53 @@ function statusLabel(status: string) {
 function statusClassName(status: string) {
   switch (status) {
     case "connected":
-      return "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-200";
+      return "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running";
     case "auth_required":
-      return "border-amber-400/20 bg-amber-400/[0.08] text-amber-200";
+      return "border-graph-status-idle/18 bg-graph-status-idle/[0.12] text-graph-status-idle";
     case "error":
-      return "border-red-400/20 bg-red-400/[0.08] text-red-200";
+      return "border-destructive/30 bg-destructive/10 text-destructive";
     case "disabled":
-      return "border-white/[0.06] bg-white/[0.02] text-white/55";
+      return "border-border bg-accent/20 text-muted-foreground";
     default:
-      return "border-sky-400/20 bg-sky-400/[0.08] text-sky-200";
+      return "border-primary/20 bg-primary/[0.1] text-primary";
   }
 }
 
 function resultClassName(result: string) {
   switch (result) {
     case "success":
-      return "border-emerald-400/20 bg-emerald-400/[0.08] text-emerald-200";
+      return "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running";
     case "rejected":
-      return "border-amber-400/20 bg-amber-400/[0.08] text-amber-200";
+      return "border-graph-status-idle/18 bg-graph-status-idle/[0.12] text-graph-status-idle";
     default:
-      return "border-red-400/20 bg-red-400/[0.08] text-red-200";
+      return "border-destructive/30 bg-destructive/10 text-destructive";
   }
 }
+
+const mcpEyebrowClass =
+  "text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80";
+const mcpMetricEyebrowClass =
+  "text-[11px] uppercase tracking-[0.16em] text-muted-foreground/80";
+const mcpPanelClass = "bg-card/20";
+const mcpPanelTextClass = "text-[13px] text-muted-foreground";
+const mcpMetricCardClass =
+  "rounded-2xl border border-border bg-card/20 px-4 py-4";
+const mcpCardSurfaceClass =
+  "rounded-xl border border-border bg-card/20 px-4 py-3";
+const mcpReadonlyBlockClass =
+  "min-h-[44px] whitespace-pre-wrap break-all rounded-xl border border-border bg-background/40 px-4 py-3 text-[12px] leading-6 text-foreground/80";
+const mcpCodeBlockClass =
+  "mt-4 max-h-48 overflow-auto rounded-xl border border-border bg-background/55 p-3 text-[11px] text-foreground/70";
+const mcpOutlineButtonClass =
+  "border-border bg-accent/20 text-foreground hover:bg-accent/35";
+const mcpDestructiveButtonClass =
+  "border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/18";
+const mcpTagClass =
+  "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]";
+const mcpInfoIconClass =
+  "flex size-14 items-center justify-center rounded-3xl border border-border bg-accent/20 text-muted-foreground";
+const mcpFilterPillBaseClass =
+  "rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
 function capabilitySummary(record: MCPServerRecord) {
   const counts = record.snapshot.capability_counts;
@@ -533,11 +558,9 @@ function renderValueOrFallback(value: string, fallback = "Not set") {
 
 function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-white/[0.06] bg-black/20 px-4 py-4">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-white/38">
-        {label}
-      </p>
-      <p className="mt-2 text-[26px] font-medium text-white">{value}</p>
+    <div className={mcpMetricCardClass}>
+      <p className={mcpMetricEyebrowClass}>{label}</p>
+      <p className="mt-2 text-[26px] font-medium text-foreground">{value}</p>
     </div>
   );
 }
@@ -556,10 +579,10 @@ function FilterPill({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+        mcpFilterPillBaseClass,
         active
-          ? "bg-white/[0.1] text-white"
-          : "bg-white/[0.03] text-white/52 hover:bg-white/[0.05] hover:text-white/84",
+          ? "border-border bg-card/30 text-foreground"
+          : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25 hover:text-foreground",
       )}
     >
       {label}
@@ -578,14 +601,9 @@ function ReadonlyBlock({
 }) {
   return (
     <div className="space-y-2">
-      <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-        {label}
-      </p>
+      <p className={mcpEyebrowClass}>{label}</p>
       <pre
-        className={cn(
-          "min-h-[44px] whitespace-pre-wrap break-all rounded-xl border border-white/[0.06] bg-black/30 px-4 py-3 text-[12px] leading-6 text-white/74",
-          mono && "font-mono text-[11px]",
-        )}
+        className={cn(mcpReadonlyBlockClass, mono && "font-mono text-[11px]")}
       >
         {value}
       </pre>
@@ -607,11 +625,11 @@ function MountToggle({
   return (
     <label
       className={cn(
-        "flex items-center justify-between gap-4 rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3 text-sm",
+        "flex items-center justify-between gap-4 rounded-xl border border-border bg-card/20 px-4 py-3 text-sm",
         disabled && "opacity-50",
       )}
     >
-      <span className="text-white/80">{label}</span>
+      <span className="text-foreground/85">{label}</span>
       <button
         type="button"
         disabled={disabled}
@@ -619,15 +637,17 @@ function MountToggle({
         className={cn(
           "relative h-6 w-11 rounded-full border transition-colors",
           checked
-            ? "border-emerald-400/30 bg-emerald-400/20"
-            : "border-white/[0.08] bg-white/[0.04]",
+            ? "border-graph-status-running/28 bg-graph-status-running/15"
+            : "border-border bg-accent/30",
         )}
         onClick={() => onChange(!checked)}
       >
         <span
           className={cn(
-            "absolute top-0.5 size-4.5 rounded-full bg-white transition-transform",
-            checked ? "translate-x-[22px]" : "translate-x-0.5",
+            "absolute top-0.5 size-4.5 rounded-full transition-transform",
+            checked
+              ? "translate-x-[22px] bg-graph-status-running text-background"
+              : "translate-x-0.5 bg-foreground/85",
           )}
         />
       </button>
@@ -662,7 +682,7 @@ function ServerDialog({
           <Button
             type="button"
             variant="outline"
-            className="border-white/10 bg-white/[0.02] text-white/78 hover:bg-white/[0.06]"
+            className={mcpOutlineButtonClass}
             onClick={() => onOpenChange(false)}
           >
             Cancel
@@ -694,10 +714,10 @@ function ServerDialog({
               })
             }
           >
-            <SelectTrigger className="h-10 w-full rounded-md border-white/[0.08] bg-black/30 text-sm text-white">
+            <SelectTrigger className="h-10 w-full rounded-md bg-background/50 text-sm text-foreground">
               <SelectValue placeholder="Select transport" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 text-white backdrop-blur-xl">
+            <SelectContent className="rounded-xl bg-popover/95 text-popover-foreground backdrop-blur-xl">
               <SelectItem value="stdio">stdio</SelectItem>
               <SelectItem value="streamable_http">streamable_http</SelectItem>
             </SelectContent>
@@ -1288,20 +1308,20 @@ export function McpPage() {
   };
 
   const quickAddPanel = (
-    <SoftPanel className="mt-4 bg-black/20">
+    <SoftPanel className={cn("mt-4", mcpPanelClass)}>
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-              Quick Add
-            </p>
-            <p className="mt-2 max-w-3xl text-[13px] leading-6 text-white/46">
+            <p className={mcpEyebrowClass}>Quick Add</p>
+            <p className="mt-2 max-w-3xl text-[13px] leading-6 text-muted-foreground">
               Paste a single-line launcher such as{" "}
-              <span className="font-mono text-white/68">
+              <span className="font-mono text-foreground/80">
                 npx @playwright/mcp@latest
               </span>{" "}
               or a single{" "}
-              <span className="font-mono text-white/68">streamable_http</span>{" "}
+              <span className="font-mono text-foreground/80">
+                streamable_http
+              </span>{" "}
               URL. Connected servers become visible to every agent
               automatically.
             </p>
@@ -1349,27 +1369,21 @@ export function McpPage() {
         </div>
         {quickAddParse.draft ? (
           <div className="grid gap-3 xl:grid-cols-3">
-            <SoftPanel className="bg-white/[0.02]">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                Transport
-              </p>
-              <p className="mt-2 text-[14px] font-medium text-white">
+            <SoftPanel className={mcpPanelClass}>
+              <p className={mcpEyebrowClass}>Transport</p>
+              <p className="mt-2 text-[14px] font-medium text-foreground">
                 {quickAddParse.draft.transport}
               </p>
             </SoftPanel>
-            <SoftPanel className="bg-white/[0.02]">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                Parsed Name
-              </p>
-              <p className="mt-2 text-[14px] font-medium text-white">
+            <SoftPanel className={mcpPanelClass}>
+              <p className={mcpEyebrowClass}>Parsed Name</p>
+              <p className="mt-2 text-[14px] font-medium text-foreground">
                 {quickAddParse.draft.name}
               </p>
             </SoftPanel>
-            <SoftPanel className="bg-white/[0.02] xl:col-span-1">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                Parsed Result
-              </p>
-              <p className="mt-2 break-all font-mono text-[12px] text-white/68">
+            <SoftPanel className={cn("xl:col-span-1", mcpPanelClass)}>
+              <p className={mcpEyebrowClass}>Parsed Result</p>
+              <p className="mt-2 break-all font-mono text-[12px] text-foreground/80">
                 {quickAddParse.draft.transport === "streamable_http"
                   ? quickAddParse.draft.url
                   : [
@@ -1381,11 +1395,11 @@ export function McpPage() {
           </div>
         ) : null}
         {quickAddError || (quickAddInput.trim() && quickAddParse.error) ? (
-          <p className="text-[13px] text-red-200">
+          <p className="text-[13px] text-destructive">
             {quickAddError ?? quickAddParse.error}
           </p>
         ) : (
-          <p className="text-[12px] text-white/42">
+          <p className="text-[12px] text-muted-foreground">
             Package-runner launchers download and start in one path. If first
             startup is slow, the server will stay visible as Connecting until
             refresh finishes.
@@ -1402,7 +1416,7 @@ export function McpPage() {
           <Button
             type="button"
             variant="outline"
-            className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+            className={mcpOutlineButtonClass}
             onClick={openCreateDialog}
           >
             Advanced Add
@@ -1417,10 +1431,10 @@ export function McpPage() {
       <div className="flex h-full min-h-0 flex-col px-8 py-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-[28px] font-medium tracking-[-0.04em] text-white">
+            <h1 className="text-[28px] font-medium tracking-[-0.04em] text-foreground">
               MCP
             </h1>
-            <p className="mt-2 max-w-3xl text-[13px] leading-6 text-white/42">
+            <p className="mt-2 max-w-3xl text-[13px] leading-6 text-muted-foreground">
               Quickly connect external MCP servers, inspect capabilities, and
               review recent MCP activity from one global control plane.
             </p>
@@ -1429,7 +1443,7 @@ export function McpPage() {
             <Button
               type="button"
               variant="outline"
-              className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+              className={mcpOutlineButtonClass}
               onClick={handleRefreshAll}
             >
               <RefreshCw className="mr-2 size-4" />
@@ -1438,7 +1452,7 @@ export function McpPage() {
             <Button
               type="button"
               variant="outline"
-              className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+              className={mcpOutlineButtonClass}
               onClick={focusQuickAdd}
             >
               <Plus className="mr-2 size-4" />
@@ -1458,30 +1472,30 @@ export function McpPage() {
                 {Array.from({ length: 5 }).map((_, index) => (
                   <div
                     key={index}
-                    className="h-24 rounded-2xl border border-white/[0.04] bg-white/[0.02] skeleton-shimmer"
+                    className="h-24 rounded-2xl border border-border bg-card/20 skeleton-shimmer"
                   />
                 ))}
-                <p className="px-2 text-[13px] text-white/42">
+                <p className="px-2 text-[13px] text-muted-foreground">
                   Loading MCP servers...
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/[0.04] bg-white/[0.02] skeleton-shimmer" />
+              <div className="rounded-2xl border border-border bg-card/20 skeleton-shimmer" />
             </div>
           ) : error ? (
-            <SoftPanel className="flex h-full items-center justify-center text-center text-white/46">
+            <SoftPanel className="flex h-full items-center justify-center text-center text-muted-foreground">
               Failed to load MCP state.
             </SoftPanel>
           ) : servers.length === 0 ? (
             <div className="flex h-full min-h-0 flex-col">
               {quickAddPanel}
               <SoftPanel className="mt-4 flex h-full flex-col items-center justify-center text-center">
-                <div className="flex size-14 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.02] text-white/52">
+                <div className={mcpInfoIconClass}>
                   <Unplug className="size-6" />
                 </div>
-                <h2 className="mt-5 text-[16px] font-medium text-white/88">
+                <h2 className="mt-5 text-[16px] font-medium text-foreground">
                   No MCP servers
                 </h2>
-                <p className="mt-2 max-w-lg text-[13px] leading-6 text-white/42">
+                <p className="mt-2 max-w-lg text-[13px] leading-6 text-muted-foreground">
                   Start with Quick Add to connect one server that every agent
                   can use after the first successful refresh.
                 </p>
@@ -1512,7 +1526,7 @@ export function McpPage() {
               <SoftPanel className="mt-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div className="relative w-full max-w-xl">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/28" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
                     <Input
                       value={serverSearch}
                       onChange={(event) =>
@@ -1540,20 +1554,20 @@ export function McpPage() {
               <div className="mt-4 min-h-0 flex-1 overflow-hidden">
                 {filteredServers.length === 0 ? (
                   <SoftPanel className="flex h-full flex-col items-center justify-center text-center">
-                    <div className="flex size-14 items-center justify-center rounded-3xl border border-white/[0.06] bg-white/[0.02] text-white/52">
+                    <div className={mcpInfoIconClass}>
                       <Search className="size-6" />
                     </div>
-                    <h2 className="mt-5 text-[16px] font-medium text-white/88">
+                    <h2 className="mt-5 text-[16px] font-medium text-foreground">
                       No matching MCP servers
                     </h2>
-                    <p className="mt-2 max-w-lg text-[13px] leading-6 text-white/42">
+                    <p className="mt-2 max-w-lg text-[13px] leading-6 text-muted-foreground">
                       Adjust the search term or status filter to see matching
                       servers again.
                     </p>
                     <Button
                       type="button"
                       variant="outline"
-                      className="mt-5 border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                      className={cn("mt-5", mcpOutlineButtonClass)}
                       onClick={clearServerFilters}
                     >
                       <X className="mr-2 size-4" />
@@ -1574,8 +1588,8 @@ export function McpPage() {
                               className={cn(
                                 "rounded-2xl border p-4 transition-colors",
                                 isSelected
-                                  ? "border-white/[0.12] bg-white/[0.04]"
-                                  : "border-white/[0.05] bg-white/[0.015] hover:bg-white/[0.03]",
+                                  ? "border-border bg-accent/20"
+                                  : "border-border bg-card/20 hover:bg-accent/20",
                               )}
                             >
                               <div className="flex items-start justify-between gap-3">
@@ -1589,21 +1603,21 @@ export function McpPage() {
                                   className="min-w-0 flex-1 text-left"
                                 >
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-[14px] font-medium text-white/88">
+                                    <p className="text-[14px] font-medium text-foreground">
                                       {record.config.name}
                                     </p>
                                     {record.config.required ? (
-                                      <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-amber-200">
+                                      <span className="rounded-full border border-graph-status-idle/18 bg-graph-status-idle/[0.12] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-graph-status-idle">
                                         required
                                       </span>
                                     ) : null}
                                     {visibility ? (
-                                      <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200">
+                                      <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
                                         {visibility}
                                       </span>
                                     ) : null}
                                   </div>
-                                  <div className="mt-3 grid gap-1.5 text-[12px] text-white/48">
+                                  <div className="mt-3 grid gap-1.5 text-[12px] text-muted-foreground">
                                     <p>Transport {record.config.transport}</p>
                                     <p>
                                       Status{" "}
@@ -1619,7 +1633,7 @@ export function McpPage() {
                                     {visibility ? <p>{visibility}</p> : null}
                                   </div>
                                   {record.snapshot.last_error ? (
-                                    <p className="mt-3 line-clamp-2 text-[12px] leading-5 text-red-200">
+                                    <p className="mt-3 line-clamp-2 text-[12px] leading-5 text-destructive">
                                       {record.snapshot.last_error}
                                     </p>
                                   ) : null}
@@ -1637,7 +1651,10 @@ export function McpPage() {
                                     <Button
                                       type="button"
                                       variant="outline"
-                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      className={cn(
+                                        "h-7 px-2 text-[11px]",
+                                        mcpOutlineButtonClass,
+                                      )}
                                       onClick={() =>
                                         handleToggleEnabled(record)
                                       }
@@ -1650,7 +1667,10 @@ export function McpPage() {
                                       type="button"
                                       variant="outline"
                                       disabled={authActionDisabled(record)}
-                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      className={cn(
+                                        "h-7 px-2 text-[11px]",
+                                        mcpOutlineButtonClass,
+                                      )}
                                       onClick={() =>
                                         record.snapshot.auth_status ===
                                         "connected"
@@ -1663,7 +1683,10 @@ export function McpPage() {
                                     <Button
                                       type="button"
                                       variant="outline"
-                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      className={cn(
+                                        "h-7 px-2 text-[11px]",
+                                        mcpOutlineButtonClass,
+                                      )}
                                       onClick={() => openEditDialog(record)}
                                     >
                                       Edit
@@ -1671,7 +1694,10 @@ export function McpPage() {
                                     <Button
                                       type="button"
                                       variant="outline"
-                                      className="h-7 border-white/10 bg-white/[0.02] px-2 text-[11px] text-white/82 hover:bg-white/[0.06]"
+                                      className={cn(
+                                        "h-7 px-2 text-[11px]",
+                                        mcpOutlineButtonClass,
+                                      )}
                                       onClick={() =>
                                         handleRefreshServer(record.config.name)
                                       }
@@ -1681,7 +1707,10 @@ export function McpPage() {
                                     <Button
                                       type="button"
                                       variant="outline"
-                                      className="h-7 border-red-400/20 bg-red-400/[0.06] px-2 text-[11px] text-red-100 hover:bg-red-400/[0.12]"
+                                      className={cn(
+                                        "h-7 px-2 text-[11px]",
+                                        mcpDestructiveButtonClass,
+                                      )}
                                       onClick={() =>
                                         handleDeleteServer(record.config.name)
                                       }
@@ -1700,15 +1729,15 @@ export function McpPage() {
                     <div className="min-h-0 overflow-hidden">
                       {selectedServer ? (
                         <SoftPanel className="flex h-full min-h-0 flex-col">
-                          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/[0.06] pb-4">
+                          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
                             <div>
                               <div className="flex flex-wrap items-center gap-3">
-                                <h2 className="text-[18px] font-medium text-white/90">
+                                <h2 className="text-[18px] font-medium text-foreground">
                                   {selectedServer.config.name}
                                 </h2>
                                 <span
                                   className={cn(
-                                    "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
+                                    mcpTagClass,
                                     statusClassName(
                                       selectedServer.snapshot.status,
                                     ),
@@ -1717,19 +1746,19 @@ export function McpPage() {
                                   {statusLabel(selectedServer.snapshot.status)}
                                 </span>
                                 {globalAvailabilityLabel(selectedServer) ? (
-                                  <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200">
+                                  <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
                                     {globalAvailabilityLabel(selectedServer)}
                                   </span>
                                 ) : null}
                               </div>
-                              <p className="mt-2 text-[13px] text-white/42">
+                              <p className="mt-2 text-[13px] text-muted-foreground">
                                 {selectedServer.config.transport} · Auth{" "}
                                 {formatAuthStatus(
                                   selectedServer.snapshot.auth_status,
                                 )}
                               </p>
                               {selectedServer.snapshot.last_error ? (
-                                <p className="mt-2 max-w-3xl text-[13px] leading-6 text-red-200">
+                                <p className="mt-2 max-w-3xl text-[13px] leading-6 text-destructive">
                                   {selectedServer.snapshot.last_error}
                                 </p>
                               ) : null}
@@ -1738,7 +1767,7 @@ export function McpPage() {
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                className={mcpOutlineButtonClass}
                                 onClick={() =>
                                   handleToggleEnabled(selectedServer)
                                 }
@@ -1751,7 +1780,7 @@ export function McpPage() {
                                 type="button"
                                 variant="outline"
                                 disabled={authActionDisabled(selectedServer)}
-                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                className={mcpOutlineButtonClass}
                                 onClick={() =>
                                   selectedServer.snapshot.auth_status ===
                                   "connected"
@@ -1764,7 +1793,7 @@ export function McpPage() {
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                className={mcpOutlineButtonClass}
                                 onClick={() => openEditDialog(selectedServer)}
                               >
                                 Edit
@@ -1772,7 +1801,7 @@ export function McpPage() {
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                className={mcpOutlineButtonClass}
                                 onClick={() =>
                                   handleRefreshServer(
                                     selectedServer.config.name,
@@ -1784,7 +1813,7 @@ export function McpPage() {
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="border-red-400/20 bg-red-400/[0.06] text-red-100 hover:bg-red-400/[0.12]"
+                                className={mcpDestructiveButtonClass}
                                 onClick={() =>
                                   handleDeleteServer(selectedServer.config.name)
                                 }
@@ -1814,16 +1843,14 @@ export function McpPage() {
                           <div className="mt-5 min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-none">
                             {detailTab === "overview" ? (
                               <div className="grid gap-4 xl:grid-cols-2">
-                                <SoftPanel className="bg-black/20">
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                    Status
-                                  </p>
-                                  <p className="mt-3 text-[22px] font-medium text-white">
+                                <SoftPanel className={mcpPanelClass}>
+                                  <p className={mcpEyebrowClass}>Status</p>
+                                  <p className="mt-3 text-[22px] font-medium text-foreground">
                                     {statusLabel(
                                       selectedServer.snapshot.status,
                                     )}
                                   </p>
-                                  <p className="mt-2 text-[13px] text-white/42">
+                                  <p className="mt-2 text-[13px] text-muted-foreground">
                                     Auth{" "}
                                     {formatAuthStatus(
                                       selectedServer.snapshot.auth_status,
@@ -1831,30 +1858,28 @@ export function McpPage() {
                                   </p>
                                 </SoftPanel>
 
-                                <SoftPanel className="bg-black/20">
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                    Visibility
-                                  </p>
-                                  <p className="mt-3 text-[22px] font-medium text-white">
+                                <SoftPanel className={mcpPanelClass}>
+                                  <p className={mcpEyebrowClass}>Visibility</p>
+                                  <p className="mt-3 text-[22px] font-medium text-foreground">
                                     {globalAvailabilityLabel(selectedServer) ??
                                       "Pending"}
                                   </p>
-                                  <p className="mt-2 text-[13px] text-white/42">
+                                  <p className="mt-2 text-[13px] text-muted-foreground">
                                     Connected servers become available to all
                                     agents without per-tab setup.
                                   </p>
                                 </SoftPanel>
 
-                                <SoftPanel className="bg-black/20">
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                <SoftPanel className={mcpPanelClass}>
+                                  <p className={mcpEyebrowClass}>
                                     Last Refresh
                                   </p>
-                                  <p className="mt-3 text-[15px] font-medium text-white">
+                                  <p className="mt-3 text-[15px] font-medium text-foreground">
                                     {formatTimestamp(
                                       selectedServer.snapshot.last_refresh_at,
                                     )}
                                   </p>
-                                  <p className="mt-2 text-[13px] text-white/42">
+                                  <p className="mt-2 text-[13px] text-muted-foreground">
                                     Result{" "}
                                     {formatSentenceCase(
                                       selectedServer.snapshot
@@ -1863,28 +1888,26 @@ export function McpPage() {
                                   </p>
                                 </SoftPanel>
 
-                                <SoftPanel className="bg-black/20">
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
-                                    Timeouts
-                                  </p>
-                                  <p className="mt-3 text-[15px] font-medium text-white">
+                                <SoftPanel className={mcpPanelClass}>
+                                  <p className={mcpEyebrowClass}>Timeouts</p>
+                                  <p className="mt-3 text-[15px] font-medium text-foreground">
                                     Startup{" "}
                                     {selectedServer.config.startup_timeout_sec}s
                                   </p>
-                                  <p className="mt-2 text-[13px] text-white/42">
+                                  <p className="mt-2 text-[13px] text-muted-foreground">
                                     Tool{" "}
                                     {selectedServer.config.tool_timeout_sec}s
                                   </p>
                                 </SoftPanel>
 
-                                <SoftPanel className="bg-black/20">
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                <SoftPanel className={mcpPanelClass}>
+                                  <p className={mcpEyebrowClass}>
                                     Tool Filters
                                   </p>
-                                  <p className="mt-3 text-[15px] font-medium text-white">
+                                  <p className="mt-3 text-[15px] font-medium text-foreground">
                                     {toolFilterSummary(selectedServer)}
                                   </p>
-                                  <p className="mt-2 text-[13px] text-white/42">
+                                  <p className="mt-2 text-[13px] text-muted-foreground">
                                     Enabled{" "}
                                     {selectedServer.config.enabled_tools.length}
                                     {" · "}Disabled{" "}
@@ -1895,8 +1918,10 @@ export function McpPage() {
                                   </p>
                                 </SoftPanel>
 
-                                <SoftPanel className="bg-black/20 xl:col-span-2">
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                <SoftPanel
+                                  className={cn("xl:col-span-2", mcpPanelClass)}
+                                >
+                                  <p className={mcpEyebrowClass}>
                                     Capability Summary
                                   </p>
                                   <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1905,12 +1930,12 @@ export function McpPage() {
                                     ).map(([key, value]) => (
                                       <div
                                         key={key}
-                                        className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+                                        className={mcpCardSurfaceClass}
                                       >
-                                        <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                        <p className={mcpEyebrowClass}>
                                           {key.replaceAll("_", " ")}
                                         </p>
-                                        <p className="mt-2 text-xl font-medium text-white">
+                                        <p className="mt-2 text-xl font-medium text-foreground">
                                           {value}
                                         </p>
                                       </div>
@@ -1919,7 +1944,12 @@ export function McpPage() {
                                 </SoftPanel>
 
                                 {selectedServer.config.launcher ? (
-                                  <SoftPanel className="bg-black/20 xl:col-span-2">
+                                  <SoftPanel
+                                    className={cn(
+                                      "xl:col-span-2",
+                                      mcpPanelClass,
+                                    )}
+                                  >
                                     <div className="grid gap-4 xl:grid-cols-2">
                                       <ReadonlyBlock
                                         label="Original Launcher"
@@ -1940,7 +1970,12 @@ export function McpPage() {
                                 ) : null}
 
                                 {selectedServer.config.transport === "stdio" ? (
-                                  <SoftPanel className="bg-black/20 xl:col-span-2">
+                                  <SoftPanel
+                                    className={cn(
+                                      "xl:col-span-2",
+                                      mcpPanelClass,
+                                    )}
+                                  >
                                     <div className="grid gap-4 xl:grid-cols-2">
                                       <ReadonlyBlock
                                         label="Command"
@@ -1973,7 +2008,12 @@ export function McpPage() {
                                     </div>
                                   </SoftPanel>
                                 ) : (
-                                  <SoftPanel className="bg-black/20 xl:col-span-2">
+                                  <SoftPanel
+                                    className={cn(
+                                      "xl:col-span-2",
+                                      mcpPanelClass,
+                                    )}
+                                  >
                                     <div className="grid gap-4 xl:grid-cols-2">
                                       <ReadonlyBlock
                                         label="URL"
@@ -2020,18 +2060,23 @@ export function McpPage() {
                                         mono
                                       />
                                     </div>
-                                    <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3">
-                                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    <div
+                                      className={cn(
+                                        "mt-4",
+                                        mcpCardSurfaceClass,
+                                      )}
+                                    >
+                                      <p className={mcpEyebrowClass}>
                                         Recent Auth Result
                                       </p>
-                                      <p className="mt-2 text-[14px] font-medium text-white">
+                                      <p className="mt-2 text-[14px] font-medium text-foreground">
                                         {renderValueOrFallback(
                                           selectedServer.snapshot
                                             .last_auth_result ?? "",
                                           "No login action yet",
                                         )}
                                       </p>
-                                      <p className="mt-2 text-[13px] text-white/42">
+                                      <p className="mt-2 text-[13px] text-muted-foreground">
                                         Current auth status{" "}
                                         {formatAuthStatus(
                                           selectedServer.snapshot.auth_status,
@@ -2071,7 +2116,12 @@ export function McpPage() {
                                   <div className="space-y-3">
                                     {selectedServer.snapshot.tools.length ===
                                     0 ? (
-                                      <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                      <SoftPanel
+                                        className={cn(
+                                          mcpPanelClass,
+                                          mcpPanelTextClass,
+                                        )}
+                                      >
                                         No tools discovered.
                                       </SoftPanel>
                                     ) : (
@@ -2079,46 +2129,46 @@ export function McpPage() {
                                         (tool) => (
                                           <SoftPanel
                                             key={tool.fully_qualified_id}
-                                            className="bg-black/20"
+                                            className={mcpPanelClass}
                                           >
                                             <div className="flex flex-wrap items-start justify-between gap-3">
                                               <div>
-                                                <p className="font-mono text-[13px] text-white/90">
+                                                <p className="font-mono text-[13px] text-foreground">
                                                   {tool.tool_name}
                                                 </p>
                                                 {tool.title ? (
-                                                  <p className="mt-2 text-[13px] text-white/62">
+                                                  <p className="mt-2 text-[13px] text-foreground/70">
                                                     {tool.title}
                                                   </p>
                                                 ) : null}
-                                                <p className="mt-1 text-[12px] text-white/42">
+                                                <p className="mt-1 text-[12px] text-muted-foreground">
                                                   {tool.fully_qualified_id}
                                                 </p>
                                               </div>
                                               <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.14em]">
                                                 {tool.read_only_hint ? (
-                                                  <span className="rounded-full border border-sky-400/20 bg-sky-400/[0.08] px-2 py-1 text-sky-200">
+                                                  <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2 py-1 text-primary">
                                                     readOnly
                                                   </span>
                                                 ) : null}
                                                 {tool.destructive_hint ? (
-                                                  <span className="rounded-full border border-red-400/20 bg-red-400/[0.08] px-2 py-1 text-red-200">
+                                                  <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-1 text-destructive">
                                                     destructive
                                                   </span>
                                                 ) : null}
                                                 {tool.open_world_hint ? (
-                                                  <span className="rounded-full border border-amber-400/20 bg-amber-400/[0.08] px-2 py-1 text-amber-200">
+                                                  <span className="rounded-full border border-graph-status-idle/18 bg-graph-status-idle/[0.12] px-2 py-1 text-graph-status-idle">
                                                     openWorld
                                                   </span>
                                                 ) : null}
                                               </div>
                                             </div>
                                             {tool.description ? (
-                                              <p className="mt-3 text-[13px] leading-6 text-white/48">
+                                              <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
                                                 {tool.description}
                                               </p>
                                             ) : null}
-                                            <pre className="mt-4 max-h-48 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                            <pre className={mcpCodeBlockClass}>
                                               {JSON.stringify(
                                                 tool.parameters ?? {},
                                                 null,
@@ -2136,7 +2186,12 @@ export function McpPage() {
                                   <div className="space-y-3">
                                     {selectedServer.snapshot.resources
                                       .length === 0 ? (
-                                      <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                      <SoftPanel
+                                        className={cn(
+                                          mcpPanelClass,
+                                          mcpPanelTextClass,
+                                        )}
+                                      >
                                         No resources discovered.
                                       </SoftPanel>
                                     ) : (
@@ -2144,20 +2199,20 @@ export function McpPage() {
                                         (resource) => (
                                           <SoftPanel
                                             key={resource.uri}
-                                            className="bg-black/20"
+                                            className={mcpPanelClass}
                                           >
-                                            <p className="text-[14px] font-medium text-white/88">
+                                            <p className="text-[14px] font-medium text-foreground">
                                               {resource.name}
                                             </p>
-                                            <p className="mt-1 font-mono text-[12px] text-white/42">
+                                            <p className="mt-1 font-mono text-[12px] text-muted-foreground">
                                               {resource.uri}
                                             </p>
-                                            <p className="mt-3 text-[13px] text-white/48">
+                                            <p className="mt-3 text-[13px] text-foreground/70">
                                               {resource.mime_type ??
                                                 "Unknown MIME"}
                                             </p>
                                             {resource.description ? (
-                                              <p className="mt-2 text-[13px] leading-6 text-white/42">
+                                              <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
                                                 {resource.description}
                                               </p>
                                             ) : null}
@@ -2172,7 +2227,12 @@ export function McpPage() {
                                   <div className="space-y-3">
                                     {selectedServer.snapshot.resource_templates
                                       .length === 0 ? (
-                                      <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                      <SoftPanel
+                                        className={cn(
+                                          mcpPanelClass,
+                                          mcpPanelTextClass,
+                                        )}
+                                      >
                                         No resource templates discovered.
                                       </SoftPanel>
                                     ) : (
@@ -2180,16 +2240,16 @@ export function McpPage() {
                                         (template) => (
                                           <SoftPanel
                                             key={template.uri_template}
-                                            className="bg-black/20"
+                                            className={mcpPanelClass}
                                           >
-                                            <p className="text-[14px] font-medium text-white/88">
+                                            <p className="text-[14px] font-medium text-foreground">
                                               {template.name}
                                             </p>
-                                            <p className="mt-1 font-mono text-[12px] text-white/42">
+                                            <p className="mt-1 font-mono text-[12px] text-muted-foreground">
                                               {template.uri_template}
                                             </p>
                                             {template.description ? (
-                                              <p className="mt-3 text-[13px] leading-6 text-white/42">
+                                              <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
                                                 {template.description}
                                               </p>
                                             ) : null}
@@ -2205,7 +2265,12 @@ export function McpPage() {
                                     <div className="space-y-3">
                                       {selectedServer.snapshot.prompts
                                         .length === 0 ? (
-                                        <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                        <SoftPanel
+                                          className={cn(
+                                            mcpPanelClass,
+                                            mcpPanelTextClass,
+                                          )}
+                                        >
                                           No prompts discovered.
                                         </SoftPanel>
                                       ) : (
@@ -2221,22 +2286,24 @@ export function McpPage() {
                                                 )
                                               }
                                               className={cn(
-                                                "block w-full rounded-xl border border-white/[0.06] bg-black/20 p-5 text-left transition-colors",
+                                                "block w-full rounded-xl border border-border bg-card/20 p-5 text-left transition-colors",
                                                 selectedPromptName ===
                                                   prompt.name
-                                                  ? "border-white/[0.16] bg-white/[0.04]"
-                                                  : "hover:bg-white/[0.03]",
+                                                  ? "border-border bg-accent/20"
+                                                  : "hover:bg-accent/20",
                                               )}
                                             >
-                                              <p className="text-[14px] font-medium text-white/88">
+                                              <p className="text-[14px] font-medium text-foreground">
                                                 {prompt.name}
                                               </p>
                                               {prompt.description ? (
-                                                <p className="mt-2 text-[13px] leading-6 text-white/42">
+                                                <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
                                                   {prompt.description}
                                                 </p>
                                               ) : null}
-                                              <pre className="mt-4 max-h-48 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                              <pre
+                                                className={mcpCodeBlockClass}
+                                              >
                                                 {JSON.stringify(
                                                   prompt.arguments ?? [],
                                                   null,
@@ -2248,16 +2315,16 @@ export function McpPage() {
                                         )
                                       )}
                                     </div>
-                                    <SoftPanel className="bg-black/20">
-                                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                    <SoftPanel className={mcpPanelClass}>
+                                      <p className={mcpEyebrowClass}>
                                         Prompt Preview
                                       </p>
                                       {selectedPromptName ? (
                                         <>
-                                          <p className="mt-3 text-[15px] font-medium text-white">
+                                          <p className="mt-3 text-[15px] font-medium text-foreground">
                                             {selectedPromptName}
                                           </p>
-                                          <p className="mt-4 text-[11px] uppercase tracking-[0.14em] text-white/38">
+                                          <p className="mt-4 text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">
                                             Arguments
                                           </p>
                                           <Textarea
@@ -2267,17 +2334,17 @@ export function McpPage() {
                                                 event.target.value,
                                               )
                                             }
-                                            className="mt-2 min-h-[120px] border-white/[0.06] bg-black/30 font-mono text-[11px] text-white/75"
+                                            className="mt-2 min-h-[120px] bg-background/50 font-mono text-[11px] text-foreground/80"
                                           />
                                           <div className="mt-3 flex items-center justify-between gap-3">
-                                            <p className="text-[12px] text-white/42">
+                                            <p className="text-[12px] text-muted-foreground">
                                               Edit argument JSON, then refresh
                                               the preview.
                                             </p>
                                             <Button
                                               type="button"
                                               variant="outline"
-                                              className="border-white/10 bg-white/[0.02] text-white/82 hover:bg-white/[0.06]"
+                                              className={mcpOutlineButtonClass}
                                               onClick={() => {
                                                 try {
                                                   const parsed = JSON.parse(
@@ -2300,7 +2367,12 @@ export function McpPage() {
                                             </Button>
                                           </div>
                                           {selectedPrompt?.arguments?.length ? (
-                                            <pre className="mt-4 max-h-40 overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                            <pre
+                                              className={cn(
+                                                mcpCodeBlockClass,
+                                                "max-h-40",
+                                              )}
+                                            >
                                               {JSON.stringify(
                                                 selectedPrompt.arguments,
                                                 null,
@@ -2308,7 +2380,12 @@ export function McpPage() {
                                               )}
                                             </pre>
                                           ) : null}
-                                          <pre className="mt-4 max-h-[420px] overflow-auto rounded-xl border border-white/[0.06] bg-black/40 p-3 text-[11px] text-white/65">
+                                          <pre
+                                            className={cn(
+                                              mcpCodeBlockClass,
+                                              "max-h-[420px]",
+                                            )}
+                                          >
                                             {promptPreviewLoading
                                               ? "Loading preview..."
                                               : JSON.stringify(
@@ -2319,7 +2396,7 @@ export function McpPage() {
                                           </pre>
                                         </>
                                       ) : (
-                                        <p className="mt-4 text-[13px] leading-6 text-white/42">
+                                        <p className="mt-4 text-[13px] leading-6 text-muted-foreground">
                                           Select a prompt to preview its
                                           parameter structure and template
                                           result.
@@ -2347,7 +2424,12 @@ export function McpPage() {
                                 </div>
 
                                 {filteredActivity.length === 0 ? (
-                                  <SoftPanel className="bg-black/20 text-[13px] text-white/42">
+                                  <SoftPanel
+                                    className={cn(
+                                      mcpPanelClass,
+                                      mcpPanelTextClass,
+                                    )}
+                                  >
                                     {selectedServer.activity.length === 0
                                       ? "No recent MCP activity."
                                       : "No activity matches the current filter."}
@@ -2356,35 +2438,35 @@ export function McpPage() {
                                   filteredActivity.map((entry) => (
                                     <SoftPanel
                                       key={entry.id}
-                                      className="bg-black/20"
+                                      className={mcpPanelClass}
                                     >
                                       <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                           <div className="flex flex-wrap items-center gap-2">
-                                            <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-white/66">
+                                            <span className="rounded-full border border-border bg-accent/20 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                                               {activityCategoryLabel(entry)}
                                             </span>
-                                            <p className="text-[14px] font-medium text-white/88">
+                                            <p className="text-[14px] font-medium text-foreground">
                                               {formatSentenceCase(entry.action)}
                                             </p>
                                           </div>
-                                          <p className="mt-2 text-[12px] text-white/42">
+                                          <p className="mt-2 text-[12px] text-muted-foreground">
                                             {formatTimestamp(entry.started_at)}
                                           </p>
                                         </div>
                                         <span
                                           className={cn(
-                                            "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
+                                            mcpTagClass,
                                             resultClassName(entry.result),
                                           )}
                                         >
                                           {entry.result}
                                         </span>
                                       </div>
-                                      <p className="mt-3 text-[13px] leading-6 text-white/46">
+                                      <p className="mt-3 text-[13px] leading-6 text-muted-foreground">
                                         {entry.summary}
                                       </p>
-                                      <div className="mt-3 flex flex-wrap gap-4 text-[12px] text-white/42">
+                                      <div className="mt-3 flex flex-wrap gap-4 text-[12px] text-muted-foreground">
                                         {entry.actor_node_id ? (
                                           <span>
                                             Node{" "}
@@ -2417,7 +2499,7 @@ export function McpPage() {
                           </div>
                         </SoftPanel>
                       ) : (
-                        <SoftPanel className="flex h-full items-center justify-center text-center text-white/46">
+                        <SoftPanel className="flex h-full items-center justify-center text-center text-muted-foreground">
                           Select an MCP server to inspect details.
                         </SoftPanel>
                       )}

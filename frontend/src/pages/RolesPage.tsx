@@ -46,6 +46,13 @@ type ToolState = "allowed" | "included" | "excluded";
 type PanelMode = "create" | "edit" | "view";
 
 const MINIMUM_TOOLS = new Set(["idle", "sleep", "todo", "contacts"]);
+const roleInputClass =
+  "w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+const roleMonoInputClass = `${roleInputClass} font-mono`;
+const roleReadOnlyClass = "cursor-default opacity-60 focus:outline-none";
+const roleSelectTriggerClass = "w-full rounded-lg bg-background/50 text-[13px]";
+const roleIconButtonClass =
+  "flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
 
 const emptyDraft = (): RoleDraft => ({
   name: "",
@@ -406,8 +413,8 @@ export function RolesPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-white/[0.05]" />
-          <p className="text-sm text-white/40">Loading roles...</p>
+          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
+          <p className="text-sm text-muted-foreground">Loading roles...</p>
         </div>
       </div>
     );
@@ -418,19 +425,19 @@ export function RolesPage() {
       {isPanelOpen ? (
         <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none">
           <div className="mx-auto max-w-3xl pb-10">
-            <div className="mb-8 flex items-center justify-between rounded-xl border border-white/[0.04] bg-white/[0.01] px-5 py-4">
+            <div className="mb-8 flex items-center justify-between rounded-xl border border-border bg-card/30 px-5 py-4">
               <div className="flex items-center gap-3">
-                <h2 className="text-[15px] font-medium text-white/90">
+                <h2 className="text-[15px] font-medium text-foreground">
                   {panelTitle}
                 </h2>
-                <span className="rounded-full border border-white/[0.06] bg-white/[0.02] px-2.5 py-0.5 text-[10px] font-medium tracking-wide text-white/50">
+                <span className="rounded-full border border-border bg-accent/25 px-2.5 py-0.5 text-[10px] font-medium tracking-wide text-muted-foreground">
                   {panelEyebrow}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={handleCancel}
-                className="flex size-7 items-center justify-center rounded-full bg-white/[0.04] text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
+                className="flex size-7 items-center justify-center rounded-full bg-accent/25 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
               >
                 <X className="size-3.5" />
               </button>
@@ -453,10 +460,8 @@ export function RolesPage() {
                     readOnly={isReadOnly || lockBuiltinFields}
                     placeholder="e.g., Code Reviewer"
                     className={cn(
-                      "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30",
-                      isReadOnly || lockBuiltinFields
-                        ? "cursor-default opacity-60 focus:outline-none"
-                        : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                      roleInputClass,
+                      isReadOnly || lockBuiltinFields ? roleReadOnlyClass : "",
                     )}
                   />
                 </SettingsRow>
@@ -474,10 +479,8 @@ export function RolesPage() {
                     placeholder="Briefly explain what this role is best suited for"
                     rows={3}
                     className={cn(
-                      "w-full resize-y rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30",
-                      isReadOnly || lockBuiltinFields
-                        ? "cursor-default opacity-60 focus:outline-none"
-                        : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                      `w-full resize-y ${roleInputClass}`,
+                      isReadOnly || lockBuiltinFields ? roleReadOnlyClass : "",
                     )}
                   />
                 </SettingsRow>
@@ -496,13 +499,13 @@ export function RolesPage() {
                       placeholder="You are a helpful assistant that..."
                       rows={12}
                       className={cn(
-                        "w-full resize-y rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 font-mono text-[13px] text-white transition-colors placeholder:text-white/30",
+                        `w-full resize-y ${roleMonoInputClass} py-3`,
                         isReadOnly || lockBuiltinFields
-                          ? "cursor-default opacity-60 focus:outline-none"
-                          : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                          ? roleReadOnlyClass
+                          : "",
                       )}
                     />
-                    <p className="text-[11px] text-white/40">
+                    <p className="text-[11px] text-muted-foreground">
                       {isReadOnly
                         ? activeRole?.is_builtin
                           ? "This built-in role can be inspected. Use Edit to adjust only its model configuration."
@@ -516,7 +519,7 @@ export function RolesPage() {
               </div>
             </section>
 
-            <section className="mb-10 border-t border-white/[0.04] pt-8">
+            <section className="mb-10 border-t border-border pt-8">
               <SectionHeader
                 title="Model Configuration"
                 description="Choose whether this role follows Settings or uses its own provider and model override."
@@ -531,8 +534,8 @@ export function RolesPage() {
                     className={cn(
                       "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       draft.model === null
-                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
-                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                        ? "border-border bg-accent/45 text-foreground"
+                        : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
                       isReadOnly && "cursor-default",
                     )}
                   >
@@ -545,8 +548,8 @@ export function RolesPage() {
                     className={cn(
                       "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       draft.model !== null
-                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
-                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                        ? "border-border bg-accent/45 text-foreground"
+                        : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
                       isReadOnly && "cursor-default",
                     )}
                   >
@@ -555,10 +558,10 @@ export function RolesPage() {
                 </div>
 
                 {draft.model ? (
-                  <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5">
+                  <div className="rounded-xl border border-border bg-card/30 p-5">
                     <div className="grid gap-6 md:grid-cols-2">
                       <div className="space-y-2">
-                        <label className="text-[13px] font-medium text-white/80">
+                        <label className="text-[13px] font-medium text-foreground/80">
                           Provider
                         </label>
                         <Select
@@ -566,10 +569,10 @@ export function RolesPage() {
                           onValueChange={handleProviderChange}
                           disabled={isReadOnly}
                         >
-                          <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                          <SelectTrigger className={roleSelectTriggerClass}>
                             <SelectValue placeholder="Select a provider" />
                           </SelectTrigger>
-                          <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                          <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
                             {providers.map((provider) => (
                               <SelectItem
                                 key={provider.id}
@@ -584,7 +587,7 @@ export function RolesPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-[13px] font-medium text-white/80">
+                        <label className="text-[13px] font-medium text-foreground/80">
                           Provider Models
                         </label>
                         <Select
@@ -609,7 +612,7 @@ export function RolesPage() {
                             activeProviderModelOptions.length === 0
                           }
                         >
-                          <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                          <SelectTrigger className={roleSelectTriggerClass}>
                             <SelectValue
                               placeholder={
                                 activeProviderModelOptions.length > 0
@@ -618,7 +621,7 @@ export function RolesPage() {
                               }
                             />
                           </SelectTrigger>
-                          <SelectContent className="max-h-[300px] rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                          <SelectContent className="max-h-[300px] rounded-xl border-border bg-popover backdrop-blur-xl">
                             {filteredActiveProviderModelOptions.map(
                               (option) => (
                                 <SelectItem
@@ -642,28 +645,26 @@ export function RolesPage() {
                             readOnly={isReadOnly}
                             placeholder="Search provider models"
                             className={cn(
-                              "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30",
-                              isReadOnly
-                                ? "cursor-default opacity-60 focus:outline-none"
-                                : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                              roleInputClass,
+                              isReadOnly ? roleReadOnlyClass : "",
                             )}
                           />
                         ) : (
-                          <p className="text-[11px] text-white/40 leading-relaxed">
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
                             No saved provider models. Manage this provider
                             catalog in Providers.
                           </p>
                         )}
                         {activeProviderModelOptions.length > 0 &&
                         filteredActiveProviderModelOptions.length === 0 ? (
-                          <p className="text-[11px] text-white/40 leading-relaxed">
+                          <p className="text-[11px] text-muted-foreground leading-relaxed">
                             No provider models match the current search.
                           </p>
                         ) : null}
                       </div>
 
                       <div className="space-y-2 md:col-span-2">
-                        <label className="text-[13px] font-medium text-white/80">
+                        <label className="text-[13px] font-medium text-foreground/80">
                           Model ID
                         </label>
                         <input
@@ -680,20 +681,18 @@ export function RolesPage() {
                           readOnly={isReadOnly}
                           placeholder="e.g., gpt-4o-mini"
                           className={cn(
-                            "w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30",
-                            isReadOnly
-                              ? "cursor-default opacity-60 focus:outline-none"
-                              : "focus:border-white/20 focus:bg-white/[0.04] focus:outline-none",
+                            roleMonoInputClass,
+                            isReadOnly ? roleReadOnlyClass : "",
                           )}
                         />
-                        <p className="text-[11px] text-white/40">
+                        <p className="text-[11px] text-muted-foreground">
                           Catalog or manual ID
                         </p>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[13px] text-white/40">
+                  <p className="text-[13px] text-muted-foreground">
                     This role follows the default provider and model from
                     Settings.
                   </p>
@@ -701,7 +700,7 @@ export function RolesPage() {
               </div>
             </section>
 
-            <section className="mb-10 border-t border-white/[0.04] pt-8">
+            <section className="mb-10 border-t border-border pt-8">
               <SectionHeader
                 title="Model Parameters"
                 description="Optionally override the canonical model parameters for this role."
@@ -716,8 +715,8 @@ export function RolesPage() {
                     className={cn(
                       "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       isEmptyModelParams(draft.model_params)
-                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
-                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                        ? "border-border bg-accent/45 text-foreground"
+                        : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
                       isReadOnly && "cursor-default",
                     )}
                   >
@@ -730,8 +729,8 @@ export function RolesPage() {
                     className={cn(
                       "rounded-lg border px-4 py-2 text-[13px] font-medium transition-colors",
                       !isEmptyModelParams(draft.model_params)
-                        ? "border-white/[0.08] bg-white/[0.04] text-white/90"
-                        : "border-transparent bg-white/[0.01] text-white/50 hover:bg-white/[0.03]",
+                        ? "border-border bg-accent/45 text-foreground"
+                        : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25",
                       isReadOnly && "cursor-default",
                     )}
                   >
@@ -740,7 +739,7 @@ export function RolesPage() {
                 </div>
 
                 {!isEmptyModelParams(draft.model_params) ? (
-                  <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5">
+                  <div className="rounded-xl border border-border bg-card/30 p-5">
                     <ModelParamsFields
                       value={cloneModelParams(draft.model_params)}
                       onChange={(params) =>
@@ -757,7 +756,7 @@ export function RolesPage() {
                     />
                   </div>
                 ) : (
-                  <p className="text-[13px] text-white/40">
+                  <p className="text-[13px] text-muted-foreground">
                     This role inherits the default model parameters from
                     Settings.
                   </p>
@@ -765,25 +764,25 @@ export function RolesPage() {
               </div>
             </section>
 
-            <section className="mb-10 border-t border-white/[0.04] pt-8">
+            <section className="mb-10 border-t border-border pt-8">
               <SectionHeader
                 title="Tool Configuration"
                 description="Minimum tools are injected by the framework. Configure the remaining tools as Allowed, Included, or Excluded."
               />
 
-              <div className="overflow-hidden rounded-xl border border-white/[0.04] bg-white/[0.01]">
+              <div className="overflow-hidden rounded-xl border border-border bg-card/30">
                 {configurableTools.map((tool) => {
                   const state = getToolState(tool.name);
                   return (
                     <div
                       key={tool.name}
-                      className="flex items-center justify-between gap-4 border-b border-white/[0.04] px-5 py-4 last:border-b-0"
+                      className="flex items-center justify-between gap-4 border-b border-border px-5 py-4 last:border-b-0"
                     >
                       <div className="min-w-0 flex-1" title={tool.description}>
-                        <p className="font-mono text-[13px] text-white/80">
+                        <p className="font-mono text-[13px] text-foreground/80">
                           {tool.name}
                         </p>
-                        <p className="mt-1 truncate text-[12px] text-white/40">
+                        <p className="mt-1 truncate text-[12px] text-muted-foreground">
                           {tool.description}
                         </p>
                       </div>
@@ -793,11 +792,12 @@ export function RolesPage() {
                         disabled={isReadOnly || lockBuiltinFields}
                         className={cn(
                           "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                          state === "included" && "bg-white/[0.08] text-white",
+                          state === "included" &&
+                            "bg-accent/50 text-foreground",
                           state === "excluded" &&
-                            "bg-transparent text-white/30 line-through",
+                            "bg-transparent text-muted-foreground line-through",
                           state === "allowed" &&
-                            "bg-white/[0.02] text-white/50 hover:bg-white/[0.04]",
+                            "bg-accent/20 text-muted-foreground hover:bg-accent/35",
                           (isReadOnly || lockBuiltinFields) &&
                             "cursor-default hover:bg-inherit opacity-60",
                         )}
@@ -814,12 +814,12 @@ export function RolesPage() {
               </div>
             </section>
 
-            <div className="flex items-center justify-end gap-3 border-t border-white/[0.04] pt-6">
+            <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
               <button
                 type="button"
                 onClick={handleCancel}
                 disabled={saving}
-                className="rounded-full px-5 py-2 text-[13px] font-medium text-white/60 transition-colors hover:text-white"
+                className="rounded-full px-5 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
               >
                 Cancel
               </button>
@@ -833,7 +833,7 @@ export function RolesPage() {
                     !draft.description.trim() ||
                     !draft.system_prompt.trim()
                   }
-                  className="rounded-full bg-white px-6 py-2 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="rounded-full bg-primary px-6 py-2 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {saving
                     ? "Saving..."
@@ -846,7 +846,7 @@ export function RolesPage() {
                 <button
                   type="button"
                   onClick={() => handleEdit(activeRole)}
-                  className="rounded-full bg-white/[0.08] px-6 py-2 text-[13px] font-medium text-white transition-colors hover:bg-white/[0.12]"
+                  className="rounded-full bg-accent/45 px-6 py-2 text-[13px] font-medium text-foreground transition-colors hover:bg-accent/60"
                 >
                   Edit Role
                 </button>
@@ -860,13 +860,13 @@ export function RolesPage() {
           animate={{ opacity: 1 }}
           className="flex h-full flex-col items-center justify-center text-center"
         >
-          <div className="flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-sm">
-            <Users className="size-5 text-white/40" />
+          <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/20 shadow-sm">
+            <Users className="size-5 text-muted-foreground" />
           </div>
-          <h3 className="mt-5 text-[15px] font-medium text-white/90">
+          <h3 className="mt-5 text-[15px] font-medium text-foreground">
             No Roles Created
           </h3>
-          <p className="mt-1.5 max-w-sm text-[13px] text-white/40">
+          <p className="mt-1.5 max-w-sm text-[13px] text-muted-foreground">
             Roles define agent behavior. Create your first role to get started.
           </p>
         </motion.div>
@@ -879,7 +879,7 @@ export function RolesPage() {
                   type="button"
                   onClick={() => void refreshRoles()}
                   disabled={loading}
-                  className="flex size-9 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/60 transition-colors hover:bg-white/[0.04] hover:text-white"
+                  className="flex size-9 items-center justify-center rounded-lg border border-border bg-accent/20 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
                 >
                   <RefreshCw
                     className={cn("size-4", loading && "animate-spin")}
@@ -889,7 +889,7 @@ export function RolesPage() {
                   type="button"
                   onClick={handleCreate}
                   disabled={isPanelOpen}
-                  className="flex h-9 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="flex h-9 items-center gap-2 rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   <Plus className="size-4" />
                   New Role
@@ -897,13 +897,13 @@ export function RolesPage() {
               </div>
             </div>
             <div className="mb-2 grid grid-cols-[260px_1fr_120px_100px] gap-4 px-4 pb-3">
-              <span className="text-[11px] font-medium text-white/40">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 Name
               </span>
-              <span className="text-[11px] font-medium text-white/40">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 Model
               </span>
-              <span className="text-[11px] font-medium text-white/40">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 Tools
               </span>
               <span />
@@ -931,28 +931,28 @@ export function RolesPage() {
                     className={cn(
                       "group grid grid-cols-[220px_1fr_100px_80px] items-center gap-4 rounded-xl px-4 py-3.5 transition-colors",
                       activeRoleName === role.name
-                        ? "bg-white/[0.04]"
-                        : "hover:bg-white/[0.02]",
+                        ? "bg-accent/25"
+                        : "hover:bg-accent/15",
                     )}
                   >
                     <div className="min-w-0 pr-2">
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-[13px] font-medium text-white/90">
+                        <span className="truncate text-[13px] font-medium text-foreground">
                           {role.name}
                         </span>
                         {role.is_builtin && (
-                          <span className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-white/40">
+                          <span className="shrink-0 rounded-full border border-border bg-accent/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">
                             Built-in
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-white/40">
+                      <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
                         {role.description}
                       </p>
                     </div>
 
                     <div className="min-w-0 pr-2">
-                      <span className="block truncate text-[13px] text-white/50">
+                      <span className="block truncate text-[13px] text-muted-foreground">
                         {role.model
                           ? `${providerName} / ${role.model.model}`
                           : "Settings default"}
@@ -960,7 +960,7 @@ export function RolesPage() {
                     </div>
 
                     <div className="pr-2">
-                      <span className="text-[13px] font-mono text-white/50">
+                      <span className="text-[13px] font-mono text-muted-foreground">
                         {toolSummary}
                       </span>
                     </div>
@@ -971,7 +971,7 @@ export function RolesPage() {
                         onClick={() => handleView(role)}
                         aria-label={`View ${role.name}`}
                         title={`View ${role.name}`}
-                        className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        className={cn("size-7", roleIconButtonClass)}
                       >
                         <Eye className="size-3.5" />
                       </button>
@@ -980,7 +980,7 @@ export function RolesPage() {
                         onClick={() => handleEdit(role)}
                         aria-label={`Edit ${role.name}`}
                         title={`Edit ${role.name}`}
-                        className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        className={cn("size-7", roleIconButtonClass)}
                       >
                         <Edit2 className="size-3.5" />
                       </button>
@@ -990,7 +990,7 @@ export function RolesPage() {
                           onClick={() => setRoleToDelete(role)}
                           aria-label={`Delete ${role.name}`}
                           title={`Delete ${role.name}`}
-                          className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                          className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Trash2 className="size-3.5" />
                         </button>

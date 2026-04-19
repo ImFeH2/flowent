@@ -245,7 +245,7 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
                         ? "bg-graph-status-initializing/62"
                         : currentItem.tone === "active"
                           ? "bg-graph-status-running/80"
-                          : "bg-white/28",
+                          : "bg-muted-foreground/30",
                   )}
                   style={{
                     width: EVENT_DOT_SIZE,

@@ -43,6 +43,17 @@ const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
   { value: "unlimited", label: "Unlimited" },
 ];
 
+const settingsInputClass =
+  "w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+const settingsMonoInputClass = `${settingsInputClass} font-mono`;
+const settingsIconButtonClass =
+  "flex size-10 items-center justify-center rounded-lg border border-border bg-accent/20 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
+const settingsFieldLabelClass =
+  "text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground";
+const settingsHelpTextClass =
+  "text-[11px] leading-relaxed text-muted-foreground";
+const settingsSelectTriggerClass = "w-full rounded-md bg-background/50";
+
 export function SettingsPage() {
   const { requireReauth } = useAccess();
   const {
@@ -204,8 +215,10 @@ export function SettingsPage() {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-white/[0.05]" />
-          <p className="text-[13px] text-white/40">Loading settings...</p>
+          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
+          <p className="text-[13px] text-muted-foreground">
+            Loading settings...
+          </p>
         </div>
       </div>
     );
@@ -217,10 +230,10 @@ export function SettingsPage() {
         <div className="mx-auto max-w-[680px] pb-10 pt-8">
           <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h1 className="text-[28px] font-medium tracking-[-0.04em] text-white">
+              <h1 className="text-[28px] font-medium tracking-[-0.04em] text-foreground">
                 Settings
               </h1>
-              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-white/42">
+              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
                 Update access, assistant defaults, leader defaults, and
                 system-wide model behavior.
               </p>
@@ -229,7 +242,7 @@ export function SettingsPage() {
               type="button"
               onClick={() => void handleSave()}
               disabled={saving || Boolean(accessDraftError)}
-              className="flex h-9 items-center gap-2 rounded-full bg-white px-5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="flex h-9 items-center gap-2 rounded-full bg-primary px-5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               <Save className="size-4" />
               {saving ? "Saving..." : "Save Changes"}
@@ -249,7 +262,7 @@ export function SettingsPage() {
                   <div className="space-y-2">
                     <label
                       htmlFor="new-access-code"
-                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                      className={settingsFieldLabelClass}
                     >
                       New Access Code
                     </label>
@@ -265,7 +278,7 @@ export function SettingsPage() {
                           }))
                         }
                         placeholder="Leave empty to keep the current access code"
-                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        className={settingsInputClass}
                       />
                       <button
                         type="button"
@@ -277,7 +290,7 @@ export function SettingsPage() {
                         onClick={() =>
                           setShowNewAccessCode((current) => !current)
                         }
-                        className="flex size-10 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/68 transition-colors hover:bg-white/[0.05] hover:text-white"
+                        className={settingsIconButtonClass}
                       >
                         {showNewAccessCode ? (
                           <EyeOff className="size-4" />
@@ -291,7 +304,7 @@ export function SettingsPage() {
                   <div className="space-y-2">
                     <label
                       htmlFor="confirm-access-code"
-                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                      className={settingsFieldLabelClass}
                     >
                       Confirm Access Code
                     </label>
@@ -307,7 +320,7 @@ export function SettingsPage() {
                           }))
                         }
                         placeholder="Repeat the new access code"
-                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        className={settingsInputClass}
                       />
                       <button
                         type="button"
@@ -319,7 +332,7 @@ export function SettingsPage() {
                         onClick={() =>
                           setShowConfirmAccessCode((current) => !current)
                         }
-                        className="flex size-10 items-center justify-center rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/68 transition-colors hover:bg-white/[0.05] hover:text-white"
+                        className={settingsIconButtonClass}
                       >
                         {showConfirmAccessCode ? (
                           <EyeOff className="size-4" />
@@ -330,7 +343,7 @@ export function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 text-[11px] leading-relaxed text-white/40">
+                  <div className={cn("space-y-2", settingsHelpTextClass)}>
                     <p>
                       Saving a new access code invalidates all current admin
                       sessions. You will need to unlock the console again with
@@ -342,7 +355,7 @@ export function SettingsPage() {
                       writes it to the local startup log.
                     </p>
                     {accessDraftError ? (
-                      <p className="text-red-200">{accessDraftError}</p>
+                      <p className="text-destructive">{accessDraftError}</p>
                     ) : null}
                   </div>
                 </div>
@@ -350,7 +363,7 @@ export function SettingsPage() {
             </div>
           </section>
 
-          <section className="mt-8 border-t border-white/6 pt-8">
+          <section className="mt-8 border-t border-border pt-8">
             <SectionHeader
               title="Assistant Configuration"
               description="Choose the role that powers the system assistant."
@@ -369,7 +382,7 @@ export function SettingsPage() {
                     })
                   }
                 >
-                  <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                  <SelectTrigger className={settingsSelectTriggerClass}>
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -377,7 +390,7 @@ export function SettingsPage() {
                       <SelectItem key={role.name} value={role.name}>
                         <div className="flex min-w-0 flex-col items-start">
                           <span>{role.name}</span>
-                          <span className="text-[11px] text-white/50">
+                          <span className="text-[11px] text-muted-foreground">
                             {role.description}
                           </span>
                         </div>
@@ -388,7 +401,7 @@ export function SettingsPage() {
                 {assistantRole ? (
                   <div
                     data-testid="assistant-role-guidance"
-                    className="mt-2 space-y-2 text-[11px] leading-relaxed text-white/40"
+                    className={cn("mt-2 space-y-2", settingsHelpTextClass)}
                   >
                     <p>{assistantRole.description}</p>
                     <p>
@@ -423,22 +436,22 @@ export function SettingsPage() {
                     className={cn(
                       "inline-flex h-8 w-[72px] items-center rounded-full border px-1 transition-colors",
                       settings.assistant.allow_network
-                        ? "border-emerald-400/30 bg-emerald-400/15"
-                        : "border-white/[0.08] bg-white/[0.04]",
+                        ? "border-graph-status-running/30 bg-graph-status-running/15"
+                        : "border-border bg-accent/30",
                     )}
                   >
                     <span
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold transition-all",
                         settings.assistant.allow_network
-                          ? "translate-x-[40px] bg-emerald-300 text-black"
-                          : "translate-x-0 bg-white/90 text-black",
+                          ? "translate-x-[40px] bg-graph-status-running text-background"
+                          : "translate-x-0 bg-foreground text-background",
                       )}
                     >
                       {settings.assistant.allow_network ? "ON" : "OFF"}
                     </span>
                   </button>
-                  <p className="text-[11px] text-white/40 leading-relaxed">
+                  <p className={settingsHelpTextClass}>
                     When disabled, the Assistant cannot make networked tool
                     calls even if its role still includes network-capable tools.
                   </p>
@@ -465,9 +478,9 @@ export function SettingsPage() {
                     rows={4}
                     spellCheck={false}
                     placeholder="/workspace/output"
-                    className="min-h-[108px] w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                    className={`min-h-[108px] ${settingsMonoInputClass}`}
                   />
-                  <p className="text-[11px] text-white/40 leading-relaxed">
+                  <p className={settingsHelpTextClass}>
                     One directory per line. Empty lines are ignored. These paths
                     bound both the Assistant&apos;s own writes and the maximum
                     write access it can delegate to execution chains.
@@ -477,7 +490,7 @@ export function SettingsPage() {
             </div>
           </section>
 
-          <section className="mt-8 border-t border-white/6 pt-8">
+          <section className="mt-8 border-t border-border pt-8">
             <SectionHeader
               title="Leader Configuration"
               description="Choose the default role used by each task tab's bound leader."
@@ -498,7 +511,7 @@ export function SettingsPage() {
                     })
                   }
                 >
-                  <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                  <SelectTrigger className={settingsSelectTriggerClass}>
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -506,7 +519,7 @@ export function SettingsPage() {
                       <SelectItem key={role.name} value={role.name}>
                         <div className="flex min-w-0 flex-col items-start">
                           <span>{role.name}</span>
-                          <span className="text-[11px] text-white/50">
+                          <span className="text-[11px] text-muted-foreground">
                             {role.description}
                           </span>
                         </div>
@@ -515,7 +528,7 @@ export function SettingsPage() {
                   </SelectContent>
                 </Select>
                 {leaderRole ? (
-                  <p className="mt-2 text-[11px] leading-relaxed text-white/40">
+                  <p className={cn("mt-2", settingsHelpTextClass)}>
                     {leaderRole.description}
                   </p>
                 ) : null}
@@ -523,7 +536,7 @@ export function SettingsPage() {
             </div>
           </section>
 
-          <section className="mt-8 border-t border-white/6 pt-8">
+          <section className="mt-8 border-t border-border pt-8">
             <SectionHeader
               title="Model Configuration"
               description="Set the active provider and model, explicit active-model metadata overrides, canonical parameters, and token-limit based automatic compact."
@@ -547,7 +560,7 @@ export function SettingsPage() {
                     setProviderModelQuery("");
                   }}
                 >
-                  <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                  <SelectTrigger className={settingsSelectTriggerClass}>
                     <SelectValue placeholder="Select a provider" />
                   </SelectTrigger>
                   <SelectContent>
@@ -570,7 +583,7 @@ export function SettingsPage() {
                   {settings.model.active_provider_id ? (
                     activeProviderModels.length > 0 ? (
                       <div className="space-y-2">
-                        <label className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">
+                        <label className={settingsFieldLabelClass}>
                           Provider Models
                         </label>
                         <input
@@ -581,7 +594,7 @@ export function SettingsPage() {
                             setProviderModelQuery(event.target.value)
                           }
                           placeholder="Search provider models"
-                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                          className={settingsInputClass}
                         />
                         <Select
                           value={
@@ -602,7 +615,7 @@ export function SettingsPage() {
                             })
                           }
                         >
-                          <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                          <SelectTrigger className={settingsSelectTriggerClass}>
                             <SelectValue placeholder="Select a provider model" />
                           </SelectTrigger>
                           <SelectContent>
@@ -614,13 +627,13 @@ export function SettingsPage() {
                           </SelectContent>
                         </Select>
                         {filteredActiveProviderModels.length === 0 ? (
-                          <p className="text-[11px] text-white/40 leading-relaxed">
+                          <p className={settingsHelpTextClass}>
                             No provider models match the current search.
                           </p>
                         ) : null}
                       </div>
                     ) : (
-                      <p className="text-[11px] text-white/40 leading-relaxed">
+                      <p className={settingsHelpTextClass}>
                         No saved provider models. Manage this catalog in
                         Providers, or enter a model ID manually below.
                       </p>
@@ -644,11 +657,11 @@ export function SettingsPage() {
                         ? "Enter model ID manually"
                         : "Select a provider first"
                     }
-                    className="w-full rounded-md border border-white/8 bg-black/[0.22] px-3 py-2 text-sm transition-all duration-200 placeholder:text-muted-foreground focus:border-white/16 focus:outline-none"
+                    className="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
                   />
                 </div>
                 {settings.model.active_model ? (
-                  <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-white/40">
+                  <div className={cn("mt-2 space-y-1", settingsHelpTextClass)}>
                     <p>
                       Context window:{" "}
                       {effectiveContextWindowTokens
@@ -678,7 +691,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="model-context-window"
-                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                        className={settingsFieldLabelClass}
                       >
                         Context Window
                       </label>
@@ -716,16 +729,16 @@ export function SettingsPage() {
                             });
                           }}
                           placeholder="Auto"
-                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                          className={settingsMonoInputClass}
                         />
-                        <span className="text-[13px] font-medium text-white/40">
+                        <span className="text-[13px] font-medium text-muted-foreground">
                           tokens
                         </span>
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">
+                      <label className={settingsFieldLabelClass}>
                         Input Image
                       </label>
                       <Select
@@ -744,7 +757,7 @@ export function SettingsPage() {
                       >
                         <SelectTrigger
                           aria-label="Input Image"
-                          className="w-full rounded-md border-white/8 bg-black/[0.22]"
+                          className={settingsSelectTriggerClass}
                         >
                           <SelectValue placeholder="Auto" />
                         </SelectTrigger>
@@ -757,7 +770,7 @@ export function SettingsPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45">
+                      <label className={settingsFieldLabelClass}>
                         Output Image
                       </label>
                       <Select
@@ -776,7 +789,7 @@ export function SettingsPage() {
                       >
                         <SelectTrigger
                           aria-label="Output Image"
-                          className="w-full rounded-md border-white/8 bg-black/[0.22]"
+                          className={settingsSelectTriggerClass}
                         >
                           <SelectValue placeholder="Auto" />
                         </SelectTrigger>
@@ -789,7 +802,7 @@ export function SettingsPage() {
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-white/40 leading-relaxed">
+                  <p className={settingsHelpTextClass}>
                     These fields override the resolved metadata for the current
                     active model only. Auto keeps using the catalog result or
                     other resolved metadata instead of forcing a value.
@@ -801,7 +814,7 @@ export function SettingsPage() {
                 label="Default Model Parameters"
                 valueClassName="w-full md:w-80"
               >
-                <div className="rounded-xl border border-white/[0.04] bg-white/[0.01] p-5">
+                <div className="rounded-xl border border-border bg-card/30 p-5">
                   <ModelParamsFields
                     className="w-full"
                     value={cloneModelParams(settings.model.params)}
@@ -851,13 +864,13 @@ export function SettingsPage() {
                           },
                         });
                       }}
-                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                      className={settingsMonoInputClass}
                     />
-                    <span className="text-[13px] font-medium text-white/40">
+                    <span className="text-[13px] font-medium text-muted-foreground">
                       ms
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/40 leading-relaxed">
+                  <p className={settingsHelpTextClass}>
                     Applies to a single LLM request attempt. Default is 10000ms.
                     Automatic retries can still make the full call take longer.
                   </p>
@@ -881,7 +894,7 @@ export function SettingsPage() {
                       })
                     }
                   >
-                    <SelectTrigger className="w-full rounded-md border-white/8 bg-black/[0.22]">
+                    <SelectTrigger className={settingsSelectTriggerClass}>
                       <SelectValue placeholder="Select a retry policy" />
                     </SelectTrigger>
                     <SelectContent>
@@ -898,7 +911,7 @@ export function SettingsPage() {
                       <div className="space-y-1">
                         <label
                           htmlFor="retry-attempts"
-                          className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                          className={settingsFieldLabelClass}
                         >
                           Retry Attempts
                         </label>
@@ -926,13 +939,13 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                          className={settingsMonoInputClass}
                         />
                       </div>
                     </div>
                   ) : null}
 
-                  <p className="text-[11px] text-white/40 leading-relaxed">
+                  <p className={settingsHelpTextClass}>
                     No retry fails immediately on transient errors. Limited
                     retries automatically up to the configured attempt count.
                     Unlimited keeps retrying transient failures until success,
@@ -950,7 +963,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="retry-initial-delay"
-                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                        className={settingsFieldLabelClass}
                       >
                         Initial Delay
                       </label>
@@ -980,9 +993,9 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                          className={settingsMonoInputClass}
                         />
-                        <span className="text-[13px] font-medium text-white/40">
+                        <span className="text-[13px] font-medium text-muted-foreground">
                           s
                         </span>
                       </div>
@@ -991,7 +1004,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="retry-max-delay"
-                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                        className={settingsFieldLabelClass}
                       >
                         Max Delay
                       </label>
@@ -1019,9 +1032,9 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                          className={settingsMonoInputClass}
                         />
-                        <span className="text-[13px] font-medium text-white/40">
+                        <span className="text-[13px] font-medium text-muted-foreground">
                           s
                         </span>
                       </div>
@@ -1030,7 +1043,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="retry-backoff-cap-retries"
-                        className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                        className={settingsFieldLabelClass}
                       >
                         Cap Retries
                       </label>
@@ -1058,12 +1071,12 @@ export function SettingsPage() {
                             },
                           });
                         }}
-                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        className={settingsMonoInputClass}
                       />
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-white/40 leading-relaxed">
+                  <p className={settingsHelpTextClass}>
                     Retries use exponential backoff from Initial Delay, stop
                     doubling after Cap Retries, and never exceed Max Delay.
                   </p>
@@ -1078,7 +1091,7 @@ export function SettingsPage() {
                   <div className="space-y-1">
                     <label
                       htmlFor="auto-compact-token-limit"
-                      className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
+                      className={settingsFieldLabelClass}
                     >
                       Token Limit
                     </label>
@@ -1116,22 +1129,22 @@ export function SettingsPage() {
                           });
                         }}
                         placeholder="Disabled"
-                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        className={settingsMonoInputClass}
                       />
-                      <span className="text-[13px] font-medium text-white/40">
+                      <span className="text-[13px] font-medium text-muted-foreground">
                         tokens
                       </span>
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-white/40 leading-relaxed">
+                  <p className={settingsHelpTextClass}>
                     Automatic compact is triggered by the latest successful API
                     usage baseline plus any locally added tail context after
                     that response. Leave this empty to disable automatic{" "}
                     <code>/compact</code>.
                   </p>
                   {knownSafeInputTokens !== null ? (
-                    <p className="text-[11px] text-white/40 leading-relaxed">
+                    <p className={settingsHelpTextClass}>
                       Known safe input window:{" "}
                       {knownSafeInputTokens.toLocaleString()} tokens.
                       {settings.model.auto_compact_token_limit !== null &&
@@ -1141,7 +1154,7 @@ export function SettingsPage() {
                         : null}
                     </p>
                   ) : settings.model.auto_compact_token_limit !== null ? (
-                    <p className="text-[11px] text-amber-200/70 leading-relaxed">
+                    <p className="text-[11px] leading-relaxed text-graph-status-idle">
                       The current model window is not resolved, so this token
                       limit can be saved but cannot be fully validated yet.
                     </p>
@@ -1151,11 +1164,11 @@ export function SettingsPage() {
             </div>
           </section>
 
-          <div className="mt-10 border-t border-white/[0.04] pt-6 flex flex-col items-center text-center">
-            <p className="text-[11px] font-medium text-white/40 tracking-wide uppercase">
+          <div className="mt-10 flex flex-col items-center border-t border-border pt-6 text-center">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Autopoe Agent Studio v{appVersion ?? "—"}
             </p>
-            <p className="mt-1.5 text-[10px] text-white/30">
+            <p className="mt-1.5 text-[10px] text-muted-foreground/80">
               A multi-agent collaboration framework.
             </p>
           </div>

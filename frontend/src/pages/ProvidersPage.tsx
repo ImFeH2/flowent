@@ -77,6 +77,16 @@ import {
   type TriStateCapability,
 } from "@/pages/providers/lib";
 
+const providerInputClass =
+  "w-full rounded-lg border border-input bg-background/50 px-3.5 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+const providerMonoInputClass = `${providerInputClass} font-mono`;
+const providerSelectTriggerClass =
+  "w-full rounded-lg bg-background/50 text-[13px]";
+const providerIconButtonClass =
+  "flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
+const providerHelpTextClass =
+  "text-[11px] leading-relaxed text-muted-foreground";
+
 export function ProvidersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -420,12 +430,12 @@ export function ProvidersPage() {
       <div className="flex h-full w-full">
         <div
           style={{ width: `${panelWidth}px` }}
-          className="relative flex shrink-0 flex-col border-r border-white/[0.04] bg-white/[0.01] pt-8 pl-8"
+          className="relative flex shrink-0 flex-col border-r border-border bg-card/20 pt-8 pl-8"
         >
           <div className="flex shrink-0 items-center justify-between px-5 py-4">
             <div className="flex items-center gap-2">
-              <Server className="size-4 text-white/40" />
-              <span className="text-[13px] font-medium text-white/80">
+              <Server className="size-4 text-muted-foreground" />
+              <span className="text-[13px] font-medium text-foreground/80">
                 Providers
               </span>
             </div>
@@ -434,7 +444,7 @@ export function ProvidersPage() {
                 type="button"
                 onClick={() => void refreshProviders()}
                 disabled={loading}
-                className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white"
+                className={cn("size-7", providerIconButtonClass)}
               >
                 <RefreshCw
                   className={cn("size-3.5", loading && "animate-spin")}
@@ -443,7 +453,7 @@ export function ProvidersPage() {
               <button
                 type="button"
                 onClick={handleCreateNew}
-                className="flex size-7 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.04] hover:text-white"
+                className={cn("size-7", providerIconButtonClass)}
               >
                 <Plus className="size-3.5" />
               </button>
@@ -456,7 +466,7 @@ export function ProvidersPage() {
                 {[...Array(3)].map((_, index) => (
                   <div
                     key={index}
-                    className="h-10 w-full animate-pulse rounded-lg bg-white/[0.02]"
+                    className="h-10 w-full animate-pulse rounded-lg bg-accent/20"
                   />
                 ))}
               </div>
@@ -466,11 +476,13 @@ export function ProvidersPage() {
                 animate={{ opacity: 1 }}
                 className="py-10 text-center"
               >
-                <p className="text-[13px] text-white/40">No providers</p>
+                <p className="text-[13px] text-muted-foreground">
+                  No providers
+                </p>
                 <button
                   type="button"
                   onClick={handleCreateNew}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/[0.06]"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-accent/25 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent/40"
                 >
                   <Plus className="size-3" />
                   Add your first provider
@@ -496,13 +508,13 @@ export function ProvidersPage() {
                     className={cn(
                       "group relative flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-all",
                       selectedId === provider.id
-                        ? "bg-white/[0.06] text-white"
-                        : "text-white/60 hover:bg-white/[0.03] hover:text-white/90",
+                        ? "bg-accent/55 text-foreground"
+                        : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
                     )}
                   >
                     <div
                       className={cn(
-                        "absolute inset-y-1 left-0 w-px rounded-full bg-white/40 transition-opacity",
+                        "absolute inset-y-1 left-0 w-px rounded-full bg-ring/60 transition-opacity",
                         selectedId === provider.id
                           ? "opacity-100"
                           : "opacity-0",
@@ -512,7 +524,7 @@ export function ProvidersPage() {
                       <p className="truncate text-[13px] font-medium">
                         {provider.name}
                       </p>
-                      <p className="truncate text-[11px] text-white/40">
+                      <p className="truncate text-[11px] text-muted-foreground">
                         {providerTypeLabel(provider.type)}
                       </p>
                     </div>
@@ -522,7 +534,7 @@ export function ProvidersPage() {
                         event.stopPropagation();
                         setProviderToDelete(provider);
                       }}
-                      className="flex size-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-white/[0.08] hover:text-red-400 group-hover:opacity-100"
+                      className="flex size-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                     >
                       <Trash2 className="size-3" />
                     </button>
@@ -544,10 +556,10 @@ export function ProvidersPage() {
             <div className="flex min-h-full flex-col px-8 py-8 md:px-12 md:py-10">
               <div className="mb-8 flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-medium text-white/90">
+                  <h2 className="text-xl font-medium text-foreground">
                     {isCreating ? "New Provider" : selectedProvider?.name}
                   </h2>
-                  <p className="mt-1 text-[13px] text-white/40">
+                  <p className="mt-1 text-[13px] text-muted-foreground">
                     {isCreating
                       ? "Configure a new provider and its model catalog"
                       : `ID: ${selectedProvider?.id}`}
@@ -560,7 +572,7 @@ export function ProvidersPage() {
                         type="button"
                         onClick={handleCancel}
                         disabled={saving}
-                        className="rounded-full px-4 py-1.5 text-[13px] font-medium text-white/60 transition-colors hover:text-white"
+                        className="rounded-full px-4 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
                       >
                         Cancel
                       </button>
@@ -568,7 +580,7 @@ export function ProvidersPage() {
                         type="button"
                         onClick={() => void handleSave()}
                         disabled={saving}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
                       >
                         <Check className="size-3.5" />
                         {saving ? "Saving..." : "Save"}
@@ -592,7 +604,7 @@ export function ProvidersPage() {
                         setDraft({ ...draft, name: event.target.value })
                       }
                       placeholder="e.g., OpenAI Production"
-                      className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                      className={providerInputClass}
                     />
                   </SettingsRow>
                   <SettingsRow label="Type">
@@ -602,10 +614,10 @@ export function ProvidersPage() {
                         setDraft({ ...draft, type: value })
                       }
                     >
-                      <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                      <SelectTrigger className={providerSelectTriggerClass}>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                      <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
                         {providerTypeOptions.map((option) => (
                           <SelectItem
                             key={option.value}
@@ -620,7 +632,7 @@ export function ProvidersPage() {
                   </SettingsRow>
                 </div>
 
-                <div className="border-t border-white/[0.04] pt-8">
+                <div className="border-t border-border pt-8">
                   <SectionHeader
                     title="Endpoint & Auth"
                     description="Configure connection details, request preview, credentials, and retry behavior."
@@ -634,7 +646,7 @@ export function ProvidersPage() {
                           setDraft({ ...draft, base_url: event.target.value })
                         }
                         placeholder="https://api.openai.com/v1"
-                        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                        className={providerInputClass}
                       />
                     </SettingsRow>
                     <SettingsRow
@@ -645,8 +657,8 @@ export function ProvidersPage() {
                         className={cn(
                           "w-full select-text rounded-lg border px-3.5 py-2.5 text-[12px]",
                           endpointPreview.error
-                            ? "border-red-500/20 bg-red-500/5 text-red-400"
-                            : "border-white/[0.04] bg-white/[0.01] text-white/70",
+                            ? "border-destructive/20 bg-destructive/8 text-destructive"
+                            : "border-border bg-card/30 text-foreground/80",
                         )}
                       >
                         {endpointPreview.error ? (
@@ -656,7 +668,7 @@ export function ProvidersPage() {
                             {endpointPreview.previewUrl}
                           </code>
                         ) : (
-                          <span className="text-white/30">
+                          <span className="text-muted-foreground">
                             Enter a base URL to preview
                           </span>
                         )}
@@ -671,12 +683,12 @@ export function ProvidersPage() {
                             setDraft({ ...draft, api_key: event.target.value })
                           }
                           placeholder="sk-..."
-                          className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 pr-10 text-[13px] text-white placeholder:text-white/30 transition-colors focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                          className={`${providerInputClass} pr-10`}
                         />
                         <button
                           type="button"
                           onClick={() => setShowKey((current) => !current)}
-                          className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.08] hover:text-white"
+                          className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
                         >
                           {showKey ? (
                             <EyeOff className="size-3.5" />
@@ -702,14 +714,14 @@ export function ProvidersPage() {
                           placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
                           spellCheck={false}
                           className={cn(
-                            "min-h-[140px] w-full rounded-lg border bg-white/[0.02] px-3.5 py-3 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:outline-none",
+                            "min-h-[140px] w-full rounded-lg border px-3.5 py-3 font-mono text-[13px] transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:outline-none",
                             parsedHeaders.error
-                              ? "border-red-500/30 focus:border-red-500/50 text-red-300"
-                              : "border-white/[0.06] focus:border-white/20 focus:bg-white/[0.04]",
+                              ? "border-destructive/30 bg-background/50 text-destructive shadow-xs focus:border-destructive/50"
+                              : "border-input bg-background/50 text-foreground shadow-xs focus:border-ring focus:bg-background/65 focus:ring-[3px] focus:ring-ring/50",
                           )}
                         />
                         {parsedHeaders.error ? (
-                          <p className="text-[11px] text-red-400">
+                          <p className="text-[11px] text-destructive">
                             {parsedHeaders.error}
                           </p>
                         ) : null}
@@ -741,13 +753,13 @@ export function ProvidersPage() {
                                 retry_429_delay_seconds: parsed,
                               });
                             }}
-                            className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                            className={providerMonoInputClass}
                           />
-                          <span className="text-[13px] font-medium text-white/40">
+                          <span className="text-[13px] font-medium text-muted-foreground">
                             s
                           </span>
                         </div>
-                        <p className="text-[11px] text-white/40 leading-relaxed">
+                        <p className={providerHelpTextClass}>
                           Adds extra wait only when this provider returns HTTP
                           429 and the system continues retrying.
                         </p>
@@ -756,20 +768,20 @@ export function ProvidersPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-white/[0.04] pt-8">
+                <div className="border-t border-border pt-8">
                   <SectionHeader
                     title="Models"
                     description="Manage this provider-scoped model catalog, fetch discovered entries, and run model-level tests against the current draft."
                   />
 
-                  <div className="space-y-4 rounded-2xl border border-white/[0.04] bg-white/[0.01] p-5">
+                  <div className="space-y-4 rounded-2xl border border-border bg-card/30 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-[13px] font-medium text-white/80">
+                        <p className="text-[13px] font-medium text-foreground/80">
                           {draft.models.length} model
                           {draft.models.length === 1 ? "" : "s"}
                         </p>
-                        <p className="mt-1 text-[11px] text-white/40">
+                        <p className="mt-1 text-[11px] text-muted-foreground">
                           Fetch discovered models or maintain manual entries in
                           this draft before saving.
                         </p>
@@ -803,11 +815,11 @@ export function ProvidersPage() {
                     </div>
 
                     {draft.models.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-white/[0.08] bg-black/10 px-4 py-5 text-center">
-                        <p className="text-[13px] font-medium text-white/70">
+                      <div className="rounded-xl border border-dashed border-border bg-background/35 px-4 py-5 text-center">
+                        <p className="text-[13px] font-medium text-foreground/80">
                           No models in this provider draft
                         </p>
-                        <p className="mt-1 text-[11px] leading-relaxed text-white/40">
+                        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                           Fetch models from the current draft connection, or add
                           a manual entry.
                         </p>
@@ -819,20 +831,20 @@ export function ProvidersPage() {
                           return (
                             <div
                               key={entry.model}
-                              className="rounded-xl border border-white/[0.05] bg-black/12 px-4 py-3"
+                              className="rounded-xl border border-border bg-background/35 px-4 py-3"
                             >
                               <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <p className="truncate select-text font-mono text-[13px] text-white/85">
+                                    <p className="truncate select-text font-mono text-[13px] text-foreground/85">
                                       {entry.model}
                                     </p>
                                     <span
                                       className={cn(
                                         "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em]",
                                         entry.source === "manual"
-                                          ? "border-amber-300/20 bg-amber-300/[0.08] text-amber-100/80"
-                                          : "border-emerald-300/20 bg-emerald-300/[0.08] text-emerald-100/80",
+                                          ? "border-graph-status-idle/20 bg-graph-status-idle/[0.12] text-graph-status-idle"
+                                          : "border-graph-status-running/20 bg-graph-status-running/[0.12] text-graph-status-running",
                                       )}
                                     >
                                       {entry.source === "manual"
@@ -840,23 +852,23 @@ export function ProvidersPage() {
                                         : "Discovered"}
                                     </span>
                                   </div>
-                                  <p className="mt-1 select-text text-[11px] leading-relaxed text-white/40">
+                                  <p className="mt-1 select-text text-[11px] leading-relaxed text-muted-foreground">
                                     {buildModelSummary(entry)}
                                   </p>
                                   {testState?.state === "running" ? (
-                                    <p className="mt-2 select-text text-[11px] text-white/55">
+                                    <p className="mt-2 select-text text-[11px] text-muted-foreground">
                                       Testing this model against the current
                                       draft provider...
                                     </p>
                                   ) : null}
                                   {testState?.state === "success" ? (
-                                    <p className="mt-2 select-text text-[11px] text-emerald-200/80">
+                                    <p className="mt-2 select-text text-[11px] text-graph-status-running">
                                       Test succeeded in {testState.duration_ms}
                                       ms
                                     </p>
                                   ) : null}
                                   {testState?.state === "error" ? (
-                                    <p className="mt-2 select-text text-[11px] text-red-300/85">
+                                    <p className="mt-2 select-text text-[11px] text-destructive">
                                       {testState.error_summary}
                                     </p>
                                   ) : null}
@@ -903,9 +915,9 @@ export function ProvidersPage() {
                 </div>
 
                 {!isCreating && selectedProvider ? (
-                  <div className="border-t border-white/[0.04] pt-8">
+                  <div className="border-t border-border pt-8">
                     <SettingsRow label="Provider ID" description="Read-only">
-                      <div className="select-text rounded-lg border border-white/[0.04] bg-white/[0.01] px-3.5 py-2.5 font-mono text-[12px] text-white/70">
+                      <div className="select-text rounded-lg border border-border bg-card/30 px-3.5 py-2.5 font-mono text-[12px] text-foreground/80">
                         {selectedProvider.id}
                       </div>
                     </SettingsRow>
@@ -919,13 +931,13 @@ export function ProvidersPage() {
               animate={{ opacity: 1 }}
               className="flex h-full flex-col items-center justify-center px-6 text-center"
             >
-              <div className="flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.02] shadow-sm">
-                <Server className="size-5 text-white/40" />
+              <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/20 shadow-sm">
+                <Server className="size-5 text-muted-foreground" />
               </div>
-              <h3 className="mt-5 text-[15px] font-medium text-white/90">
+              <h3 className="mt-5 text-[15px] font-medium text-foreground">
                 No Provider Selected
               </h3>
-              <p className="mt-1.5 max-w-sm text-[13px] text-white/40">
+              <p className="mt-1.5 max-w-sm text-[13px] text-muted-foreground">
                 Select a provider from the sidebar to edit its connection
                 fields, model catalog, and model tests.
               </p>
@@ -954,7 +966,7 @@ export function ProvidersPage() {
 
           <div className="space-y-4 px-5 py-4">
             <div className="space-y-2">
-              <label className="text-[13px] font-medium text-white/80">
+              <label className="text-[13px] font-medium text-foreground/80">
                 Model ID
               </label>
               <input
@@ -968,21 +980,21 @@ export function ProvidersPage() {
                   })
                 }
                 placeholder="gpt-5"
-                className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                className={providerMonoInputClass}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-[13px] font-medium text-white/80">
+              <label className="text-[13px] font-medium text-foreground/80">
                 Source
               </label>
-              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] px-3.5 py-2.5 text-[13px] text-white/70">
+              <div className="rounded-lg border border-border bg-card/30 px-3.5 py-2.5 text-[13px] text-foreground/80">
                 {modelEditorDraft.source === "manual" ? "Manual" : "Discovered"}
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[13px] font-medium text-white/80">
+              <label className="text-[13px] font-medium text-foreground/80">
                 Context Window
               </label>
               <div className="flex items-center gap-2">
@@ -1003,9 +1015,9 @@ export function ProvidersPage() {
                     });
                   }}
                   placeholder="Optional"
-                  className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 font-mono text-[13px] text-white transition-colors placeholder:text-white/30 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none"
+                  className={providerMonoInputClass}
                 />
-                <span className="text-[13px] font-medium text-white/40">
+                <span className="text-[13px] font-medium text-muted-foreground">
                   tokens
                 </span>
               </div>
@@ -1013,7 +1025,7 @@ export function ProvidersPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-[13px] font-medium text-white/80">
+                <label className="text-[13px] font-medium text-foreground/80">
                   Input Image
                 </label>
                 <Select
@@ -1025,10 +1037,10 @@ export function ProvidersPage() {
                     })
                   }
                 >
-                  <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                  <SelectTrigger className={providerSelectTriggerClass}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                  <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="enabled">Enabled</SelectItem>
                     <SelectItem value="disabled">Disabled</SelectItem>
@@ -1036,7 +1048,7 @@ export function ProvidersPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-[13px] font-medium text-white/80">
+                <label className="text-[13px] font-medium text-foreground/80">
                   Output Image
                 </label>
                 <Select
@@ -1048,10 +1060,10 @@ export function ProvidersPage() {
                     })
                   }
                 >
-                  <SelectTrigger className="w-full rounded-lg border-white/[0.06] bg-white/[0.02] text-[13px]">
+                  <SelectTrigger className={providerSelectTriggerClass}>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-white/[0.08] bg-black/80 backdrop-blur-xl">
+                  <SelectContent className="rounded-xl border-border bg-popover backdrop-blur-xl">
                     <SelectItem value="auto">Auto</SelectItem>
                     <SelectItem value="enabled">Enabled</SelectItem>
                     <SelectItem value="disabled">Disabled</SelectItem>

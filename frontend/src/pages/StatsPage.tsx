@@ -73,6 +73,10 @@ const SORT_OPTIONS: Array<{ value: StatsSortKey; label: string }> = [
   { value: "cache_hit_rate", label: "Cache Hit Rate" },
 ];
 
+const statsSelectTriggerClass = "rounded-xl bg-background/50 text-foreground";
+const statsFilterLabelClass =
+  "text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80";
+
 function formatTimestamp(timestamp: number | null | undefined): string {
   if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {
     return "Unknown";
@@ -150,7 +154,7 @@ function StatsLoadingState() {
       <SoftPanel className="space-y-4">
         <div className="h-3 w-28 rounded-full skeleton-shimmer" />
         <div className="h-[220px] rounded-2xl skeleton-shimmer" />
-        <p className="text-sm text-white/42">Loading stats...</p>
+        <p className="text-sm text-muted-foreground">Loading stats...</p>
       </SoftPanel>
     </div>
   );
@@ -159,11 +163,11 @@ function StatsLoadingState() {
 function StatsEmptyState() {
   return (
     <SoftPanel className="flex min-h-[280px] flex-col items-center justify-center text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-white/72">
+      <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/20 text-muted-foreground">
         <ChartColumnBig className="size-5" />
       </div>
-      <h2 className="mt-5 text-xl font-medium text-white/90">No stats yet</h2>
-      <p className="mt-2 max-w-xl text-[13px] leading-6 text-white/42">
+      <h2 className="mt-5 text-xl font-medium text-foreground">No stats yet</h2>
+      <p className="mt-2 max-w-xl text-[13px] leading-6 text-muted-foreground">
         There are no request records, compact records, or current runtime
         activity in the selected range.
       </p>
@@ -180,19 +184,19 @@ function StatsErrorState({
 }) {
   return (
     <SoftPanel className="flex min-h-[280px] flex-col items-center justify-center text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl border border-red-400/20 bg-red-400/[0.08] text-red-300">
+      <div className="flex size-12 items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/10 text-destructive">
         <AlertTriangle className="size-5" />
       </div>
-      <h2 className="mt-5 text-xl font-medium text-white/90">
+      <h2 className="mt-5 text-xl font-medium text-foreground">
         Failed to load stats
       </h2>
-      <p className="mt-2 max-w-xl text-[13px] leading-6 text-white/42">
+      <p className="mt-2 max-w-xl text-[13px] leading-6 text-muted-foreground">
         {message}
       </p>
       <Button
         type="button"
         variant="outline"
-        className="mt-5 border-white/10 bg-white/[0.02] text-white/86 hover:bg-white/[0.06]"
+        className="mt-5 border-border bg-accent/20 text-foreground hover:bg-accent/35"
         onClick={onRetry}
       >
         Retry
@@ -216,22 +220,22 @@ function StatsValueCard({
 }) {
   return (
     <SoftPanel className="relative overflow-hidden">
-      <div className="absolute inset-x-0 top-0 h-px bg-white/[0.06]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-border" />
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/42">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             {title}
           </p>
-          <p className="mt-3 text-[28px] font-medium tracking-[-0.04em] text-white">
+          <p className="mt-3 text-[28px] font-medium tracking-[-0.04em] text-foreground">
             {value}
           </p>
-          <p className="mt-2 text-[12px] leading-5 text-white/40">
+          <p className="mt-2 text-[12px] leading-5 text-muted-foreground">
             {description}
           </p>
         </div>
         <div
           className={cn(
-            "flex size-10 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-white/72",
+            "flex size-10 items-center justify-center rounded-2xl border border-border bg-accent/20 text-muted-foreground",
             accentClassName,
           )}
         >
@@ -259,7 +263,7 @@ function StatsTrendChart({
 
   if (buckets.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-white/[0.06] bg-black/[0.18] text-[13px] text-white/34">
+      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-border bg-card/30 text-[13px] text-muted-foreground">
         No trend data in the selected range.
       </div>
     );
@@ -283,17 +287,17 @@ function StatsTrendChart({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-white/[0.06] bg-black/[0.18] px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border bg-card/30 px-4 py-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/40">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
           </p>
-          <p className="mt-2 text-sm text-white/88">
+          <p className="mt-2 text-sm text-foreground">
             {formatTimestamp(activeBucket.startMs)} to{" "}
             {formatTimestamp(activeBucket.endMs)}
           </p>
         </div>
-        <div className="grid gap-x-5 gap-y-2 text-[12px] text-white/56 sm:grid-cols-4">
+        <div className="grid gap-x-5 gap-y-2 text-[12px] text-muted-foreground sm:grid-cols-4">
           <span>Requests {formatInteger(activeBucket.requestCount)}</span>
           <span>Failures {formatInteger(activeBucket.errorCount)}</span>
           <span>Tokens {formatInteger(activeBucket.totalTokens)}</span>
@@ -310,7 +314,7 @@ function StatsTrendChart({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/[0.06] bg-[linear-gradient(180deg,rgba(255,255,255,0.02),rgba(0,0,0,0.14))] p-4">
+      <div className="rounded-3xl border border-border bg-card/25 p-4">
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[220px] w-full">
           {Array.from({ length: 5 }).map((_, index) => {
             const y = 20 + (chartHeight / 4) * index;
@@ -321,7 +325,7 @@ function StatsTrendChart({
                 y1={y}
                 x2={width - paddingX}
                 y2={y}
-                stroke="rgba(255,255,255,0.05)"
+                stroke="var(--graph-grid)"
                 strokeWidth="1"
               />
             );
@@ -358,7 +362,8 @@ function StatsTrendChart({
                       bucket.autoCompactCount > 0 ? 2 : 0,
                     )}
                     rx="8"
-                    fill="rgba(56,189,248,0.78)"
+                    fill="var(--primary)"
+                    fillOpacity="0.78"
                   />
                   <rect
                     x={x}
@@ -369,11 +374,23 @@ function StatsTrendChart({
                       bucket.manualCompactCount > 0 ? 2 : 0,
                     )}
                     rx="8"
-                    fill="rgba(245,158,11,0.78)"
+                    fill="var(--graph-status-idle)"
+                    fillOpacity="0.78"
                   />
                 </g>
               );
             }
+
+            const fillColor =
+              metric === "errors"
+                ? "var(--graph-status-error)"
+                : metric === "latency"
+                  ? "var(--graph-status-idle)"
+                  : metric === "cache_hit_rate"
+                    ? "var(--graph-status-running)"
+                    : metric === "cache_read" || metric === "cache_write"
+                      ? "var(--primary)"
+                      : "var(--foreground)";
 
             return (
               <rect
@@ -383,17 +400,8 @@ function StatsTrendChart({
                 width={Math.max(8, barWidth * 0.7)}
                 height={Math.max(normalizedHeight, value > 0 ? 2 : 0)}
                 rx="10"
-                fill={
-                  metric === "errors"
-                    ? "rgba(248,113,113,0.82)"
-                    : metric === "latency"
-                      ? "rgba(250,204,21,0.78)"
-                      : metric === "cache_hit_rate"
-                        ? "rgba(52,211,153,0.78)"
-                        : metric === "cache_read" || metric === "cache_write"
-                          ? "rgba(94,234,212,0.78)"
-                          : "rgba(148,163,184,0.82)"
-                }
+                fill={fillColor}
+                fillOpacity={metric === "errors" ? "0.82" : "0.78"}
               />
             );
           })}
@@ -410,7 +418,8 @@ function StatsTrendChart({
                     width={barWidth}
                     height={chartHeight + 16}
                     rx="14"
-                    fill="rgba(255,255,255,0.04)"
+                    fill="var(--accent)"
+                    fillOpacity="0.35"
                   />
                 ) : null}
                 <rect
@@ -440,7 +449,8 @@ function StatsTrendChart({
                 x={x}
                 y={height - 12}
                 textAnchor="middle"
-                fill="rgba(255,255,255,0.38)"
+                fill="var(--muted-foreground)"
+                fillOpacity="0.8"
                 fontSize="10"
               >
                 {bucket.label}
@@ -465,8 +475,8 @@ function StatsSectionTitle({
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 className="text-[15px] font-medium text-white/90">{title}</h2>
-        <p className="mt-1 text-[12px] leading-5 text-white/40">
+        <h2 className="text-[15px] font-medium text-foreground">{title}</h2>
+        <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
           {description}
         </p>
       </div>
@@ -478,7 +488,7 @@ function StatsSectionTitle({
 function EventDetail({ event }: { event: StatsEvent }) {
   if (event.kind === "compact") {
     return (
-      <div className="grid gap-3 rounded-2xl border border-white/[0.05] bg-black/[0.18] p-4 text-[12px] text-white/60 sm:grid-cols-2">
+      <div className="grid gap-3 rounded-2xl border border-border bg-card/30 p-4 text-[12px] text-muted-foreground sm:grid-cols-2">
         <span>Trigger {event.compact.trigger_type}</span>
         <span>Duration {formatDuration(event.compact.duration_ms)}</span>
         <span>Result {event.compact.result}</span>
@@ -489,8 +499,8 @@ function EventDetail({ event }: { event: StatsEvent }) {
 
   const usage = event.request.normalized_usage;
   return (
-    <div className="space-y-3 rounded-2xl border border-white/[0.05] bg-black/[0.18] p-4">
-      <div className="grid gap-3 text-[12px] text-white/60 sm:grid-cols-3">
+    <div className="space-y-3 rounded-2xl border border-border bg-card/30 p-4">
+      <div className="grid gap-3 text-[12px] text-muted-foreground sm:grid-cols-3">
         <span>Duration {formatDuration(event.request.duration_ms)}</span>
         <span>Retries {formatInteger(event.request.retry_count)}</span>
         <span>Result {event.request.result}</span>
@@ -516,18 +526,18 @@ function EventDetail({ event }: { event: StatsEvent }) {
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/42">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Normalized Usage
           </p>
-          <pre className="max-h-[240px] overflow-auto rounded-2xl border border-white/[0.05] bg-black/[0.28] p-4 text-[11px] leading-6 text-white/72">
+          <pre className="max-h-[240px] overflow-auto rounded-2xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
             {JSON.stringify(event.request.normalized_usage ?? null, null, 2)}
           </pre>
         </div>
         <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/42">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
             Raw Usage
           </p>
-          <pre className="max-h-[240px] overflow-auto rounded-2xl border border-white/[0.05] bg-black/[0.28] p-4 text-[11px] leading-6 text-white/72">
+          <pre className="max-h-[240px] overflow-auto rounded-2xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
             {JSON.stringify(event.request.raw_usage ?? null, null, 2)}
           </pre>
         </div>
@@ -677,14 +687,14 @@ export function StatsPage() {
       description:
         "Failed requests divided by all requests in the selected scope.",
       icon: FileWarning,
-      accentClassName: "text-red-300",
+      accentClassName: "text-destructive",
     },
     {
       title: "Avg Latency",
       value: formatDuration(overview.avgLatencyMs),
       description: "Average full-request duration, not a single retry attempt.",
       icon: Clock3,
-      accentClassName: "text-amber-200",
+      accentClassName: "text-graph-status-idle",
     },
     ...(overview.hasCacheUsage
       ? [
@@ -694,7 +704,7 @@ export function StatsPage() {
             description:
               "Normalized cache hit tokens returned by providers when known.",
             icon: Database,
-            accentClassName: "text-emerald-200",
+            accentClassName: "text-graph-status-running",
           },
           {
             title: "Cache Write",
@@ -719,16 +729,16 @@ export function StatsPage() {
   return (
     <PageScaffold className="min-h-0">
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <div className="shrink-0 border-b border-white/[0.04] px-6 py-5">
+        <div className="shrink-0 border-b border-border px-6 py-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/38">
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
                 Global Observability
               </p>
-              <h1 className="mt-2 text-[28px] font-medium tracking-[-0.04em] text-white/92">
+              <h1 className="mt-2 text-[28px] font-medium tracking-[-0.04em] text-foreground">
                 Stats
               </h1>
-              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-white/42">
+              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
                 Review formal runtime facts across requests, retries, compacts,
                 cache usage, and current node activity without narrowing to a
                 single task conversation.
@@ -736,14 +746,14 @@ export function StatsPage() {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/36">
-                  Range
-                </span>
+                <span className={statsFilterLabelClass}>Range</span>
                 <Select
                   value={range}
                   onValueChange={(value: StatsRange) => setRange(value)}
                 >
-                  <SelectTrigger className="w-[120px] rounded-xl border-white/[0.08] bg-black/[0.2] text-white/88">
+                  <SelectTrigger
+                    className={`w-[120px] ${statsSelectTriggerClass}`}
+                  >
                     <SelectValue placeholder="Range" />
                   </SelectTrigger>
                   <SelectContent>
@@ -758,7 +768,7 @@ export function StatsPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="mt-5 border-white/[0.08] bg-black/[0.2] text-white/84 hover:bg-white/[0.06]"
+                className="mt-5 border-border bg-accent/20 text-foreground hover:bg-accent/35"
                 onClick={() => void mutate()}
               >
                 <RefreshCw
@@ -771,9 +781,7 @@ export function StatsPage() {
 
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/36">
-                Provider
-              </span>
+              <span className={statsFilterLabelClass}>Provider</span>
               <Select
                 value={effectiveFilters.providerId ?? FILTER_ALL}
                 onValueChange={(value) =>
@@ -783,7 +791,7 @@ export function StatsPage() {
                   }))
                 }
               >
-                <SelectTrigger className="w-full rounded-xl border-white/[0.08] bg-black/[0.2] text-white/88">
+                <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
                   <SelectValue placeholder="All Providers" />
                 </SelectTrigger>
                 <SelectContent>
@@ -797,9 +805,7 @@ export function StatsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/36">
-                Model
-              </span>
+              <span className={statsFilterLabelClass}>Model</span>
               <Select
                 value={effectiveFilters.model ?? FILTER_ALL}
                 onValueChange={(value) =>
@@ -809,7 +815,7 @@ export function StatsPage() {
                   }))
                 }
               >
-                <SelectTrigger className="w-full rounded-xl border-white/[0.08] bg-black/[0.2] text-white/88">
+                <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
                   <SelectValue placeholder="All Models" />
                 </SelectTrigger>
                 <SelectContent>
@@ -823,9 +829,7 @@ export function StatsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/36">
-                Tab
-              </span>
+              <span className={statsFilterLabelClass}>Tab</span>
               <Select
                 value={effectiveFilters.tabId ?? FILTER_ALL}
                 onValueChange={(value) =>
@@ -835,7 +839,7 @@ export function StatsPage() {
                   }))
                 }
               >
-                <SelectTrigger className="w-full rounded-xl border-white/[0.08] bg-black/[0.2] text-white/88">
+                <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
                   <SelectValue placeholder="All Tabs" />
                 </SelectTrigger>
                 <SelectContent>
@@ -849,9 +853,7 @@ export function StatsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/36">
-                Agent
-              </span>
+              <span className={statsFilterLabelClass}>Agent</span>
               <Select
                 value={effectiveFilters.agentId ?? FILTER_ALL}
                 onValueChange={(value) =>
@@ -861,7 +863,7 @@ export function StatsPage() {
                   }))
                 }
               >
-                <SelectTrigger className="w-full rounded-xl border-white/[0.08] bg-black/[0.2] text-white/88">
+                <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
                   <SelectValue placeholder="All Agents" />
                 </SelectTrigger>
                 <SelectContent>
@@ -890,17 +892,17 @@ export function StatsPage() {
           ) : (
             <div className="space-y-6">
               {error ? (
-                <SoftPanel className="border-red-400/12 bg-red-400/[0.05]">
+                <SoftPanel className="border-destructive/12 bg-destructive/6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex size-9 items-center justify-center rounded-2xl border border-red-400/16 bg-red-400/[0.08] text-red-300">
+                      <div className="flex size-9 items-center justify-center rounded-2xl border border-destructive/16 bg-destructive/10 text-destructive">
                         <AlertTriangle className="size-4" />
                       </div>
                       <div>
-                        <p className="text-[13px] font-medium text-white/88">
+                        <p className="text-[13px] font-medium text-foreground">
                           Stats refresh failed
                         </p>
-                        <p className="text-[12px] text-white/44">
+                        <p className="text-[12px] text-muted-foreground">
                           Showing the last successful response. Retry when
                           ready.
                         </p>
@@ -909,7 +911,7 @@ export function StatsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="border-white/[0.08] bg-black/[0.2] text-white/84 hover:bg-white/[0.06]"
+                      className="border-border bg-accent/20 text-foreground hover:bg-accent/35"
                       onClick={() => void mutate()}
                     >
                       Retry
@@ -940,7 +942,9 @@ export function StatsPage() {
                       value={metric}
                       onValueChange={(value: StatsMetric) => setMetric(value)}
                     >
-                      <SelectTrigger className="w-[180px] rounded-xl border-white/[0.08] bg-black/[0.22] text-white/88">
+                      <SelectTrigger
+                        className={`w-[180px] ${statsSelectTriggerClass}`}
+                      >
                         <SelectValue placeholder="Metric" />
                       </SelectTrigger>
                       <SelectContent>
@@ -964,21 +968,21 @@ export function StatsPage() {
                   />
                   <div className="space-y-4">
                     {providerGroups.length === 0 ? (
-                      <div className="rounded-2xl border border-white/[0.06] bg-black/[0.18] px-4 py-6 text-[13px] text-white/36">
+                      <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                         No request data matches the current scope.
                       </div>
                     ) : (
                       providerGroups.map((provider) => (
                         <div
                           key={provider.key}
-                          className="rounded-2xl border border-white/[0.06] bg-black/[0.18] p-4"
+                          className="rounded-2xl border border-border bg-card/30 p-4"
                         >
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <p className="text-[14px] font-medium text-white/90">
+                              <p className="text-[14px] font-medium text-foreground">
                                 {provider.providerLabel}
                               </p>
-                              <p className="mt-1 text-[12px] text-white/42">
+                              <p className="mt-1 text-[12px] text-muted-foreground">
                                 Requests {formatInteger(provider.requestCount)}{" "}
                                 · Errors {formatInteger(provider.errorCount)} ·
                                 Tokens {formatInteger(provider.totalTokens)} ·
@@ -986,7 +990,7 @@ export function StatsPage() {
                                 Retries {formatInteger(provider.retryCount)}
                               </p>
                             </div>
-                            <div className="text-right text-[12px] text-white/46">
+                            <div className="text-right text-[12px] text-muted-foreground">
                               <p>
                                 Cache Read {formatInteger(provider.cacheRead)}
                               </p>
@@ -1002,9 +1006,9 @@ export function StatsPage() {
                             {provider.models.map((model) => (
                               <div
                                 key={model.key}
-                                className="grid gap-2 rounded-2xl border border-white/[0.05] bg-white/[0.02] px-3.5 py-3 text-[12px] text-white/60 md:grid-cols-[minmax(0,1.2fr)_repeat(6,minmax(0,0.8fr))]"
+                                className="grid gap-2 rounded-2xl border border-border bg-accent/15 px-3.5 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.2fr)_repeat(6,minmax(0,0.8fr))]"
                               >
-                                <span className="font-medium text-white/86">
+                                <span className="font-medium text-foreground">
                                   {model.model}
                                 </span>
                                 <span>
@@ -1046,7 +1050,9 @@ export function StatsPage() {
                             setSortKey(value)
                           }
                         >
-                          <SelectTrigger className="w-[170px] rounded-xl border-white/[0.08] bg-black/[0.22] text-white/88">
+                          <SelectTrigger
+                            className={`w-[170px] ${statsSelectTriggerClass}`}
+                          >
                             <SelectValue placeholder="Sort" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1064,20 +1070,20 @@ export function StatsPage() {
                     />
                     <div className="space-y-5">
                       <div className="space-y-2">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/38">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
                           Tabs
                         </p>
                         {tabGroups.length === 0 ? (
-                          <div className="rounded-2xl border border-white/[0.06] bg-black/[0.18] px-4 py-6 text-[13px] text-white/36">
+                          <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                             No matching tab aggregates.
                           </div>
                         ) : (
                           tabGroups.map((tab) => (
                             <div
                               key={tab.key}
-                              className="grid gap-2 rounded-2xl border border-white/[0.05] bg-black/[0.18] px-4 py-3 text-[12px] text-white/60 md:grid-cols-[minmax(0,1.15fr)_repeat(6,minmax(0,0.75fr))]"
+                              className="grid gap-2 rounded-2xl border border-border bg-card/30 px-4 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.15fr)_repeat(6,minmax(0,0.75fr))]"
                             >
-                              <span className="font-medium text-white/88">
+                              <span className="font-medium text-foreground">
                                 {tab.tabTitle}
                               </span>
                               <span>Req {formatInteger(tab.requestCount)}</span>
@@ -1094,24 +1100,24 @@ export function StatsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-white/38">
+                        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
                           Agents
                         </p>
                         {agentGroups.length === 0 ? (
-                          <div className="rounded-2xl border border-white/[0.06] bg-black/[0.18] px-4 py-6 text-[13px] text-white/36">
+                          <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                             No matching agent aggregates.
                           </div>
                         ) : (
                           agentGroups.map((agent) => (
                             <div
                               key={agent.key}
-                              className="grid gap-2 rounded-2xl border border-white/[0.05] bg-black/[0.18] px-4 py-3 text-[12px] text-white/60 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.8fr)_repeat(5,minmax(0,0.72fr))]"
+                              className="grid gap-2 rounded-2xl border border-border bg-card/30 px-4 py-3 text-[12px] text-muted-foreground md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.8fr)_repeat(5,minmax(0,0.72fr))]"
                             >
                               <div className="min-w-0">
-                                <p className="truncate font-medium text-white/88">
+                                <p className="truncate font-medium text-foreground">
                                   {agent.agentLabel}
                                 </p>
-                                <p className="truncate text-[11px] text-white/38">
+                                <p className="truncate text-[11px] text-muted-foreground/80">
                                   {agent.roleName || "No role"} ·{" "}
                                   {agent.tabTitle}
                                 </p>
@@ -1121,7 +1127,7 @@ export function StatsPage() {
                                   "inline-flex h-fit w-fit rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.12em]",
                                   agent.state
                                     ? stateBadgeColor[agent.state]
-                                    : "border-white/[0.08] bg-white/[0.03] text-white/54",
+                                    : "border-border bg-accent/25 text-muted-foreground",
                                 )}
                               >
                                 {agent.state || "unknown"}
@@ -1156,7 +1162,7 @@ export function StatsPage() {
                 />
                 <div className="space-y-2">
                   {recentEvents.length === 0 ? (
-                    <div className="rounded-2xl border border-white/[0.06] bg-black/[0.18] px-4 py-6 text-[13px] text-white/36">
+                    <div className="rounded-2xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
                       No recent events match the current scope.
                     </div>
                   ) : (
@@ -1174,14 +1180,14 @@ export function StatsPage() {
                         <div key={event.key} className="space-y-2">
                           <button
                             type="button"
-                            className="grid w-full gap-3 rounded-2xl border border-white/[0.05] bg-black/[0.18] px-4 py-3 text-left text-[12px] text-white/62 transition-colors hover:bg-white/[0.03] md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.25fr)]"
+                            className="grid w-full gap-3 rounded-2xl border border-border bg-card/30 px-4 py-3 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent/20 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.25fr)]"
                             onClick={() =>
                               setExpandedEventId((current) =>
                                 current === event.key ? null : event.key,
                               )
                             }
                           >
-                            <span className="text-white/82">
+                            <span className="text-foreground/85">
                               {formatTimestamp(event.endedAt)}
                             </span>
                             <span className="truncate">{event.tabTitle}</span>
@@ -1193,10 +1199,10 @@ export function StatsPage() {
                               className={cn(
                                 "truncate",
                                 event.kind === "request_error"
-                                  ? "text-red-300"
+                                  ? "text-destructive"
                                   : event.kind === "compact"
-                                    ? "text-amber-200"
-                                    : "text-emerald-200",
+                                    ? "text-graph-status-idle"
+                                    : "text-graph-status-running",
                               )}
                             >
                               {summaryText}

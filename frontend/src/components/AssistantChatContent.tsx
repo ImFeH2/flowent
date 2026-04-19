@@ -397,10 +397,10 @@ export function AssistantChatComposer({
           role="listbox"
           aria-label="Assistant commands"
           className={cn(
-            "pointer-events-auto mb-2 overflow-hidden rounded-[1rem] border backdrop-blur-xl",
+            "pointer-events-auto mb-2 overflow-hidden rounded-xl border",
             isWorkspace
-              ? "border-border bg-surface-overlay shadow-xl"
-              : "border-border bg-popover shadow-xl",
+              ? "border-border bg-surface-overlay shadow-sm"
+              : "border-border bg-popover shadow-sm",
           )}
         >
           {commandOptions.length > 0 ? (
@@ -444,10 +444,10 @@ export function AssistantChatComposer({
       ) : null}
       <div
         className={cn(
-          "rounded-[0.8rem] border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
+          "rounded-md border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
           isWorkspace
-            ? "border-border bg-background/30 shadow-xl hover:border-ring/35 focus-within:border-ring/45 focus-within:ring-[3px] focus-within:ring-ring/35"
-            : "border-border bg-surface-2/90 shadow-xl backdrop-blur-xl hover:border-ring/30 focus-within:border-ring/40 focus-within:ring-[3px] focus-within:ring-ring/30",
+            ? "border-border bg-background/30 shadow-sm hover:border-ring/35 focus-within:border-ring/45 focus-within:ring-[3px] focus-within:ring-ring/35"
+            : "border-border bg-surface-2/90 shadow-sm hover:border-ring/30 focus-within:border-ring/40 focus-within:ring-[3px] focus-within:ring-ring/30",
         )}
       >
         {images.length > 0 ? (
@@ -504,7 +504,7 @@ export function AssistantChatComposer({
             rows={1}
             className={cn(
               "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
-              isWorkspace ? "rounded-[0.55rem]" : "rounded-[0.6rem]",
+              "rounded-sm",
             )}
           />
           <button
@@ -802,8 +802,8 @@ function HumanBubble({
         className={cn(
           "min-w-0 overflow-hidden px-2.5 py-1.5 text-[13px] [overflow-wrap:anywhere]",
           isWorkspace
-            ? "max-w-[84%] rounded-[10px] border border-border bg-accent/80 text-accent-foreground"
-            : "max-w-[80%] rounded-[12px] border border-border bg-accent/65 text-accent-foreground",
+            ? "max-w-[84%] rounded-lg border border-border bg-accent/80 text-accent-foreground"
+            : "max-w-[80%] rounded-lg border border-border bg-accent/65 text-accent-foreground",
           pending && "opacity-80",
         )}
       >
@@ -898,7 +898,7 @@ function MessageActivityCard({
     <div
       className={cn(
         "min-w-0 w-full px-2 py-1.5",
-        isWorkspace ? "border-l border-border pl-3" : "rounded-[12px]",
+        isWorkspace ? "border-l border-border pl-3" : "rounded-lg",
         tone === "received" && "border-border bg-accent/20",
         tone === "sent" && "border-border bg-background/24",
       )}

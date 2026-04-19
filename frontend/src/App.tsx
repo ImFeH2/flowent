@@ -268,11 +268,11 @@ function AccessGate() {
       <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10">
         <ShellSurface
           variant="access"
-          className="w-full max-w-[460px] rounded-[1.5rem] border border-border p-7 text-popover-foreground shadow-2xl backdrop-blur-2xl"
+          className="w-full max-w-[460px] rounded-2xl border border-border p-7 text-popover-foreground shadow-lg"
         >
           <div className="relative z-10">
             <div className="flex items-center gap-3">
-              <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/40 text-foreground">
+              <div className="flex size-12 items-center justify-center rounded-xl border border-border bg-accent/40 text-foreground">
                 <KeyRound className="size-5" />
               </div>
               <div>
@@ -384,7 +384,7 @@ function App() {
           position="bottom-right"
           toastOptions={{
             className:
-              "rounded-md border border-border bg-surface-overlay text-foreground shadow-xl backdrop-blur-xl",
+              "rounded-md border border-border bg-surface-overlay text-foreground shadow-md",
           }}
         />
         <TooltipProvider delayDuration={300}>

@@ -796,7 +796,7 @@ describe("AssistantChatComposer", () => {
     expect(composerShell).not.toBeNull();
     expect(composerShell).toContainElement(sendButton);
     expect(composerShell?.className).toContain("border-border");
-    expect(composerShell?.className).toContain("shadow-xl");
+    expect(composerShell?.className).toContain("shadow-sm");
 
     const originalGetComputedStyle = window.getComputedStyle;
     const getComputedStyleSpy = vi

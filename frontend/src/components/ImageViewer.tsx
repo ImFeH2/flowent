@@ -629,7 +629,7 @@ function ImageViewerOverlay({
           data-pan-exempt="true"
         >
           <div
-            className="rounded-full border border-border bg-surface-overlay/88 px-3 py-1 text-[11px] font-medium text-foreground/88 shadow-xl backdrop-blur-xl"
+            className="rounded-full border border-border bg-surface-overlay/88 px-3 py-1 text-[11px] font-medium text-foreground/88 shadow-md"
             data-pan-exempt="true"
             data-testid="global-image-viewer-zoom"
           >
@@ -646,7 +646,7 @@ function ImageViewerOverlay({
           className="absolute bottom-4 left-1/2 z-20 w-full max-w-3xl -translate-x-1/2 px-2"
           data-pan-exempt="true"
         >
-          <div className="rounded-2xl border border-border bg-surface-overlay/88 px-4 py-3 text-center shadow-xl backdrop-blur-xl">
+          <div className="rounded-xl border border-border bg-surface-overlay/88 px-4 py-3 text-center shadow-md">
             <div className="text-sm font-medium text-foreground">
               {imageLabel}
             </div>
@@ -717,7 +717,7 @@ function ViewerControlButton({
   return (
     <button
       aria-label={ariaLabel}
-      className="flex size-10 items-center justify-center rounded-full border border-border bg-surface-overlay/88 text-foreground/82 shadow-xl backdrop-blur-xl transition-colors hover:bg-accent/60 hover:text-foreground"
+      className="flex size-10 items-center justify-center rounded-full border border-border bg-surface-overlay/88 text-foreground/82 shadow-md transition-colors hover:bg-accent/60 hover:text-foreground"
       data-pan-exempt="true"
       onClick={onClick}
       type="button"

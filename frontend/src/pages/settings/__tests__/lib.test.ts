@@ -17,6 +17,8 @@ import type { Provider, Role } from "@/types";
 
 function buildSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
+    app_data_dir: overrides.app_data_dir ?? "/home/test/.autopoe",
+    working_dir: overrides.working_dir ?? "/workspace/project",
     access: {
       configured: true,
       ...(overrides.access ?? {}),
@@ -221,6 +223,7 @@ describe("settings lib", () => {
     );
 
     expect(payload).toEqual({
+      working_dir: "/workspace/project",
       assistant: {
         role_name: "Steward",
         allow_network: false,

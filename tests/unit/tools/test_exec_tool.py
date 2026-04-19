@@ -6,6 +6,7 @@ import pytest
 
 from app.agent import Agent
 from app.models import NodeConfig, NodeType
+from app.settings import Settings
 from app.tools.exec import ExecTool
 
 
@@ -43,7 +44,7 @@ def _sandbox_exec_supported(tmp_path) -> bool:
     return probe.returncode == 0
 
 
-def test_exec_tool_runs_in_current_workspace_when_tmp_is_sandboxed(
+def test_exec_tool_runs_in_working_dir_when_tmp_is_sandboxed(
     monkeypatch,
     tmp_path,
 ):
@@ -52,7 +53,10 @@ def test_exec_tool_runs_in_current_workspace_when_tmp_is_sandboxed(
 
     target = tmp_path / "settings.json"
     target.write_text('{"name": "demo"}\n', encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(working_dir=str(tmp_path)),
+    )
 
     agent = Agent(
         NodeConfig(

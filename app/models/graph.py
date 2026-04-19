@@ -99,7 +99,7 @@ class GraphNodeRecord:
 
     @classmethod
     def from_mapping(cls, data: dict[str, object]) -> GraphNodeRecord:
-        from app.settings import normalize_tool_names
+        from app.settings import build_assistant_write_dirs, normalize_tool_names
 
         raw_config = data.get("config")
         config = raw_config if isinstance(raw_config, dict) else {}
@@ -139,6 +139,16 @@ class GraphNodeRecord:
             )
         raw_position = data.get("position")
 
+        raw_write_dirs = (
+            [
+                str(item)
+                for item in config.get("write_dirs", [])
+                if isinstance(item, str)
+            ]
+            if isinstance(config.get("write_dirs"), list)
+            else []
+        )
+
         return cls(
             id=str(data.get("id", "")),
             config=NodeConfig(
@@ -163,13 +173,10 @@ class GraphNodeRecord:
                     if isinstance(config.get("tools"), list)
                     else []
                 ),
-                write_dirs=[
-                    str(item)
-                    for item in config.get("write_dirs", [])
-                    if isinstance(item, str)
-                ]
-                if isinstance(config.get("write_dirs"), list)
-                else [],
+                write_dirs=build_assistant_write_dirs(
+                    raw_write_dirs,
+                    field_name="write_dirs",
+                ),
                 allow_network=bool(config.get("allow_network", False)),
                 blueprint_slot_id=(
                     str(config["blueprint_slot_id"])

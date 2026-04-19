@@ -76,6 +76,8 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
 
     assert result == {
         "settings": {
+            "app_data_dir": settings.app_data_dir,
+            "working_dir": settings.working_dir,
             "event_log": {"timestamp_format": "absolute"},
             "access": {"configured": False},
             "assistant": {
@@ -899,6 +901,101 @@ def test_update_settings_persists_assistant_permissions(monkeypatch):
         "write_dirs": expected_write_dirs,
     }
     assert saved == [settings]
+
+
+def test_update_settings_persists_working_dir(monkeypatch, tmp_path):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(working_dir=str(tmp_path)),
+        )
+    )
+
+    assert settings.working_dir == str(tmp_path.resolve())
+    assert result["settings"]["working_dir"] == str(tmp_path.resolve())
+    assert saved == [settings]
+
+
+def test_update_settings_resolves_assistant_write_dirs_against_new_working_dir(
+    monkeypatch,
+    tmp_path,
+):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+    saved: list[Settings] = []
+    target_dir = tmp_path / "project"
+    target_dir.mkdir()
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "app.routes.settings.save_settings", lambda current: saved.append(current)
+    )
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = asyncio.run(
+        update_settings(
+            UpdateSettingsRequest(
+                working_dir=str(target_dir),
+                assistant={"write_dirs": ["./out"]},
+            ),
+        )
+    )
+
+    assert settings.working_dir == str(target_dir.resolve())
+    assert settings.assistant.write_dirs == [str((target_dir / "out").resolve())]
+    assert result["settings"]["assistant"]["write_dirs"] == [
+        str((target_dir / "out").resolve())
+    ]
+    assert saved == [settings]
+
+
+def test_update_settings_rejects_blank_working_dir(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(working_dir="   "),
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "working_dir must not be empty"
+
+
+def test_update_settings_rejects_missing_working_dir(monkeypatch):
+    settings = Settings(
+        roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
+    )
+
+    monkeypatch.setattr("app.routes.settings.get_settings", lambda: settings)
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            update_settings(
+                UpdateSettingsRequest(
+                    working_dir="/definitely/missing/autopoe-working-dir"
+                ),
+            )
+        )
+
+    assert excinfo.value.status_code == 400
+    assert excinfo.value.detail == "working_dir must be an existing directory"
 
 
 def test_update_settings_persists_leader_role(monkeypatch):

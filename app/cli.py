@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+
+APP_DATA_DIR_ENV_VAR = "AUTOPOE_APP_DATA_DIR"
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -33,7 +36,15 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="Show version and exit",
     )
+    parser.add_argument(
+        "--app-data-dir",
+        default="",
+        help="Override the Autopoe app data directory for this process",
+    )
     args = parser.parse_args(argv)
+
+    if isinstance(args.app_data_dir, str) and args.app_data_dir.strip():
+        os.environ[APP_DATA_DIR_ENV_VAR] = args.app_data_dir.strip()
 
     if args.command == "access" and args.access_command == "refresh":
         from app.access import refresh_local_access

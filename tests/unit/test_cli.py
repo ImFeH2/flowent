@@ -1,7 +1,9 @@
+import os
+
 import pytest
 
 from app.access import is_access_configured, set_access_code, verify_access_code
-from app.cli import main
+from app.cli import APP_DATA_DIR_ENV_VAR, main
 
 
 def test_access_refresh_command_generates_new_persisted_access_code(
@@ -75,3 +77,19 @@ def test_removed_mcp_command_is_rejected(capsys):
 
     assert "invalid choice" in error_output
     assert "'mcp'" in error_output
+
+
+def test_cli_sets_app_data_dir_env_before_dispatch(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv(APP_DATA_DIR_ENV_VAR, raising=False)
+    called: list[str] = []
+
+    monkeypatch.setattr(
+        "app.access.refresh_local_access",
+        lambda: called.append("refresh") or "Generated new access code: TEST",
+    )
+
+    main(["--app-data-dir", str(tmp_path), "access", "refresh"])
+
+    assert called == ["refresh"]
+    assert os.environ[APP_DATA_DIR_ENV_VAR] == str(tmp_path)
+    assert capsys.readouterr().out.strip() == "Generated new access code: TEST"

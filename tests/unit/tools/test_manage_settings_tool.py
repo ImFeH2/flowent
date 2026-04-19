@@ -33,6 +33,8 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
     result = json.loads(ManageSettingsTool().execute(agent, {"action": "get"}))
 
     assert result == {
+        "app_data_dir": settings.app_data_dir,
+        "working_dir": settings.working_dir,
         "assistant": {
             "role_name": "Steward",
             "allow_network": False,
@@ -188,6 +190,77 @@ def test_manage_settings_update_changes_assistant_permissions(monkeypatch):
     }
     assert settings.assistant.allow_network is False
     assert settings.assistant.write_dirs == expected_write_dirs
+
+
+def test_manage_settings_update_changes_working_dir(monkeypatch, tmp_path):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "working_dir": str(tmp_path),
+            },
+        )
+    )
+
+    assert result["working_dir"] == str(tmp_path.resolve())
+    assert settings.working_dir == str(tmp_path.resolve())
+
+
+def test_manage_settings_update_resolves_write_dirs_against_new_working_dir(
+    monkeypatch,
+    tmp_path,
+):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+    target_dir = tmp_path / "project"
+    target_dir.mkdir()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("app.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("app.providers.gateway.gateway.invalidate_cache", lambda: None)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "working_dir": str(target_dir),
+                "assistant_write_dirs": ["./out"],
+            },
+        )
+    )
+
+    assert result["working_dir"] == str(target_dir.resolve())
+    assert result["assistant"]["write_dirs"] == [str((target_dir / "out").resolve())]
+    assert settings.working_dir == str(target_dir.resolve())
+    assert settings.assistant.write_dirs == [str((target_dir / "out").resolve())]
+
+
+def test_manage_settings_update_rejects_blank_working_dir(monkeypatch):
+    agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
+    settings = Settings()
+
+    monkeypatch.setattr("app.settings.get_settings", lambda: settings)
+
+    result = json.loads(
+        ManageSettingsTool().execute(
+            agent,
+            {
+                "action": "update",
+                "working_dir": "   ",
+            },
+        )
+    )
+
+    assert result == {"error": "working_dir must not be empty"}
 
 
 def test_manage_settings_update_changes_leader_role(monkeypatch):

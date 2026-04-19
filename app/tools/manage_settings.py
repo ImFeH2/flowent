@@ -25,6 +25,8 @@ def _serialize_settings(settings: Settings) -> dict[str, object]:
             context_window_tokens=settings.model.context_window_tokens,
         )
     return {
+        "app_data_dir": settings.app_data_dir,
+        "working_dir": settings.working_dir,
         "assistant": {
             "role_name": settings.assistant.role_name,
             "allow_network": settings.assistant.allow_network,
@@ -102,6 +104,10 @@ class ManageSettingsTool(Tool):
                 "type": "array",
                 "description": "Writable directory boundaries for the Assistant",
                 "items": {"type": "string"},
+            },
+            "working_dir": {
+                "type": "string",
+                "description": "System working directory used as the default cwd and relative path base",
             },
             "leader_role_name": {
                 "type": "string",
@@ -196,6 +202,7 @@ class ManageSettingsTool(Tool):
             build_model_retry_max_delay_seconds,
             build_model_retry_policy,
             build_model_timeout_ms,
+            build_working_dir,
             find_role,
             get_settings,
             save_settings,
@@ -206,6 +213,7 @@ class ManageSettingsTool(Tool):
         assistant_role_name = args.get("assistant_role_name")
         assistant_allow_network = args.get("assistant_allow_network")
         assistant_write_dirs = args.get("assistant_write_dirs")
+        working_dir = args.get("working_dir")
         leader_role_name = args.get("leader_role_name")
         active_provider_id = args.get("active_provider_id")
         active_model = args.get("active_model")
@@ -237,6 +245,8 @@ class ManageSettingsTool(Tool):
             return json.dumps(
                 {"error": "assistant_write_dirs must be an array of strings"}
             )
+        if working_dir is not None and not isinstance(working_dir, str):
+            return json.dumps({"error": "working_dir must be a string"})
         if leader_role_name is not None and not isinstance(leader_role_name, str):
             return json.dumps({"error": "leader_role_name must be a string"})
         if active_provider_id is not None and not isinstance(active_provider_id, str):
@@ -323,6 +333,16 @@ class ManageSettingsTool(Tool):
         if action != "update":
             return json.dumps({"error": f"Unsupported action: {action}"})
 
+        next_working_dir = settings.working_dir
+        if working_dir is not None:
+            try:
+                next_working_dir = build_working_dir(
+                    working_dir,
+                    field_name="working_dir",
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+
         next_assistant_role_name = settings.assistant.role_name
         if assistant_role_name is not None:
             next_role_name = assistant_role_name.strip()
@@ -346,6 +366,7 @@ class ManageSettingsTool(Tool):
                 next_assistant_write_dirs = build_assistant_write_dirs(
                     assistant_write_dirs,
                     field_name="assistant_write_dirs",
+                    base_dir=next_working_dir,
                 )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
@@ -457,6 +478,7 @@ class ManageSettingsTool(Tool):
         if timestamp_format is not None:
             next_timestamp_format = timestamp_format
 
+        settings.working_dir = next_working_dir
         settings.assistant.role_name = next_assistant_role_name
         settings.assistant.allow_network = next_assistant_allow_network
         settings.assistant.write_dirs = next_assistant_write_dirs

@@ -57,7 +57,7 @@ class ImageAsset:
 def _get_assets_dir() -> Path:
     from app import settings as settings_module
 
-    return settings_module._SETTINGS_FILE.parent / "image-assets"
+    return settings_module.get_app_data_dir_path() / "image-assets"
 
 
 def _get_metadata_path(asset_id: str) -> Path:

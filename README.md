@@ -35,7 +35,9 @@ On first run, configure your LLM provider via the Settings panel (gear icon). Fo
 - **Anthropic** — any endpoint following the Anthropic Messages API
 - **Google Gemini** — any endpoint following the Gemini `generateContent` API
 
-Settings are saved to `settings.json` and can be changed at runtime without restarting.
+Autopoe stores instance data in `~/.autopoe/` by default, including `settings.json`, workspace snapshots, and image assets.
+You can override that app data directory before startup with `AUTOPOE_APP_DATA_DIR=/path/to/data` or `autopoe --app-data-dir /path/to/data`.
+The system `working_dir` can be changed at runtime from Settings without restarting.
 
 ## Development
 

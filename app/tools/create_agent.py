@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from app.graph_service import create_agent_node
 from app.models import NodeType
+from app.settings import build_assistant_write_dirs, resolve_path
 from app.tools import Tool
 
 if TYPE_CHECKING:
@@ -80,6 +80,13 @@ class CreateAgentTool(Tool):
             return json.dumps({"error": "allow_network must be a boolean"})
         if not isinstance(connect_to_creator, bool):
             return json.dumps({"error": "connect_to_creator must be a boolean"})
+        try:
+            write_dirs = build_assistant_write_dirs(
+                write_dirs,
+                field_name="write_dirs",
+            )
+        except ValueError as exc:
+            return json.dumps({"error": str(exc)})
         normalized_role_name = role_name.strip()
         if agent.node_type == NodeType.ASSISTANT:
             return json.dumps(
@@ -119,12 +126,12 @@ class CreateAgentTool(Tool):
             leader_config.allow_network if leader_config is not None else False
         )
 
-        parent_write_dirs = [Path(path).resolve() for path in agent.config.write_dirs]
+        parent_write_dirs = [resolve_path(path) for path in agent.config.write_dirs]
         invalid_write_dirs = sorted(
             path
             for path in write_dirs
             if not any(
-                Path(path).resolve().is_relative_to(parent_path)
+                resolve_path(path).is_relative_to(parent_path)
                 for parent_path in parent_write_dirs
             )
         )
@@ -141,12 +148,12 @@ class CreateAgentTool(Tool):
                     "error": "allow_network boundary exceeded: parent disallows network access"
                 }
             )
-        leader_write_dirs = [Path(path).resolve() for path in leader_write_dirs_source]
+        leader_write_dirs = [resolve_path(path) for path in leader_write_dirs_source]
         leader_invalid_write_dirs = sorted(
             path
             for path in write_dirs
             if not any(
-                Path(path).resolve().is_relative_to(parent_path)
+                resolve_path(path).is_relative_to(parent_path)
                 for parent_path in leader_write_dirs
             )
         )

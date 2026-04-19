@@ -1,6 +1,7 @@
 from app.agent import Agent
 from app.models import NodeConfig, NodeType
 from app.security import authorize
+from app.settings import Settings
 
 
 def test_authorize_allows_edit_within_write_dirs(tmp_path):
@@ -47,6 +48,30 @@ def test_authorize_rejects_edit_outside_write_dirs(tmp_path):
     result = authorize("edit", agent, {"path": str(blocked)})
 
     assert result == f"Path not in write_dirs: {blocked}"
+
+
+def test_authorize_resolves_relative_write_dirs_against_working_dir(
+    monkeypatch,
+    tmp_path,
+):
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    agent = Agent(
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            tools=["edit"],
+            write_dirs=["./allowed"],
+        )
+    )
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(working_dir=str(tmp_path)),
+    )
+
+    result = authorize("edit", agent, {"path": str(allowed / "file.txt")})
+
+    assert result is None
 
 
 def test_authorize_allows_fetch_when_network_enabled():

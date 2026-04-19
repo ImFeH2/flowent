@@ -13,6 +13,8 @@ export const DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024;
 export type TriStateCapability = "auto" | "enabled" | "disabled";
 
 export interface UserSettings {
+  app_data_dir: string;
+  working_dir: string;
   access: {
     configured: boolean;
   };
@@ -198,6 +200,7 @@ export function buildSettingsSavePayload(
 
   return {
     ...(accessPayload ? { access: accessPayload } : {}),
+    working_dir: settings.working_dir.trim(),
     assistant: {
       role_name: settings.assistant.role_name,
       allow_network: settings.assistant.allow_network,

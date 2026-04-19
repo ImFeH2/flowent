@@ -12,8 +12,32 @@ from loguru import logger
 
 from app.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
 
-WORKING_DIR = Path(os.getcwd())
-_SETTINGS_FILE = WORKING_DIR / "settings.json"
+APP_DATA_DIR_ENV_VAR = "AUTOPOE_APP_DATA_DIR"
+WORKING_DIR = Path(os.getcwd()).resolve()
+
+
+def _resolve_path_from_base(
+    raw_path: str | Path,
+    *,
+    base_dir: str | Path | None = None,
+    strict: bool = False,
+) -> Path:
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        anchor = Path(base_dir).expanduser() if base_dir is not None else WORKING_DIR
+        path = anchor / path
+    return path.resolve(strict=strict)
+
+
+def _resolve_startup_app_data_dir() -> Path:
+    raw_app_data_dir = os.environ.get(APP_DATA_DIR_ENV_VAR)
+    if isinstance(raw_app_data_dir, str) and raw_app_data_dir.strip():
+        return _resolve_path_from_base(raw_app_data_dir.strip(), strict=False)
+    return Path("~/.autopoe").expanduser().resolve(strict=False)
+
+
+APP_DATA_DIR = _resolve_startup_app_data_dir()
+_SETTINGS_FILE = APP_DATA_DIR / "settings.json"
 STEWARD_ROLE_NAME = "Steward"
 WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
@@ -138,8 +162,37 @@ DEFAULT_MCP_SERVER_STARTUP_TIMEOUT_SEC = 10
 DEFAULT_MCP_SERVER_TOOL_TIMEOUT_SEC = 30
 
 
-def build_default_assistant_write_dirs() -> list[str]:
-    return [str(WORKING_DIR.resolve())]
+def build_default_app_data_dir() -> str:
+    return str(Path(_SETTINGS_FILE).parent.resolve(strict=False))
+
+
+def build_default_working_dir() -> str:
+    return str(WORKING_DIR)
+
+
+def get_app_data_dir_path() -> Path:
+    return Path(_SETTINGS_FILE).parent.resolve(strict=False)
+
+
+def get_runtime_working_dir_path() -> Path:
+    return Path(get_settings().working_dir).resolve(strict=False)
+
+
+def resolve_path(
+    raw_path: str | Path,
+    *,
+    base_dir: str | Path | None = None,
+    strict: bool = False,
+) -> Path:
+    base_path = base_dir if base_dir is not None else get_runtime_working_dir_path()
+    return _resolve_path_from_base(raw_path, base_dir=base_path, strict=strict)
+
+
+def build_default_assistant_write_dirs(
+    working_dir: str | Path | None = None,
+) -> list[str]:
+    target_working_dir = working_dir if working_dir is not None else WORKING_DIR
+    return [str(resolve_path(target_working_dir, base_dir=WORKING_DIR, strict=False))]
 
 
 @dataclass
@@ -194,12 +247,44 @@ def build_default_model_params() -> ModelParams:
     return ModelParams()
 
 
-def _normalize_assistant_write_dir(raw_write_dir: str) -> str:
-    return str(Path(raw_write_dir).expanduser().resolve(strict=False))
+def _normalize_assistant_write_dir(
+    raw_write_dir: str,
+    *,
+    base_dir: str | Path | None = None,
+) -> str:
+    return str(resolve_path(raw_write_dir, base_dir=base_dir, strict=False))
 
 
-def _normalize_mcp_server_cwd(raw_cwd: str) -> str:
-    return str(Path(raw_cwd).expanduser().resolve(strict=False))
+def _normalize_mcp_server_cwd(
+    raw_cwd: str,
+    *,
+    base_dir: str | Path | None = None,
+) -> str:
+    return str(resolve_path(raw_cwd, base_dir=base_dir, strict=False))
+
+
+def build_working_dir(
+    raw_working_dir: object,
+    *,
+    field_name: str = "working_dir",
+) -> str:
+    if not isinstance(raw_working_dir, str):
+        raise ValueError(f"{field_name} must be a string")
+    stripped = raw_working_dir.strip()
+    if not stripped:
+        raise ValueError(f"{field_name} must not be empty")
+    try:
+        normalized = str(_resolve_path_from_base(stripped, strict=True))
+    except FileNotFoundError as exc:
+        raise ValueError(f"{field_name} must be an existing directory") from exc
+    except OSError as exc:
+        raise ValueError(f"{field_name} must be an accessible directory") from exc
+    path = Path(normalized)
+    if not path.is_dir():
+        raise ValueError(f"{field_name} must be an existing directory")
+    if not os.access(path, os.R_OK | os.X_OK):
+        raise ValueError(f"{field_name} must be an accessible directory")
+    return normalized
 
 
 @dataclass
@@ -292,6 +377,8 @@ class TelegramSettings:
 
 @dataclass
 class Settings:
+    app_data_dir: str = field(default_factory=build_default_app_data_dir)
+    working_dir: str = field(default_factory=build_default_working_dir)
     event_log: EventLogSettings = field(default_factory=EventLogSettings)
     access: AccessSettings = field(default_factory=AccessSettings)
     assistant: AssistantSettings = field(default_factory=AssistantSettings)
@@ -535,6 +622,7 @@ def build_assistant_write_dirs(
     raw_write_dirs: object,
     *,
     field_name: str = "assistant.write_dirs",
+    base_dir: str | Path | None = None,
 ) -> list[str]:
     if not isinstance(raw_write_dirs, list):
         raise ValueError(f"{field_name} must be an array of strings")
@@ -547,7 +635,10 @@ def build_assistant_write_dirs(
         stripped = raw_item.strip()
         if not stripped:
             continue
-        normalized_item = _normalize_assistant_write_dir(stripped)
+        normalized_item = _normalize_assistant_write_dir(
+            stripped,
+            base_dir=base_dir,
+        )
         if normalized_item in seen:
             continue
         seen.add(normalized_item)
@@ -719,6 +810,7 @@ def build_mcp_cwd(
     raw_cwd: object,
     *,
     field_name: str,
+    base_dir: str | Path | None = None,
 ) -> str:
     if raw_cwd is None:
         return ""
@@ -727,7 +819,7 @@ def build_mcp_cwd(
     cwd = raw_cwd.strip()
     if not cwd:
         return ""
-    return _normalize_mcp_server_cwd(cwd)
+    return _normalize_mcp_server_cwd(cwd, base_dir=base_dir)
 
 
 def build_provider_headers(
@@ -1321,6 +1413,8 @@ def _normalize_mcp_headers(raw_headers: object) -> tuple[dict[str, str], bool]:
 
 def _build_mcp_server_config(
     raw_server: object,
+    *,
+    base_dir: str | Path | None = None,
 ) -> tuple[MCPServerConfig | None, bool]:
     if not isinstance(raw_server, dict):
         return None, True
@@ -1392,7 +1486,7 @@ def _build_mcp_server_config(
     cwd_raw = raw_server.get("cwd")
     cwd = ""
     if isinstance(cwd_raw, str) and cwd_raw.strip():
-        cwd = _normalize_mcp_server_cwd(cwd_raw.strip())
+        cwd = _normalize_mcp_server_cwd(cwd_raw.strip(), base_dir=base_dir)
         migrated = migrated or cwd != cwd_raw
     elif cwd_raw not in {None, ""}:
         migrated = True
@@ -1475,6 +1569,8 @@ def _build_mcp_server_config(
 
 def _normalize_mcp_servers(
     raw_servers: object,
+    *,
+    base_dir: str | Path | None = None,
 ) -> tuple[list[MCPServerConfig], bool]:
     if raw_servers is None:
         return [], False
@@ -1485,7 +1581,10 @@ def _normalize_mcp_servers(
     seen: set[str] = set()
     migrated = False
     for raw_server in raw_servers:
-        server, server_migrated = _build_mcp_server_config(raw_server)
+        server, server_migrated = _build_mcp_server_config(
+            raw_server,
+            base_dir=base_dir,
+        )
         migrated = migrated or server_migrated
         if server is None:
             continue
@@ -1610,6 +1709,28 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         event_log_data = {}
     event_log = EventLogSettings(**event_log_data)
 
+    app_data_dir = build_default_app_data_dir()
+    raw_app_data_dir = data.get("app_data_dir")
+    if (
+        raw_app_data_dir is None
+        or not isinstance(raw_app_data_dir, str)
+        or raw_app_data_dir.strip() != app_data_dir
+    ):
+        migrated = True
+
+    raw_working_dir = data.get("working_dir")
+    if raw_working_dir is None:
+        working_dir = build_default_working_dir()
+        migrated = True
+    else:
+        try:
+            working_dir = build_working_dir(raw_working_dir)
+            if not isinstance(raw_working_dir, str) or working_dir != raw_working_dir:
+                migrated = True
+        except ValueError:
+            working_dir = build_default_working_dir()
+            migrated = True
+
     access_data = data.get("access", {})
     if access_data is None:
         access_data = {}
@@ -1674,7 +1795,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     if raw_assistant_write_dirs is None or not isinstance(
         raw_assistant_write_dirs, list
     ):
-        assistant_write_dirs = build_default_assistant_write_dirs()
+        assistant_write_dirs = build_default_assistant_write_dirs(working_dir)
         migrated = True
     else:
         assistant_write_dirs = []
@@ -1687,7 +1808,10 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
             if not stripped:
                 migrated = True
                 continue
-            normalized_item = _normalize_assistant_write_dir(stripped)
+            normalized_item = _normalize_assistant_write_dir(
+                stripped,
+                base_dir=working_dir,
+            )
             if normalized_item != raw_item:
                 migrated = True
             if normalized_item in seen_assistant_write_dirs:
@@ -1996,11 +2120,16 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
             )
         )
 
-    mcp_servers, mcp_servers_migrated = _normalize_mcp_servers(data.get("mcp_servers"))
+    mcp_servers, mcp_servers_migrated = _normalize_mcp_servers(
+        data.get("mcp_servers"),
+        base_dir=working_dir,
+    )
     migrated = migrated or mcp_servers_migrated
 
     return (
         Settings(
+            app_data_dir=app_data_dir,
+            working_dir=working_dir,
             event_log=event_log,
             access=access,
             assistant=assistant,

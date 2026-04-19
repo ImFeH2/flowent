@@ -94,6 +94,8 @@ function buildRole(
 
 function buildSettings(overrides: Partial<UserSettings> = {}): UserSettings {
   return {
+    app_data_dir: overrides.app_data_dir ?? "/home/test/.autopoe",
+    working_dir: overrides.working_dir ?? "/workspace/project",
     access: {
       configured: true,
       ...(overrides.access ?? {}),
@@ -197,6 +199,12 @@ describe("SettingsPage", () => {
 
     expect(await screen.findByLabelText("Request Timeout")).toHaveValue(
       "10000",
+    );
+    expect(screen.getByLabelText("App Data Directory")).toHaveValue(
+      "/home/test/.autopoe",
+    );
+    expect(screen.getByLabelText("Working Directory")).toHaveValue(
+      "/workspace/project",
     );
     expect(screen.getByText("Context window: 128,000")).toBeInTheDocument();
     expect(
@@ -306,6 +314,7 @@ describe("SettingsPage", () => {
 
     await waitFor(() =>
       expect(saveSettings).toHaveBeenCalledWith({
+        working_dir: "/workspace/project",
         assistant: {
           role_name: "Steward",
           allow_network: false,

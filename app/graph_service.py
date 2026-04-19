@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from pathlib import Path
 
 from app import settings as settings_module
 from app.events import event_bus
@@ -28,7 +27,9 @@ from app.settings import (
     DESIGNER_ROLE_NAME,
     STEWARD_ROLE_INCLUDED_TOOLS,
     STEWARD_ROLE_NAME,
+    build_assistant_write_dirs,
     find_role,
+    resolve_path,
 )
 from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
@@ -367,6 +368,10 @@ def _build_leader_record(
     write_dirs: list[str] | None = None,
 ) -> GraphNodeRecord:
     role_name = resolve_leader_role_name(settings=settings)
+    normalized_write_dirs = build_assistant_write_dirs(
+        write_dirs or [],
+        field_name="write_dirs",
+    )
     return GraphNodeRecord(
         id=leader_id,
         config=NodeConfig(
@@ -375,7 +380,7 @@ def _build_leader_record(
             tab_id=tab_id,
             name=LEADER_NODE_NAME,
             tools=build_tools_for_role(role_name, settings=settings),
-            write_dirs=[path for path in (write_dirs or []) if path.strip()],
+            write_dirs=normalized_write_dirs,
             allow_network=allow_network,
         ),
         state=AgentState.INITIALIZING,
@@ -706,9 +711,9 @@ def create_tab(
 
 
 def _is_path_within_boundary(path: str, boundary_dirs: list[str]) -> bool:
-    resolved_path = Path(path).resolve()
+    resolved_path = resolve_path(path)
     return any(
-        resolved_path.is_relative_to(Path(boundary_dir).resolve())
+        resolved_path.is_relative_to(resolve_path(boundary_dir))
         for boundary_dir in boundary_dirs
     )
 
@@ -913,6 +918,13 @@ def build_node_config(
     requested_write_dirs = write_dirs or []
     if not all(isinstance(item, str) for item in requested_write_dirs):
         return None, "write_dirs must be an array of strings"
+    try:
+        normalized_write_dirs = build_assistant_write_dirs(
+            requested_write_dirs,
+            field_name="write_dirs",
+        )
+    except ValueError as exc:
+        return None, str(exc)
 
     return (
         NodeConfig(
@@ -925,7 +937,7 @@ def build_node_config(
                 requested_tools=requested_tools,
                 settings=settings,
             ),
-            write_dirs=[path for path in requested_write_dirs if path.strip()],
+            write_dirs=normalized_write_dirs,
             allow_network=allow_network,
         ),
         None,

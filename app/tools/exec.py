@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import threading
 from collections.abc import Callable
@@ -37,11 +36,12 @@ class ExecTool(Tool):
 
     def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str:
         on_output: Callable[[str], None] | None = kwargs.get("on_output")
+        from app.settings import get_runtime_working_dir_path
 
         command = args["command"]
         timeout = int(args.get("timeout", 30))
         write_dirs = agent.config.write_dirs
-        cwd = Path(os.getcwd()).resolve()
+        cwd = Path(get_runtime_working_dir_path())
 
         bwrap_cmd = build_bwrap_cmd(
             write_dirs,

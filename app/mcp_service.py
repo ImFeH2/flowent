@@ -205,11 +205,15 @@ def build_fully_qualified_tool_id(server_name: str, tool_name: str) -> str:
 
 
 def _build_root_uri(path: str) -> str:
-    return Path(path).resolve().as_uri()
+    from app.settings import resolve_path
+
+    return resolve_path(path).as_uri()
 
 
 def _build_roots_for_agent(agent: Agent) -> list[dict[str, str]]:
-    workspace_root = str(Path.cwd().resolve())
+    from app.settings import get_runtime_working_dir_path, resolve_path
+
+    workspace_root = str(get_runtime_working_dir_path())
     if agent.config.node_type.value == "assistant":
         boundary_dirs = list(get_settings().assistant.write_dirs)
     else:
@@ -217,7 +221,7 @@ def _build_roots_for_agent(agent: Agent) -> list[dict[str, str]]:
     ordered_paths: list[str] = []
     seen: set[str] = set()
     for path in [workspace_root, *boundary_dirs]:
-        resolved = str(Path(path).resolve())
+        resolved = str(resolve_path(path))
         if resolved in seen:
             continue
         seen.add(resolved)

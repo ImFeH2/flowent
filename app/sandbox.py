@@ -4,8 +4,10 @@ from pathlib import Path
 
 
 def is_path_writable(path: str | Path, write_dirs: list[str]) -> bool:
-    p = Path(path).resolve()
-    return any(p.is_relative_to(Path(d).resolve()) for d in write_dirs)
+    from app.settings import resolve_path
+
+    p = resolve_path(path)
+    return any(p.is_relative_to(resolve_path(directory)) for directory in write_dirs)
 
 
 def build_bwrap_cmd(
@@ -15,7 +17,9 @@ def build_bwrap_cmd(
     allow_network: bool = False,
     cwd: str | Path | None = None,
 ) -> list[str]:
-    resolved_cwd = Path(cwd).resolve() if cwd is not None else None
+    from app.settings import resolve_path
+
+    resolved_cwd = resolve_path(cwd) if cwd is not None else None
     cmd = [
         "bwrap",
         "--ro-bind",
@@ -30,8 +34,9 @@ def build_bwrap_cmd(
     ]
     if resolved_cwd is not None:
         cmd.extend(["--ro-bind", str(resolved_cwd), str(resolved_cwd)])
-    for d in write_dirs:
-        cmd.extend(["--bind", d, d])
+    for directory in write_dirs:
+        resolved_dir = resolve_path(directory)
+        cmd.extend(["--bind", str(resolved_dir), str(resolved_dir)])
     if not allow_network:
         cmd.append("--unshare-net")
     if resolved_cwd is not None:

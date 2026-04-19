@@ -167,6 +167,10 @@ export function SettingsPage() {
       toast.error(accessDraftError);
       return;
     }
+    if (!settings.working_dir.trim()) {
+      toast.error("Working Directory must not be empty");
+      return;
+    }
     if (
       settings.model.retry_max_delay_seconds <
       settings.model.retry_initial_delay_seconds
@@ -205,8 +209,10 @@ export function SettingsPage() {
       }
 
       toast.success("Settings saved");
-    } catch {
-      toast.error("Failed to save settings");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save settings",
+      );
     } finally {
       setSaving(false);
     }
@@ -235,15 +241,19 @@ export function SettingsPage() {
                 Settings
               </h1>
               <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
-                Update access, assistant defaults, leader defaults, and
-                system-wide model behavior.
+                Update access, path defaults, assistant defaults, leader
+                defaults, and system-wide model behavior.
               </p>
             </div>
             <Button
               type="button"
               size="sm"
               onClick={() => void handleSave()}
-              disabled={saving || Boolean(accessDraftError)}
+              disabled={
+                saving ||
+                Boolean(accessDraftError) ||
+                !settings.working_dir.trim()
+              }
               className="text-[13px]"
             >
               <Save className="size-4" />
@@ -358,6 +368,76 @@ export function SettingsPage() {
                     </p>
                     {accessDraftError ? (
                       <p className="text-destructive">{accessDraftError}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </SettingsRow>
+            </div>
+          </section>
+
+          <section className="mt-8 border-t border-border pt-8">
+            <SectionHeader
+              title="Path Configuration"
+              description="Review the instance data root and change the default system working directory."
+            />
+            <div>
+              <SettingsRow
+                label="App Data Directory"
+                description="Instance storage root"
+              >
+                <div className="space-y-2">
+                  <input
+                    aria-label="App Data Directory"
+                    type="text"
+                    value={settings.app_data_dir}
+                    readOnly
+                    className={settingsMonoInputClass}
+                  />
+                  <div className={cn("space-y-2", settingsHelpTextClass)}>
+                    <p>
+                      Autopoe stores settings, workspace snapshots, image
+                      assets, and other instance data here. It is not the
+                      project working tree.
+                    </p>
+                    <p>
+                      This path is fixed before startup and cannot be changed
+                      from the running Settings page.
+                    </p>
+                  </div>
+                </div>
+              </SettingsRow>
+
+              <SettingsRow
+                label="Working Directory"
+                description="Default system task root"
+              >
+                <div className="space-y-2">
+                  <input
+                    aria-label="Working Directory"
+                    type="text"
+                    value={settings.working_dir}
+                    onChange={(event) =>
+                      setLocalSettings({
+                        ...settings,
+                        working_dir: event.target.value,
+                      })
+                    }
+                    placeholder="/workspace/project"
+                    className={settingsMonoInputClass}
+                  />
+                  <div className={cn("space-y-2", settingsHelpTextClass)}>
+                    <p>
+                      This directory becomes the default cwd, the relative-path
+                      base, and the MCP project root for future execution.
+                    </p>
+                    <p>
+                      Changing it does not automatically widen or rewrite any
+                      existing write directory boundary.
+                    </p>
+                    {!settings.working_dir.trim() ? (
+                      <p className="text-destructive">
+                        Working Directory must not be empty.
+                      </p>
                     ) : null}
                   </div>
                 </div>

@@ -30,6 +30,7 @@ from app.settings import (
     build_model_retry_max_delay_seconds,
     build_model_retry_policy,
     build_model_timeout_ms,
+    build_working_dir,
     find_role,
     get_settings,
     save_settings,
@@ -69,6 +70,7 @@ class UpdateSettingsRequest(BaseModel):
     event_log: dict[str, object] | None = None
     leader: dict[str, object] | None = None
     model: dict[str, object] | None = None
+    working_dir: str | None = None
 
 
 class UpdateTelegramSettingsRequest(BaseModel):
@@ -85,6 +87,7 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
     current = deepcopy(source_settings)
     next_access_code: str | None = None
     reauth_required = False
+    next_working_dir = current.working_dir
 
     if req.access is not None:
         raw_new_code = req.access.get("new_code", "")
@@ -112,6 +115,13 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                     detail="access.confirm_code must match access.new_code",
                 )
             next_access_code = new_code
+
+    if req.working_dir is not None:
+        try:
+            next_working_dir = build_working_dir(req.working_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        current.working_dir = next_working_dir
 
     if req.assistant is not None:
         assistant_unknown_fields = sorted(
@@ -147,7 +157,8 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
         if "write_dirs" in req.assistant:
             try:
                 next_write_dirs = build_assistant_write_dirs(
-                    req.assistant.get("write_dirs")
+                    req.assistant.get("write_dirs"),
+                    base_dir=next_working_dir,
                 )
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc

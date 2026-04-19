@@ -1,4 +1,5 @@
 from app.sandbox import build_bwrap_cmd
+from app.settings import Settings
 
 
 def test_build_bwrap_cmd_mounts_cwd_read_only_and_chdirs_into_it(tmp_path):
@@ -53,3 +54,25 @@ def test_build_bwrap_cmd_binds_write_dirs_and_preserves_network_when_allowed(tmp
     chdir_index = cmd.index("--chdir")
     assert cmd[chdir_index : chdir_index + 2] == ["--chdir", str(writable)]
     assert cmd[-3:] == ["bash", "-c", "pwd"]
+
+
+def test_build_bwrap_cmd_resolves_relative_write_dirs_against_working_dir(
+    monkeypatch,
+    tmp_path,
+):
+    writable = tmp_path / "workspace"
+    writable.mkdir()
+
+    monkeypatch.setattr(
+        "app.settings.get_settings",
+        lambda: Settings(working_dir=str(tmp_path)),
+    )
+
+    cmd = build_bwrap_cmd(["./workspace"], "pwd", cwd=tmp_path)
+
+    bind_index = cmd.index("--bind")
+    assert cmd[bind_index : bind_index + 3] == [
+        "--bind",
+        str(writable),
+        str(writable),
+    ]

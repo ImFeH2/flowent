@@ -19,7 +19,7 @@ from app.models import (
 def _get_workspace_file() -> Path:
     from app import settings as settings_module
 
-    return settings_module._SETTINGS_FILE.parent / "workspace.json"
+    return settings_module.get_app_data_dir_path() / "workspace.json"
 
 
 @dataclass
@@ -99,6 +99,8 @@ class WorkspaceStore:
             if isinstance(raw, dict)
             else WorkspaceSnapshot()
         )
+        if isinstance(raw, dict) and snapshot.serialize() != raw:
+            self._persist_snapshot(snapshot)
         self._snapshot = snapshot
         return snapshot
 

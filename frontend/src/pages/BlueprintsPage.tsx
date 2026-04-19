@@ -73,11 +73,11 @@ import { PageScaffold } from "@/components/layout/PageScaffold";
 const LIBRARY_PANEL_ID = "blueprints-library-width";
 const INSPECTOR_PANEL_ID = "blueprints-inspector-width";
 const blueprintFormInputClass =
-  "h-10 rounded-[0.95rem] bg-background/50 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
+  "bg-background/50 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
 const blueprintFormTextareaClass =
-  "min-h-[108px] rounded-[1rem] bg-background/50 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
+  "min-h-[108px] rounded-md bg-background/50 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
 const blueprintChoiceListClass =
-  "max-h-56 space-y-2 overflow-y-auto rounded-[1rem] border border-border bg-background/35 p-2 scrollbar-none";
+  "max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border bg-background/35 p-2 scrollbar-none";
 
 type DraftMode = "create" | "edit";
 
@@ -187,7 +187,7 @@ function BlueprintFlowNode({ data }: NodeProps) {
   return (
     <div
       className={cn(
-        "group relative min-w-[140px] rounded-[18px] border border-border bg-card/85 px-4 py-3 shadow-[0_18px_36px_-26px_var(--shell-scrim)] transition-[border-color,background-color,box-shadow] duration-200",
+        "group relative min-w-[140px] rounded-xl border border-border bg-card/85 px-4 py-3 shadow-[0_18px_36px_-26px_var(--shell-scrim)] transition-[border-color,background-color,box-shadow] duration-200",
         selected
           ? "shadow-lg shadow-ring/10 ring-1 ring-ring/35"
           : "hover:border-ring/25 hover:bg-accent/20",
@@ -206,7 +206,7 @@ function BlueprintFlowNode({ data }: NodeProps) {
         className="!top-[64%] !size-2 !-translate-y-1/2 !border-graph-handle-border !bg-graph-handle-bg !opacity-0"
       />
       <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-accent/35 text-foreground/80">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-accent/35 text-foreground/80">
           <Bot className="size-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -337,7 +337,7 @@ function DrawerShell({
         exit={{ opacity: 0, x: align === "left" ? -20 : 20 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
-          "absolute inset-y-0 z-30 w-[min(24rem,calc(100%-1.5rem))] overflow-hidden rounded-[1.15rem] border border-border bg-popover shadow-xl",
+          "absolute inset-y-0 z-30 w-[min(24rem,calc(100%-1.5rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-md",
           align === "left" ? "left-0" : "right-0",
         )}
       >
@@ -875,7 +875,7 @@ export function BlueprintsPage() {
 
   return (
     <PageScaffold className="px-4 py-4 sm:px-5 sm:py-5">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.2rem] border border-border bg-surface-overlay shadow-xl">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-md">
         <div className="border-b border-border px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
@@ -1032,10 +1032,10 @@ export function BlueprintsPage() {
           }
         }}
       >
-        <AlertDialogContent className="max-w-[30rem] rounded-[1.35rem] border-border bg-surface-overlay shadow-xl backdrop-blur-2xl">
+        <AlertDialogContent className="max-w-[30rem]">
           <AlertDialogHeader className="gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl border border-border bg-accent/45 text-foreground">
+              <div className="flex size-11 items-center justify-center rounded-xl border border-border bg-accent/45 text-foreground">
                 <Trash2 className="size-5" />
               </div>
               <div>
@@ -1136,7 +1136,7 @@ function BlueprintLibraryColumn({
             {Array.from({ length: 5 }).map((_, index) => (
               <div
                 key={index}
-                className="rounded-[1rem] border border-border bg-card/30 p-3"
+                className="rounded-xl border border-border bg-card/30 p-3"
               >
                 <div className="h-3 w-28 rounded-full skeleton-shimmer" />
                 <div className="mt-3 h-2.5 w-full rounded-full skeleton-shimmer" />
@@ -1147,7 +1147,7 @@ function BlueprintLibraryColumn({
         ) : blueprints.length === 0 ? (
           <div className="flex h-full min-h-[15rem] items-center justify-center">
             <div className="max-w-[15rem] text-center">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/20 text-muted-foreground">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-xl border border-border bg-accent/20 text-muted-foreground">
                 <BookCopy className="size-5" />
               </div>
               <p className="mt-4 text-[15px] font-medium text-foreground">
@@ -1171,7 +1171,7 @@ function BlueprintLibraryColumn({
                   type="button"
                   onClick={() => onSelectBlueprint(blueprint.id)}
                   className={cn(
-                    "group relative w-full overflow-hidden rounded-[1rem] border px-4 py-3 text-left transition-[background-color,border-color,transform] duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "group relative w-full overflow-hidden rounded-xl border px-4 py-3 text-left transition-[background-color,border-color,transform] duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     isSelected
                       ? "border-border bg-accent/35"
                       : "border-transparent bg-transparent hover:border-border hover:bg-accent/20",
@@ -1333,7 +1333,7 @@ function BlueprintStageColumn({
       ) : (
         <div className="flex h-full min-h-[24rem] items-center justify-center px-6">
           <div className="max-w-sm text-center">
-            <div className="mx-auto flex size-14 items-center justify-center rounded-[1.35rem] border border-border bg-accent/20 text-muted-foreground">
+            <div className="mx-auto flex size-14 items-center justify-center rounded-xl border border-border bg-accent/20 text-muted-foreground">
               <BookCopy className="size-5" />
             </div>
             <p className="mt-4 text-[15px] font-medium text-foreground">
@@ -1458,7 +1458,7 @@ function BlueprintInspectorColumn({
         {selectedSlot ? (
           <div className="space-y-4">
             <InspectorSection title="Slot Key">
-              <div className="rounded-[1rem] border border-border bg-background/40 px-3 py-2 font-mono text-[12px] text-foreground/80">
+              <div className="rounded-md border border-border bg-background/40 px-3 py-2 font-mono text-[12px] text-foreground/80">
                 {selectedSlot.id}
               </div>
             </InspectorSection>
@@ -1498,7 +1498,7 @@ function BlueprintInspectorColumn({
                               )
                             }
                             className={cn(
-                              "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors",
+                              "w-full rounded-md border px-3 py-2.5 text-left transition-colors",
                               selectedSlot.role_name === role.name
                                 ? "border-border bg-accent/35"
                                 : "border-transparent bg-transparent hover:border-border hover:bg-accent/20",
@@ -1543,12 +1543,12 @@ function BlueprintInspectorColumn({
             ) : (
               <>
                 <InspectorSection title="Role">
-                  <div className="rounded-[1rem] border border-border bg-background/40 px-3 py-2 text-[13px] text-foreground">
+                  <div className="rounded-md border border-border bg-background/40 px-3 py-2 text-[13px] text-foreground">
                     {selectedSlot.role_name}
                   </div>
                 </InspectorSection>
                 <InspectorSection title="Display Name">
-                  <div className="rounded-[1rem] border border-border bg-background/40 px-3 py-2 text-[13px] text-foreground">
+                  <div className="rounded-md border border-border bg-background/40 px-3 py-2 text-[13px] text-foreground">
                     {selectedSlot.display_name || selectedSlot.role_name}
                   </div>
                 </InspectorSection>
@@ -1570,7 +1570,7 @@ function BlueprintInspectorColumn({
                   className={blueprintFormInputClass}
                 />
               ) : (
-                <div className="rounded-[1rem] border border-border bg-background/40 px-3 py-2 text-[13px] text-foreground">
+                <div className="rounded-md border border-border bg-background/40 px-3 py-2 text-[13px] text-foreground">
                   {blueprint.name}
                 </div>
               )}
@@ -1591,7 +1591,7 @@ function BlueprintInspectorColumn({
                   className={blueprintFormTextareaClass}
                 />
               ) : (
-                <div className="rounded-[1rem] border border-border bg-background/40 px-3 py-3 text-[13px] leading-relaxed text-foreground/80">
+                <div className="rounded-md border border-border bg-background/40 px-3 py-3 text-[13px] leading-relaxed text-foreground/80">
                   {blueprint.description || "No description"}
                 </div>
               )}
@@ -1621,7 +1621,7 @@ function BlueprintInspectorColumn({
             >
               <div className="space-y-2">
                 {versionHistory.length === 0 ? (
-                  <div className="rounded-[1rem] border border-dashed border-border px-3 py-3 text-[12px] text-muted-foreground">
+                  <div className="rounded-md border border-dashed border-border px-3 py-3 text-[12px] text-muted-foreground">
                     Version history starts after the first save.
                   </div>
                 ) : (
@@ -1631,7 +1631,7 @@ function BlueprintInspectorColumn({
                     .map((item) => (
                       <div
                         key={`${item.version}-${item.updated_at}`}
-                        className="rounded-[1rem] border border-border bg-background/35 px-3 py-3"
+                        className="rounded-xl border border-border bg-background/35 px-3 py-3"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-[13px] font-medium text-foreground">
@@ -1663,14 +1663,14 @@ function BlueprintInspectorColumn({
                   </Button>
                 ) : null}
                 {blueprint.edges.length === 0 ? (
-                  <div className="rounded-[1rem] border border-dashed border-border px-3 py-3 text-[12px] text-muted-foreground">
+                  <div className="rounded-md border border-dashed border-border px-3 py-3 text-[12px] text-muted-foreground">
                     No connections in this blueprint.
                   </div>
                 ) : (
                   blueprint.edges.map((edge, index) => (
                     <div
                       key={`${edge.from_slot_id}-${edge.to_slot_id}-${index}`}
-                      className="rounded-[1rem] border border-border bg-background/35 p-3"
+                      className="rounded-xl border border-border bg-background/35 p-3"
                     >
                       {draft ? (
                         <div className="space-y-3">
@@ -1687,7 +1687,7 @@ function BlueprintInspectorColumn({
                               >
                                 <SelectValue placeholder="Endpoint A" />
                               </SelectTrigger>
-                              <SelectContent className="rounded-[1rem] border-border bg-popover text-popover-foreground backdrop-blur-2xl">
+                              <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
                                 {edgeTargets.map((target) => (
                                   <SelectItem key={target.id} value={target.id}>
                                     {target.label}
@@ -1707,7 +1707,7 @@ function BlueprintInspectorColumn({
                               >
                                 <SelectValue placeholder="Endpoint B" />
                               </SelectTrigger>
-                              <SelectContent className="rounded-[1rem] border-border bg-popover text-popover-foreground backdrop-blur-2xl">
+                              <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
                                 {edgeTargets.map((target) => (
                                   <SelectItem key={target.id} value={target.id}>
                                     {target.label}
@@ -1758,7 +1758,7 @@ function InspectorSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[1rem] border border-border bg-card/30 p-4">
+    <section className="rounded-xl border border-border bg-card/30 p-4">
       <div className="mb-3">
         <h3 className="text-[13px] font-medium text-foreground">{title}</h3>
         {description ? (
@@ -1780,7 +1780,7 @@ function SummaryRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-[0.9rem] border border-border bg-background/40 px-3 py-2.5 text-[12px]">
+    <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-background/40 px-3 py-2.5 text-[12px]">
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right text-foreground/80">{children}</span>
     </div>

@@ -102,13 +102,13 @@ const DEFAULT_PANEL_WIDTH = 448;
 const COMPACT_PANEL_MIN_WIDTH = 300;
 
 const workspaceDialogInputClass =
-  "bg-background/40 text-foreground shadow-xs backdrop-blur-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
+  "bg-background/40 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
 const workspaceChoiceCardClass =
-  "rounded-[1rem] border border-border bg-card/40 px-4 py-3";
+  "rounded-xl border border-border bg-card/40 px-4 py-3";
 const workspaceChoiceListClass =
-  "max-h-56 space-y-2 overflow-y-auto rounded-[1rem] border border-border bg-background/40 p-2 scrollbar-none";
+  "max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border bg-background/40 p-2 scrollbar-none";
 const workspaceChoiceButtonBaseClass =
-  "w-full rounded-[0.9rem] border px-3 py-2.5 text-left transition-colors";
+  "w-full rounded-md border px-3 py-2.5 text-left transition-colors";
 const workspaceSelectionBadgeClass =
   "rounded-md bg-accent/45 px-2 py-1 text-xs text-foreground";
 const workspaceStateBadgeClass: Record<AgentState, string> = {
@@ -668,7 +668,7 @@ export function HomePage() {
   return (
     <div
       ref={workspaceRef}
-      className="relative isolate flex h-full overflow-hidden rounded-[0.9rem] border border-border bg-surface-overlay shadow-xl [contain:paint]"
+      className="relative isolate flex h-full overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-md [contain:paint]"
     >
       <div
         className="pointer-events-none absolute inset-0"
@@ -784,7 +784,7 @@ export function HomePage() {
           <div className="pointer-events-none absolute inset-x-3 bottom-4 z-40 flex justify-center">
             <div
               data-testid="workspace-toolbar"
-              className="pointer-events-auto inline-flex max-w-full items-center overflow-x-auto rounded-[14px] border border-border bg-surface-overlay/92 p-0.5 shadow-xl backdrop-blur-md scrollbar-none"
+              className="pointer-events-auto inline-flex max-w-full items-center overflow-x-auto rounded-xl border border-border bg-surface-overlay/92 p-0.5 shadow-sm scrollbar-none"
             >
               <ToolbarButton
                 disabled={!activeTabId || !graphHistory.canUndo(activeTabId)}
@@ -860,7 +860,7 @@ export function HomePage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 18 }}
                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-y-2.5 right-2.5 z-20 shrink-0 overflow-hidden rounded-[0.95rem] border border-border bg-surface-overlay shadow-xl backdrop-blur-xl"
+                className="absolute inset-y-2.5 right-2.5 z-20 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-md"
                 style={{ width: `${resolvedPanelWidth}px` }}
               >
                 <div
@@ -925,7 +925,7 @@ export function HomePage() {
               animate={{ width: resolvedPanelWidth, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="relative z-20 shrink-0 border-l border-border bg-surface-overlay shadow-xl backdrop-blur-xl"
+              className="relative z-20 shrink-0 border-l border-border bg-surface-overlay shadow-md"
             >
               <div
                 aria-hidden="true"
@@ -1030,7 +1030,7 @@ export function HomePage() {
             value={createTabTitle}
             onChange={(event) => setCreateTabTitle(event.target.value)}
             placeholder="Release checklist"
-            className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
+            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
           />
         </WorkspaceDialogField>
         <WorkspaceDialogField label="Goal" hint="Optional">
@@ -1040,7 +1040,7 @@ export function HomePage() {
             onChange={(event) => setCreateTabGoal(event.target.value)}
             placeholder="Summarize the task or outcome this workspace should drive."
             className={cn(
-              "min-h-[116px] rounded-[1rem]",
+              "min-h-[116px] rounded-md",
               workspaceDialogInputClass,
             )}
           />
@@ -1054,7 +1054,7 @@ export function HomePage() {
                 setCreateTabBlueprintQuery(event.target.value)
               }
               placeholder="Search blueprints"
-              className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
+              className={cn("h-10 rounded-md", workspaceDialogInputClass)}
             />
             {selectedCreateTabBlueprint ? (
               <div className={workspaceChoiceCardClass}>
@@ -1170,7 +1170,7 @@ export function HomePage() {
             onChange={(event) => setCreateTabWriteDirs(event.target.value)}
             placeholder="/workspace/output&#10;/workspace/cache"
             className={cn(
-              "min-h-[80px] rounded-[1rem] font-mono text-[13px]",
+              "min-h-[80px] rounded-md font-mono text-[13px]",
               workspaceDialogInputClass,
             )}
           />
@@ -1218,7 +1218,7 @@ export function HomePage() {
             value={saveBlueprintName}
             onChange={(event) => setSaveBlueprintName(event.target.value)}
             placeholder="Review Pipeline"
-            className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
+            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
           />
         </WorkspaceDialogField>
         <WorkspaceDialogField label="Description" hint="Optional">
@@ -1230,7 +1230,7 @@ export function HomePage() {
             }
             placeholder="Describe the reusable collaboration architecture."
             className={cn(
-              "min-h-[116px] rounded-[1rem]",
+              "min-h-[116px] rounded-md",
               workspaceDialogInputClass,
             )}
           />
@@ -1284,7 +1284,7 @@ export function HomePage() {
               value={createAgentRoleQuery}
               onChange={(event) => setCreateAgentRoleQuery(event.target.value)}
               placeholder="Search roles"
-              className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
+              className={cn("h-10 rounded-md", workspaceDialogInputClass)}
             />
             {selectedCreateAgentRole ? (
               <div className={workspaceChoiceCardClass}>
@@ -1336,7 +1336,7 @@ export function HomePage() {
             aria-label="Agent display name"
             onChange={(event) => setCreateAgentName(event.target.value)}
             placeholder="Docs Worker"
-            className={cn("h-11 rounded-[1rem]", workspaceDialogInputClass)}
+            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
           />
         </WorkspaceDialogField>
       </WorkspaceCommandDialog>
@@ -1402,13 +1402,13 @@ export function HomePage() {
             <SelectTrigger
               aria-label="Agent A"
               className={cn(
-                "h-11 rounded-[1rem] data-[placeholder]:text-muted-foreground",
+                "h-10 rounded-md data-[placeholder]:text-muted-foreground",
                 workspaceDialogInputClass,
               )}
             >
               <SelectValue placeholder="Choose first agent" />
             </SelectTrigger>
-            <SelectContent className="rounded-[1rem] border-border bg-popover text-popover-foreground backdrop-blur-2xl">
+            <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
               {tabAgentOptions.map((agent) => (
                 <SelectItem key={agent.id} value={agent.id}>
                   {agent.label}
@@ -1422,13 +1422,13 @@ export function HomePage() {
             <SelectTrigger
               aria-label="Agent B"
               className={cn(
-                "h-11 rounded-[1rem] data-[placeholder]:text-muted-foreground",
+                "h-10 rounded-md data-[placeholder]:text-muted-foreground",
                 workspaceDialogInputClass,
               )}
             >
               <SelectValue placeholder="Choose second agent" />
             </SelectTrigger>
-            <SelectContent className="rounded-[1rem] border-border bg-popover text-popover-foreground backdrop-blur-2xl">
+            <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
               {tabAgentOptions
                 .filter((agent) => agent.id !== connectSourceId)
                 .map((agent) => (
@@ -1449,10 +1449,10 @@ export function HomePage() {
           }
         }}
       >
-        <AlertDialogContent className="max-w-[30rem] rounded-[1.35rem] border-border bg-surface-overlay shadow-xl backdrop-blur-2xl">
+        <AlertDialogContent className="max-w-[30rem]">
           <AlertDialogHeader className="gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl border border-border bg-accent/45 text-foreground shadow-xs">
+              <div className="flex size-11 items-center justify-center rounded-xl border border-border bg-accent/45 text-foreground shadow-xs">
                 <Trash2 className="size-5" />
               </div>
               <div>
@@ -1518,7 +1518,7 @@ function ToolbarButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[11px] border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-muted-foreground transition-[background-color,border-color,color] duration-150 hover:border-border hover:bg-accent/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:border-transparent disabled:text-muted-foreground/50 disabled:hover:bg-transparent",
+        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-transparent bg-transparent px-3 py-1.75 text-[11px] font-medium text-muted-foreground transition-[background-color,border-color,color] duration-150 hover:border-border hover:bg-accent/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:border-transparent disabled:text-muted-foreground/50 disabled:hover:bg-transparent",
         active && "border-border bg-accent/70 text-foreground",
       )}
     >
@@ -2086,7 +2086,7 @@ function PanelToggleButton({
       title={title}
       aria-label={title}
       className={cn(
-        "pointer-events-auto relative isolate flex size-9 items-center justify-center rounded-md border border-border bg-surface-overlay/80 text-muted-foreground backdrop-blur-lg transition-[background-color,color] duration-150 hover:bg-accent/60 hover:text-foreground [contain:paint]",
+        "pointer-events-auto relative isolate flex size-9 items-center justify-center rounded-md border border-border bg-surface-overlay/80 text-muted-foreground shadow-sm transition-[background-color,color] duration-150 hover:bg-accent/60 hover:text-foreground [contain:paint]",
         className,
       )}
     >

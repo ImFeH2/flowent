@@ -64,12 +64,12 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         initial={{ opacity: 0, scale: 0.96, y: -4 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.12, ease: "easeOut" }}
-        className="fixed z-[200] min-w-[160px] rounded-md border border-glass-border bg-surface-raised py-1 shadow-xl backdrop-blur-sm"
+        className="fixed z-[200] min-w-[160px] rounded-md border border-border bg-popover py-1 shadow-md"
         style={{ left: pos.left, top: pos.top }}
       >
         {items.map((item, i) =>
           item === "divider" ? (
-            <div key={i} className="my-1 border-t border-glass-border" />
+            <div key={i} className="my-1 border-t border-border" />
           ) : (
             <button
               key={i}
@@ -80,10 +80,10 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
                   onClose();
                 }
               }}
-              className={`w-full px-3 py-1.5 text-left text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              className={`w-full px-3 py-1.5 text-left text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                 item.danger
-                  ? "text-graph-status-error/90 hover:bg-graph-status-error/[0.12] hover:text-graph-status-error"
-                  : "text-foreground hover:bg-surface-3"
+                  ? "text-graph-status-error/90 hover:bg-destructive/10 hover:text-graph-status-error"
+                  : "text-popover-foreground/90 hover:bg-accent/30 hover:text-popover-foreground"
               }`}
             >
               {item.label}

@@ -39,7 +39,7 @@ export function WorkspaceCommandDialog({
             <button
               type="button"
               aria-label="Close dialog"
-              className="absolute right-4 top-4 z-20 flex size-7 items-center justify-center rounded-full bg-accent/60 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="absolute right-4 top-4 z-20 flex size-7 items-center justify-center rounded-md bg-accent/45 text-muted-foreground transition-colors hover:bg-accent/65 hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <X className="size-3.5" />
             </button>

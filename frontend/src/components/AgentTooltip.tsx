@@ -52,11 +52,11 @@ export function AgentTooltip({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 2, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="pointer-events-none fixed z-[100] max-w-[320px] rounded-md border border-glass-border bg-glass-bg px-3 py-2 shadow-xl backdrop-blur-sm"
+            className="pointer-events-none fixed z-[100] max-w-[320px] rounded-md border border-border bg-popover px-2 py-1 text-popover-foreground shadow-md"
             style={style}
           >
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium">{label}</span>
+              <span className="text-[11px] font-medium">{label}</span>
               <Badge
                 variant="outline"
                 className={`text-[10px] ${tooltipStateBadgeClass[agent.state]}`}
@@ -77,7 +77,7 @@ export function AgentTooltip({
                 </Badge>
               ) : null}
             </div>
-            <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+            <div className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
               <span>ID</span>
               <span className="font-mono text-foreground/80">
                 {agentId.slice(0, 8)}
@@ -99,7 +99,7 @@ export function AgentTooltip({
                 </>
               ) : null}
             </div>
-            <div className="mt-2 space-y-1">
+            <div className="mt-1.5 space-y-1">
               <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 Todos
               </div>

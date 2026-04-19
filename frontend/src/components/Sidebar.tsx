@@ -69,13 +69,13 @@ export function Sidebar({
     <aside
       style={{ width: `${width}px` }}
       className={cn(
-        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border-r border-sidebar-border bg-sidebar shadow-2xl backdrop-blur-2xl transition-colors",
+        "text-sidebar-foreground relative isolate z-40 flex flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-colors",
         autoHide ? "h-full" : "fixed inset-y-0 left-0 h-auto",
         className,
       )}
     >
       <div
-        className="pointer-events-none absolute inset-0 opacity-30"
+        className="pointer-events-none absolute inset-0 opacity-20"
         style={{ background: "var(--shell-surface-sweep)" }}
       />
       <div className="flex h-full flex-col overflow-hidden">
@@ -121,7 +121,7 @@ export function Sidebar({
               type="button"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "group flex w-full items-center gap-3 rounded-md px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 currentPage === id
                   ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
                   : "text-sidebar-foreground/60 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
@@ -148,7 +148,7 @@ export function Sidebar({
             onClick={() => {
               void logout();
             }}
-            className="mb-3 flex w-full items-center justify-between rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-left text-[12px] font-medium text-sidebar-foreground/78 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="mb-3 flex w-full items-center justify-between rounded-md border border-sidebar-border bg-sidebar-accent/25 px-3 py-2 text-left text-[12px] font-medium text-sidebar-foreground/74 transition-colors hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <span>Logout</span>
             <LogOut className="size-3.5" />

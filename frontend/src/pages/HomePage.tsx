@@ -697,10 +697,10 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "relative flex h-9 w-full items-center rounded-[0.7rem] px-3 pr-8 text-left text-[13px] font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "relative flex h-8 w-full items-center rounded-md border-b-2 px-3 pr-8 text-left text-[13px] font-medium transition-[color,border-color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     activeTabId === tab.id
-                      ? "border border-border bg-accent/80 text-accent-foreground shadow-xs"
-                      : "bg-transparent text-muted-foreground hover:bg-accent/45 hover:text-foreground",
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:bg-accent/25 hover:text-foreground",
                   )}
                 >
                   <div className="truncate leading-tight">{tab.title}</div>
@@ -714,9 +714,9 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 transition-all duration-200 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 transition-all duration-200 hover:bg-accent/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     activeTabId === tab.id
-                      ? "text-muted-foreground opacity-100"
+                      ? "text-foreground/70 opacity-100"
                       : "text-muted-foreground/60 opacity-0 group-hover:opacity-100",
                   )}
                 >

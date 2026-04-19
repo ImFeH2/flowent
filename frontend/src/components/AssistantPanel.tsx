@@ -44,8 +44,8 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
       className={cn(
         "relative flex h-full flex-col",
         isFloating
-          ? "overflow-hidden rounded-[1.25rem] border border-border bg-surface-overlay text-foreground shadow-xl backdrop-blur-3xl"
-          : "overflow-hidden border-l border-border bg-surface-overlay/94 text-foreground shadow-xl backdrop-blur-2xl",
+          ? "overflow-hidden rounded-xl border border-border bg-surface-2 text-foreground shadow-md"
+          : "overflow-hidden border-l border-border bg-surface-overlay/94 text-foreground shadow-sm",
       )}
     >
       <div

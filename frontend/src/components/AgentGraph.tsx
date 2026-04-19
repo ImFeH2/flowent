@@ -54,13 +54,13 @@ const VIEWPORT_MIN_ZOOM = 0.05;
 const VIEWPORT_MAX_ZOOM = 6;
 const LAYOUT_RETRY_LIMIT = 1;
 const graphChromePillClass =
-  "rounded-full border border-border bg-surface-overlay/88 px-3 py-1 text-[11px] font-medium text-foreground/88 shadow-lg backdrop-blur-md";
+  "rounded-md border border-border bg-popover px-3 py-1 text-[11px] font-medium text-popover-foreground shadow-sm";
 const quickCreateInputClass =
-  "h-10 w-full rounded-[0.9rem] border border-input bg-background/55 px-3 text-[13px] text-foreground shadow-xs placeholder:text-muted-foreground transition-[border-color,box-shadow] focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+  "h-8 w-full rounded-md border border-input bg-background/55 px-3 text-[13px] text-foreground shadow-xs placeholder:text-muted-foreground transition-[border-color,box-shadow] focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50";
 const quickCreateListClass =
-  "max-h-56 space-y-2 overflow-y-auto rounded-[0.9rem] border border-border bg-background/40 p-2 scrollbar-none";
+  "max-h-56 space-y-2 overflow-y-auto rounded-md border border-border bg-background/40 p-2 scrollbar-none";
 const quickCreateButtonClass =
-  "w-full rounded-[0.85rem] border px-3 py-2.5 text-left transition-colors";
+  "w-full rounded-md border px-3 py-2 text-left transition-colors";
 
 const nodeTypes: NodeTypes = {
   agent: AgentNode,
@@ -1695,7 +1695,7 @@ function GraphQuickCreatePopover({
     <ViewportPortal>
       <div
         ref={ref}
-        className="fixed z-[210] w-[min(24rem,calc(100vw-1.5rem))] rounded-[1rem] border border-border bg-popover p-4 text-popover-foreground shadow-xl backdrop-blur-xl"
+        className="fixed z-[210] w-[min(24rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-md"
         style={{ left: pos.left, top: pos.top }}
       >
         <div className="flex items-center justify-between gap-3">
@@ -1708,7 +1708,7 @@ function GraphQuickCreatePopover({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
+            className="flex h-8 items-center rounded-md px-2.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
           >
             Close
           </button>
@@ -1768,7 +1768,7 @@ function GraphQuickCreatePopover({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full px-3 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
+            className="flex h-8 items-center rounded-md px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
           >
             Cancel
           </button>
@@ -1776,7 +1776,7 @@ function GraphQuickCreatePopover({
             type="button"
             disabled={!selectedRoleName || submitting}
             onClick={onSubmit}
-            className="rounded-full bg-primary px-3.5 py-1.5 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-8 items-center rounded-md bg-primary px-3.5 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Saving..." : title}
           </button>

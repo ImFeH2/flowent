@@ -69,6 +69,11 @@
   --color-graph-status-terminated: var(--graph-status-terminated);
   --color-scrollbar-thumb: var(--scrollbar-thumb);
   --color-scrollbar-thumb-hover: var(--scrollbar-thumb-hover);
+  --color-shell-hairline: var(--shell-hairline);
+  --color-shell-noise-dot: var(--shell-noise-dot);
+  --color-shell-scrim: var(--shell-scrim);
+  --color-shell-spotlight-primary: var(--shell-spotlight-primary);
+  --color-shell-spotlight-secondary: var(--shell-spotlight-secondary);
 }
 
 :root {
@@ -136,6 +141,71 @@
   --graph-status-terminated: oklch(0.42 0 0);
   --scrollbar-thumb: oklch(0.34 0.002 260);
   --scrollbar-thumb-hover: oklch(0.44 0.002 260);
+  --shell-hairline: oklch(0.98 0.002 260 / 8%);
+  --shell-noise-dot: oklch(0.98 0.002 260);
+  --shell-noise-opacity: 0.022;
+  --shell-scrim: oklch(0.03 0.002 260 / 58%);
+  --shell-spotlight-primary: oklch(0.98 0.002 260 / 3.2%);
+  --shell-spotlight-secondary: oklch(0.98 0.002 260 / 1.2%);
+  --shell-app-bg: linear-gradient(
+    180deg,
+    oklch(0.07 0.002 260) 0%,
+    oklch(0.08 0.002 260) 100%
+  );
+  --shell-access-bg: linear-gradient(
+    180deg,
+    oklch(0.07 0.002 260) 0%,
+    oklch(0.08 0.002 260) 100%
+  );
+  --shell-app-spotlight-primary: radial-gradient(
+    circle at top left,
+    var(--shell-spotlight-primary),
+    transparent 18%
+  );
+  --shell-app-spotlight-secondary: radial-gradient(
+    circle at 72% 12%,
+    var(--shell-spotlight-secondary),
+    transparent 18%
+  );
+  --shell-access-spotlight-primary: radial-gradient(
+    circle at top left,
+    var(--shell-spotlight-primary),
+    transparent 18%
+  );
+  --shell-access-spotlight-secondary: radial-gradient(
+    circle at 72% 12%,
+    var(--shell-spotlight-secondary),
+    transparent 18%
+  );
+  --shell-sweep: linear-gradient(
+    180deg,
+    oklch(0.98 0.002 260 / 2%) 0%,
+    transparent 16%,
+    transparent 86%,
+    oklch(0.98 0.002 260 / 1.2%) 100%
+  );
+  --shell-surface-workspace: linear-gradient(
+    180deg,
+    oklch(0.115 0.002 260 / 90%),
+    oklch(0.1 0.002 260 / 86%)
+  );
+  --shell-surface-page: linear-gradient(
+    180deg,
+    oklch(0.13 0.002 260 / 90%),
+    oklch(0.11 0.002 260 / 88%)
+  );
+  --shell-surface-access: linear-gradient(
+    180deg,
+    oklch(0.135 0.002 260 / 96%),
+    oklch(0.11 0.002 260 / 94%)
+  );
+  --shell-surface-sweep: linear-gradient(
+    180deg,
+    oklch(0.98 0.002 260 / 2.6%),
+    transparent 14%,
+    transparent 84%,
+    oklch(0.98 0.002 260 / 1.2%)
+  );
 }
 
 @layer base {

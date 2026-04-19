@@ -10,6 +10,10 @@ import {
 import { Suspense, lazy, useState, type ComponentType } from "react";
 import { Toaster } from "sonner";
 import { ImageViewerProvider } from "@/components/ImageViewer";
+import {
+  ShellBackground,
+  ShellSurface,
+} from "@/components/layout/ShellBackground";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
 import { AccessProvider } from "@/context/AccessContext";
@@ -71,6 +75,15 @@ const lazyPageMap: Record<PageId, ComponentType> = {
   settings: SettingsPage,
 };
 
+const shellFloatingButtonClass =
+  "z-30 flex items-center justify-center border border-border bg-surface-overlay text-muted-foreground backdrop-blur-xl transition-colors hover:bg-accent/80 hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+
+const accessInputClass =
+  "w-full rounded-[1rem] border border-input bg-background/50 px-4 py-3 text-[14px] text-foreground transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+
+const accessButtonClass =
+  "flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-[13px] font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
+
 function PageLoadingFallback() {
   return (
     <div className="flex h-full items-center justify-center">
@@ -107,10 +120,7 @@ function AppContent() {
   };
 
   return (
-    <div className="relative h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.032),transparent_18%),radial-gradient(circle_at_72%_12%,rgba(255,255,255,0.012),transparent_18%),linear-gradient(180deg,#050505_0%,#070707_100%)]">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_16%,transparent_86%,rgba(255,255,255,0.012))]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.022] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:20px_20px]" />
-
+    <ShellBackground variant="app">
       {isCompactLayout ? (
         <AnimatePresence>
           {sidebarOpen ? (
@@ -122,7 +132,7 @@ function AppContent() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.18 }}
-                className="absolute inset-0 z-40 bg-black/50 backdrop-blur-[2px]"
+                className="absolute inset-0 z-40 bg-background/72 backdrop-blur-[2px]"
                 onClick={() => setSidebarDrawerOpen(false)}
               />
               <motion.div
@@ -157,13 +167,9 @@ function AppContent() {
               }
         }
       >
-        <div
-          className={cn(
-            "relative isolate h-full overflow-hidden backdrop-blur-xl [contain:paint]",
-            isWorkspace
-              ? "bg-[linear-gradient(180deg,rgba(11,11,12,0.9),rgba(9,9,10,0.86))]"
-              : "bg-[linear-gradient(180deg,rgba(13,13,14,0.9),rgba(10,10,11,0.88))]",
-          )}
+        <ShellSurface
+          variant={isWorkspace ? "workspace" : "page"}
+          className={cn("h-full backdrop-blur-xl [contain:paint]")}
         >
           {isCompactLayout ? (
             <>
@@ -173,7 +179,10 @@ function AppContent() {
                   sidebarOpen ? "Close navigation" : "Open navigation"
                 }
                 onClick={() => setSidebarDrawerOpen((current) => !current)}
-                className="absolute left-3.5 top-3.5 z-30 flex size-9 items-center justify-center rounded-md border border-white/10 bg-black/28 text-white/72 backdrop-blur-xl transition-colors hover:bg-white/[0.06] hover:text-white"
+                className={cn(
+                  shellFloatingButtonClass,
+                  "absolute left-3.5 top-3.5 size-9 rounded-md",
+                )}
               >
                 {sidebarOpen ? (
                   <PanelLeftClose className="size-4" />
@@ -187,15 +196,16 @@ function AppContent() {
                 onClick={() => {
                   void logout();
                 }}
-                className="absolute right-3.5 top-3.5 z-30 flex h-9 items-center gap-2 rounded-full border border-white/10 bg-black/28 px-3 text-[12px] font-medium text-white/72 backdrop-blur-xl transition-colors hover:bg-white/[0.06] hover:text-white"
+                className={cn(
+                  shellFloatingButtonClass,
+                  "absolute right-3.5 top-3.5 h-9 gap-2 rounded-full px-3 text-[12px] font-medium",
+                )}
               >
                 <LogOut className="size-3.5" />
                 Logout
               </button>
             </>
           ) : null}
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_16%,transparent_84%,rgba(255,255,255,0.012))]" />
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/8" />
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}
@@ -208,9 +218,9 @@ function AppContent() {
               {renderPage()}
             </motion.div>
           </AnimatePresence>
-        </div>
+        </ShellSurface>
       </main>
-    </div>
+    </ShellBackground>
   );
 }
 
@@ -254,79 +264,84 @@ function AccessGate() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.032),transparent_18%),radial-gradient(circle_at_72%_12%,rgba(255,255,255,0.012),transparent_18%),linear-gradient(180deg,#050505_0%,#070707_100%)]">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_16%,transparent_86%,rgba(255,255,255,0.012))]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.022] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] [background-size:20px_20px]" />
+    <ShellBackground variant="access">
       <div className="relative z-10 flex min-h-screen items-center justify-center px-5 py-10">
-        <div className="w-full max-w-[460px] rounded-[1.5rem] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(17,17,18,0.96),rgba(11,11,12,0.94))] p-7 shadow-[0_30px_90px_-42px_rgba(0,0,0,0.95),0_16px_38px_-28px_rgba(255,255,255,0.08)] backdrop-blur-2xl">
-          <div className="flex items-center gap-3">
-            <div className="flex size-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-white/88">
-              <KeyRound className="size-5" />
+        <ShellSurface
+          variant="access"
+          className="w-full max-w-[460px] rounded-[1.5rem] border border-border p-7 text-popover-foreground shadow-2xl backdrop-blur-2xl"
+        >
+          <div className="relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-2xl border border-border bg-accent/40 text-foreground">
+                <KeyRound className="size-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+                  Access
+                </p>
+                <h1 className="mt-1 text-[24px] font-medium tracking-[-0.04em] text-foreground">
+                  Enter Access Code
+                </h1>
+              </div>
             </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-white/38">
-                Access
-              </p>
-              <h1 className="mt-1 text-[24px] font-medium tracking-[-0.04em] text-white">
-                Enter Access Code
-              </h1>
-            </div>
-          </div>
 
-          <p className="mt-5 text-[13px] leading-6 text-white/48">
-            {description}
-          </p>
+            <p className="mt-5 text-[13px] leading-6 text-muted-foreground">
+              {description}
+            </p>
 
-          <div className="mt-7 space-y-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="access-code"
-                className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/45"
-              >
-                Access Code
-              </label>
-              <input
-                id="access-code"
-                type="password"
-                autoComplete="current-password"
-                value={code}
+            <div className="mt-7 space-y-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="access-code"
+                  className="text-[11px] font-medium uppercase tracking-[0.12em] text-foreground/72"
+                >
+                  Access Code
+                </label>
+                <input
+                  id="access-code"
+                  type="password"
+                  autoComplete="current-password"
+                  value={code}
+                  disabled={submitting || accessUnavailable}
+                  onChange={(event) => setCode(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleSubmit();
+                    }
+                  }}
+                  placeholder="Enter access code"
+                  className={accessInputClass}
+                />
+              </div>
+
+              {error ? (
+                <p className="text-[12px] leading-5 text-graph-status-error">
+                  {error}
+                </p>
+              ) : (
+                <p className="text-[12px] leading-5 text-muted-foreground">
+                  This browser stays signed in until you logout or the access
+                  code changes.
+                </p>
+              )}
+
+              <button
+                type="button"
                 disabled={submitting || accessUnavailable}
-                onChange={(event) => setCode(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void handleSubmit();
-                  }
-                }}
-                placeholder="Enter access code"
-                className="w-full rounded-[1rem] border border-white/[0.08] bg-black/30 px-4 py-3 text-[14px] text-white transition-colors placeholder:text-white/28 focus:border-white/20 focus:bg-white/[0.04] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-              />
+                onClick={() => void handleSubmit()}
+                className={accessButtonClass}
+              >
+                {submitting ? (
+                  <LoaderCircle className="size-4 animate-spin" />
+                ) : null}
+                {submitting ? "Verifying..." : "Unlock"}
+              </button>
             </div>
-
-            {error ? (
-              <p className="text-[12px] leading-5 text-red-200">{error}</p>
-            ) : (
-              <p className="text-[12px] leading-5 text-white/38">
-                This browser stays signed in until you logout or the access code
-                changes.
-              </p>
-            )}
-
-            <button
-              type="button"
-              disabled={submitting || accessUnavailable}
-              onClick={() => void handleSubmit()}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white text-[13px] font-medium text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : null}
-              {submitting ? "Verifying..." : "Unlock"}
-            </button>
           </div>
-        </div>
+        </ShellSurface>
       </div>
-    </div>
+    </ShellBackground>
   );
 }
 
@@ -335,12 +350,15 @@ function AppShell() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#050505_0%,#070707_100%)]">
+      <ShellBackground
+        variant="access"
+        className="flex min-h-screen items-center justify-center"
+      >
         <div className="space-y-3 text-center">
           <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
           <p className="text-sm text-muted-foreground">Loading access...</p>
         </div>
-      </div>
+      </ShellBackground>
     );
   }
 
@@ -366,7 +384,7 @@ function App() {
           position="bottom-right"
           toastOptions={{
             className:
-              "rounded-md border border-border bg-surface-2 text-foreground shadow-[0_24px_60px_-32px_rgba(0,0,0,0.85)]",
+              "rounded-md border border-border bg-surface-overlay text-foreground shadow-xl backdrop-blur-xl",
           }}
         />
         <TooltipProvider delayDuration={300}>

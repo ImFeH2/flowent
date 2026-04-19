@@ -25,7 +25,7 @@ export function SoftPanel({ children, className }: SoftPanelProps) {
   return (
     <section
       className={cn(
-        "rounded-xl border border-white/[0.04] bg-white/[0.01] p-5",
+        "rounded-xl border border-border bg-card/30 p-5",
         className,
       )}
     >
@@ -43,9 +43,9 @@ export function SectionHeader({
 }) {
   return (
     <div className="mb-6">
-      <h2 className="text-base font-medium text-white/90">{title}</h2>
+      <h2 className="text-base font-medium text-foreground">{title}</h2>
       {description ? (
-        <p className="mt-1 text-[13px] text-white/40">{description}</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>
       ) : null}
     </div>
   );
@@ -65,9 +65,11 @@ export function SettingsRow({
   return (
     <div className="flex flex-col gap-2 py-4 first:pt-0 md:flex-row md:items-start md:justify-between md:gap-8">
       <div className="min-w-0 flex-1 md:max-w-[200px]">
-        <label className="text-[13px] font-medium text-white/80">{label}</label>
+        <label className="text-[13px] font-medium text-foreground/80">
+          {label}
+        </label>
         {description ? (
-          <p className="mt-1 text-[12px] text-white/40 leading-relaxed">
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
             {description}
           </p>
         ) : null}

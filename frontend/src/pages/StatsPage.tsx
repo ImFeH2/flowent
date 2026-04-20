@@ -32,7 +32,11 @@ import {
   type StatsMetric,
   type StatsSortKey,
 } from "@/lib/stats";
-import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
+import {
+  PageScaffold,
+  PageTitleBar,
+  SoftPanel,
+} from "@/components/layout/PageScaffold";
 import { Button } from "@/components/ui/button";
 import { formatLocalTimestamp } from "@/lib/datetime";
 import {
@@ -728,54 +732,46 @@ export function StatsPage() {
     <PageScaffold className="min-h-0">
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
         <div className="shrink-0 border-b border-border px-6 py-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground/80">
-                Global Observability
-              </p>
-              <h1 className="mt-2 text-[28px] font-medium tracking-[-0.04em] text-foreground">
-                Stats
-              </h1>
-              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
-                Review formal runtime facts across requests, retries, compacts,
-                cache usage, and current node activity without narrowing to a
-                single task conversation.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-col gap-1">
-                <span className={statsFilterLabelClass}>Range</span>
-                <Select
-                  value={range}
-                  onValueChange={(value: StatsRange) => setRange(value)}
-                >
-                  <SelectTrigger
-                    className={`w-[120px] ${statsSelectTriggerClass}`}
+          <PageTitleBar
+            title="Stats"
+            hint="Review system-wide runtime observability here instead of a single task conversation."
+            actions={
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className={statsFilterLabelClass}>Range</span>
+                  <Select
+                    value={range}
+                    onValueChange={(value: StatsRange) => setRange(value)}
                   >
-                    <SelectValue placeholder="Range" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RANGE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      className={`w-[120px] ${statsSelectTriggerClass}`}
+                    >
+                      <SelectValue placeholder="Range" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RANGE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-5 border-border bg-accent/20 text-foreground hover:bg-accent/35"
+                  onClick={() => void mutate()}
+                >
+                  <RefreshCw
+                    className={cn("size-4", isLoading && "animate-spin")}
+                  />
+                  Refresh
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-5 border-border bg-accent/20 text-foreground hover:bg-accent/35"
-                onClick={() => void mutate()}
-              >
-                <RefreshCw
-                  className={cn("size-4", isLoading && "animate-spin")}
-                />
-                Refresh
-              </Button>
-            </div>
-          </div>
+            }
+            className="border-b-0 pb-0"
+          />
 
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1">

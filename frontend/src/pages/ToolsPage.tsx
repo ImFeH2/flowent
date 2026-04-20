@@ -24,7 +24,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { fetchTools, type ToolInfo } from "@/lib/api";
-import { PageScaffold } from "@/components/layout/PageScaffold";
+import { PageScaffold, PageTitleBar } from "@/components/layout/PageScaffold";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -181,17 +181,9 @@ export function ToolsPage() {
 
   return (
     <PageScaffold>
-      <div className="flex h-full flex-col pt-8 px-8">
-        <div className="mb-6">
-          <h1 className="text-[28px] font-medium tracking-[-0.04em] text-foreground">
-            Tools
-          </h1>
-          <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
-            Browse the current tool directory, including built-in tools and
-            discovered MCP tools.
-          </p>
-        </div>
-        <div className="mb-6 flex items-center gap-4">
+      <div className="flex h-full flex-col px-8 pt-6">
+        <PageTitleBar title="Tools" />
+        <div className="mb-6 mt-6 flex items-center gap-4">
           <div className="relative max-w-md flex-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input

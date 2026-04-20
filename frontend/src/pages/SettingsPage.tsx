@@ -48,7 +48,7 @@ export function SettingsPage() {
   return (
     <PageScaffold>
       <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none">
-        <div className="mx-auto max-w-[680px] pb-10 pt-8">
+        <div className="mx-auto max-w-[680px] pb-10 pt-6">
           <SettingsHeader
             accessDraftError={accessDraftError}
             onSave={() => {

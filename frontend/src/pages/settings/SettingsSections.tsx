@@ -9,7 +9,11 @@ import {
   formLabelClass,
   formSelectTriggerClass,
 } from "@/components/form/FormControls";
-import { SectionHeader, SettingsRow } from "@/components/layout/PageScaffold";
+import {
+  PageTitleBar,
+  SectionHeader,
+  SettingsRow,
+} from "@/components/layout/PageScaffold";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -54,29 +58,24 @@ export function SettingsHeader({
   settings,
 }: SettingsHeaderProps) {
   return (
-    <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-[28px] font-medium tracking-[-0.04em] text-foreground">
-          Settings
-        </h1>
-        <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted-foreground">
-          Update access, path defaults, assistant defaults, leader defaults, and
-          system-wide model behavior.
-        </p>
-      </div>
-      <Button
-        type="button"
-        size="sm"
-        onClick={onSave}
-        disabled={
-          saving || Boolean(accessDraftError) || !settings.working_dir.trim()
-        }
-        className="text-[13px]"
-      >
-        <Save className="size-4" />
-        {saving ? "Saving..." : "Save Changes"}
-      </Button>
-    </div>
+    <PageTitleBar
+      title="Settings"
+      actions={
+        <Button
+          type="button"
+          size="sm"
+          onClick={onSave}
+          disabled={
+            saving || Boolean(accessDraftError) || !settings.working_dir.trim()
+          }
+          className="text-[13px]"
+        >
+          <Save className="size-4" />
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      }
+      className="mb-8"
+    />
   );
 }
 
@@ -93,72 +92,62 @@ export function AccessConfigurationSection({
 }: AccessConfigurationSectionProps) {
   return (
     <section>
-      <SectionHeader
-        title="Access Configuration"
-        description="Manage the shared admin access code used to unlock the control plane."
-      />
-      <div>
-        <SettingsRow
-          label="Shared Admin Access"
-          description="Autopoe uses one shared admin access code instead of multiple user accounts."
-        >
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="new-access-code" className={formLabelClass}>
-                New Access Code
-              </label>
-              <SecretInput
-                id="new-access-code"
-                value={accessDraft.newCode}
-                onChange={(event) =>
-                  onAccessDraftChange((current) => ({
-                    ...current,
-                    newCode: event.target.value,
-                  }))
-                }
-                placeholder="Leave empty to keep the current access code"
-                showLabel="Show new access code"
-                hideLabel="Hide new access code"
-                buttonSize="default"
-              />
-            </div>
+      <SectionHeader title="Access Configuration" />
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <label htmlFor="new-access-code" className={formLabelClass}>
+            New Access Code
+          </label>
+          <SecretInput
+            id="new-access-code"
+            value={accessDraft.newCode}
+            onChange={(event) =>
+              onAccessDraftChange((current) => ({
+                ...current,
+                newCode: event.target.value,
+              }))
+            }
+            placeholder="Leave empty to keep the current access code"
+            showLabel="Show new access code"
+            hideLabel="Hide new access code"
+            buttonSize="default"
+          />
+        </div>
 
-            <div className="space-y-2">
-              <label htmlFor="confirm-access-code" className={formLabelClass}>
-                Confirm Access Code
-              </label>
-              <SecretInput
-                id="confirm-access-code"
-                value={accessDraft.confirmCode}
-                onChange={(event) =>
-                  onAccessDraftChange((current) => ({
-                    ...current,
-                    confirmCode: event.target.value,
-                  }))
-                }
-                placeholder="Repeat the new access code"
-                showLabel="Show confirmed access code"
-                hideLabel="Hide confirmed access code"
-                buttonSize="default"
-              />
-            </div>
+        <div className="space-y-2">
+          <label htmlFor="confirm-access-code" className={formLabelClass}>
+            Confirm Access Code
+          </label>
+          <SecretInput
+            id="confirm-access-code"
+            value={accessDraft.confirmCode}
+            onChange={(event) =>
+              onAccessDraftChange((current) => ({
+                ...current,
+                confirmCode: event.target.value,
+              }))
+            }
+            placeholder="Repeat the new access code"
+            showLabel="Show confirmed access code"
+            hideLabel="Hide confirmed access code"
+            buttonSize="default"
+          />
+        </div>
 
-            <div className={cn("space-y-2", formHelpTextClass)}>
-              <p>
-                Saving a new access code invalidates all current admin sessions.
-                You will need to unlock the console again with the new code.
-              </p>
-              <p>
-                The first access code is not created here. When Autopoe starts
-                without one, it automatically generates a code and writes it to
-                the local startup log.
-              </p>
-              {accessDraftError ? (
-                <p className="text-destructive">{accessDraftError}</p>
-              ) : null}
-            </div>
-          </div>
-        </SettingsRow>
+        <div className={cn("space-y-2", formHelpTextClass)}>
+          <p>
+            Saving a new access code invalidates all current admin sessions. You
+            will need to unlock the console again with the new code.
+          </p>
+          <p>
+            The first access code is not created here. When Autopoe starts
+            without one, it automatically generates a code and writes it to the
+            local startup log.
+          </p>
+          {accessDraftError ? (
+            <p className="text-destructive">{accessDraftError}</p>
+          ) : null}
+        </div>
       </div>
     </section>
   );
@@ -174,11 +163,8 @@ export function PathConfigurationSection({
   settings,
 }: PathConfigurationSectionProps) {
   return (
-    <section className="mt-8 border-t border-border pt-8">
-      <SectionHeader
-        title="Path Configuration"
-        description="Review the instance data root and change the default system working directory."
-      />
+    <section className="mt-12 border-t border-border pt-8">
+      <SectionHeader title="Path Configuration" />
       <div>
         <SettingsRow
           label="App Data Directory"
@@ -257,11 +243,8 @@ export function AssistantConfigurationSection({
   settings,
 }: AssistantConfigurationSectionProps) {
   return (
-    <section className="mt-8 border-t border-border pt-8">
-      <SectionHeader
-        title="Assistant Configuration"
-        description="Choose the role that powers the system assistant."
-      />
+    <section className="mt-12 border-t border-border pt-8">
+      <SectionHeader title="Assistant Configuration" />
       <div>
         <SettingsRow label="Assistant Role" description="System role">
           <Select
@@ -382,11 +365,8 @@ export function LeaderConfigurationSection({
   settings,
 }: LeaderConfigurationSectionProps) {
   return (
-    <section className="mt-8 border-t border-border pt-8">
-      <SectionHeader
-        title="Leader Configuration"
-        description="Choose the default role used by each task tab's bound leader."
-      />
+    <section className="mt-12 border-t border-border pt-8">
+      <SectionHeader title="Leader Configuration" />
       <div>
         <SettingsRow label="Leader Role" description="Default tab owner role">
           <Select
@@ -458,11 +438,8 @@ export function ModelConfigurationSection({
   settings,
 }: ModelConfigurationSectionProps) {
   return (
-    <section className="mt-8 border-t border-border pt-8">
-      <SectionHeader
-        title="Model Configuration"
-        description="Set the active provider and model, explicit active-model metadata overrides, canonical parameters, and token-limit based automatic compact."
-      />
+    <section className="mt-12 border-t border-border pt-8">
+      <SectionHeader title="Model Configuration" />
       <div>
         <SettingsRow
           label="Active Provider"

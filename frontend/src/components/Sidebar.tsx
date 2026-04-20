@@ -9,33 +9,8 @@ import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
 import { Button } from "@/components/ui/button";
-import {
-  BookCopy,
-  LayoutDashboard,
-  ChartNoAxesCombined,
-  LogOut,
-  PlugZap,
-  Server,
-  Users,
-  MessageSquareQuote,
-  Wrench,
-  Radio,
-  Settings,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-
-const NAV_ITEMS: Array<{ id: PageId; label: string; icon: LucideIcon }> = [
-  { id: "workspace", label: "Workspace", icon: LayoutDashboard },
-  { id: "blueprints", label: "Blueprints", icon: BookCopy },
-  { id: "providers", label: "Providers", icon: Server },
-  { id: "roles", label: "Roles", icon: Users },
-  { id: "prompts", label: "Prompts", icon: MessageSquareQuote },
-  { id: "tools", label: "Tools", icon: Wrench },
-  { id: "mcp", label: "MCP", icon: PlugZap },
-  { id: "channels", label: "Channels", icon: Radio },
-  { id: "stats", label: "Stats", icon: ChartNoAxesCombined },
-  { id: "settings", label: "Settings", icon: Settings },
-];
+import { LogOut } from "lucide-react";
+import { PAGE_NAVIGATION_ITEMS } from "@/lib/pageNavigation";
 
 interface SidebarProps {
   autoHide?: boolean;
@@ -116,19 +91,27 @@ export function Sidebar({
         </div>
 
         <nav className="min-h-0 flex-1 space-y-0.5 px-3 py-2 overflow-y-auto scrollbar-none">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+          {PAGE_NAVIGATION_ITEMS.map(({ id, label, icon: Icon }) => (
             <Button
               key={id}
               type="button"
               variant="ghost"
               onClick={() => navigate(id)}
               className={cn(
-                "group flex w-full items-center gap-3 rounded-md px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "group relative flex w-full items-center gap-3 rounded-md px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 currentPage === id
                   ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
                   : "text-sidebar-foreground/60 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
               )}
             >
+              <span
+                className={cn(
+                  "absolute inset-y-2 left-0 w-px rounded-full bg-sidebar-accent-foreground/80 transition-opacity",
+                  currentPage === id
+                    ? "opacity-100"
+                    : "opacity-0 group-hover:opacity-60",
+                )}
+              />
               <Icon
                 className={cn(
                   "size-4 shrink-0 transition-colors duration-200",

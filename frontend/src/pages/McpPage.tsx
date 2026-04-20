@@ -29,7 +29,11 @@ import {
   SummaryCard,
 } from "@/components/mcp/McpPrimitives";
 import { Textarea } from "@/components/ui/textarea";
-import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
+import {
+  PageScaffold,
+  PageTitleBar,
+  SoftPanel,
+} from "@/components/layout/PageScaffold";
 import { WorkspaceDialogField } from "@/components/WorkspaceCommandDialog";
 import { formatLocalTimestamp } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
@@ -975,42 +979,36 @@ export function McpPage() {
 
   return (
     <PageScaffold>
-      <div className="flex h-full min-h-0 flex-col px-8 py-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-[28px] font-medium tracking-[-0.04em] text-foreground">
-              MCP
-            </h1>
-            <p className="mt-2 max-w-3xl text-[13px] leading-6 text-muted-foreground">
-              Quickly connect external MCP servers, inspect capabilities, and
-              review recent MCP activity from one global control plane.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className={mcpOutlineButtonClass}
-              onClick={handleRefreshAll}
-            >
-              <RefreshCw className="mr-2 size-4" />
-              Refresh
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className={mcpOutlineButtonClass}
-              onClick={focusQuickAdd}
-            >
-              <Plus className="mr-2 size-4" />
-              Quick Add
-            </Button>
-            <Button type="button" onClick={openCreateDialog}>
-              <Plus className="mr-2 size-4" />
-              Advanced Add
-            </Button>
-          </div>
-        </div>
+      <div className="flex h-full min-h-0 flex-col px-8 py-6">
+        <PageTitleBar
+          title="MCP"
+          actions={
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                className={mcpOutlineButtonClass}
+                onClick={handleRefreshAll}
+              >
+                <RefreshCw className="mr-2 size-4" />
+                Refresh
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className={mcpOutlineButtonClass}
+                onClick={focusQuickAdd}
+              >
+                <Plus className="mr-2 size-4" />
+                Quick Add
+              </Button>
+              <Button type="button" onClick={openCreateDialog}>
+                <Plus className="mr-2 size-4" />
+                Advanced Add
+              </Button>
+            </>
+          }
+        />
 
         <div className="mt-6 min-h-0 flex-1 overflow-hidden">
           {isLoading ? (

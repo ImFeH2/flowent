@@ -73,7 +73,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PageScaffold } from "@/components/layout/PageScaffold";
+import { PageScaffold, PageTitleBar } from "@/components/layout/PageScaffold";
 
 const LIBRARY_PANEL_ID = "blueprints-library-width";
 const INSPECTOR_PANEL_ID = "blueprints-inspector-width";
@@ -869,44 +869,34 @@ export function BlueprintsPage() {
   );
 
   return (
-    <PageScaffold className="px-4 py-4 sm:px-5 sm:py-5">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface-overlay shadow-md">
-        <div className="border-b border-border px-5 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-[1.05rem] font-semibold text-foreground">
-                Blueprints
-              </h1>
-              <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-                Manage reusable collaboration architecture blueprints for future
-                task tabs.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {draft ? (
-                <>
-                  <Button variant="outline" onClick={cancelDraft}>
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => void handleSaveDraft()}
-                    disabled={saving}
-                  >
-                    <Save className="mr-1 size-4" />
-                    {saving ? "Saving..." : "Save"}
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={beginCreateDraft}>
-                  <Plus className="mr-1 size-4" />
-                  New Blueprint
+    <PageScaffold className="px-4 pb-4 pt-6 sm:px-5">
+      <div className="flex h-full min-h-0 flex-col">
+        <PageTitleBar
+          title="Blueprints"
+          actions={
+            draft ? (
+              <>
+                <Button variant="outline" onClick={cancelDraft}>
+                  Cancel
                 </Button>
-              )}
-            </div>
-          </div>
-        </div>
+                <Button
+                  onClick={() => void handleSaveDraft()}
+                  disabled={saving}
+                >
+                  <Save className="mr-1 size-4" />
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={beginCreateDraft}>
+                <Plus className="mr-1 size-4" />
+                New Blueprint
+              </Button>
+            )
+          }
+        />
 
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="relative mt-6 min-h-0 flex-1 overflow-hidden rounded-xl border border-border/60 bg-card/[0.14]">
           {isCompactLayout ? (
             <div className="relative h-full">
               <BlueprintStageColumn

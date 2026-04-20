@@ -3,7 +3,7 @@ import useSWR from "swr";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { FormTextarea } from "@/components/form/FormControls";
-import { PageScaffold } from "@/components/layout/PageScaffold";
+import { PageScaffold, PageTitleBar } from "@/components/layout/PageScaffold";
 import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import { Button } from "@/components/ui/button";
 import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
@@ -61,20 +61,24 @@ export function PromptsPage() {
 
   return (
     <PageScaffold>
-      <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-4 pb-10 pt-8">
-        <div className="mb-6 flex justify-end">
-          <Button
-            type="button"
-            onClick={() => void handleSave()}
-            disabled={saving}
-            size="sm"
-            className="text-[13px]"
-          >
-            <Save className="size-4" />
-            {saving ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
-        <div className="grid min-h-0 flex-1 gap-8">
+      <div className="mx-auto flex h-full w-full max-w-[800px] flex-col px-4 pb-10 pt-6">
+        <PageTitleBar
+          title="Prompts"
+          hint="Custom Prompt is appended to the global system prompt layer. Custom Post Prompt is appended after the built-in runtime post prompt."
+          actions={
+            <Button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              size="sm"
+              className="text-[13px]"
+            >
+              <Save className="size-4" />
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          }
+        />
+        <div className="grid min-h-0 flex-1 gap-8 pt-6">
           <div className="flex min-h-0 flex-col">
             <div className="mb-3 flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
@@ -104,7 +108,7 @@ export function PromptsPage() {
             <div className="mb-3 flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
                 <h2 className="text-[15px] font-medium text-foreground">
-                  Runtime Post Prompt
+                  Custom Post Prompt
                 </h2>
                 <span className={promptCharCountClass}>
                   {customPostPrompt.length} chars

@@ -10,7 +10,11 @@ import {
   updateTelegramSettings,
 } from "@/lib/api";
 import { SecretInput } from "@/components/form/FormControls";
-import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
+import {
+  PageScaffold,
+  PageTitleBar,
+  SoftPanel,
+} from "@/components/layout/PageScaffold";
 import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import { Button } from "@/components/ui/button";
 import { formatLocalTimestamp } from "@/lib/datetime";
@@ -123,21 +127,15 @@ export function ChannelsPage() {
 
   return (
     <PageScaffold>
-      <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none pt-8">
+      <div className="h-full min-h-0 overflow-y-auto pr-2 scrollbar-none pt-6">
         <div className="mx-auto max-w-[680px] pb-10">
-          <SoftPanel className="space-y-8">
+          <PageTitleBar title="Channels" />
+          <SoftPanel className="mt-6 space-y-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/75">
+                <h2 className="text-lg font-medium text-foreground">
                   Telegram
-                </p>
-                <h2 className="mt-1.5 text-lg font-medium text-foreground">
-                  Bot Channel
                 </h2>
-                <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-                  Configure the Telegram bot token and approve or revoke private
-                  chats that can talk to the Assistant.
-                </p>
               </div>
               <div
                 className={cn(

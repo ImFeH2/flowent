@@ -34,6 +34,7 @@ import {
 } from "@/lib/stats";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { Button } from "@/components/ui/button";
+import { formatLocalTimestamp } from "@/lib/datetime";
 import {
   Select,
   SelectContent,
@@ -79,11 +80,7 @@ const statsFilterLabelClass =
   "text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80";
 
 function formatTimestamp(timestamp: number | null | undefined): string {
-  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) {
-    return "Unknown";
-  }
-  const normalized = timestamp > 1e12 ? timestamp : timestamp * 1000;
-  return new Date(normalized).toLocaleString();
+  return formatLocalTimestamp(timestamp, { fallback: "Unknown" });
 }
 
 function formatInteger(value: number | null | undefined): string {

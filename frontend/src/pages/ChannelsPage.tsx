@@ -13,6 +13,7 @@ import { SecretInput } from "@/components/form/FormControls";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import { Button } from "@/components/ui/button";
+import { formatLocalTimestamp } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type {
   TelegramApprovedChat,
@@ -21,10 +22,12 @@ import type {
 } from "@/types";
 
 function formatTimestamp(timestampSeconds: number): string {
-  if (!timestampSeconds) {
-    return "—";
-  }
-  return new Date(timestampSeconds * 1000).toLocaleString();
+  return timestampSeconds
+    ? formatLocalTimestamp(timestampSeconds, {
+        fallback: "—",
+        unit: "seconds",
+      })
+    : "—";
 }
 
 function getChatLabel(

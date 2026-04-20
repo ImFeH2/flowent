@@ -1,3 +1,8 @@
+import {
+  nullableBoolFromTriState,
+  triStateFromNullableBool,
+  type TriStateCapability,
+} from "@/lib/triState";
 import type {
   MCPServerConfig,
   ModelCapabilities,
@@ -10,7 +15,11 @@ import type {
 export const DEFAULT_CONTEXT_OUTPUT_BUDGET_TOKENS = 1024;
 export const DEFAULT_CONTEXT_PROVIDER_HEADROOM_TOKENS = 1024;
 
-export type TriStateCapability = "auto" | "enabled" | "disabled";
+export {
+  nullableBoolFromTriState,
+  triStateFromNullableBool,
+  type TriStateCapability,
+};
 
 export interface UserSettings {
   app_data_dir: string;
@@ -51,30 +60,6 @@ export interface SettingsBootstrapData {
   providers: Provider[];
   roles: Role[];
   version: string | null;
-}
-
-export function triStateFromNullableBool(
-  value: boolean | null,
-): TriStateCapability {
-  if (value === true) {
-    return "enabled";
-  }
-  if (value === false) {
-    return "disabled";
-  }
-  return "auto";
-}
-
-export function nullableBoolFromTriState(
-  value: TriStateCapability,
-): boolean | null {
-  if (value === "enabled") {
-    return true;
-  }
-  if (value === "disabled") {
-    return false;
-  }
-  return null;
 }
 
 export function normalizeWriteDirs(writeDirs: string[]): string[] {

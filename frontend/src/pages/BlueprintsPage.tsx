@@ -47,7 +47,12 @@ import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
 import { getLayoutedElements, getAgentNodeWidth } from "@/lib/layout";
+import { formatLocalTimestamp } from "@/lib/datetime";
 import { PanelResizer } from "@/components/PanelResizer";
+import {
+  formInputClass,
+  formTextareaClass,
+} from "@/components/form/FormControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -72,10 +77,8 @@ import { PageScaffold } from "@/components/layout/PageScaffold";
 
 const LIBRARY_PANEL_ID = "blueprints-library-width";
 const INSPECTOR_PANEL_ID = "blueprints-inspector-width";
-const blueprintFormInputClass =
-  "bg-background/50 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
-const blueprintFormTextareaClass =
-  "min-h-[108px] rounded-md bg-background/50 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
+const blueprintFormInputClass = `${formInputClass} text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50`;
+const blueprintFormTextareaClass = `min-h-[108px] ${formTextareaClass} text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50`;
 const blueprintChoiceListClass =
   "max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border bg-background/35 p-2 scrollbar-none";
 
@@ -171,14 +174,6 @@ function resolveVersionHistory(
       updated_at: blueprint.updated_at,
     },
   ];
-}
-
-function formatTimestamp(timestamp: number | null): string {
-  if (!timestamp) {
-    return "Unknown";
-  }
-  const normalized = timestamp > 1e12 ? timestamp : timestamp * 1000;
-  return new Date(normalized).toLocaleString();
 }
 
 function BlueprintFlowNode({ data }: NodeProps) {
@@ -1640,7 +1635,9 @@ function BlueprintInspectorColumn({
                             v{item.version}
                           </span>
                           <span className="text-[11px] text-muted-foreground">
-                            {formatTimestamp(item.updated_at)}
+                            {formatLocalTimestamp(item.updated_at, {
+                              fallback: "Unknown",
+                            })}
                           </span>
                         </div>
                       </div>

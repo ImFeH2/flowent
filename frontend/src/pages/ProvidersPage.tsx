@@ -1,5 +1,3 @@
-import { useCallback, useMemo, useState } from "react";
-import useSWR from "swr";
 import { motion } from "motion/react";
 import {
   Check,
@@ -10,35 +8,20 @@ import {
   Server,
   Trash2,
 } from "lucide-react";
-import { toast } from "sonner";
-import {
-  createProvider,
-  deleteProvider,
-  fetchProviderCatalogPreview,
-  fetchProviders,
-  testProviderModelRequest,
-  updateProvider,
-} from "@/lib/api";
 import {
   PageScaffold,
   SectionHeader,
   SettingsRow,
 } from "@/components/layout/PageScaffold";
 import {
-  FormIconButton,
   FormInput,
   FormTextarea,
   SecretInput,
   formHelpTextClass,
   formSelectTriggerClass,
 } from "@/components/form/FormControls";
-import { parseProviderHeadersInput } from "@/lib/providerHeaders";
-import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
-import { buildProviderRequestPreview } from "@/lib/providerUrls";
-import type { Provider, ProviderModelCatalogEntry } from "@/types";
+import { providerTypeOptions } from "@/lib/providerTypes";
 import { cn } from "@/lib/utils";
-import { usePanelDrag, usePanelWidth } from "@/hooks/usePanelDrag";
-import { PanelResizer } from "@/components/PanelResizer";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -51,493 +34,72 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  buildModelSummary,
-  buildProviderDraftRequestPayload,
-  buildProviderModelEntry,
-  buildProviderPayload,
-  createProviderDraft,
-  createProviderModelEditorDraft,
-  findDuplicateModelId,
-  mergeFetchedModelsIntoDraft,
-  serializeProviderDraft,
-  validateProviderModelEditorDraft,
-  type ProviderDraft,
-  type ProviderModelEditorDraft,
-  type ProviderModelEditorState,
-  type ProviderModelTestState,
-  type TriStateCapability,
-} from "@/pages/providers/lib";
+import { buildModelSummary } from "@/pages/providers/lib";
+import { ProviderModelDialog } from "@/pages/providers/ProviderModelDialog";
+import { ProvidersSidebar } from "@/pages/providers/ProvidersSidebar";
+import { useProvidersPageState } from "@/pages/providers/useProvidersPageState";
 
 export function ProvidersPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [draft, setDraft] = useState<ProviderDraft>(createProviderDraft());
-  const [saving, setSaving] = useState(false);
-  const [providerToDelete, setProviderToDelete] = useState<Provider | null>(
-    null,
-  );
-  const [fetchingModels, setFetchingModels] = useState(false);
-  const [modelEditorState, setModelEditorState] =
-    useState<ProviderModelEditorState>(null);
-  const [modelEditorDraft, setModelEditorDraft] =
-    useState<ProviderModelEditorDraft>(createProviderModelEditorDraft());
-  const [modelTestStates, setModelTestStates] = useState<
-    Record<string, ProviderModelTestState>
-  >({});
-
   const {
-    data: providers = [],
-    isLoading: loading,
-    mutate: mutateProviders,
-  } = useSWR("providers", fetchProviders, {
-    onSuccess: (items) => {
-      if (selectedId && !items.find((provider) => provider.id === selectedId)) {
-        setSelectedId(null);
-        setIsCreating(false);
-        setDraft(createProviderDraft());
-        setModelTestStates({});
-      }
-    },
-  });
-
-  const [panelWidth, setPanelWidth] = usePanelWidth(
-    "providers-panel-width",
-    300,
-    200,
-    500,
-  );
-  const { isDragging, startDrag } = usePanelDrag(
+    draft,
+    endpointPreview,
+    fetchingModels,
+    handleCancel,
+    handleCreateNew,
+    handleDelete,
+    handleDeleteModel,
+    handleFetchModels,
+    handleSave,
+    handleSaveModel,
+    handleSelect,
+    handleTestModel,
+    hasChanges,
+    isCreating,
+    isDragging,
+    loading,
+    modelEditorDraft,
+    modelEditorState,
+    modelTestStates,
+    openCreateModelDialog,
+    openEditModelDialog,
     panelWidth,
-    setPanelWidth,
-    "right",
-  );
-
-  const selectedProvider = providers.find(
-    (provider) => provider.id === selectedId,
-  );
-  const endpointPreview = useMemo(
-    () => buildProviderRequestPreview(draft.type, draft.base_url),
-    [draft.base_url, draft.type],
-  );
-  const parsedHeaders = useMemo(
-    () => parseProviderHeadersInput(draft.headers_text),
-    [draft.headers_text],
-  );
-  const hasChanges = useMemo(() => {
-    const baseline = isCreating
-      ? createProviderDraft()
-      : createProviderDraft(selectedProvider);
-    return serializeProviderDraft(draft) !== serializeProviderDraft(baseline);
-  }, [draft, isCreating, selectedProvider]);
-
-  const refreshProviders = useCallback(async () => {
-    await mutateProviders();
-  }, [mutateProviders]);
-
-  const handleSelect = (provider: Provider) => {
-    setSelectedId(provider.id);
-    setIsCreating(false);
-    setDraft(createProviderDraft(provider));
-    setModelTestStates({});
-    setModelEditorState(null);
-  };
-
-  const handleCreateNew = () => {
-    setIsCreating(true);
-    setSelectedId(null);
-    setDraft(createProviderDraft());
-    setModelTestStates({});
-    setModelEditorState(null);
-  };
-
-  const handleCancel = () => {
-    if (isCreating) {
-      setIsCreating(false);
-      setDraft(createProviderDraft());
-    } else {
-      setDraft(createProviderDraft(selectedProvider));
-    }
-    setModelTestStates({});
-    setModelEditorState(null);
-  };
-
-  const handleSave = async () => {
-    if (!draft.name.trim()) {
-      toast.error("Provider name is required");
-      return;
-    }
-    if (!draft.base_url.trim()) {
-      toast.error("Provider base URL is required");
-      return;
-    }
-    if (endpointPreview.error) {
-      toast.error(endpointPreview.error);
-      return;
-    }
-    if (parsedHeaders.error) {
-      toast.error(parsedHeaders.error);
-      return;
-    }
-
-    const duplicateModelId = findDuplicateModelId(draft.models);
-    if (duplicateModelId) {
-      toast.error(`Model ID '${duplicateModelId}' is duplicated`);
-      return;
-    }
-
-    const payload = buildProviderPayload(draft, parsedHeaders.headers);
-
-    setSaving(true);
-    try {
-      if (isCreating) {
-        const created = await createProvider(payload);
-        void mutateProviders([...providers, created], false);
-        setIsCreating(false);
-        setSelectedId(created.id);
-        setDraft(createProviderDraft(created));
-        toast.success("Provider created");
-      } else if (selectedId) {
-        const updated = await updateProvider(selectedId, payload);
-        void mutateProviders(
-          providers.map((provider) =>
-            provider.id === selectedId ? updated : provider,
-          ),
-          false,
-        );
-        setDraft(createProviderDraft(updated));
-        toast.success("Provider updated");
-      }
-      setModelTestStates({});
-    } catch {
-      toast.error(
-        isCreating ? "Failed to create provider" : "Failed to update provider",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!providerToDelete) {
-      return;
-    }
-    const providerId = providerToDelete.id;
-    setProviderToDelete(null);
-    try {
-      await deleteProvider(providerId);
-      void mutateProviders(
-        providers.filter((provider) => provider.id !== providerId),
-        false,
-      );
-      if (selectedId === providerId) {
-        setSelectedId(null);
-        setDraft(createProviderDraft());
-      }
-      setModelTestStates({});
-      toast.success("Provider deleted");
-    } catch {
-      toast.error("Failed to delete provider");
-    }
-  };
-
-  const openCreateModelDialog = () => {
-    setModelEditorState({ mode: "create", originalModel: null });
-    setModelEditorDraft(createProviderModelEditorDraft());
-  };
-
-  const openEditModelDialog = (entry: ProviderModelCatalogEntry) => {
-    setModelEditorState({ mode: "edit", originalModel: entry.model });
-    setModelEditorDraft(createProviderModelEditorDraft(entry));
-  };
-
-  const closeModelDialog = () => {
-    setModelEditorState(null);
-    setModelEditorDraft(createProviderModelEditorDraft());
-  };
-
-  const handleSaveModel = () => {
-    const validationError = validateProviderModelEditorDraft(modelEditorDraft);
-    if (validationError) {
-      toast.error(validationError);
-      return;
-    }
-
-    const modelId = modelEditorDraft.model.trim();
-    if (
-      draft.models.some(
-        (entry) =>
-          entry.model === modelId &&
-          entry.model !== modelEditorState?.originalModel,
-      )
-    ) {
-      toast.error(`Model ID '${modelId}' already exists in this provider`);
-      return;
-    }
-    const nextEntry = buildProviderModelEntry(modelEditorDraft);
-
-    setDraft((current) => {
-      if (modelEditorState?.mode === "edit" && modelEditorState.originalModel) {
-        return {
-          ...current,
-          models: current.models.map((entry) =>
-            entry.model === modelEditorState.originalModel ? nextEntry : entry,
-          ),
-        };
-      }
-      return {
-        ...current,
-        models: [...current.models, nextEntry],
-      };
-    });
-    setModelTestStates((current) => {
-      const next = { ...current };
-      if (
-        modelEditorState?.originalModel &&
-        modelEditorState.originalModel !== modelId
-      ) {
-        delete next[modelEditorState.originalModel];
-      }
-      return next;
-    });
-    closeModelDialog();
-  };
-
-  const handleDeleteModel = (modelId: string) => {
-    setDraft((current) => ({
-      ...current,
-      models: current.models.filter((entry) => entry.model !== modelId),
-    }));
-    setModelTestStates((current) => {
-      const next = { ...current };
-      delete next[modelId];
-      return next;
-    });
-  };
-
-  const handleFetchModels = async () => {
-    if (!draft.type.trim() || !draft.base_url.trim()) {
-      toast.error(
-        "Provider type and base URL are required before fetching models",
-      );
-      return;
-    }
-    if (endpointPreview.error) {
-      toast.error(endpointPreview.error);
-      return;
-    }
-    if (parsedHeaders.error) {
-      toast.error(parsedHeaders.error);
-      return;
-    }
-
-    setFetchingModels(true);
-    try {
-      const fetchedModels = await fetchProviderCatalogPreview(
-        buildProviderDraftRequestPayload(
-          draft,
-          parsedHeaders.headers,
-          selectedId ?? undefined,
-        ),
-      );
-      setDraft((current) => ({
-        ...current,
-        models: mergeFetchedModelsIntoDraft(current.models, fetchedModels),
-      }));
-      toast.success("Provider models fetched");
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to fetch provider models",
-      );
-    } finally {
-      setFetchingModels(false);
-    }
-  };
-
-  const handleTestModel = async (entry: ProviderModelCatalogEntry) => {
-    if (endpointPreview.error) {
-      toast.error(endpointPreview.error);
-      return;
-    }
-    if (parsedHeaders.error) {
-      toast.error(parsedHeaders.error);
-      return;
-    }
-
-    setModelTestStates((current) => ({
-      ...current,
-      [entry.model]: { state: "running" },
-    }));
-
-    try {
-      const result = await testProviderModelRequest({
-        ...buildProviderDraftRequestPayload(
-          draft,
-          parsedHeaders.headers,
-          selectedId ?? undefined,
-        ),
-        model: entry.model,
-      });
-      setModelTestStates((current) => ({
-        ...current,
-        [entry.model]: result.ok
-          ? {
-              state: "success",
-              duration_ms: result.duration_ms ?? 0,
-            }
-          : {
-              state: "error",
-              error_summary: result.error_summary ?? "Provider test failed",
-            },
-      }));
-    } catch (error) {
-      setModelTestStates((current) => ({
-        ...current,
-        [entry.model]: {
-          state: "error",
-          error_summary:
-            error instanceof Error ? error.message : "Provider test failed",
-        },
-      }));
-    }
-  };
+    parsedHeaders,
+    providerToDelete,
+    providers,
+    refreshProviders,
+    saving,
+    selectedId,
+    selectedProvider,
+    setDraft,
+    setModelEditorDraft,
+    setProviderToDelete,
+    startDrag,
+    closeModelDialog,
+  } = useProvidersPageState();
 
   return (
     <PageScaffold className="overflow-hidden p-0 md:p-0">
       <div className="flex h-full w-full">
-        <div
-          style={{ width: `${panelWidth}px` }}
-          className="relative flex shrink-0 flex-col border-r border-border bg-card/20 pt-8 pl-8"
-        >
-          <div className="flex shrink-0 items-center justify-between px-5 py-4">
-            <div className="flex items-center gap-2">
-              <Server className="size-4 text-muted-foreground" />
-              <span className="text-[13px] font-medium text-foreground/80">
-                Providers
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <FormIconButton
-                onClick={() => void refreshProviders()}
-                disabled={loading}
-                className="size-7"
-              >
-                <RefreshCw
-                  className={cn("size-3.5", loading && "animate-spin")}
-                />
-              </FormIconButton>
-              <FormIconButton onClick={handleCreateNew} className="size-7">
-                <Plus className="size-3.5" />
-              </FormIconButton>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-            {loading ? (
-              <div className="space-y-1">
-                {[...Array(3)].map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-10 w-full animate-pulse rounded-lg bg-accent/20"
-                  />
-                ))}
-              </div>
-            ) : providers.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="py-10 text-center"
-              >
-                <p className="text-[13px] text-muted-foreground">
-                  No providers
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleCreateNew}
-                  className="mt-4"
-                >
-                  <Plus className="size-3" />
-                  Add your first provider
-                </Button>
-              </motion.div>
-            ) : (
-              <div className="space-y-0.5">
-                {providers.map((provider, index) => (
-                  <motion.div
-                    key={provider.id}
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.03 }}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleSelect(provider)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        handleSelect(provider);
-                      }
-                    }}
-                    className={cn(
-                      "group relative flex w-full items-center justify-between rounded-lg px-3 py-2.5 transition-all",
-                      selectedId === provider.id
-                        ? "bg-accent/55 text-foreground"
-                        : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "absolute inset-y-1 left-0 w-px rounded-full bg-ring/60 transition-opacity",
-                        selectedId === provider.id
-                          ? "opacity-100"
-                          : "opacity-0",
-                      )}
-                    />
-                    <div className="min-w-0 flex-1 pl-2">
-                      <p className="truncate text-[13px] font-medium">
-                        {provider.name}
-                      </p>
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {providerTypeLabel(provider.type)}
-                      </p>
-                    </div>
-                    <FormIconButton
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setProviderToDelete(provider);
-                      }}
-                      className="size-6 shrink-0 border-transparent bg-transparent opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                    >
-                      <Trash2 className="size-3" />
-                    </FormIconButton>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <PanelResizer
-            position="right"
-            isDragging={isDragging}
-            onMouseDown={startDrag}
-          />
-        </div>
+        <ProvidersSidebar
+          isDragging={isDragging}
+          loading={loading}
+          onCreate={handleCreateNew}
+          onDelete={setProviderToDelete}
+          onRefresh={() => {
+            void refreshProviders();
+          }}
+          onResizeStart={startDrag}
+          onSelect={handleSelect}
+          panelWidth={panelWidth}
+          providers={providers}
+          selectedId={selectedId}
+        />
 
         <div className="min-w-0 flex-1 overflow-y-auto bg-transparent">
           {isCreating || selectedProvider ? (
@@ -919,141 +481,13 @@ export function ProvidersPage() {
         </div>
       </div>
 
-      <Dialog
-        open={modelEditorState !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeModelDialog();
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {modelEditorState?.mode === "edit" ? "Edit Model" : "Add Model"}
-            </DialogTitle>
-            <DialogDescription>
-              Maintain one provider-scoped catalog entry at a time.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 px-5 py-4">
-            <div className="space-y-2">
-              <label className="text-[13px] font-medium text-foreground/80">
-                Model ID
-              </label>
-              <FormInput
-                aria-label="Model ID"
-                value={modelEditorDraft.model}
-                onChange={(event) =>
-                  setModelEditorDraft({
-                    ...modelEditorDraft,
-                    model: event.target.value,
-                  })
-                }
-                placeholder="gpt-5"
-                mono
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[13px] font-medium text-foreground/80">
-                Source
-              </label>
-              <div className="rounded-md border border-border bg-card/30 px-3 py-2 text-[13px] text-foreground/80">
-                {modelEditorDraft.source === "manual" ? "Manual" : "Discovered"}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[13px] font-medium text-foreground/80">
-                Context Window
-              </label>
-              <div className="flex items-center gap-2">
-                <FormInput
-                  aria-label="Context Window"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={modelEditorDraft.context_window_tokens}
-                  onChange={(event) => {
-                    const nextValue = event.target.value.trim();
-                    if (!/^\d*$/.test(nextValue)) {
-                      return;
-                    }
-                    setModelEditorDraft({
-                      ...modelEditorDraft,
-                      context_window_tokens: nextValue,
-                    });
-                  }}
-                  placeholder="Optional"
-                  mono
-                />
-                <span className="text-[13px] font-medium text-muted-foreground">
-                  tokens
-                </span>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-[13px] font-medium text-foreground/80">
-                  Input Image
-                </label>
-                <Select
-                  value={modelEditorDraft.input_image}
-                  onValueChange={(value: TriStateCapability) =>
-                    setModelEditorDraft({
-                      ...modelEditorDraft,
-                      input_image: value,
-                    })
-                  }
-                >
-                  <SelectTrigger className={formSelectTriggerClass}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-border bg-popover">
-                    <SelectItem value="auto">Auto</SelectItem>
-                    <SelectItem value="enabled">Enabled</SelectItem>
-                    <SelectItem value="disabled">Disabled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[13px] font-medium text-foreground/80">
-                  Output Image
-                </label>
-                <Select
-                  value={modelEditorDraft.output_image}
-                  onValueChange={(value: TriStateCapability) =>
-                    setModelEditorDraft({
-                      ...modelEditorDraft,
-                      output_image: value,
-                    })
-                  }
-                >
-                  <SelectTrigger className={formSelectTriggerClass}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-border bg-popover">
-                    <SelectItem value="auto">Auto</SelectItem>
-                    <SelectItem value="enabled">Enabled</SelectItem>
-                    <SelectItem value="disabled">Disabled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="px-5 pb-5">
-            <Button variant="ghost" onClick={closeModelDialog}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveModel}>
-              {modelEditorState?.mode === "edit" ? "Save Model" : "Add Model"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProviderModelDialog
+        draft={modelEditorDraft}
+        onClose={closeModelDialog}
+        onDraftChange={setModelEditorDraft}
+        onSave={handleSaveModel}
+        state={modelEditorState}
+      />
 
       <AlertDialog
         open={providerToDelete !== null}

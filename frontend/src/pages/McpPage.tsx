@@ -31,6 +31,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
 import { WorkspaceDialogField } from "@/components/WorkspaceCommandDialog";
+import { formatLocalTimestamp } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 import type {
   MCPActivityRecord,
@@ -103,11 +104,7 @@ const ACTIVITY_FILTER_OPTIONS: Array<{
 ];
 
 function formatTimestamp(value?: number | null) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "Never";
-  }
-  const normalized = value > 1e12 ? value : value * 1000;
-  return new Date(normalized).toLocaleString();
+  return formatLocalTimestamp(value, { fallback: "Never" });
 }
 
 function formatSentenceCase(value: string) {
@@ -135,16 +132,15 @@ function formatAuthStatus(value: string) {
 }
 
 function formatTimestampShort(value?: number | null) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "Never";
-  }
-  const normalized = value > 1e12 ? value : value * 1000;
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(normalized));
+  return formatLocalTimestamp(value, {
+    fallback: "Never",
+    format: {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  });
 }
 
 function statusLabel(status: string) {

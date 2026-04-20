@@ -1,7 +1,16 @@
+import {
+  nullableBoolFromTriState,
+  triStateFromNullableBool,
+  type TriStateCapability,
+} from "@/lib/triState";
 import { formatProviderHeaders } from "@/lib/providerHeaders";
 import type { Provider, ProviderModelCatalogEntry } from "@/types";
 
-export type TriStateCapability = "auto" | "enabled" | "disabled";
+export {
+  nullableBoolFromTriState,
+  triStateFromNullableBool,
+  type TriStateCapability,
+};
 
 export type ProviderDraft = Omit<Provider, "id" | "headers"> & {
   headers_text: string;
@@ -36,30 +45,6 @@ export type ProviderModelTestState =
 export type ProviderDraftRequestPayload = Omit<Provider, "id" | "models"> & {
   provider_id?: string;
 };
-
-export function triStateFromNullableBool(
-  value: boolean | null,
-): TriStateCapability {
-  if (value === true) {
-    return "enabled";
-  }
-  if (value === false) {
-    return "disabled";
-  }
-  return "auto";
-}
-
-export function nullableBoolFromTriState(
-  value: TriStateCapability,
-): boolean | null {
-  if (value === "enabled") {
-    return true;
-  }
-  if (value === "disabled") {
-    return false;
-  }
-  return null;
-}
 
 export function createProviderDraft(provider?: Provider | null): ProviderDraft {
   if (!provider) {

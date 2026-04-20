@@ -54,6 +54,10 @@ function lazyPage<TModule, TKey extends keyof TModule & string>(
 }
 
 const HomePage = lazyPage(() => import("@/pages/HomePage"), "HomePage");
+const AssistantPage = lazyPage(
+  () => import("@/pages/AssistantPage"),
+  "AssistantPage",
+);
 const StatsPage = lazyPage(() => import("@/pages/StatsPage"), "StatsPage");
 const BlueprintsPage = lazyPage(
   () => import("@/pages/BlueprintsPage"),
@@ -80,6 +84,7 @@ const SettingsPage = lazyPage(
 );
 
 const lazyPageMap: Record<PageId, ComponentType> = {
+  assistant: AssistantPage,
   workspace: HomePage,
   blueprints: BlueprintsPage,
   providers: ProvidersPage,

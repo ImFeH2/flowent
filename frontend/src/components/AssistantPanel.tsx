@@ -2,22 +2,29 @@ import {
   AssistantChatComposer,
   AssistantChatMessages,
 } from "@/components/AssistantChatContent";
+import { Button } from "@/components/ui/button";
 import { useAgentNodesRuntime } from "@/context/AgentContext";
 import { useMeasuredHeight } from "@/hooks/useMeasuredHeight";
 import { useAssistantChat } from "@/hooks/useAssistantChat";
 import { cn } from "@/lib/utils";
 
 interface AssistantPanelProps {
+  onOpenDetails?: () => void;
   variant?: "page" | "floating" | "docked";
 }
 
-export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
+export function AssistantPanel({
+  onOpenDetails,
+  variant = "page",
+}: AssistantPanelProps) {
   const { agents } = useAgentNodesRuntime();
   const { height: composerHeight, ref: composerRef } =
     useMeasuredHeight<HTMLDivElement>();
   const {
     addImages = async () => {},
     assistantActivity = { running: false },
+    clearChat,
+    clearing = false,
     connected,
     draftImages = [],
     handleKeyDown,
@@ -38,14 +45,19 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
   } = useAssistantChat({ bottomInset: composerHeight });
   const isFloating = variant === "floating";
   const chatVariant = isFloating ? "floating" : "panel";
+  const assistantRoleName =
+    Array.from(agents.values()).find((agent) => agent.node_type === "assistant")
+      ?.role_name ?? null;
 
   return (
     <div
       className={cn(
-        "relative flex h-full flex-col",
+        "relative flex h-full flex-col overflow-hidden text-foreground",
         isFloating
           ? "overflow-hidden rounded-xl border border-border bg-surface-2 text-foreground shadow-md"
-          : "overflow-hidden border-l border-border bg-surface-overlay/94 text-foreground shadow-sm",
+          : variant === "page"
+            ? "bg-surface-overlay/94 shadow-sm"
+            : "border-l border-border bg-surface-overlay/94 shadow-sm",
       )}
     >
       <div
@@ -57,9 +69,17 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
             : "border-transparent opacity-0",
         )}
       />
-      <PanelHeader connected={connected} floating={isFloating} />
+      <PanelHeader
+        connected={connected}
+        floating={isFloating}
+        onClearChat={() => void clearChat()}
+        onOpenDetails={onOpenDetails}
+        roleName={assistantRoleName}
+        clearing={clearing}
+      />
       <div className="relative flex min-h-0 flex-1 flex-col">
         <AssistantChatMessages
+          allowHumanMessageRetry
           bottomInset={composerHeight}
           items={timelineItems}
           nodes={agents}
@@ -88,6 +108,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
               hasUploadingImages ||
               sending
             }
+            commandsEnabled
             images={draftImages}
             imageInputEnabled={supportsInputImage}
             input={input}
@@ -99,6 +120,7 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
             onSend={() => void sendMessage()}
             overlay
             suppressCommandNavigation={isBrowsingInputHistory}
+            targetLabel="Assistant"
             variant={chatVariant}
           />
         </div>
@@ -108,11 +130,19 @@ export function AssistantPanel({ variant = "page" }: AssistantPanelProps) {
 }
 
 function PanelHeader({
+  clearing,
   connected,
   floating,
+  onClearChat,
+  onOpenDetails,
+  roleName,
 }: {
+  clearing: boolean;
   connected: boolean;
   floating: boolean;
+  onClearChat: () => void;
+  onOpenDetails?: () => void;
+  roleName?: string | null;
 }) {
   return (
     <div
@@ -123,10 +153,39 @@ function PanelHeader({
           : "border-border bg-background/20",
       )}
     >
-      <span className="text-[13px] font-medium tracking-wide text-foreground">
-        Assistant
-      </span>
-      <StatusBadge connected={connected} />
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium tracking-wide text-foreground">
+          Assistant
+        </div>
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-muted-foreground/78">
+          {roleName ? (
+            <span className="rounded-full border border-border bg-accent/35 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+              Role: {roleName}
+            </span>
+          ) : null}
+          <StatusBadge connected={connected} />
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={clearing}
+          onClick={onClearChat}
+        >
+          {clearing ? "Clearing..." : "Clear Chat"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!onOpenDetails}
+          onClick={onOpenDetails}
+        >
+          Assistant Details
+        </Button>
+      </div>
     </div>
   );
 }
@@ -141,7 +200,7 @@ function StatusBadge({ connected }: { connected: boolean }) {
           : "border-graph-status-idle/18 bg-graph-status-idle/[0.12] text-graph-status-idle",
       )}
     >
-      {connected ? "Online" : "Connecting"}
+      {connected ? "Online" : "Connecting..."}
     </span>
   );
 }

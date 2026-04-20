@@ -13,11 +13,10 @@ import {
   deleteTabRequest,
   fetchBlueprints,
   fetchRoles,
-  interruptNode,
   saveTabAsBlueprintRequest,
 } from "@/lib/api";
-import { getAssistantNode } from "@/lib/assistant";
 import { getNodeLabel } from "@/lib/constants";
+import { getWorkflowLeaderNode } from "@/lib/workflow";
 import {
   hasCachedPanelWidth,
   usePanelDrag,
@@ -52,7 +51,7 @@ export type WorkspaceDialogKind =
   | "delete-tab"
   | null;
 
-export type AssistantPanelView = "chat" | "detail";
+export type WorkspacePanelView = "chat" | "detail";
 
 export interface DeleteTabTarget {
   id: string;
@@ -66,18 +65,11 @@ export function useHomePageState() {
   const { connected } = useAgentConnectionRuntime();
   const { activeToolCalls } = useAgentActivityRuntime();
   const { streamingDeltas } = useAgentHistoryRuntime();
-  const {
-    activeTabId,
-    pendingAssistantMessages,
-    selectedAgentId,
-    selectAgent,
-    setActiveTabId,
-  } = useAgentUI();
+  const { activeTabId, selectedAgentId, selectAgent, setActiveTabId } =
+    useAgentUI();
 
   const [panelOpen, setPanelOpen] = useState(true);
-  const [assistantPanelView, setAssistantPanelView] =
-    useState<AssistantPanelView>("chat");
-  const [interruptingAssistant, setInterruptingAssistant] = useState(false);
+  const [panelView, setPanelView] = useState<WorkspacePanelView>("chat");
   const isCompactWorkspace = useMediaQuery("(max-width: 1180px)");
   const [activeDialog, setActiveDialog] = useState<WorkspaceDialogKind>(null);
   const [pendingAction, setPendingAction] = useState<WorkspaceDialogKind>(null);
@@ -285,31 +277,36 @@ export function useHomePageState() {
       Math.max(COMPACT_PANEL_MIN_WIDTH, containerWidth - 24),
     );
   }, [isCompactWorkspace, panelWidth]);
-  const assistantNode = getAssistantNode(agents);
-  const assistantId = assistantNode?.id ?? null;
-  const assistantDetailVisible =
-    assistantPanelView === "detail" && assistantNode !== null;
-  const assistantPanelRunning = useMemo(() => {
-    const assistantDeltas = assistantId
-      ? (streamingDeltas.get(assistantId) ?? [])
-      : [];
+  const leaderNode = useMemo(
+    () => getWorkflowLeaderNode(agents, activeTab),
+    [activeTab, agents],
+  );
+  const leaderId = leaderNode?.id ?? activeTab?.leader_id ?? null;
+  const leaderDetailVisible = panelView === "detail" && leaderNode !== null;
+  const leaderPanelRunning = useMemo(() => {
+    const leaderDeltas = leaderId ? (streamingDeltas.get(leaderId) ?? []) : [];
 
     return (
       connected &&
-      (pendingAssistantMessages.length > 0 ||
-        assistantNode?.state === "running" ||
-        assistantNode?.state === "sleeping" ||
-        (assistantId ? activeToolCalls.has(assistantId) : false) ||
-        assistantDeltas.length > 0)
+      Boolean(
+        leaderId &&
+        (leaderNode?.state === "running" ||
+          leaderNode?.state === "sleeping" ||
+          activeToolCalls.has(leaderId) ||
+          leaderDeltas.length > 0),
+      )
     );
-  }, [
-    activeToolCalls,
-    assistantId,
-    assistantNode,
-    connected,
-    pendingAssistantMessages.length,
-    streamingDeltas,
-  ]);
+  }, [activeToolCalls, connected, leaderId, leaderNode, streamingDeltas]);
+
+  useEffect(() => {
+    if (
+      selectedAgent &&
+      selectedAgent.tab_id !== null &&
+      selectedAgent.tab_id !== activeTabId
+    ) {
+      selectAgent(null);
+    }
+  }, [activeTabId, selectAgent, selectedAgent]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -341,28 +338,14 @@ export function useHomePageState() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeDialog, activeTabId, graphHistory]);
 
-  const handleOpenAssistantDetails = useCallback(() => {
+  const handleOpenLeaderDetails = useCallback(() => {
     setPanelOpen(true);
-    setAssistantPanelView("detail");
+    setPanelView("detail");
   }, []);
 
-  const handleCloseAssistantDetails = useCallback(() => {
-    setAssistantPanelView("chat");
+  const handleCloseLeaderDetails = useCallback(() => {
+    setPanelView("chat");
   }, []);
-
-  const handleInterruptAssistant = useCallback(() => {
-    if (!assistantId || interruptingAssistant) {
-      return;
-    }
-    setInterruptingAssistant(true);
-    interruptNode(assistantId)
-      .catch(() => {
-        toast.error("Failed to interrupt assistant");
-      })
-      .finally(() => {
-        setInterruptingAssistant(false);
-      });
-  }, [assistantId, interruptingAssistant]);
 
   const togglePanel = useCallback(() => {
     if (panelVisible) {
@@ -592,9 +575,6 @@ export function useHomePageState() {
     activeDialog,
     activeTab,
     activeTabId,
-    assistantDetailVisible,
-    assistantNode,
-    assistantPanelRunning,
     connected,
     connectSourceId,
     connectTargetId,
@@ -613,17 +593,18 @@ export function useHomePageState() {
     graphConnectMode,
     graphHistory,
     graphRef,
-    handleCloseAssistantDetails,
+    handleCloseLeaderDetails,
     handleConnectAgents,
     handleCreateAgent,
     handleCreateTab,
     handleDeleteTab,
-    handleInterruptAssistant,
-    handleOpenAssistantDetails,
+    handleOpenLeaderDetails,
     handleSaveCurrentNetworkAsBlueprint,
-    interruptingAssistant,
     isCompactWorkspace,
     isDragging,
+    leaderDetailVisible,
+    leaderNode,
+    leaderPanelRunning,
     loadingBlueprints,
     loadingRoles,
     openConnectDialog,

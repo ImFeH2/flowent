@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -12,9 +14,53 @@ from app.workspace_store import workspace_store
 router = APIRouter()
 
 
+class DispatchNodeMessagePart(BaseModel):
+    type: Literal["text", "image"]
+    text: str | None = None
+    asset_id: str | None = None
+    mime_type: str | None = None
+    width: int | None = None
+    height: int | None = None
+    alt: str | None = None
+
+
 class DispatchNodeMessageRequest(BaseModel):
-    content: str
+    content: str | None = None
+    parts: list[DispatchNodeMessagePart] | None = None
     from_id: str = "human"
+
+
+DispatchNodeMessageRequest.model_rebuild()
+
+
+def _parse_dispatch_parts(req: DispatchNodeMessageRequest):
+    from app.image_assets import require_image_asset
+    from app.models import TextPart as ModelTextPart
+    from app.models import (
+        content_parts_to_text,
+        has_image_parts,
+        parse_content_parts_payload,
+    )
+
+    if req.parts:
+        parts = parse_content_parts_payload(
+            [part.model_dump(exclude_none=True) for part in req.parts]
+        )
+    elif isinstance(req.content, str):
+        parts = [ModelTextPart(text=req.content)]
+    else:
+        parts = []
+
+    if not parts:
+        raise HTTPException(status_code=400, detail="Node message cannot be empty")
+    if not has_image_parts(parts) and not content_parts_to_text(parts).strip():
+        raise HTTPException(status_code=400, detail="Node message cannot be empty")
+
+    for part in parts:
+        asset_id = getattr(part, "asset_id", None)
+        if isinstance(asset_id, str):
+            require_image_asset(asset_id)
+    return parts
 
 
 def _serialize_model_capabilities(role_name: str | None) -> dict[str, bool] | None:
@@ -257,12 +303,46 @@ async def clear_node_chat(node_id: str) -> dict:
 @router.post("/api/nodes/{node_id}/messages")
 async def dispatch_node_message(node_id: str, req: DispatchNodeMessageRequest) -> dict:
     from app.graph_service import dispatch_node_message
+    from app.models import NodeType, content_parts_to_text, has_image_parts
 
-    error = dispatch_node_message(
+    node = registry.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    if req.from_id != "human":
+        raise HTTPException(
+            status_code=400,
+            detail="Web UI node messages must originate from `human`",
+        )
+
+    if node.config.node_type == NodeType.ASSISTANT:
+        raise HTTPException(
+            status_code=400,
+            detail="Use /api/assistant/message for Assistant input",
+        )
+    if not is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Human input can only target Assistant or a Workflow Leader",
+        )
+
+    try:
+        parts = _parse_dispatch_parts(req)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if has_image_parts(parts) and not node.supports_input_image():
+        raise HTTPException(
+            status_code=409,
+            detail="Current model does not support `input_image`.",
+        )
+
+    error, message_id = dispatch_node_message(
         node_id=node_id,
-        content=req.content,
-        from_id=req.from_id,
+        content=content_parts_to_text(parts),
+        parts=parts,
+        from_id="human",
     )
     if error is not None:
         raise HTTPException(status_code=400, detail=error)
-    return {"status": "sent"}
+    return {"status": "sent", "message_id": message_id}

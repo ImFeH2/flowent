@@ -1171,22 +1171,25 @@ def dispatch_node_message(
     *,
     node_id: str,
     content: str,
+    parts: list | None = None,
     from_id: str = "human",
-) -> str | None:
+) -> tuple[str | None, str | None]:
     from app.models import Message
 
     target = registry.get(node_id)
     if target is None:
-        return f"Node '{node_id}' is not active"
+        return f"Node '{node_id}' is not active", None
+    message_id = str(uuid.uuid4())
     target.enqueue_message(
         Message(
             from_id=from_id,
             to_id=node_id,
+            parts=list(parts or []),
             content=content,
-            message_id=str(uuid.uuid4()),
+            message_id=message_id,
         )
     )
-    return None
+    return None, message_id
 
 
 def list_tab_nodes(tab_id: str) -> list[GraphNodeRecord]:

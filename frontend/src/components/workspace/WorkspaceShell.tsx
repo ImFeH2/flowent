@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import type { WorkspaceAgentOption } from "@/components/workspace/WorkspaceDialogs";
 import {
   AgentDetailPanel,
-  AssistantChatPanel,
   BadgeChip,
+  LeaderChatPanel,
   PanelToggleButton,
   ToolbarButton,
   ToolbarDivider,
+  WorkspacePanelEmptyState,
 } from "@/components/workspace/WorkspacePanels";
 import { cn } from "@/lib/utils";
 import type { Node, Role, TaskTab } from "@/types";
@@ -58,24 +59,22 @@ interface WorkspaceGraphHistory {
 
 interface WorkspaceShellProps {
   activeTabId: string | null;
-  assistantDetailVisible: boolean;
-  assistantNode: Node | null;
-  assistantPanelRunning: boolean;
   connected: boolean;
   graphConnectMode: boolean;
   graphHistory: WorkspaceGraphHistory;
   graphRef: RefObject<AgentGraphHandle | null>;
-  interruptingAssistant: boolean;
   isCompactWorkspace: boolean;
   isDragging: boolean;
+  leaderDetailVisible: boolean;
+  leaderNode: Node | null;
+  leaderPanelRunning: boolean;
   loadingRoles: boolean;
-  onCloseAssistantDetails: () => void;
+  onCloseLeaderDetails: () => void;
   onConnectModeChange: (active: boolean) => void;
   onCreateAgent: () => void;
   onCreateTab: () => void;
   onDeleteTab: (tabId: string, title: string, nodeCount?: number) => void;
-  onInterruptAssistant: () => void;
-  onOpenAssistantDetails: () => void;
+  onOpenLeaderDetails: () => void;
   onOpenConnectDialog: () => void;
   onSaveBlueprint: () => void;
   panelVisible: boolean;
@@ -94,24 +93,22 @@ interface WorkspaceShellProps {
 
 export function WorkspaceShell({
   activeTabId,
-  assistantDetailVisible,
-  assistantNode,
-  assistantPanelRunning,
   connected,
   graphConnectMode,
   graphHistory,
   graphRef,
-  interruptingAssistant,
   isCompactWorkspace,
   isDragging,
+  leaderDetailVisible,
+  leaderNode,
+  leaderPanelRunning,
   loadingRoles,
-  onCloseAssistantDetails,
+  onCloseLeaderDetails,
   onConnectModeChange,
   onCreateAgent,
   onCreateTab,
   onDeleteTab,
-  onInterruptAssistant,
-  onOpenAssistantDetails,
+  onOpenLeaderDetails,
   onOpenConnectDialog,
   onSaveBlueprint,
   panelVisible,
@@ -128,22 +125,17 @@ export function WorkspaceShell({
   workspaceRef,
 }: WorkspaceShellProps) {
   const renderPrimaryPanel = () => {
-    if (assistantDetailVisible && assistantNode) {
+    if (leaderDetailVisible && leaderNode) {
       return (
-        <AgentDetailPanel
-          agent={assistantNode}
-          onClose={onCloseAssistantDetails}
-        />
+        <AgentDetailPanel agent={leaderNode} onClose={onCloseLeaderDetails} />
       );
     }
 
-    return (
-      <AssistantChatPanel
-        interrupting={interruptingAssistant}
-        onInterrupt={onInterruptAssistant}
-        onOpenDetails={onOpenAssistantDetails}
-      />
-    );
+    if (!activeTabId) {
+      return <WorkspacePanelEmptyState />;
+    }
+
+    return <LeaderChatPanel onOpenDetails={onOpenLeaderDetails} />;
   };
 
   return (
@@ -192,7 +184,7 @@ export function WorkspaceShell({
                   type="button"
                   variant="ghost"
                   size="icon-xs"
-                  title="Delete tab"
+                  title="Delete workflow"
                   aria-label={`Delete ${tab.title}`}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -213,7 +205,7 @@ export function WorkspaceShell({
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Create tab"
+              aria-label="Create workflow"
               onClick={onCreateTab}
               className="shrink-0 rounded-md text-muted-foreground transition-all duration-200 hover:bg-accent/45 hover:text-foreground"
             >
@@ -349,7 +341,7 @@ export function WorkspaceShell({
                   aria-hidden="true"
                   className={cn(
                     "pointer-events-none absolute inset-0 z-20 border transition-[opacity,border-color,box-shadow] duration-300",
-                    !selectedAgent && assistantPanelRunning
+                    !selectedAgent && leaderPanelRunning
                       ? "animate-pulse border-ring/25 opacity-100 shadow-lg shadow-ring/10"
                       : "border-transparent opacity-0",
                   )}
@@ -413,7 +405,7 @@ export function WorkspaceShell({
                 aria-hidden="true"
                 className={cn(
                   "pointer-events-none absolute inset-0 z-20 border transition-[opacity,border-color,box-shadow] duration-300",
-                  !selectedAgent && assistantPanelRunning
+                  !selectedAgent && leaderPanelRunning
                     ? "animate-pulse border-ring/25 opacity-100 shadow-lg shadow-ring/10"
                     : "border-transparent opacity-0",
                 )}

@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 
 interface AssistantChatComposerProps {
   busy?: boolean;
+  commandsEnabled?: boolean;
   disabled: boolean;
   images?: AssistantComposerImage[];
   imageInputEnabled?: boolean;
@@ -45,12 +46,14 @@ interface AssistantChatComposerProps {
   onSend: () => void;
   onStop?: () => void;
   overlay?: boolean;
+  targetLabel?: string;
   stopping?: boolean;
   variant: AssistantChatVariant;
 }
 
 export function AssistantChatComposer({
   busy = false,
+  commandsEnabled = true,
   disabled,
   images = [],
   imageInputEnabled = true,
@@ -63,6 +66,7 @@ export function AssistantChatComposer({
   onSend,
   onStop,
   overlay = false,
+  targetLabel = "Assistant",
   stopping = false,
   suppressCommandNavigation = false,
   variant,
@@ -76,7 +80,9 @@ export function AssistantChatComposer({
     filtered: commandOptions,
     isCommandInput,
     token: commandToken,
-  } = parseAssistantCommandInput(input);
+  } = commandsEnabled
+    ? parseAssistantCommandInput(input)
+    : { filtered: [], isCommandInput: false, token: "" };
   const [selectedCommandState, setSelectedCommandState] = useState<{
     index: number;
     token: string;
@@ -85,6 +91,7 @@ export function AssistantChatComposer({
     string | null
   >(null);
   const commandPanelVisible =
+    commandsEnabled &&
     images.length === 0 &&
     isCommandInput &&
     dismissedCommandToken !== commandToken;
@@ -123,7 +130,9 @@ export function AssistantChatComposer({
   }, [input, isWorkspace]);
 
   const handleInputChange = (nextValue: string) => {
-    const nextCommandInput = parseAssistantCommandInput(nextValue);
+    const nextCommandInput = commandsEnabled
+      ? parseAssistantCommandInput(nextValue)
+      : { isCommandInput: false, token: "" };
 
     if (!nextCommandInput.isCommandInput) {
       setDismissedCommandToken(null);
@@ -374,7 +383,11 @@ export function AssistantChatComposer({
             onChange={(event) => handleInputChange(event.target.value)}
             onKeyDown={handleComposerKeyDown}
             onPaste={handleComposerPaste}
-            placeholder="Message Assistant or type / for commands"
+            placeholder={
+              commandsEnabled
+                ? `Message ${targetLabel} or type / for commands`
+                : `Message ${targetLabel}`
+            }
             rows={1}
             className={cn(
               "min-h-5 w-full resize-none self-center border-0 bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0",
@@ -387,7 +400,9 @@ export function AssistantChatComposer({
             size={isWorkspace ? "sm" : "icon-sm"}
             onClick={busy ? onStop : onSend}
             disabled={actionDisabled}
-            aria-label={busy ? "Stop assistant" : "Send message"}
+            aria-label={
+              busy ? `Stop ${targetLabel}` : `Send ${targetLabel} message`
+            }
             className={cn(
               "shrink-0 rounded-full transition-all duration-300 active:scale-[0.96] disabled:opacity-30",
               isWorkspace

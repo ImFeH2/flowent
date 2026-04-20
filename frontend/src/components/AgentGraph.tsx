@@ -1384,24 +1384,24 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       if (tabs.size === 0) {
         return {
           eyebrow: "Workspace",
-          title: "No task tabs yet",
-          description: "Create a task tab to start building an agent network.",
-          hint: "Use the + button in the tab strip to open your first workspace.",
+          title: "No workflows yet",
+          description: "Create a workflow to start building an agent network.",
+          hint: "Use the + button in the workflow strip to open your first workspace.",
         };
       }
       if (!activeTabId) {
         return {
           eyebrow: "Workspace",
-          title: "Select a task tab",
-          description: "Choose a tab to inspect and edit its agent network.",
-          hint: "Each tab keeps its own goal, nodes, and connections.",
+          title: "Select a workflow",
+          description:
+            "Choose a workflow to inspect and edit its agent network.",
+          hint: "Each workflow keeps its own goal, nodes, and connections.",
         };
       }
       return {
         eyebrow: "Empty canvas",
-        title: "This task tab is ready for its first agent",
-        description:
-          "Add agents, connect them, or ask Assistant to scaffold the network.",
+        title: "This workflow is ready for its first agent",
+        description: "Add agents and connect them to build the network.",
         hint: "Start with a worker, a reviewer, or another helper node.",
       };
     }, [activeTabId, tabs.size]);

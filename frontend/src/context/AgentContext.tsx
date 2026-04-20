@@ -44,6 +44,7 @@ export interface ActiveMessage {
 }
 
 export type PageId =
+  | "assistant"
   | "workspace"
   | "blueprints"
   | "providers"
@@ -171,7 +172,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [pendingAssistantMessages, setPendingAssistantMessages] = useState<
     PendingAssistantChatMessage[]
   >([]);
-  const [currentPage, setCurrentPage] = useState<PageId>("workspace");
+  const [currentPage, setCurrentPage] = useState<PageId>("assistant");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );

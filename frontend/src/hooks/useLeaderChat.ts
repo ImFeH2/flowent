@@ -1,0 +1,803 @@
+import {
+  useSyncExternalStore,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type UIEvent,
+} from "react";
+import { toast } from "sonner";
+import {
+  dispatchNodeMessageRequest,
+  fetchNodeDetail,
+  getImageAssetUrl,
+  interruptNode,
+  uploadImageAssetRequest,
+} from "@/lib/api";
+import {
+  useAgentActivityRuntime,
+  useAgentConnectionRuntime,
+  useAgentHistoryRuntime,
+  useAgentNodesRuntime,
+  useAgentTabsRuntime,
+  useAgentUI,
+} from "@/context/AgentContext";
+import { mergeHistoryWithDeltas } from "@/lib/history";
+import { contentPartsToText, normalizeContentParts } from "@/lib/contentParts";
+import {
+  appendChatInputHistoryEntry,
+  getChatInputHistorySnapshot,
+  subscribeChatInputHistory,
+} from "@/lib/chatInputHistory";
+import { getWorkflowLeaderNode } from "@/lib/workflow";
+import type {
+  AssistantChatItem,
+  AssistantInputHistoryEntry,
+  AssistantInputHistoryImage,
+  ContentPart,
+  HistoryEntry,
+  NodeDetail,
+  PendingAssistantChatMessage,
+} from "@/types";
+
+const SCROLL_BOTTOM_EPSILON = 10;
+
+function isScrolledToBottom(element: HTMLDivElement) {
+  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+  return maxScrollTop - element.scrollTop <= SCROLL_BOTTOM_EPSILON;
+}
+
+interface UseLeaderChatOptions {
+  bottomInset?: number;
+}
+
+interface DraftLeaderImage {
+  id: string;
+  assetId: string | null;
+  previewUrl: string;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  name: string;
+  status: "uploading" | "ready";
+}
+
+function createDraftImageId() {
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `draft-${Date.now()}-${Math.random()}`
+  );
+}
+
+function revokeDraftImageUrl(image: DraftLeaderImage) {
+  if (image.previewUrl.startsWith("blob:")) {
+    URL.revokeObjectURL(image.previewUrl);
+  }
+}
+
+function revokeDraftImageUrls(images: DraftLeaderImage[]) {
+  for (const image of images) {
+    revokeDraftImageUrl(image);
+  }
+}
+
+function toInputHistoryImages(
+  images: DraftLeaderImage[],
+): AssistantInputHistoryImage[] {
+  return images
+    .filter(
+      (image): image is DraftLeaderImage & { assetId: string } =>
+        image.status === "ready" && Boolean(image.assetId),
+    )
+    .map((image) => ({
+      assetId: image.assetId,
+      mimeType: image.mimeType,
+      width: image.width,
+      height: image.height,
+      name: image.name,
+    }));
+}
+
+function toDraftImagesFromHistory(
+  entry: AssistantInputHistoryEntry,
+): DraftLeaderImage[] {
+  return entry.images.map((image, index) => ({
+    id: `history-${entry.timestamp}-${index}`,
+    assetId: image.assetId,
+    previewUrl: getImageAssetUrl(image.assetId),
+    mimeType: image.mimeType,
+    width: image.width,
+    height: image.height,
+    name: image.name,
+    status: "ready",
+  }));
+}
+
+function draftImagesMatchHistoryEntry(
+  images: DraftLeaderImage[],
+  entry: AssistantInputHistoryEntry,
+) {
+  if (images.length !== entry.images.length) {
+    return false;
+  }
+
+  return entry.images.every((image, index) => {
+    const draft = images[index];
+
+    return (
+      Boolean(draft) &&
+      draft?.status === "ready" &&
+      draft.assetId === image.assetId &&
+      draft.mimeType === image.mimeType &&
+      draft.width === image.width &&
+      draft.height === image.height &&
+      draft.name === image.name
+    );
+  });
+}
+
+function readImageSize(
+  file: File,
+): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const previewUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const width = image.naturalWidth;
+      const height = image.naturalHeight;
+      URL.revokeObjectURL(previewUrl);
+      resolve(
+        width > 0 && height > 0
+          ? {
+              width,
+              height,
+            }
+          : null,
+      );
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(previewUrl);
+      resolve(null);
+    };
+    image.src = previewUrl;
+  });
+}
+
+function createPendingMessage(
+  content: string,
+  parts: ContentPart[],
+  timestamp: number,
+): PendingAssistantChatMessage {
+  return {
+    id: `pending-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "PendingHumanMessage",
+    from: "human",
+    content,
+    parts,
+    timestamp,
+    message_id: null,
+  };
+}
+
+export function useLeaderChat(options: UseLeaderChatOptions = {}) {
+  const { bottomInset = 0 } = options;
+  const { agents } = useAgentNodesRuntime();
+  const { tabs } = useAgentTabsRuntime();
+  const { connected } = useAgentConnectionRuntime();
+  const {
+    agentHistories,
+    clearAgentHistory,
+    clearHistorySnapshot,
+    historyInvalidatedAt,
+    historyClearedAt,
+    historySnapshots,
+    streamingDeltas,
+  } = useAgentHistoryRuntime();
+  const { activeToolCalls } = useAgentActivityRuntime();
+  const { activeTabId } = useAgentUI();
+  const activeTab = activeTabId ? (tabs.get(activeTabId) ?? null) : null;
+  const leaderNode = useMemo(
+    () => getWorkflowLeaderNode(agents, activeTab),
+    [activeTab, agents],
+  );
+  const leaderId = leaderNode?.id ?? activeTab?.leader_id ?? null;
+  const inputHistoryScope = activeTabId
+    ? `leader:${activeTabId}`
+    : "leader:none";
+  const [detail, setDetail] = useState<NodeDetail | null>(null);
+  const [fetchedAt, setFetchedAt] = useState(0);
+  const [input, setInputState] = useState("");
+  const [draftImages, setDraftImages] = useState<DraftLeaderImage[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<number | null>(null);
+  const [sending, setSending] = useState(false);
+  const [pendingMessages, setPendingMessages] = useState<
+    PendingAssistantChatMessage[]
+  >([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
+  const draftImagesRef = useRef<DraftLeaderImage[]>([]);
+  const supportsInputImage = leaderNode?.capabilities?.input_image ?? false;
+  const historyClearedAtMs = leaderId
+    ? (historyClearedAt.get(leaderId) ?? 0)
+    : 0;
+  const historyInvalidatedAtMs = leaderId
+    ? (historyInvalidatedAt.get(leaderId) ?? 0)
+    : 0;
+  const historySnapshot = leaderId
+    ? (historySnapshots.get(leaderId) ?? null)
+    : null;
+  const hasUploadingImages = draftImages.some(
+    (image) => image.status === "uploading",
+  );
+  const readyImages = draftImages.filter(
+    (image): image is DraftLeaderImage & { assetId: string } =>
+      image.status === "ready" && Boolean(image.assetId),
+  );
+  const inputHistoryEntries = useSyncExternalStore(
+    (listener) => subscribeChatInputHistory(inputHistoryScope, listener),
+    () => getChatInputHistorySnapshot(inputHistoryScope),
+    () => getChatInputHistorySnapshot(inputHistoryScope),
+  );
+  const currentHistoryEntry =
+    historyCursor !== null
+      ? (inputHistoryEntries[historyCursor] ?? null)
+      : null;
+  const isBrowsingInputHistory =
+    currentHistoryEntry !== null &&
+    input === currentHistoryEntry.text &&
+    draftImagesMatchHistoryEntry(draftImages, currentHistoryEntry);
+
+  const restoreHistoryEntry = useCallback(
+    (entry: AssistantInputHistoryEntry | null, cursor: number | null) => {
+      setHistoryCursor(cursor);
+      setInputState(entry?.text ?? "");
+      setDraftImages(entry ? toDraftImagesFromHistory(entry) : []);
+    },
+    [],
+  );
+
+  const setInput = useCallback((value: string) => {
+    setHistoryCursor(null);
+    setInputState(value);
+  }, []);
+
+  useEffect(() => {
+    draftImagesRef.current = draftImages;
+  }, [draftImages]);
+
+  useEffect(
+    () => () => {
+      revokeDraftImageUrls(draftImagesRef.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    revokeDraftImageUrls(draftImagesRef.current);
+    setInputState("");
+    setDraftImages([]);
+    setHistoryCursor(null);
+    setPendingMessages([]);
+  }, [inputHistoryScope]);
+
+  useEffect(() => {
+    if (!historyClearedAtMs) {
+      return;
+    }
+
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            history: current.history.filter(
+              (entry) =>
+                entry.type === "SystemEntry" || entry.type === "StateEntry",
+            ),
+          }
+        : current,
+    );
+    setFetchedAt(Date.now());
+  }, [historyClearedAtMs]);
+
+  useEffect(() => {
+    if (!historyInvalidatedAtMs || !historySnapshot) {
+      return;
+    }
+
+    setDetail((current) =>
+      current
+        ? {
+            ...current,
+            history: historySnapshot,
+          }
+        : current,
+    );
+    setFetchedAt(Date.now());
+  }, [historyInvalidatedAtMs, historySnapshot]);
+
+  useEffect(() => {
+    if (!connected || !leaderId) {
+      setDetail(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const load = async () => {
+      clearAgentHistory(leaderId);
+      try {
+        const data = await fetchNodeDetail(leaderId, controller.signal);
+        if (cancelled || !data) {
+          return;
+        }
+        setDetail(data);
+        setFetchedAt(Date.now());
+        clearHistorySnapshot(leaderId);
+      } catch {
+        if (!cancelled && !controller.signal.aborted) {
+          toast.error("Failed to load Leader history");
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [
+    clearAgentHistory,
+    clearHistorySnapshot,
+    connected,
+    historyClearedAtMs,
+    historyInvalidatedAtMs,
+    leaderId,
+  ]);
+
+  const mergedHistory = useMemo(() => {
+    if (!leaderId) {
+      return [];
+    }
+    return mergeHistoryWithDeltas({
+      history: historySnapshot ?? detail?.history ?? [],
+      incremental: agentHistories.get(leaderId),
+      deltas: streamingDeltas.get(leaderId),
+      fetchedAt: fetchedAt || Date.now(),
+    });
+  }, [
+    agentHistories,
+    detail,
+    fetchedAt,
+    historySnapshot,
+    leaderId,
+    streamingDeltas,
+  ]);
+
+  useEffect(() => {
+    if (!leaderId || pendingMessages.length === 0) {
+      return;
+    }
+
+    const confirmedMessageIds = new Set(
+      mergedHistory
+        .filter(
+          (entry) =>
+            entry.type === "ReceivedMessage" &&
+            entry.from_id === "human" &&
+            typeof entry.message_id === "string",
+        )
+        .map((entry) => entry.message_id as string),
+    );
+
+    if (confirmedMessageIds.size === 0) {
+      return;
+    }
+
+    setPendingMessages((current) =>
+      current.filter(
+        (message) =>
+          !message.message_id || !confirmedMessageIds.has(message.message_id),
+      ),
+    );
+  }, [leaderId, mergedHistory, pendingMessages.length]);
+
+  const timelineItems = useMemo<AssistantChatItem[]>(
+    () => [
+      ...mergedHistory,
+      ...pendingMessages.map((message) => ({ ...message })),
+    ],
+    [mergedHistory, pendingMessages],
+  );
+
+  const leaderActivity = useMemo(() => {
+    const pendingCount = pendingMessages.length;
+    const deltas = leaderId ? (streamingDeltas.get(leaderId) ?? []) : [];
+    const running =
+      connected &&
+      Boolean(
+        leaderId &&
+        (pendingCount > 0 ||
+          leaderNode?.state === "running" ||
+          leaderNode?.state === "sleeping" ||
+          activeToolCalls.has(leaderId) ||
+          deltas.length > 0),
+      );
+    const lastHumanIndex = [...timelineItems]
+      .map((item, index) => ({ item, index }))
+      .reverse()
+      .find(({ item }) =>
+        item.type === "PendingHumanMessage"
+          ? true
+          : item.type === "ReceivedMessage" &&
+            item.from_id === "human" &&
+            normalizeContentParts(item.parts, item.content).length > 0,
+      )?.index;
+    const turnItems =
+      lastHumanIndex === undefined
+        ? []
+        : timelineItems.slice(lastHumanIndex + 1);
+    const hasAssistantText = turnItems.some(
+      (item) =>
+        item.type === "AssistantText" &&
+        normalizeContentParts(item.parts, item.content).length > 0,
+    );
+    const runningToolCall = [...turnItems]
+      .reverse()
+      .find(
+        (item): item is HistoryEntry & { type: "ToolCall" } =>
+          item.type === "ToolCall" && item.streaming === true,
+      );
+    const activeToolName = leaderId
+      ? (activeToolCalls.get(leaderId) ?? null)
+      : null;
+    const toolName = activeToolName ?? runningToolCall?.tool_name ?? null;
+
+    return {
+      running,
+      runningHint:
+        running && lastHumanIndex !== undefined && !hasAssistantText
+          ? {
+              label: toolName ? "Running tools..." : "Thinking...",
+              toolName,
+            }
+          : null,
+    };
+  }, [
+    activeToolCalls,
+    connected,
+    leaderId,
+    leaderNode?.state,
+    pendingMessages.length,
+    streamingDeltas,
+    timelineItems,
+  ]);
+
+  const runningHintKey = leaderActivity.runningHint
+    ? `${leaderActivity.runningHint.label}:${leaderActivity.runningHint.toolName ?? ""}`
+    : "";
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element || !autoScrollRef.current) {
+      return;
+    }
+    element.scrollTop = element.scrollHeight;
+  }, [bottomInset, runningHintKey, timelineItems]);
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (!autoScrollRef.current) {
+        return;
+      }
+      element.scrollTop = element.scrollHeight;
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  const onMessagesScroll = (event: UIEvent<HTMLDivElement>) => {
+    autoScrollRef.current = isScrolledToBottom(event.currentTarget);
+  };
+
+  const sendMessage = async () => {
+    if (!leaderId) {
+      return;
+    }
+
+    const content = input.trim();
+    if (
+      (!content && readyImages.length === 0) ||
+      hasUploadingImages ||
+      sending
+    ) {
+      return;
+    }
+
+    const parts: ContentPart[] = [];
+    if (content) {
+      parts.push({ type: "text", text: content });
+    }
+    for (const image of readyImages) {
+      parts.push({
+        type: "image",
+        asset_id: image.assetId,
+        mime_type: image.mimeType,
+        width: image.width,
+        height: image.height,
+        alt: image.name,
+      });
+    }
+
+    const previousInput = input;
+    const previousDraftImages = draftImages;
+    const previousHistoryCursor = historyCursor;
+    const submittedAt = Date.now();
+    const pendingMessage = createPendingMessage(
+      content || contentPartsToText(parts),
+      parts,
+      submittedAt,
+    );
+
+    setSending(true);
+    setPendingMessages((current) => [...current, pendingMessage]);
+    setHistoryCursor(null);
+    setInputState("");
+    setDraftImages([]);
+
+    try {
+      const response = await dispatchNodeMessageRequest(leaderId, {
+        content: content || contentPartsToText(parts),
+        parts,
+      });
+      setPendingMessages((current) =>
+        current.map((message) =>
+          message.id === pendingMessage.id
+            ? {
+                ...message,
+                message_id: response.message_id ?? null,
+              }
+            : message,
+        ),
+      );
+      appendChatInputHistoryEntry(inputHistoryScope, {
+        text: previousInput,
+        images: toInputHistoryImages(previousDraftImages),
+        timestamp: submittedAt,
+      });
+      revokeDraftImageUrls(previousDraftImages);
+    } catch (error) {
+      setPendingMessages((current) =>
+        current.filter((message) => message.id !== pendingMessage.id),
+      );
+      setInputState(previousInput);
+      setDraftImages(previousDraftImages);
+      setHistoryCursor(previousHistoryCursor);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to send message",
+      );
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const addImages = useCallback(
+    async (files: FileList | File[]) => {
+      setHistoryCursor(null);
+      if (!supportsInputImage) {
+        toast.error("Current model does not support image input");
+        return;
+      }
+      const selectedFiles = Array.from(files).filter((file) =>
+        file.type.startsWith("image/"),
+      );
+      if (selectedFiles.length === 0) {
+        return;
+      }
+
+      const drafts = await Promise.all(
+        selectedFiles.map(async (file) => {
+          const size = await readImageSize(file);
+          return {
+            id: createDraftImageId(),
+            assetId: null,
+            previewUrl: URL.createObjectURL(file),
+            mimeType: file.type || null,
+            width: size?.width ?? null,
+            height: size?.height ?? null,
+            name: file.name,
+            status: "uploading" as const,
+          };
+        }),
+      );
+
+      setDraftImages((current) => [...current, ...drafts]);
+
+      await Promise.all(
+        drafts.map(async (draft, index) => {
+          const file = selectedFiles[index];
+          if (!file) {
+            return;
+          }
+          try {
+            const asset = await uploadImageAssetRequest(file);
+            setDraftImages((current) =>
+              current.map((image) =>
+                image.id === draft.id
+                  ? {
+                      ...image,
+                      assetId: asset.id,
+                      mimeType: asset.mime_type,
+                      width:
+                        typeof asset.width === "number"
+                          ? asset.width
+                          : image.width,
+                      height:
+                        typeof asset.height === "number"
+                          ? asset.height
+                          : image.height,
+                      status: "ready",
+                    }
+                  : image,
+              ),
+            );
+          } catch (error) {
+            revokeDraftImageUrl(draft);
+            setDraftImages((current) =>
+              current.filter((image) => image.id !== draft.id),
+            );
+            toast.error(
+              error instanceof Error ? error.message : "Failed to upload image",
+            );
+          }
+        }),
+      );
+    },
+    [supportsInputImage],
+  );
+
+  const removeImage = useCallback((imageId: string) => {
+    setHistoryCursor(null);
+    setDraftImages((current) => {
+      const image = current.find((item) => item.id === imageId);
+      if (image) {
+        revokeDraftImageUrl(image);
+      }
+      return current.filter((item) => item.id !== imageId);
+    });
+  }, []);
+
+  const navigateInputHistory = useCallback(
+    (
+      direction: -1 | 1,
+      selection: {
+        start: number | null;
+        end: number | null;
+      },
+    ) => {
+      if (inputHistoryEntries.length === 0) {
+        return false;
+      }
+
+      const selectionStart = selection.start;
+      const selectionEnd = selection.end;
+      const isBlankDraft = input.length === 0 && draftImages.length === 0;
+      const isBoundarySelection =
+        typeof selectionStart === "number" &&
+        typeof selectionEnd === "number" &&
+        selectionStart === selectionEnd &&
+        (selectionStart === 0 || selectionStart === input.length);
+      const canContinueHistory =
+        currentHistoryEntry !== null &&
+        isBrowsingInputHistory &&
+        isBoundarySelection;
+
+      if (!isBlankDraft && !canContinueHistory) {
+        return false;
+      }
+
+      if (historyCursor === null) {
+        if (direction !== -1) {
+          return false;
+        }
+
+        const nextIndex = inputHistoryEntries.length - 1;
+        restoreHistoryEntry(inputHistoryEntries[nextIndex] ?? null, nextIndex);
+        return true;
+      }
+
+      if (direction === -1) {
+        const nextIndex = Math.max(historyCursor - 1, 0);
+        restoreHistoryEntry(inputHistoryEntries[nextIndex] ?? null, nextIndex);
+        return true;
+      }
+
+      if (historyCursor >= inputHistoryEntries.length - 1) {
+        restoreHistoryEntry(null, null);
+        return true;
+      }
+
+      const nextIndex = historyCursor + 1;
+      restoreHistoryEntry(inputHistoryEntries[nextIndex] ?? null, nextIndex);
+      return true;
+    },
+    [
+      currentHistoryEntry,
+      draftImages,
+      historyCursor,
+      input,
+      inputHistoryEntries,
+      isBrowsingInputHistory,
+      restoreHistoryEntry,
+    ],
+  );
+
+  const stopLeader = useCallback(async () => {
+    if (!leaderId) {
+      return;
+    }
+
+    if (leaderNode?.state !== "running" && leaderNode?.state !== "sleeping") {
+      return;
+    }
+
+    await interruptNode(leaderId);
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      const data = await fetchNodeDetail(leaderId);
+      if (!data) {
+        break;
+      }
+      setDetail(data);
+      setFetchedAt(Date.now());
+      if (data.state !== "running" && data.state !== "sleeping") {
+        return;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+    }
+
+    throw new Error("Leader did not stop in time");
+  }, [leaderId, leaderNode?.state]);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      void sendMessage();
+    }
+  };
+
+  return {
+    activeTab,
+    addImages,
+    connected,
+    draftImages,
+    handleKeyDown,
+    hasUploadingImages,
+    input,
+    isBrowsingInputHistory,
+    leaderActivity,
+    leaderNode,
+    navigateInputHistory,
+    onMessagesScroll,
+    removeImage,
+    scrollRef,
+    sendMessage,
+    sending,
+    setInput,
+    stopLeader,
+    supportsInputImage,
+    timelineItems,
+  };
+}

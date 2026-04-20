@@ -13,10 +13,9 @@ import {
   useAgentTabsRuntime,
 } from "@/context/AgentContext";
 import { useAgentDetail } from "@/hooks/useAgentDetail";
-import { useAssistantChat } from "@/hooks/useAssistantChat";
+import { useLeaderChat } from "@/hooks/useLeaderChat";
 import { useMeasuredHeight } from "@/hooks/useMeasuredHeight";
 import { interruptNode } from "@/lib/api";
-import { getAssistantNode } from "@/lib/assistant";
 import { getNodeLabel } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { AgentState, HistoryEntry, Node } from "@/types";
@@ -233,7 +232,7 @@ export function AgentDetailPanel({
 
             <div className="min-w-0 sm:border-l sm:border-border sm:pl-3.5">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Task Tab
+                Workflow
               </p>
               <p className="mt-2 select-text text-sm text-foreground">
                 {detailTab?.title ?? detailTabId?.slice(0, 8) ?? "None"}
@@ -241,7 +240,7 @@ export function AgentDetailPanel({
             </div>
           </div>
 
-          <DetailSection title="Task Context">
+          <DetailSection title="Workflow Context">
             {detailTabId ? (
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
@@ -280,7 +279,9 @@ export function AgentDetailPanel({
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No task metadata</p>
+              <p className="text-sm text-muted-foreground">
+                No workflow metadata
+              </p>
             )}
           </DetailSection>
 
@@ -475,51 +476,56 @@ export function AgentDetailPanel({
   );
 }
 
-export function AssistantChatPanel({
-  interrupting,
-  onInterrupt,
+export function LeaderChatPanel({
   onOpenDetails,
 }: {
-  interrupting: boolean;
-  onInterrupt: () => void;
   onOpenDetails: () => void;
 }) {
   const { agents } = useAgentNodesRuntime();
+  const [stopping, setStopping] = useState(false);
   const { height: composerHeight, ref: composerRef } =
     useMeasuredHeight<HTMLDivElement>();
   const {
+    activeTab,
     addImages = async () => {},
-    assistantActivity,
-    clearChat,
-    clearing,
     connected,
     draftImages = [],
     handleKeyDown,
     hasUploadingImages = false,
     input,
     isBrowsingInputHistory,
+    leaderActivity,
+    leaderNode,
     navigateInputHistory,
     onMessagesScroll,
     removeImage = () => {},
-    retryMessage,
-    retryingMessageId,
     scrollRef,
     sending,
     sendMessage,
     setInput,
+    stopLeader,
     supportsInputImage = false,
     timelineItems,
-  } = useAssistantChat({ bottomInset: composerHeight });
-  const assistantRoleName = getAssistantNode(agents)?.role_name ?? null;
+  } = useLeaderChat({ bottomInset: composerHeight });
+
+  if (!activeTab) {
+    return <WorkspacePanelEmptyState />;
+  }
+  if (!leaderNode) {
+    return <WorkspacePanelLoadingState />;
+  }
 
   return (
     <div className="relative flex h-full flex-col">
       <div className="flex items-center gap-2.5 border-b border-border px-3.5 py-2.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          <p className="text-[13px] font-semibold">Assistant</p>
-          {assistantRoleName ? (
+          <p className="text-[13px] font-semibold">Leader</p>
+          <span className="rounded-full border border-border bg-accent/35 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
+            {activeTab.title}
+          </span>
+          {leaderNode.role_name ? (
             <span className="rounded-full border border-border bg-accent/35 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/78">
-              {assistantRoleName}
+              {leaderNode.role_name}
             </span>
           ) : null}
           <span className="text-[11px] text-muted-foreground/72">
@@ -531,33 +537,21 @@ export function AssistantChatPanel({
             type="button"
             size="sm"
             variant="outline"
-            disabled={clearing}
-            onClick={() => void clearChat()}
-          >
-            {clearing ? "Clearing..." : "Clear Chat"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={clearing}
             onClick={onOpenDetails}
           >
-            Assistant Details
+            Leader Details
           </Button>
         </div>
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <AssistantChatMessages
+          allowHumanMessageRetry={false}
           bottomInset={composerHeight}
           items={timelineItems}
           nodes={agents}
-          onRetryHumanMessage={(messageId) => void retryMessage(messageId)}
           onScroll={onMessagesScroll}
-          retryImageInputEnabled={supportsInputImage}
-          retryingMessageId={retryingMessageId}
-          runningHint={assistantActivity.runningHint}
+          runningHint={leaderActivity.runningHint}
           scrollRef={scrollRef}
           variant="workspace"
         />
@@ -570,7 +564,8 @@ export function AssistantChatPanel({
           className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-b from-transparent via-background/70 to-background/95 px-2.5 pt-8"
         >
           <AssistantChatComposer
-            busy={assistantActivity.running}
+            busy={leaderActivity.running}
+            commandsEnabled={false}
             disabled={
               (!input.trim() && draftImages.length === 0) ||
               hasUploadingImages ||
@@ -585,13 +580,58 @@ export function AssistantChatPanel({
             onKeyDown={handleKeyDown}
             onRemoveImage={removeImage}
             onSend={() => void sendMessage()}
-            onStop={onInterrupt}
+            onStop={() => {
+              setStopping(true);
+              void stopLeader()
+                .catch((error) => {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to interrupt leader",
+                  );
+                })
+                .finally(() => {
+                  setStopping(false);
+                });
+            }}
             overlay
             suppressCommandNavigation={isBrowsingInputHistory}
-            stopping={interrupting}
+            targetLabel="Leader"
+            stopping={stopping}
             variant="workspace"
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function WorkspacePanelEmptyState() {
+  return (
+    <div className="flex h-full items-center justify-center px-6">
+      <div className="max-w-sm rounded-xl border border-border bg-accent/20 px-5 py-6 text-center">
+        <p className="text-[13px] font-semibold text-foreground">
+          No workflow selected
+        </p>
+        <p className="mt-2 text-[12px] leading-6 text-muted-foreground">
+          Create a workflow or switch to an existing one to open its Leader
+          panel.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function WorkspacePanelLoadingState() {
+  return (
+    <div className="flex h-full items-center justify-center px-6">
+      <div className="max-w-sm rounded-xl border border-border bg-accent/20 px-5 py-6 text-center">
+        <p className="text-[13px] font-semibold text-foreground">
+          Loading workflow context
+        </p>
+        <p className="mt-2 text-[12px] leading-6 text-muted-foreground">
+          Restoring the current workflow Leader panel.
+        </p>
       </div>
     </div>
   );

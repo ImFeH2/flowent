@@ -9,6 +9,11 @@ from app.routes.nodes import router as nodes_router
 from app.settings import STEWARD_ROLE_INCLUDED_TOOLS
 from app.tools import MINIMUM_TOOLS
 
+_ONE_PIXEL_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082"
+)
+
 
 def _get_assistant_id(client: TestClient) -> str:
     response = client.get("/api/assistant")
@@ -208,3 +213,118 @@ def test_assistant_chat_can_be_cleared_via_nodes_api(client: TestClient):
         entry["type"] in {"ReceivedMessage", "AssistantText"}
         for entry in detail["history"]
     )
+
+
+def test_human_input_can_be_sent_directly_to_workflow_leader(client: TestClient):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+
+    response = client.post(
+        f"/api/nodes/{tab['leader_id']}/messages",
+        json={"content": "/help investigate the failure"},
+    )
+
+    assert response.status_code == 200
+    message_id = response.json()["message_id"]
+    assert isinstance(message_id, str)
+
+    detail = client.get(f"/api/nodes/{tab['leader_id']}").json()
+    assert any(
+        entry["type"] == "ReceivedMessage"
+        and entry["from_id"] == "human"
+        and entry["message_id"] == message_id
+        and entry["content"] == "/help investigate the failure"
+        for entry in detail["history"]
+    )
+
+
+def test_human_input_cannot_target_regular_worker(client: TestClient):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+    worker = client.post(
+        f"/api/tabs/{tab['id']}/nodes",
+        json={"role_name": "Worker", "name": "Worker"},
+    ).json()
+
+    response = client.post(
+        f"/api/nodes/{worker['id']}/messages",
+        json={"content": "Do the work"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Human input can only target Assistant or a Workflow Leader"
+    )
+
+
+def test_browser_cannot_spoof_non_human_sender_for_node_messages(client: TestClient):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+    worker = client.post(
+        f"/api/tabs/{tab['id']}/nodes",
+        json={"role_name": "Worker", "name": "Worker"},
+    ).json()
+
+    response = client.post(
+        f"/api/nodes/{worker['id']}/messages",
+        json={"content": "Do the work", "from_id": "assistant"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Web UI node messages must originate from `human`"
+    )
+
+
+def test_leader_message_supports_structured_parts_and_image_validation(
+    monkeypatch, client: TestClient
+):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+    leader = registry.get(tab["leader_id"])
+    assert leader is not None
+
+    upload_response = client.post(
+        "/api/image-assets",
+        files={"file": ("pixel.png", _ONE_PIXEL_PNG, "image/png")},
+    )
+    assert upload_response.status_code == 200
+    asset_id = upload_response.json()["id"]
+
+    monkeypatch.setattr(leader, "supports_input_image", lambda: True)
+
+    response = client.post(
+        f"/api/nodes/{tab['leader_id']}/messages",
+        json={
+            "parts": [
+                {"type": "text", "text": "Inspect this screenshot"},
+                {
+                    "type": "image",
+                    "asset_id": asset_id,
+                    "mime_type": "image/png",
+                    "width": 1,
+                    "height": 1,
+                    "alt": "Pixel",
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    detail = client.get(f"/api/nodes/{tab['leader_id']}").json()
+    entry = next(
+        history_entry
+        for history_entry in detail["history"]
+        if history_entry["type"] == "ReceivedMessage"
+        and history_entry["message_id"] == response.json()["message_id"]
+    )
+    assert entry["parts"][0]["text"] == "Inspect this screenshot"
+    assert entry["parts"][1]["asset_id"] == asset_id

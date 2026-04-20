@@ -1,4 +1,4 @@
-import type { Node, NodeDetail } from "@/types";
+import type { ContentPart, Node, NodeDetail } from "@/types";
 import { requestJson, requestVoid } from "./shared";
 
 export async function fetchNodes(): Promise<Node[]> {
@@ -50,15 +50,24 @@ export async function clearAssistantChatRequest(nodeId: string): Promise<void> {
 
 export async function dispatchNodeMessageRequest(
   nodeId: string,
-  content: string,
-  fromId = "human",
-): Promise<void> {
-  await requestVoid(`/api/nodes/${nodeId}/messages`, {
+  input: {
+    content?: string;
+    parts?: ContentPart[];
+  },
+): Promise<{ message_id?: string | null }> {
+  return requestJson<
+    { status: string; message_id?: string | null },
+    { message_id?: string | null }
+  >(`/api/nodes/${nodeId}/messages`, {
     method: "POST",
     body: {
-      content,
-      from_id: fromId,
+      content: input.content,
+      parts: input.parts,
     },
     errorMessage: "Failed to send node message",
+    map: (data) => ({
+      message_id:
+        typeof data?.message_id === "string" ? data.message_id : undefined,
+    }),
   });
 }

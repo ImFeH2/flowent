@@ -35,6 +35,7 @@ import type {
 } from "@/types";
 
 interface AssistantChatMessagesProps {
+  allowHumanMessageRetry?: boolean;
   bottomInset?: number;
   scrollRef: RefObject<HTMLDivElement | null>;
   items: AssistantChatItem[];
@@ -48,6 +49,7 @@ interface AssistantChatMessagesProps {
 }
 
 export const AssistantChatMessages = memo(function AssistantChatMessages({
+  allowHumanMessageRetry = true,
   bottomInset = 0,
   scrollRef,
   items,
@@ -93,6 +95,7 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
           className="[content-visibility:auto] [contain-intrinsic-size:auto_100px]"
         >
           <TimelineItem
+            allowHumanMessageRetry={allowHumanMessageRetry}
             item={item}
             nodes={nodes}
             onRetryHumanMessage={onRetryHumanMessage}
@@ -156,6 +159,7 @@ function AssistantRunningHint({
 }
 
 const TimelineItem = memo(function TimelineItem({
+  allowHumanMessageRetry,
   item,
   nodes,
   onRetryHumanMessage,
@@ -163,6 +167,7 @@ const TimelineItem = memo(function TimelineItem({
   retryingMessageId,
   variant,
 }: {
+  allowHumanMessageRetry?: boolean;
   item: AssistantChatItem;
   nodes?: Map<string, Node>;
   onRetryHumanMessage?: (messageId: string) => void;
@@ -194,6 +199,7 @@ const TimelineItem = memo(function TimelineItem({
           !retryImageInputEnabled;
         return (
           <HumanBubble
+            allowRetry={allowHumanMessageRetry}
             content={contentPartsToText(item.parts, item.content)}
             retryDisabled={retryBlocked}
             retryDisabledReason={
@@ -286,6 +292,7 @@ const TimelineItem = memo(function TimelineItem({
 });
 
 function HumanBubble({
+  allowRetry = true,
   content,
   messageId,
   onRetry,
@@ -296,6 +303,7 @@ function HumanBubble({
   variant,
   pending = false,
 }: {
+  allowRetry?: boolean;
   content: string;
   messageId?: string | null;
   onRetry?: () => void;
@@ -308,7 +316,10 @@ function HumanBubble({
 }) {
   const isWorkspace = variant === "workspace";
   const showRetry =
-    !pending && Boolean(messageId) && (Boolean(onRetry) || retryDisabled);
+    allowRetry &&
+    !pending &&
+    Boolean(messageId) &&
+    (Boolean(onRetry) || retryDisabled);
 
   return (
     <div className="group mt-2 flex min-w-0 flex-col items-end">

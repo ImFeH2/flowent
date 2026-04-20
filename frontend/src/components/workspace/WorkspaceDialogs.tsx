@@ -89,7 +89,7 @@ export function CreateTabDialog({
     <WorkspaceCommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Create Task Tab"
+      title="Create Workflow"
       footer={
         <>
           <Button
@@ -100,15 +100,15 @@ export function CreateTabDialog({
             Cancel
           </Button>
           <Button onClick={onSubmit} disabled={!title.trim() || pending}>
-            {pending ? "Creating..." : "Create Task Tab"}
+            {pending ? "Creating..." : "Create Workflow"}
           </Button>
         </>
       }
     >
-      <WorkspaceDialogField label="Title" hint="Shown in the tab strip">
+      <WorkspaceDialogField label="Title" hint="Shown in the workflow strip">
         <Input
           autoFocus
-          aria-label="Tab title"
+          aria-label="Workflow title"
           value={title}
           onChange={(event) => onTitleChange(event.target.value)}
           placeholder="Release checklist"
@@ -118,7 +118,7 @@ export function CreateTabDialog({
       <WorkspaceDialogField label="Goal" hint="Optional">
         <Textarea
           value={goal}
-          aria-label="Tab goal"
+          aria-label="Workflow goal"
           onChange={(event) => onGoalChange(event.target.value)}
           placeholder="Summarize the task or outcome this workspace should drive."
           className={cn("min-h-[116px] rounded-md", workspaceDialogInputClass)}
@@ -163,7 +163,7 @@ export function CreateTabDialog({
                 Start blank
               </div>
               <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                Create a tab with only its bound Leader. Permissions do not
+                Create a workflow with only its bound Leader. Permissions do not
                 inherit from a blueprint.
               </p>
             </Button>
@@ -211,8 +211,8 @@ export function CreateTabDialog({
       </WorkspaceDialogField>
       <WorkspaceDialogMeta>
         The selected Network Access and Write Dirs initialize the bound Leader
-        for this tab. MCP servers are provided globally after they connect, and
-        they do not inherit from a blueprint.
+        for this workflow. MCP servers are provided globally after they connect,
+        and they do not inherit from a blueprint.
       </WorkspaceDialogMeta>
       <WorkspaceDialogField
         label="Network Access"

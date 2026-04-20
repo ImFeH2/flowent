@@ -790,7 +790,9 @@ describe("AssistantChatComposer", () => {
     const textarea = screen.getByPlaceholderText(
       "Message Assistant or type / for commands",
     );
-    const sendButton = screen.getByRole("button", { name: "Send message" });
+    const sendButton = screen.getByRole("button", {
+      name: "Send Assistant message",
+    });
     const composerShell = textarea.parentElement?.parentElement;
 
     expect(composerShell).not.toBeNull();
@@ -872,7 +874,7 @@ describe("AssistantChatComposer", () => {
       />,
     );
 
-    const stopButton = screen.getByRole("button", { name: "Stop assistant" });
+    const stopButton = screen.getByRole("button", { name: "Stop Assistant" });
     expect(stopButton).toHaveTextContent("Stop");
     expect(stopButton.className).toContain("bg-destructive/18");
 

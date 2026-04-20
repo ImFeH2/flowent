@@ -13,9 +13,6 @@ export function HomePage() {
     activeDialog,
     activeTab,
     activeTabId,
-    assistantDetailVisible,
-    assistantNode,
-    assistantPanelRunning,
     connected,
     connectSourceId,
     connectTargetId,
@@ -34,17 +31,18 @@ export function HomePage() {
     graphConnectMode,
     graphHistory,
     graphRef,
-    handleCloseAssistantDetails,
+    handleCloseLeaderDetails,
     handleConnectAgents,
     handleCreateAgent,
     handleCreateTab,
     handleDeleteTab,
-    handleInterruptAssistant,
-    handleOpenAssistantDetails,
+    handleOpenLeaderDetails,
     handleSaveCurrentNetworkAsBlueprint,
-    interruptingAssistant,
     isCompactWorkspace,
     isDragging,
+    leaderDetailVisible,
+    leaderNode,
+    leaderPanelRunning,
     loadingBlueprints,
     loadingRoles,
     openConnectDialog,
@@ -91,24 +89,22 @@ export function HomePage() {
     <>
       <WorkspaceShell
         activeTabId={activeTabId}
-        assistantDetailVisible={assistantDetailVisible}
-        assistantNode={assistantNode}
-        assistantPanelRunning={assistantPanelRunning}
         connected={connected}
         graphConnectMode={graphConnectMode}
         graphHistory={graphHistory}
         graphRef={graphRef}
-        interruptingAssistant={interruptingAssistant}
         isCompactWorkspace={isCompactWorkspace}
         isDragging={isDragging}
+        leaderDetailVisible={leaderDetailVisible}
+        leaderNode={leaderNode}
+        leaderPanelRunning={leaderPanelRunning}
         loadingRoles={loadingRoles}
-        onCloseAssistantDetails={handleCloseAssistantDetails}
+        onCloseLeaderDetails={handleCloseLeaderDetails}
         onConnectModeChange={setGraphConnectMode}
         onCreateAgent={openCreateAgentDialog}
         onCreateTab={openCreateTabDialog}
         onDeleteTab={requestDeleteTab}
-        onInterruptAssistant={handleInterruptAssistant}
-        onOpenAssistantDetails={handleOpenAssistantDetails}
+        onOpenLeaderDetails={handleOpenLeaderDetails}
         onOpenConnectDialog={openConnectDialog}
         onSaveBlueprint={openSaveBlueprintDialog}
         panelVisible={panelVisible}

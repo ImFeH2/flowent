@@ -93,22 +93,34 @@ vi.mock("@/context/AgentContext", () => ({
   useAgentUI: () => useAgentUIMock(),
 }));
 
-vi.mock("@/hooks/useAssistantChat", () => ({
-  useAssistantChat: () => ({
-    assistantActivity: {
+vi.mock("@/hooks/useLeaderChat", () => ({
+  useLeaderChat: () => ({
+    activeTab: buildTab(),
+    clearing: false,
+    connected: true,
+    draftImages: [],
+    handleKeyDown: vi.fn(),
+    hasUploadingImages: false,
+    input: "",
+    isBrowsingInputHistory: false,
+    leaderActivity: {
       running: false,
       runningHint: null,
     },
-    clearChat: (...args: unknown[]) => clearChatMock(...args),
-    clearing: false,
-    connected: true,
-    handleKeyDown: vi.fn(),
-    input: "",
+    leaderNode: buildNode({
+      id: "leader-1",
+      is_leader: true,
+      role_name: "Conductor",
+    }),
+    navigateInputHistory: vi.fn(),
     onMessagesScroll: vi.fn(),
+    removeImage: vi.fn(),
     scrollRef: { current: null },
     sending: false,
     sendMessage: vi.fn(),
     setInput: vi.fn(),
+    stopLeader: vi.fn(),
+    supportsInputImage: false,
     timelineItems: [],
   }),
 }));
@@ -317,14 +329,14 @@ describe("HomePage", () => {
 
     render(<HomePage />);
 
-    fireEvent.click(screen.getByLabelText("Create tab"));
-    fireEvent.change(screen.getByLabelText("Tab title"), {
+    fireEvent.click(screen.getByLabelText("Create workflow"));
+    fireEvent.change(screen.getByLabelText("Workflow title"), {
       target: { value: "Release Prep" },
     });
-    fireEvent.change(screen.getByLabelText("Tab goal"), {
+    fireEvent.change(screen.getByLabelText("Workflow goal"), {
       target: { value: "Coordinate the launch work" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create Task Tab" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create Workflow" }));
 
     await waitFor(() =>
       expect(createTabRequestMock).toHaveBeenCalledWith(
@@ -443,16 +455,15 @@ describe("HomePage", () => {
     );
   });
 
-  it("opens assistant details from the workspace panel and keeps interrupt only in the detail header", async () => {
-    const assistant = buildNode({
-      id: "assistant",
-      node_type: "assistant",
-      tab_id: null,
-      role_name: "Steward",
+  it("opens leader details from the workspace panel and keeps interrupt only in the detail header", async () => {
+    const leader = buildNode({
+      id: "leader-1",
+      is_leader: true,
       state: "running",
+      role_name: "Conductor",
     });
     useAgentNodesRuntimeMock.mockReturnValue({
-      agents: new Map([[assistant.id, assistant]]),
+      agents: new Map([[leader.id, leader]]),
     });
     useAgentUIMock.mockReturnValue({
       activeTabId: "tab-1",
@@ -463,14 +474,15 @@ describe("HomePage", () => {
     });
     useAgentDetailMock.mockReturnValue({
       detail: {
-        id: assistant.id,
-        node_type: "assistant",
-        tab_id: null,
+        id: leader.id,
+        node_type: "agent",
+        is_leader: true,
+        tab_id: "tab-1",
         state: "running",
-        name: "Assistant",
+        name: "Leader",
         contacts: [],
         connections: [],
-        role_name: "Steward",
+        role_name: "Conductor",
         todos: [],
         tools: [],
         write_dirs: [],
@@ -502,10 +514,10 @@ describe("HomePage", () => {
       within(view.container).queryByRole("button", { name: "Interrupt" }),
     ).toBeNull();
 
-    const assistantDetailButtons = screen.getAllByRole("button", {
-      name: "Assistant Details",
+    const leaderDetailButtons = screen.getAllByRole("button", {
+      name: "Leader Details",
     });
-    fireEvent.click(assistantDetailButtons[assistantDetailButtons.length - 1]);
+    fireEvent.click(leaderDetailButtons[leaderDetailButtons.length - 1]);
 
     expect(screen.getAllByText("Status").length).toBeGreaterThan(0);
     expect(screen.getAllByText("State Timeline").length).toBeGreaterThan(0);
@@ -518,27 +530,16 @@ describe("HomePage", () => {
     fireEvent.click(interruptButton);
 
     await waitFor(() => {
-      expect(interruptNodeMock).toHaveBeenCalledWith("assistant");
+      expect(interruptNodeMock).toHaveBeenCalledWith("leader-1");
     });
   });
 
-  it("clears assistant chat from the workspace panel header", async () => {
-    clearChatMock.mockResolvedValue(undefined);
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-1",
-      pendingAssistantMessages: [],
-      selectedAgentId: null,
-      selectAgent: vi.fn(),
-      setActiveTabId: vi.fn(),
-    });
-
+  it("does not expose assistant-only clear chat actions in the workspace panel", () => {
     render(<HomePage />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Clear Chat" })[0]);
-
-    await waitFor(() => {
-      expect(clearChatMock).toHaveBeenCalledTimes(1);
-    });
+    expect(
+      screen.queryByRole("button", { name: "Clear Chat" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the same interrupt action for a running task node detail view", async () => {

@@ -58,6 +58,7 @@ describe("Sidebar", () => {
     expect(
       screen.getAllByRole("button").map((button) => button.textContent),
     ).toEqual([
+      "Assistant",
       "Workspace",
       "Blueprints",
       "Providers",

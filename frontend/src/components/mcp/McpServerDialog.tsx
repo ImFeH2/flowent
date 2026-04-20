@@ -1,4 +1,5 @@
 import type { MCPServerConfig } from "@/types";
+import { FormSwitch } from "@/components/form/FormControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -72,25 +73,12 @@ function MountToggle({
       }`}
     >
       <span className="text-foreground/85">{label}</span>
-      <button
-        type="button"
+      <FormSwitch
+        checked={checked}
         disabled={disabled}
-        aria-pressed={checked}
-        className={`relative h-6 w-11 rounded-full border transition-colors ${
-          checked
-            ? "border-graph-status-running/28 bg-graph-status-running/15"
-            : "border-border bg-accent/30"
-        }`}
-        onClick={() => onChange(!checked)}
-      >
-        <span
-          className={`absolute top-0.5 size-4.5 rounded-full transition-transform ${
-            checked
-              ? "translate-x-[22px] bg-graph-status-running text-background"
-              : "translate-x-0.5 bg-foreground/85"
-          }`}
-        />
-      </button>
+        label={label}
+        onCheckedChange={onChange}
+      />
     </label>
   );
 }

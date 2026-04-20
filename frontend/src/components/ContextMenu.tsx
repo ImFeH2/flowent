@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
+import { Button } from "@/components/ui/button";
 import { ViewportPortal } from "@/components/ViewportPortal";
 
 export interface ContextMenuItem {
@@ -71,8 +72,10 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
           item === "divider" ? (
             <div key={i} className="my-1 border-t border-border" />
           ) : (
-            <button
+            <Button
               key={i}
+              type="button"
+              variant="ghost"
               disabled={item.disabled}
               onClick={() => {
                 if (!item.disabled) {
@@ -80,14 +83,14 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
                   onClose();
                 }
               }}
-              className={`w-full px-3 py-1.5 text-left text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              className={`h-auto w-full justify-start rounded-none px-3 py-1.5 text-left text-[11px] hover:text-inherit disabled:opacity-40 ${
                 item.danger
                   ? "text-graph-status-error/90 hover:bg-destructive/10 hover:text-graph-status-error"
                   : "text-popover-foreground/90 hover:bg-accent/30 hover:text-popover-foreground"
               }`}
             >
               {item.label}
-            </button>
+            </Button>
           ),
         )}
       </motion.div>

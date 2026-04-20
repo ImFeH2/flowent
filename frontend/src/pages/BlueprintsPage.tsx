@@ -1166,12 +1166,13 @@ function BlueprintLibraryColumn({
             {blueprints.map((blueprint) => {
               const isSelected = blueprint.id === selectedBlueprintId;
               return (
-                <button
+                <Button
                   key={blueprint.id}
                   type="button"
+                  variant="ghost"
                   onClick={() => onSelectBlueprint(blueprint.id)}
                   className={cn(
-                    "group relative w-full overflow-hidden rounded-xl border px-4 py-3 text-left transition-[background-color,border-color,transform] duration-180 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "group relative h-auto w-full flex-col items-stretch overflow-hidden rounded-xl border px-4 py-3 text-left transition-[background-color,border-color,transform] duration-180 hover:text-inherit",
                     isSelected
                       ? "border-border bg-accent/35"
                       : "border-transparent bg-transparent hover:border-border hover:bg-accent/20",
@@ -1201,7 +1202,7 @@ function BlueprintLibraryColumn({
                     <span>{blueprint.node_count} slots</span>
                     <span>{blueprint.edge_count} connections</span>
                   </div>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -1487,9 +1488,10 @@ function BlueprintInspectorColumn({
                         </p>
                       ) : (
                         visibleRoles.map((role) => (
-                          <button
+                          <Button
                             key={role.name}
                             type="button"
+                            variant="ghost"
                             onClick={() =>
                               onUpdateSlot(
                                 selectedSlot.id,
@@ -1498,7 +1500,7 @@ function BlueprintInspectorColumn({
                               )
                             }
                             className={cn(
-                              "w-full rounded-md border px-3 py-2.5 text-left transition-colors",
+                              "h-auto w-full flex-col items-stretch rounded-md border px-3 py-2.5 text-left transition-colors hover:text-inherit",
                               selectedSlot.role_name === role.name
                                 ? "border-border bg-accent/35"
                                 : "border-transparent bg-transparent hover:border-border hover:bg-accent/20",
@@ -1510,7 +1512,7 @@ function BlueprintInspectorColumn({
                             <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                               {role.description}
                             </p>
-                          </button>
+                          </Button>
                         ))
                       )}
                     </div>

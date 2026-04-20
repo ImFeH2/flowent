@@ -9,6 +9,7 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { Link2, Plus, Radio, Redo2, Save, Undo2, X } from "lucide-react";
 import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
+import { Button } from "@/components/ui/button";
 import type { AgentBlueprint, Role } from "@/types";
 import {
   useAgentActivityRuntime,
@@ -625,8 +626,10 @@ export function HomePage() {
                 key={tab.id}
                 className="group relative min-w-[120px] max-w-[200px] shrink-0"
               >
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setActiveTabId(tab.id)}
                   onAuxClick={(event) => {
                     if (event.button !== 1) {
@@ -636,16 +639,18 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "relative flex h-8 w-full items-center rounded-md border-b-2 px-3 pr-8 text-left text-[13px] font-medium transition-[color,border-color,background-color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "relative h-8 w-full justify-start rounded-md border-b-2 px-3 pr-8 text-left text-[13px] font-medium transition-[color,border-color,background-color] duration-200",
                     activeTabId === tab.id
                       ? "border-primary text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-accent/25 hover:text-foreground",
                   )}
                 >
                   <div className="truncate leading-tight">{tab.title}</div>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-xs"
                   title="Delete tab"
                   aria-label={`Delete ${tab.title}`}
                   onClick={(event) => {
@@ -653,26 +658,28 @@ export function HomePage() {
                     requestDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "absolute right-1.5 top-1/2 z-20 -translate-y-1/2 rounded-sm p-1 transition-all duration-200 hover:bg-accent/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    "absolute right-1.5 top-1/2 z-20 size-5 -translate-y-1/2 rounded-sm p-1 transition-all duration-200 hover:bg-accent/45 hover:text-foreground",
                     activeTabId === tab.id
                       ? "text-foreground/70 opacity-100"
                       : "text-muted-foreground/60 opacity-0 group-hover:opacity-100",
                   )}
                 >
                   <X className="size-3" />
-                </button>
+                </Button>
               </div>
             ))}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-sm"
               aria-label="Create tab"
               onClick={() => {
                 openCreateTabDialog();
               }}
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-accent/45 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="shrink-0 rounded-md text-muted-foreground transition-all duration-200 hover:bg-accent/45 hover:text-foreground"
             >
               <Plus className="size-4" />
-            </button>
+            </Button>
           </div>
         </div>
 

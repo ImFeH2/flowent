@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -36,13 +37,15 @@ export function WorkspaceCommandDialog({
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-6">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-foreground/[0.04] to-transparent opacity-50" />
           <DialogClose asChild>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               aria-label="Close dialog"
-              className="absolute right-4 top-4 z-20 flex size-7 items-center justify-center rounded-md bg-accent/45 text-muted-foreground transition-colors hover:bg-accent/65 hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="absolute right-4 top-4 z-20 size-7 rounded-md bg-accent/45 text-muted-foreground hover:bg-accent/65 hover:text-accent-foreground"
             >
               <X className="size-3.5" />
-            </button>
+            </Button>
           </DialogClose>
 
           <DialogHeader className="relative z-10 shrink-0 pr-8">

@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { getImageAssetUrl } from "@/lib/api";
 import { useImageViewer } from "@/context/imageViewer";
 import { cn } from "@/lib/utils";
@@ -34,8 +35,9 @@ export function ImageAssetPreview({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() =>
           openImage({
             src,
@@ -46,7 +48,7 @@ export function ImageAssetPreview({
           })
         }
         className={cn(
-          "group block w-full overflow-hidden rounded-xl border border-border bg-accent/20 text-left transition-colors hover:bg-accent/30",
+          "group h-auto w-full flex-col items-stretch overflow-hidden rounded-xl border border-border bg-accent/20 p-0 text-left transition-colors hover:bg-accent/30 hover:text-inherit",
           compact ? "max-w-[240px]" : "max-w-[360px]",
         )}
       >
@@ -70,7 +72,7 @@ export function ImageAssetPreview({
           </div>
           <div className="text-[11px] text-muted-foreground">{meta}</div>
         </div>
-      </button>
+      </Button>
     </>
   );
 }

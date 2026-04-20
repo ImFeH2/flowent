@@ -1179,9 +1179,10 @@ export function StatsPage() {
                       }
                       return (
                         <div key={event.key} className="space-y-2">
-                          <button
+                          <Button
                             type="button"
-                            className="grid w-full gap-3 rounded-xl border border-border bg-card/30 px-4 py-3 text-left text-[12px] text-muted-foreground transition-colors hover:bg-accent/20 md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.25fr)]"
+                            variant="ghost"
+                            className="grid h-auto w-full gap-3 rounded-xl border border-border bg-card/30 px-4 py-3 text-left text-[12px] text-muted-foreground hover:bg-accent/20 hover:text-inherit md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.25fr)]"
                             onClick={() =>
                               setExpandedEventId((current) =>
                                 current === event.key ? null : event.key,
@@ -1208,7 +1209,7 @@ export function StatsPage() {
                             >
                               {summaryText}
                             </span>
-                          </button>
+                          </Button>
                           {isExpanded ? <EventDetail event={event} /> : null}
                         </div>
                       );

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   ImageViewerContext,
   type ImageViewerPayload,
@@ -715,14 +716,16 @@ function ViewerControlButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-lg"
       aria-label={ariaLabel}
-      className="flex size-10 items-center justify-center rounded-full border border-border bg-surface-overlay/88 text-foreground/82 shadow-md transition-colors hover:bg-accent/60 hover:text-foreground"
+      className="rounded-full border border-border bg-surface-overlay/88 text-foreground/82 shadow-md hover:bg-accent/60 hover:text-foreground"
       data-pan-exempt="true"
       onClick={onClick}
-      type="button"
     >
       {children}
-    </button>
+    </Button>
   );
 }

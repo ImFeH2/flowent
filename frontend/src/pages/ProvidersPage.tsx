@@ -517,16 +517,15 @@ export function ProvidersPage() {
                         {providerTypeLabel(provider.type)}
                       </p>
                     </div>
-                    <button
-                      type="button"
+                    <FormIconButton
                       onClick={(event) => {
                         event.stopPropagation();
                         setProviderToDelete(provider);
                       }}
-                      className="flex size-6 shrink-0 items-center justify-center rounded-md opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                      className="size-6 shrink-0 border-transparent bg-transparent opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                     >
                       <Trash2 className="size-3" />
-                    </button>
+                    </FormIconButton>
                   </motion.div>
                 ))}
               </div>

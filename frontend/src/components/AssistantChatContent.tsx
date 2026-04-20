@@ -26,6 +26,9 @@ import {
 } from "lucide-react";
 import { CopyButton } from "@/components/CopyButton";
 import { ImageAssetPreview } from "@/components/ImageAssetPreview";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useImageViewer } from "@/context/imageViewer";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import {
@@ -407,9 +410,10 @@ export function AssistantChatComposer({
             commandOptions.map((command, index) => {
               const selected = index === selectedCommandIndex;
               return (
-                <button
+                <Button
                   key={command.name}
                   type="button"
+                  variant="ghost"
                   role="option"
                   aria-selected={selected}
                   onMouseDown={(event) => {
@@ -417,8 +421,10 @@ export function AssistantChatComposer({
                     selectCommand(command);
                   }}
                   className={cn(
-                    "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors",
-                    selected ? "bg-accent/60" : "hover:bg-accent/35",
+                    "h-auto w-full items-start justify-start gap-3 rounded-none px-3 py-2.5 text-left whitespace-normal transition-colors",
+                    selected
+                      ? "bg-accent/60 hover:bg-accent/60"
+                      : "hover:bg-accent/35",
                   )}
                 >
                   <span className="mt-0.5 shrink-0 rounded-full border border-border bg-accent/45 px-2 py-0.5 font-mono text-[11px] text-foreground">
@@ -432,7 +438,7 @@ export function AssistantChatComposer({
                       {command.usage}
                     </span>
                   </span>
-                </button>
+                </Button>
               );
             })
           ) : (
@@ -462,7 +468,7 @@ export function AssistantChatComposer({
           </div>
         ) : null}
         <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
-          <input
+          <Input
             ref={fileInputRef}
             accept="image/png,image/jpeg,image/gif,image/webp"
             className="hidden"
@@ -476,8 +482,10 @@ export function AssistantChatComposer({
             }}
             type="file"
           />
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
             aria-label={
               imageInputEnabled
                 ? "Add images"
@@ -486,15 +494,15 @@ export function AssistantChatComposer({
             disabled={!imageInputEnabled}
             onClick={() => fileInputRef.current?.click()}
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-35",
+              "shrink-0 rounded-full transition-colors disabled:opacity-35",
               imageInputEnabled
                 ? "bg-accent/55 text-foreground hover:bg-accent"
                 : "bg-accent/20 text-muted-foreground",
             )}
           >
             <ImagePlus className="size-4" />
-          </button>
-          <textarea
+          </Button>
+          <Textarea
             ref={textareaRef}
             value={input}
             onChange={(event) => handleInputChange(event.target.value)}
@@ -503,26 +511,27 @@ export function AssistantChatComposer({
             placeholder="Message Assistant or type / for commands"
             rows={1}
             className={cn(
-              "min-h-5 w-full resize-none self-center bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground placeholder:text-muted-foreground focus:outline-none",
+              "min-h-5 w-full resize-none self-center border-0 bg-transparent px-0.5 py-0 text-[13px] leading-5 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0",
               "rounded-sm",
             )}
           />
-          <button
+          <Button
             type="button"
+            variant={isWorkspace && !busy ? "default" : "ghost"}
+            size={isWorkspace ? "sm" : "icon-sm"}
             onClick={busy ? onStop : onSend}
             disabled={actionDisabled}
             aria-label={busy ? "Stop assistant" : "Send message"}
             className={cn(
-              "flex shrink-0 items-center justify-center rounded-full transition-all duration-300 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-30",
+              "shrink-0 rounded-full transition-all duration-300 active:scale-[0.96] disabled:opacity-30",
               isWorkspace
-                ? "h-8 gap-1.5 bg-primary px-3.5 text-primary-foreground hover:opacity-90"
-                : "size-8 bg-accent/70 text-foreground hover:bg-accent",
-              busy && isWorkspace
+                ? "h-8 gap-1.5 px-3.5"
+                : "bg-accent/70 p-0 text-foreground hover:bg-accent",
+              busy
                 ? "bg-destructive/18 text-destructive hover:bg-destructive/24"
-                : "",
-              busy && !isWorkspace
-                ? "bg-destructive/18 text-destructive hover:bg-destructive/24"
-                : "",
+                : isWorkspace
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "",
             )}
           >
             {busy ? (
@@ -533,7 +542,7 @@ export function AssistantChatComposer({
             {isWorkspace ? (
               <span className="text-[11px] font-medium">{actionLabel}</span>
             ) : null}
-          </button>
+          </Button>
         </div>
       </div>
       {!imageInputEnabled ? (
@@ -604,9 +613,11 @@ function PendingImagePreviewTile({
   return (
     <>
       <div className="relative overflow-hidden rounded-lg border border-border bg-background/35 transition-colors hover:border-ring/35">
-        <button
+        <Button
           aria-label={`Preview ${image.name}`}
-          className="block text-left"
+          type="button"
+          variant="ghost"
+          className="h-auto w-auto items-start justify-start rounded-none p-0 text-left hover:bg-transparent hover:text-inherit"
           onClick={() =>
             openImage({
               src: image.previewUrl,
@@ -616,7 +627,6 @@ function PendingImagePreviewTile({
               height: image.height,
             })
           }
-          type="button"
         >
           <img
             alt={image.name}
@@ -627,15 +637,17 @@ function PendingImagePreviewTile({
             <div className="truncate">{image.name}</div>
             <div className="text-muted-foreground">{meta}</div>
           </div>
-        </button>
-        <button
+        </Button>
+        <Button
           aria-label={`Remove ${image.name}`}
-          className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded-full bg-background/72 text-muted-foreground transition-colors hover:bg-background/90 hover:text-foreground"
-          onClick={onRemove}
           type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="absolute right-1 top-1 z-10 rounded-full bg-background/72 text-muted-foreground hover:bg-background/90 hover:text-foreground"
+          onClick={onRemove}
         >
           <X className="size-3.5" />
-        </button>
+        </Button>
       </div>
     </>
   );
@@ -826,13 +838,15 @@ function HumanBubble({
       <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <CopyButton text={content} />
         {showRetry ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={onRetry}
             disabled={retrying || retryDisabled}
             title={retryDisabledReason}
             className={cn(
-              "inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45",
+              "h-auto rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-accent/45 hover:text-foreground disabled:opacity-45",
               isWorkspace ? "bg-accent/35" : "bg-accent/25",
             )}
           >
@@ -842,7 +856,7 @@ function HumanBubble({
               <RotateCcw className="size-3" />
             )}
             <span>{retrying ? "Retrying..." : "Retry"}</span>
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>
@@ -1152,10 +1166,12 @@ function ActivityDisclosure({
         tone === "tool" && !isWorkspace && "hover:bg-accent/20",
       )}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center gap-2 text-left"
+        className="h-auto w-full justify-start gap-2 px-0 py-0 text-left hover:bg-transparent hover:text-inherit"
       >
         <span className="flex size-5 shrink-0 translate-y-px items-center justify-center text-muted-foreground">
           {icon}
@@ -1180,7 +1196,7 @@ function ActivityDisclosure({
             open && "rotate-90",
           )}
         />
-      </button>
+      </Button>
 
       {open ? <div className="mt-3 min-w-0">{children}</div> : null}
     </div>

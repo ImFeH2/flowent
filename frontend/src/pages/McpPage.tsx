@@ -1144,14 +1144,15 @@ export function McpPage() {
                               )}
                             >
                               <div className="flex items-start justify-between gap-3">
-                                <button
+                                <Button
                                   type="button"
+                                  variant="ghost"
                                   onClick={() =>
                                     startTransition(() =>
                                       setSelectedServerName(record.config.name),
                                     )
                                   }
-                                  className="min-w-0 flex-1 text-left"
+                                  className="h-auto min-w-0 flex-1 justify-start p-0 text-left hover:bg-transparent hover:text-inherit"
                                 >
                                   <div className="flex flex-wrap items-center gap-2">
                                     <p className="text-[14px] font-medium text-foreground">
@@ -1188,7 +1189,7 @@ export function McpPage() {
                                       {record.snapshot.last_error}
                                     </p>
                                   ) : null}
-                                </button>
+                                </Button>
                                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                                   <span
                                     className={cn(
@@ -1829,9 +1830,10 @@ export function McpPage() {
                                       ) : (
                                         selectedServer.snapshot.prompts.map(
                                           (prompt) => (
-                                            <button
+                                            <Button
                                               key={prompt.name}
                                               type="button"
+                                              variant="ghost"
                                               onClick={() =>
                                                 handleSelectPrompt(
                                                   selectedServer.config.name,
@@ -1839,7 +1841,7 @@ export function McpPage() {
                                                 )
                                               }
                                               className={cn(
-                                                "block w-full rounded-xl border border-border bg-card/20 p-5 text-left transition-colors",
+                                                "h-auto w-full flex-col items-stretch rounded-xl border border-border bg-card/20 p-5 text-left transition-colors hover:text-inherit",
                                                 selectedPromptName ===
                                                   prompt.name
                                                   ? "border-border bg-accent/20"
@@ -1863,7 +1865,7 @@ export function McpPage() {
                                                   2,
                                                 )}
                                               </pre>
-                                            </button>
+                                            </Button>
                                           ),
                                         )
                                       )}

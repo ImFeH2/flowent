@@ -25,10 +25,11 @@ import {
 } from "lucide-react";
 import { fetchTools, type ToolInfo } from "@/lib/api";
 import { PageScaffold } from "@/components/layout/PageScaffold";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const toolSearchInputClass =
-  "h-8 w-full rounded-md border border-input bg-background/50 pl-10 pr-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
+  "bg-background/50 pl-10 pr-3 text-[13px] focus:bg-background/65";
 const toolChipClass =
   "inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-accent/20 px-2.5 text-[11px] font-medium text-muted-foreground";
 
@@ -193,7 +194,7 @@ export function ToolsPage() {
         <div className="mb-6 flex items-center gap-4">
           <div className="relative max-w-md flex-1">
             <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
+            <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search tools..."

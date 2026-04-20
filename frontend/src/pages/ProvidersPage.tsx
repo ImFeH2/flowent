@@ -3,8 +3,6 @@ import useSWR from "swr";
 import { motion } from "motion/react";
 import {
   Check,
-  Eye,
-  EyeOff,
   PencilLine,
   Play,
   Plus,
@@ -26,6 +24,14 @@ import {
   SectionHeader,
   SettingsRow,
 } from "@/components/layout/PageScaffold";
+import {
+  FormIconButton,
+  FormInput,
+  FormTextarea,
+  SecretInput,
+  formHelpTextClass,
+  formSelectTriggerClass,
+} from "@/components/form/FormControls";
 import { parseProviderHeadersInput } from "@/lib/providerHeaders";
 import { providerTypeLabel, providerTypeOptions } from "@/lib/providerTypes";
 import { buildProviderRequestPreview } from "@/lib/providerUrls";
@@ -77,22 +83,11 @@ import {
   type TriStateCapability,
 } from "@/pages/providers/lib";
 
-const providerInputClass =
-  "h-8 w-full rounded-md border border-input bg-background/50 px-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
-const providerMonoInputClass = `${providerInputClass} font-mono`;
-const providerSelectTriggerClass =
-  "h-8 w-full rounded-md bg-background/50 text-[13px]";
-const providerIconButtonClass =
-  "flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
-const providerHelpTextClass =
-  "text-[11px] leading-relaxed text-muted-foreground";
-
 export function ProvidersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [draft, setDraft] = useState<ProviderDraft>(createProviderDraft());
   const [saving, setSaving] = useState(false);
-  const [showKey, setShowKey] = useState(false);
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(
     null,
   );
@@ -158,7 +153,6 @@ export function ProvidersPage() {
     setSelectedId(provider.id);
     setIsCreating(false);
     setDraft(createProviderDraft(provider));
-    setShowKey(false);
     setModelTestStates({});
     setModelEditorState(null);
   };
@@ -167,7 +161,6 @@ export function ProvidersPage() {
     setIsCreating(true);
     setSelectedId(null);
     setDraft(createProviderDraft());
-    setShowKey(false);
     setModelTestStates({});
     setModelEditorState(null);
   };
@@ -440,23 +433,18 @@ export function ProvidersPage() {
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                type="button"
+              <FormIconButton
                 onClick={() => void refreshProviders()}
                 disabled={loading}
-                className={cn("size-7", providerIconButtonClass)}
+                className="size-7"
               >
                 <RefreshCw
                   className={cn("size-3.5", loading && "animate-spin")}
                 />
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateNew}
-                className={cn("size-7", providerIconButtonClass)}
-              >
+              </FormIconButton>
+              <FormIconButton onClick={handleCreateNew} className="size-7">
                 <Plus className="size-3.5" />
-              </button>
+              </FormIconButton>
             </div>
           </div>
 
@@ -599,14 +587,12 @@ export function ProvidersPage() {
                 />
                 <div className="mb-10 space-y-2">
                   <SettingsRow label="Name">
-                    <input
-                      type="text"
+                    <FormInput
                       value={draft.name}
                       onChange={(event) =>
                         setDraft({ ...draft, name: event.target.value })
                       }
                       placeholder="e.g., OpenAI Production"
-                      className={providerInputClass}
                     />
                   </SettingsRow>
                   <SettingsRow label="Type">
@@ -616,7 +602,7 @@ export function ProvidersPage() {
                         setDraft({ ...draft, type: value })
                       }
                     >
-                      <SelectTrigger className={providerSelectTriggerClass}>
+                      <SelectTrigger className={formSelectTriggerClass}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-border bg-popover">
@@ -641,14 +627,12 @@ export function ProvidersPage() {
                   />
                   <div className="space-y-2">
                     <SettingsRow label="Base URL">
-                      <input
-                        type="text"
+                      <FormInput
                         value={draft.base_url}
                         onChange={(event) =>
                           setDraft({ ...draft, base_url: event.target.value })
                         }
                         placeholder="https://api.openai.com/v1"
-                        className={providerInputClass}
                       />
                     </SettingsRow>
                     <SettingsRow
@@ -677,35 +661,23 @@ export function ProvidersPage() {
                       </div>
                     </SettingsRow>
                     <SettingsRow label="API Key" description="Optional">
-                      <div className="relative">
-                        <input
-                          type={showKey ? "text" : "password"}
-                          value={draft.api_key}
-                          onChange={(event) =>
-                            setDraft({ ...draft, api_key: event.target.value })
-                          }
-                          placeholder="sk-..."
-                          className={`${providerInputClass} pr-10`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowKey((current) => !current)}
-                          className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
-                        >
-                          {showKey ? (
-                            <EyeOff className="size-3.5" />
-                          ) : (
-                            <Eye className="size-3.5" />
-                          )}
-                        </button>
-                      </div>
+                      <SecretInput
+                        value={draft.api_key}
+                        onChange={(event) =>
+                          setDraft({ ...draft, api_key: event.target.value })
+                        }
+                        placeholder="sk-..."
+                        mono
+                        showLabel="Show API key"
+                        hideLabel="Hide API key"
+                      />
                     </SettingsRow>
                     <SettingsRow
                       label="Headers"
                       description="Optional JSON object"
                     >
                       <div className="space-y-2">
-                        <textarea
+                        <FormTextarea
                           value={draft.headers_text}
                           onChange={(event) =>
                             setDraft({
@@ -716,11 +688,12 @@ export function ProvidersPage() {
                           placeholder={'{\n  "Authorization": "Bearer ..."\n}'}
                           spellCheck={false}
                           className={cn(
-                            "min-h-[140px] w-full rounded-md border px-3 py-2.5 font-mono text-[13px] transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:outline-none",
+                            "min-h-[140px]",
                             parsedHeaders.error
-                              ? "border-destructive/30 bg-background/50 text-destructive shadow-xs focus:border-destructive/50"
-                              : "border-input bg-background/50 text-foreground shadow-xs focus:border-ring focus:bg-background/65 focus:ring-[3px] focus:ring-ring/50",
+                              ? "border-destructive/30 text-destructive focus-visible:border-destructive/50 focus-visible:ring-destructive/20"
+                              : "",
                           )}
+                          mono
                         />
                         {parsedHeaders.error ? (
                           <p className="text-[11px] text-destructive">
@@ -735,9 +708,8 @@ export function ProvidersPage() {
                     >
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <input
+                          <FormInput
                             aria-label="429 Retry Delay"
-                            type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
                             value={String(draft.retry_429_delay_seconds)}
@@ -755,13 +727,13 @@ export function ProvidersPage() {
                                 retry_429_delay_seconds: parsed,
                               });
                             }}
-                            className={providerMonoInputClass}
+                            mono
                           />
                           <span className="text-[13px] font-medium text-muted-foreground">
                             s
                           </span>
                         </div>
-                        <p className={providerHelpTextClass}>
+                        <p className={formHelpTextClass}>
                           Adds extra wait only when this provider returns HTTP
                           429 and the system continues retrying.
                         </p>
@@ -971,9 +943,8 @@ export function ProvidersPage() {
               <label className="text-[13px] font-medium text-foreground/80">
                 Model ID
               </label>
-              <input
+              <FormInput
                 aria-label="Model ID"
-                type="text"
                 value={modelEditorDraft.model}
                 onChange={(event) =>
                   setModelEditorDraft({
@@ -982,7 +953,7 @@ export function ProvidersPage() {
                   })
                 }
                 placeholder="gpt-5"
-                className={providerMonoInputClass}
+                mono
               />
             </div>
 
@@ -1000,9 +971,8 @@ export function ProvidersPage() {
                 Context Window
               </label>
               <div className="flex items-center gap-2">
-                <input
+                <FormInput
                   aria-label="Context Window"
-                  type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   value={modelEditorDraft.context_window_tokens}
@@ -1017,7 +987,7 @@ export function ProvidersPage() {
                     });
                   }}
                   placeholder="Optional"
-                  className={providerMonoInputClass}
+                  mono
                 />
                 <span className="text-[13px] font-medium text-muted-foreground">
                   tokens
@@ -1039,7 +1009,7 @@ export function ProvidersPage() {
                     })
                   }
                 >
-                  <SelectTrigger className={providerSelectTriggerClass}>
+                  <SelectTrigger className={formSelectTriggerClass}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-border bg-popover">
@@ -1062,7 +1032,7 @@ export function ProvidersPage() {
                     })
                   }
                 >
-                  <SelectTrigger className={providerSelectTriggerClass}>
+                  <SelectTrigger className={formSelectTriggerClass}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl border-border bg-popover">

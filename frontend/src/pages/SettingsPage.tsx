@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { Eye, EyeOff, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
+import {
+  FormInput,
+  SecretInput,
+  formHelpTextClass,
+  formInputClass,
+  formLabelClass,
+  formMonoInputClass,
+  formSelectTriggerClass,
+} from "@/components/form/FormControls";
 import { fetchSettingsBootstrap, saveSettings } from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
 import {
@@ -9,6 +18,7 @@ import {
   SectionHeader,
   SettingsRow,
 } from "@/components/layout/PageScaffold";
+import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import {
   Select,
   SelectContent,
@@ -44,17 +54,6 @@ const retryPolicyOptions: Array<{ value: RetryPolicy; label: string }> = [
   { value: "unlimited", label: "Unlimited" },
 ];
 
-const settingsInputClass =
-  "h-8 w-full rounded-md border border-input bg-background/50 px-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
-const settingsMonoInputClass = `${settingsInputClass} font-mono`;
-const settingsIconButtonClass =
-  "flex size-8 items-center justify-center rounded-md border border-border bg-accent/20 text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
-const settingsFieldLabelClass =
-  "text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground";
-const settingsHelpTextClass =
-  "text-[11px] leading-relaxed text-muted-foreground";
-const settingsSelectTriggerClass = "h-8 w-full rounded-md bg-background/50";
-
 export function SettingsPage() {
   const { requireReauth } = useAccess();
   const {
@@ -70,8 +69,6 @@ export function SettingsPage() {
     newCode: "",
     confirmCode: "",
   });
-  const [showNewAccessCode, setShowNewAccessCode] = useState(false);
-  const [showConfirmAccessCode, setShowConfirmAccessCode] = useState(false);
 
   const providers = useMemo(
     () => bootstrapData?.providers ?? [],
@@ -194,8 +191,6 @@ export function SettingsPage() {
 
       setLocalSettings(savedSettings);
       setAccessDraft({ newCode: "", confirmCode: "" });
-      setShowNewAccessCode(false);
-      setShowConfirmAccessCode(false);
       void mutateSettings(
         (current) =>
           current ? { ...current, settings: savedSettings } : current,
@@ -220,14 +215,10 @@ export function SettingsPage() {
 
   if (loading || !settings) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
-          <p className="text-[13px] text-muted-foreground">
-            Loading settings...
-          </p>
-        </div>
-      </div>
+      <PageLoadingState
+        label="Loading settings..."
+        textClassName="text-[13px]"
+      />
     );
   }
 
@@ -272,90 +263,49 @@ export function SettingsPage() {
               >
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label
-                      htmlFor="new-access-code"
-                      className={settingsFieldLabelClass}
-                    >
+                    <label htmlFor="new-access-code" className={formLabelClass}>
                       New Access Code
                     </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        id="new-access-code"
-                        type={showNewAccessCode ? "text" : "password"}
-                        value={accessDraft.newCode}
-                        onChange={(event) =>
-                          setAccessDraft((current) => ({
-                            ...current,
-                            newCode: event.target.value,
-                          }))
-                        }
-                        placeholder="Leave empty to keep the current access code"
-                        className={settingsInputClass}
-                      />
-                      <button
-                        type="button"
-                        aria-label={
-                          showNewAccessCode
-                            ? "Hide new access code"
-                            : "Show new access code"
-                        }
-                        onClick={() =>
-                          setShowNewAccessCode((current) => !current)
-                        }
-                        className={settingsIconButtonClass}
-                      >
-                        {showNewAccessCode ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </button>
-                    </div>
+                    <SecretInput
+                      id="new-access-code"
+                      value={accessDraft.newCode}
+                      onChange={(event) =>
+                        setAccessDraft((current) => ({
+                          ...current,
+                          newCode: event.target.value,
+                        }))
+                      }
+                      placeholder="Leave empty to keep the current access code"
+                      showLabel="Show new access code"
+                      hideLabel="Hide new access code"
+                      buttonSize="default"
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <label
                       htmlFor="confirm-access-code"
-                      className={settingsFieldLabelClass}
+                      className={formLabelClass}
                     >
                       Confirm Access Code
                     </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        id="confirm-access-code"
-                        type={showConfirmAccessCode ? "text" : "password"}
-                        value={accessDraft.confirmCode}
-                        onChange={(event) =>
-                          setAccessDraft((current) => ({
-                            ...current,
-                            confirmCode: event.target.value,
-                          }))
-                        }
-                        placeholder="Repeat the new access code"
-                        className={settingsInputClass}
-                      />
-                      <button
-                        type="button"
-                        aria-label={
-                          showConfirmAccessCode
-                            ? "Hide confirmed access code"
-                            : "Show confirmed access code"
-                        }
-                        onClick={() =>
-                          setShowConfirmAccessCode((current) => !current)
-                        }
-                        className={settingsIconButtonClass}
-                      >
-                        {showConfirmAccessCode ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </button>
-                    </div>
+                    <SecretInput
+                      id="confirm-access-code"
+                      value={accessDraft.confirmCode}
+                      onChange={(event) =>
+                        setAccessDraft((current) => ({
+                          ...current,
+                          confirmCode: event.target.value,
+                        }))
+                      }
+                      placeholder="Repeat the new access code"
+                      showLabel="Show confirmed access code"
+                      hideLabel="Hide confirmed access code"
+                      buttonSize="default"
+                    />
                   </div>
 
-                  <div className={cn("space-y-2", settingsHelpTextClass)}>
+                  <div className={cn("space-y-2", formHelpTextClass)}>
                     <p>
                       Saving a new access code invalidates all current admin
                       sessions. You will need to unlock the console again with
@@ -386,14 +336,13 @@ export function SettingsPage() {
                 description="Instance storage root"
               >
                 <div className="space-y-2">
-                  <input
+                  <FormInput
                     aria-label="App Data Directory"
-                    type="text"
                     value={settings.app_data_dir}
                     readOnly
-                    className={settingsMonoInputClass}
+                    mono
                   />
-                  <div className={cn("space-y-2", settingsHelpTextClass)}>
+                  <div className={cn("space-y-2", formHelpTextClass)}>
                     <p>
                       Autopoe stores settings, workspace snapshots, image
                       assets, and other instance data here. It is not the
@@ -412,9 +361,8 @@ export function SettingsPage() {
                 description="Default system task root"
               >
                 <div className="space-y-2">
-                  <input
+                  <FormInput
                     aria-label="Working Directory"
-                    type="text"
                     value={settings.working_dir}
                     onChange={(event) =>
                       setLocalSettings({
@@ -423,9 +371,9 @@ export function SettingsPage() {
                       })
                     }
                     placeholder="/workspace/project"
-                    className={settingsMonoInputClass}
+                    mono
                   />
-                  <div className={cn("space-y-2", settingsHelpTextClass)}>
+                  <div className={cn("space-y-2", formHelpTextClass)}>
                     <p>
                       This directory becomes the default cwd, the relative-path
                       base, and the MCP project root for future execution.
@@ -464,7 +412,7 @@ export function SettingsPage() {
                     })
                   }
                 >
-                  <SelectTrigger className={settingsSelectTriggerClass}>
+                  <SelectTrigger className={formSelectTriggerClass}>
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -483,7 +431,7 @@ export function SettingsPage() {
                 {assistantRole ? (
                   <div
                     data-testid="assistant-role-guidance"
-                    className={cn("mt-2 space-y-2", settingsHelpTextClass)}
+                    className={cn("mt-2 space-y-2", formHelpTextClass)}
                   >
                     <p>{assistantRole.description}</p>
                     <p>
@@ -533,7 +481,7 @@ export function SettingsPage() {
                       {settings.assistant.allow_network ? "ON" : "OFF"}
                     </span>
                   </button>
-                  <p className={settingsHelpTextClass}>
+                  <p className={formHelpTextClass}>
                     When disabled, the Assistant cannot make networked tool
                     calls even if its role still includes network-capable tools.
                   </p>
@@ -560,9 +508,9 @@ export function SettingsPage() {
                     rows={4}
                     spellCheck={false}
                     placeholder="/workspace/output"
-                    className={`min-h-[108px] ${settingsMonoInputClass}`}
+                    className={`min-h-[108px] ${formMonoInputClass}`}
                   />
-                  <p className={settingsHelpTextClass}>
+                  <p className={formHelpTextClass}>
                     One directory per line. Empty lines are ignored. These paths
                     bound both the Assistant&apos;s own writes and the maximum
                     write access it can delegate to execution chains.
@@ -593,7 +541,7 @@ export function SettingsPage() {
                     })
                   }
                 >
-                  <SelectTrigger className={settingsSelectTriggerClass}>
+                  <SelectTrigger className={formSelectTriggerClass}>
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -610,7 +558,7 @@ export function SettingsPage() {
                   </SelectContent>
                 </Select>
                 {leaderRole ? (
-                  <p className={cn("mt-2", settingsHelpTextClass)}>
+                  <p className={cn("mt-2", formHelpTextClass)}>
                     {leaderRole.description}
                   </p>
                 ) : null}
@@ -642,7 +590,7 @@ export function SettingsPage() {
                     setProviderModelQuery("");
                   }}
                 >
-                  <SelectTrigger className={settingsSelectTriggerClass}>
+                  <SelectTrigger className={formSelectTriggerClass}>
                     <SelectValue placeholder="Select a provider" />
                   </SelectTrigger>
                   <SelectContent>
@@ -665,7 +613,7 @@ export function SettingsPage() {
                   {settings.model.active_provider_id ? (
                     activeProviderModels.length > 0 ? (
                       <div className="space-y-2">
-                        <label className={settingsFieldLabelClass}>
+                        <label className={formLabelClass}>
                           Provider Models
                         </label>
                         <input
@@ -676,7 +624,7 @@ export function SettingsPage() {
                             setProviderModelQuery(event.target.value)
                           }
                           placeholder="Search provider models"
-                          className={settingsInputClass}
+                          className={formInputClass}
                         />
                         <Select
                           value={
@@ -697,7 +645,7 @@ export function SettingsPage() {
                             })
                           }
                         >
-                          <SelectTrigger className={settingsSelectTriggerClass}>
+                          <SelectTrigger className={formSelectTriggerClass}>
                             <SelectValue placeholder="Select a provider model" />
                           </SelectTrigger>
                           <SelectContent>
@@ -709,13 +657,13 @@ export function SettingsPage() {
                           </SelectContent>
                         </Select>
                         {filteredActiveProviderModels.length === 0 ? (
-                          <p className={settingsHelpTextClass}>
+                          <p className={formHelpTextClass}>
                             No provider models match the current search.
                           </p>
                         ) : null}
                       </div>
                     ) : (
-                      <p className={settingsHelpTextClass}>
+                      <p className={formHelpTextClass}>
                         No saved provider models. Manage this catalog in
                         Providers, or enter a model ID manually below.
                       </p>
@@ -743,7 +691,7 @@ export function SettingsPage() {
                   />
                 </div>
                 {settings.model.active_model ? (
-                  <div className={cn("mt-2 space-y-1", settingsHelpTextClass)}>
+                  <div className={cn("mt-2 space-y-1", formHelpTextClass)}>
                     <p>
                       Context window:{" "}
                       {effectiveContextWindowTokens
@@ -773,7 +721,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="model-context-window"
-                        className={settingsFieldLabelClass}
+                        className={formLabelClass}
                       >
                         Context Window
                       </label>
@@ -811,7 +759,7 @@ export function SettingsPage() {
                             });
                           }}
                           placeholder="Auto"
-                          className={settingsMonoInputClass}
+                          className={formMonoInputClass}
                         />
                         <span className="text-[13px] font-medium text-muted-foreground">
                           tokens
@@ -820,9 +768,7 @@ export function SettingsPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className={settingsFieldLabelClass}>
-                        Input Image
-                      </label>
+                      <label className={formLabelClass}>Input Image</label>
                       <Select
                         value={triStateFromNullableBool(
                           settings.model.input_image,
@@ -839,7 +785,7 @@ export function SettingsPage() {
                       >
                         <SelectTrigger
                           aria-label="Input Image"
-                          className={settingsSelectTriggerClass}
+                          className={formSelectTriggerClass}
                         >
                           <SelectValue placeholder="Auto" />
                         </SelectTrigger>
@@ -852,9 +798,7 @@ export function SettingsPage() {
                     </div>
 
                     <div className="space-y-1">
-                      <label className={settingsFieldLabelClass}>
-                        Output Image
-                      </label>
+                      <label className={formLabelClass}>Output Image</label>
                       <Select
                         value={triStateFromNullableBool(
                           settings.model.output_image,
@@ -871,7 +815,7 @@ export function SettingsPage() {
                       >
                         <SelectTrigger
                           aria-label="Output Image"
-                          className={settingsSelectTriggerClass}
+                          className={formSelectTriggerClass}
                         >
                           <SelectValue placeholder="Auto" />
                         </SelectTrigger>
@@ -884,7 +828,7 @@ export function SettingsPage() {
                     </div>
                   </div>
 
-                  <p className={settingsHelpTextClass}>
+                  <p className={formHelpTextClass}>
                     These fields override the resolved metadata for the current
                     active model only. Auto keeps using the catalog result or
                     other resolved metadata instead of forcing a value.
@@ -946,13 +890,13 @@ export function SettingsPage() {
                           },
                         });
                       }}
-                      className={settingsMonoInputClass}
+                      className={formMonoInputClass}
                     />
                     <span className="text-[13px] font-medium text-muted-foreground">
                       ms
                     </span>
                   </div>
-                  <p className={settingsHelpTextClass}>
+                  <p className={formHelpTextClass}>
                     Applies to a single LLM request attempt. Default is 10000ms.
                     Automatic retries can still make the full call take longer.
                   </p>
@@ -976,7 +920,7 @@ export function SettingsPage() {
                       })
                     }
                   >
-                    <SelectTrigger className={settingsSelectTriggerClass}>
+                    <SelectTrigger className={formSelectTriggerClass}>
                       <SelectValue placeholder="Select a retry policy" />
                     </SelectTrigger>
                     <SelectContent>
@@ -993,7 +937,7 @@ export function SettingsPage() {
                       <div className="space-y-1">
                         <label
                           htmlFor="retry-attempts"
-                          className={settingsFieldLabelClass}
+                          className={formLabelClass}
                         >
                           Retry Attempts
                         </label>
@@ -1021,13 +965,13 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className={settingsMonoInputClass}
+                          className={formMonoInputClass}
                         />
                       </div>
                     </div>
                   ) : null}
 
-                  <p className={settingsHelpTextClass}>
+                  <p className={formHelpTextClass}>
                     No retry fails immediately on transient errors. Limited
                     retries automatically up to the configured attempt count.
                     Unlimited keeps retrying transient failures until success,
@@ -1045,7 +989,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="retry-initial-delay"
-                        className={settingsFieldLabelClass}
+                        className={formLabelClass}
                       >
                         Initial Delay
                       </label>
@@ -1075,7 +1019,7 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className={settingsMonoInputClass}
+                          className={formMonoInputClass}
                         />
                         <span className="text-[13px] font-medium text-muted-foreground">
                           s
@@ -1086,7 +1030,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="retry-max-delay"
-                        className={settingsFieldLabelClass}
+                        className={formLabelClass}
                       >
                         Max Delay
                       </label>
@@ -1114,7 +1058,7 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className={settingsMonoInputClass}
+                          className={formMonoInputClass}
                         />
                         <span className="text-[13px] font-medium text-muted-foreground">
                           s
@@ -1125,7 +1069,7 @@ export function SettingsPage() {
                     <div className="space-y-1">
                       <label
                         htmlFor="retry-backoff-cap-retries"
-                        className={settingsFieldLabelClass}
+                        className={formLabelClass}
                       >
                         Cap Retries
                       </label>
@@ -1153,12 +1097,12 @@ export function SettingsPage() {
                             },
                           });
                         }}
-                        className={settingsMonoInputClass}
+                        className={formMonoInputClass}
                       />
                     </div>
                   </div>
 
-                  <p className={settingsHelpTextClass}>
+                  <p className={formHelpTextClass}>
                     Retries use exponential backoff from Initial Delay, stop
                     doubling after Cap Retries, and never exceed Max Delay.
                   </p>
@@ -1173,7 +1117,7 @@ export function SettingsPage() {
                   <div className="space-y-1">
                     <label
                       htmlFor="auto-compact-token-limit"
-                      className={settingsFieldLabelClass}
+                      className={formLabelClass}
                     >
                       Token Limit
                     </label>
@@ -1211,7 +1155,7 @@ export function SettingsPage() {
                           });
                         }}
                         placeholder="Disabled"
-                        className={settingsMonoInputClass}
+                        className={formMonoInputClass}
                       />
                       <span className="text-[13px] font-medium text-muted-foreground">
                         tokens
@@ -1219,14 +1163,14 @@ export function SettingsPage() {
                     </div>
                   </div>
 
-                  <p className={settingsHelpTextClass}>
+                  <p className={formHelpTextClass}>
                     Automatic compact is triggered by the latest successful API
                     usage baseline plus any locally added tail context after
                     that response. Leave this empty to disable automatic{" "}
                     <code>/compact</code>.
                   </p>
                   {knownSafeInputTokens !== null ? (
-                    <p className={settingsHelpTextClass}>
+                    <p className={formHelpTextClass}>
                       Known safe input window:{" "}
                       {knownSafeInputTokens.toLocaleString()} tokens.
                       {settings.model.auto_compact_token_limit !== null &&

@@ -14,6 +14,7 @@ import {
   ShellBackground,
   ShellSurface,
 } from "@/components/layout/ShellBackground";
+import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
 import { AccessProvider } from "@/context/AccessContext";
@@ -84,17 +85,6 @@ const accessInputClass =
 const accessButtonClass =
   "flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-[13px] font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
 
-function PageLoadingFallback() {
-  return (
-    <div className="flex h-full items-center justify-center">
-      <div className="space-y-3 text-center">
-        <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
-        <p className="text-sm text-muted-foreground">Loading page...</p>
-      </div>
-    </div>
-  );
-}
-
 function AppContent() {
   const { currentPage } = useAgentUI();
   const { logout } = useAccess();
@@ -113,7 +103,14 @@ function AppContent() {
 
   const renderPage = () => {
     return (
-      <Suspense fallback={<PageLoadingFallback />}>
+      <Suspense
+        fallback={
+          <PageLoadingState
+            label="Loading page..."
+            barClassName="skeleton-shimmer animate-none"
+          />
+        }
+      >
         <LazyPage />
       </Suspense>
     );
@@ -354,10 +351,10 @@ function AppShell() {
         variant="access"
         className="flex min-h-screen items-center justify-center"
       >
-        <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 rounded-full skeleton-shimmer" />
-          <p className="text-sm text-muted-foreground">Loading access...</p>
-        </div>
+        <PageLoadingState
+          label="Loading access..."
+          barClassName="skeleton-shimmer animate-none"
+        />
       </ShellBackground>
     );
   }

@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { PageScaffold } from "@/components/layout/PageScaffold";
+import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import { Button } from "@/components/ui/button";
 import { fetchPromptSettings, savePromptSettings } from "@/lib/api";
 
@@ -50,14 +51,10 @@ export function PromptsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
-          <p className="text-[13px] text-muted-foreground">
-            Loading prompts...
-          </p>
-        </div>
-      </div>
+      <PageLoadingState
+        label="Loading prompts..."
+        textClassName="text-[13px]"
+      />
     );
   }
 

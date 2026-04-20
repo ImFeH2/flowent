@@ -15,6 +15,14 @@ import {
   SectionHeader,
   SettingsRow,
 } from "@/components/layout/PageScaffold";
+import { PageLoadingState } from "@/components/layout/PageLoadingState";
+import {
+  FormIconButton,
+  FormInput,
+  FormTextarea,
+  formReadOnlyClass,
+  formSelectTriggerClass,
+} from "@/components/form/FormControls";
 import {
   Select,
   SelectContent,
@@ -46,17 +54,6 @@ type ToolState = "allowed" | "included" | "excluded";
 type PanelMode = "create" | "edit" | "view";
 
 const MINIMUM_TOOLS = new Set(["idle", "sleep", "todo", "contacts"]);
-const roleInputClass =
-  "h-8 w-full rounded-md border border-input bg-background/50 px-3 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
-const roleMonoInputClass = `${roleInputClass} font-mono`;
-const roleTextareaClass =
-  "w-full rounded-md border border-input bg-background/50 px-3 py-2.5 text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50";
-const roleMonoTextareaClass = `${roleTextareaClass} font-mono`;
-const roleReadOnlyClass = "cursor-default opacity-60 focus:outline-none";
-const roleSelectTriggerClass =
-  "h-8 w-full rounded-md bg-background/50 text-[13px]";
-const roleIconButtonClass =
-  "flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground";
 
 const emptyDraft = (): RoleDraft => ({
   name: "",
@@ -414,14 +411,7 @@ export function RolesPage() {
   };
 
   if (loading && !isPanelOpen) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
-          <p className="text-sm text-muted-foreground">Loading roles...</p>
-        </div>
-      </div>
-    );
+    return <PageLoadingState label="Loading roles..." />;
   }
 
   return (
@@ -457,8 +447,7 @@ export function RolesPage() {
 
               <div className="space-y-4">
                 <SettingsRow label="Role Name" description="Unique identifier">
-                  <input
-                    type="text"
+                  <FormInput
                     value={draft.name}
                     onChange={(e) =>
                       setDraft({ ...draft, name: e.target.value })
@@ -466,8 +455,7 @@ export function RolesPage() {
                     readOnly={isReadOnly || lockBuiltinFields}
                     placeholder="e.g., Code Reviewer"
                     className={cn(
-                      roleInputClass,
-                      isReadOnly || lockBuiltinFields ? roleReadOnlyClass : "",
+                      isReadOnly || lockBuiltinFields ? formReadOnlyClass : "",
                     )}
                   />
                 </SettingsRow>
@@ -476,7 +464,7 @@ export function RolesPage() {
                   label="Description"
                   description="Short summary shown when humans or agents choose a role"
                 >
-                  <textarea
+                  <FormTextarea
                     value={draft.description}
                     onChange={(e) =>
                       setDraft({ ...draft, description: e.target.value })
@@ -485,8 +473,8 @@ export function RolesPage() {
                     placeholder="Briefly explain what this role is best suited for"
                     rows={3}
                     className={cn(
-                      `w-full resize-y ${roleTextareaClass}`,
-                      isReadOnly || lockBuiltinFields ? roleReadOnlyClass : "",
+                      "resize-y",
+                      isReadOnly || lockBuiltinFields ? formReadOnlyClass : "",
                     )}
                   />
                 </SettingsRow>
@@ -496,7 +484,7 @@ export function RolesPage() {
                   description="Appended after the built-in collaboration prompt"
                 >
                   <div className="space-y-2">
-                    <textarea
+                    <FormTextarea
                       value={draft.system_prompt}
                       onChange={(e) =>
                         setDraft({ ...draft, system_prompt: e.target.value })
@@ -505,11 +493,12 @@ export function RolesPage() {
                       placeholder="You are a helpful assistant that..."
                       rows={12}
                       className={cn(
-                        `w-full resize-y ${roleMonoTextareaClass}`,
+                        "resize-y",
                         isReadOnly || lockBuiltinFields
-                          ? roleReadOnlyClass
+                          ? formReadOnlyClass
                           : "",
                       )}
+                      mono
                     />
                     <p className="text-[11px] text-muted-foreground">
                       {isReadOnly
@@ -575,7 +564,7 @@ export function RolesPage() {
                           onValueChange={handleProviderChange}
                           disabled={isReadOnly}
                         >
-                          <SelectTrigger className={roleSelectTriggerClass}>
+                          <SelectTrigger className={formSelectTriggerClass}>
                             <SelectValue placeholder="Select a provider" />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl border-border bg-popover">
@@ -618,7 +607,7 @@ export function RolesPage() {
                             activeProviderModelOptions.length === 0
                           }
                         >
-                          <SelectTrigger className={roleSelectTriggerClass}>
+                          <SelectTrigger className={formSelectTriggerClass}>
                             <SelectValue
                               placeholder={
                                 activeProviderModelOptions.length > 0
@@ -642,18 +631,14 @@ export function RolesPage() {
                           </SelectContent>
                         </Select>
                         {activeProviderModelOptions.length > 0 ? (
-                          <input
-                            type="text"
+                          <FormInput
                             value={providerModelQuery}
                             onChange={(event) =>
                               setProviderModelQuery(event.target.value)
                             }
                             readOnly={isReadOnly}
                             placeholder="Search provider models"
-                            className={cn(
-                              roleInputClass,
-                              isReadOnly ? roleReadOnlyClass : "",
-                            )}
+                            className={cn(isReadOnly ? formReadOnlyClass : "")}
                           />
                         ) : (
                           <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -673,8 +658,7 @@ export function RolesPage() {
                         <label className="text-[13px] font-medium text-foreground/80">
                           Model ID
                         </label>
-                        <input
-                          type="text"
+                        <FormInput
                           value={draft.model.model}
                           onChange={(e) =>
                             setDraft((current) => ({
@@ -686,10 +670,8 @@ export function RolesPage() {
                           }
                           readOnly={isReadOnly}
                           placeholder="e.g., gpt-4o-mini"
-                          className={cn(
-                            roleMonoInputClass,
-                            isReadOnly ? roleReadOnlyClass : "",
-                          )}
+                          className={cn(isReadOnly ? formReadOnlyClass : "")}
+                          mono
                         />
                         <p className="text-[11px] text-muted-foreground">
                           Catalog or manual ID
@@ -976,24 +958,22 @@ export function RolesPage() {
                     </div>
 
                     <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                      <button
-                        type="button"
+                      <FormIconButton
                         onClick={() => handleView(role)}
                         aria-label={`View ${role.name}`}
                         title={`View ${role.name}`}
-                        className={cn("size-7", roleIconButtonClass)}
+                        className="size-7"
                       >
                         <Eye className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
+                      </FormIconButton>
+                      <FormIconButton
                         onClick={() => handleEdit(role)}
                         aria-label={`Edit ${role.name}`}
                         title={`Edit ${role.name}`}
-                        className={cn("size-7", roleIconButtonClass)}
+                        className="size-7"
                       >
                         <Edit2 className="size-3.5" />
-                      </button>
+                      </FormIconButton>
                       {!role.is_builtin && (
                         <button
                           type="button"

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import { Check, Eye, EyeOff, Save, Trash2 } from "lucide-react";
+import { Check, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   approveTelegramChat,
@@ -9,7 +9,9 @@ import {
   fetchTelegramSettings,
   updateTelegramSettings,
 } from "@/lib/api";
+import { SecretInput } from "@/components/form/FormControls";
 import { PageScaffold, SoftPanel } from "@/components/layout/PageScaffold";
+import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
@@ -45,7 +47,6 @@ export function ChannelsPage() {
   } = useSWR("telegramSettings", fetchTelegramSettings);
 
   const [saving, setSaving] = useState(false);
-  const [showToken, setShowToken] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
   const [tokenDirty, setTokenDirty] = useState(false);
 
@@ -110,14 +111,10 @@ export function ChannelsPage() {
 
   if (loading || !settings) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="space-y-3 text-center">
-          <div className="mx-auto h-2 w-32 animate-pulse rounded-full bg-accent/30" />
-          <p className="text-[13px] text-muted-foreground">
-            Loading channels...
-          </p>
-        </div>
-      </div>
+      <PageLoadingState
+        label="Loading channels..."
+        textClassName="text-[13px]"
+      />
     );
   }
 
@@ -160,28 +157,18 @@ export function ChannelsPage() {
                   Leave empty to keep the current token
                 </span>
               </div>
-              <div className="relative mt-3">
-                <input
-                  type={showToken ? "text" : "password"}
+              <div className="mt-3">
+                <SecretInput
                   value={tokenInput}
                   onChange={(event) => {
                     setTokenInput(event.target.value);
                     setTokenDirty(true);
                   }}
                   placeholder={settings.bot_token || "Enter Telegram bot token"}
-                  className="h-8 w-full rounded-md border border-input bg-background/50 px-3 pr-10 font-mono text-[13px] text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:bg-background/65 focus:outline-none focus:ring-[3px] focus:ring-ring/50"
+                  mono
+                  showLabel="Show Telegram bot token"
+                  hideLabel="Hide Telegram bot token"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowToken((current) => !current)}
-                  className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/45 hover:text-foreground"
-                >
-                  {showToken ? (
-                    <EyeOff className="size-3.5" />
-                  ) : (
-                    <Eye className="size-3.5" />
-                  )}
-                </button>
               </div>
             </section>
 

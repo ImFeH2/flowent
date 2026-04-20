@@ -7,16 +7,7 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  Link2,
-  Plus,
-  Radio,
-  Redo2,
-  Save,
-  Trash2,
-  Undo2,
-  X,
-} from "lucide-react";
+import { Link2, Plus, Radio, Redo2, Save, Undo2, X } from "lucide-react";
 import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
 import type { AgentBlueprint, Role } from "@/types";
 import {
@@ -48,6 +39,14 @@ import {
 } from "@/lib/api";
 import { toast } from "sonner";
 import {
+  ConnectAgentsDialog,
+  CreateAgentDialog,
+  CreateTabDialog,
+  DeleteTabDialog,
+  type WorkspaceAgentOption,
+  SaveBlueprintDialog,
+} from "@/components/workspace/WorkspaceDialogs";
+import {
   AgentDetailPanel,
   AssistantChatPanel,
   BadgeChip,
@@ -55,31 +54,6 @@ import {
   ToolbarButton,
   ToolbarDivider,
 } from "@/components/workspace/WorkspacePanels";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  WorkspaceCommandDialog,
-  WorkspaceDialogField,
-  WorkspaceDialogMeta,
-} from "@/components/WorkspaceCommandDialog";
 
 const WORKSPACE_PANEL_ID = "workspace-panel-width";
 const MIN_PANEL_WIDTH = 296;
@@ -88,15 +62,6 @@ const MAX_PANEL_WIDTH = 960;
 const DEFAULT_PANEL_RATIO = 0.34;
 const DEFAULT_PANEL_WIDTH = 448;
 const COMPACT_PANEL_MIN_WIDTH = 300;
-
-const workspaceDialogInputClass =
-  "bg-background/40 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
-const workspaceChoiceCardClass =
-  "rounded-xl border border-border bg-card/40 px-4 py-3";
-const workspaceChoiceListClass =
-  "max-h-56 space-y-2 overflow-y-auto rounded-xl border border-border bg-background/40 p-2 scrollbar-none";
-const workspaceChoiceButtonBaseClass =
-  "w-full rounded-md border px-3 py-2.5 text-left transition-colors";
 
 type WorkspaceDialogKind =
   | "create-tab"
@@ -281,7 +246,7 @@ export function HomePage() {
     () => tabAgents.filter((agent) => !agent.is_leader),
     [tabAgents],
   );
-  const tabAgentOptions = useMemo(
+  const tabAgentOptions = useMemo<WorkspaceAgentOption[]>(
     () =>
       regularTabAgents.map((agent) => ({
         id: agent.id,
@@ -967,510 +932,108 @@ export function HomePage() {
         ) : null}
       </AnimatePresence>
 
-      <WorkspaceCommandDialog
+      <CreateTabDialog
         open={activeDialog === "create-tab"}
         onOpenChange={(open) => {
           if (!open) {
             setActiveDialog(null);
           }
         }}
-        title="Create Task Tab"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setActiveDialog(null)}
-              disabled={pendingAction === "create-tab"}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleCreateTab()}
-              disabled={
-                !createTabTitle.trim() || pendingAction === "create-tab"
-              }
-            >
-              {pendingAction === "create-tab"
-                ? "Creating..."
-                : "Create Task Tab"}
-            </Button>
-          </>
-        }
-      >
-        <WorkspaceDialogField label="Title" hint="Shown in the tab strip">
-          <Input
-            autoFocus
-            aria-label="Tab title"
-            value={createTabTitle}
-            onChange={(event) => setCreateTabTitle(event.target.value)}
-            placeholder="Release checklist"
-            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-          />
-        </WorkspaceDialogField>
-        <WorkspaceDialogField label="Goal" hint="Optional">
-          <Textarea
-            value={createTabGoal}
-            aria-label="Tab goal"
-            onChange={(event) => setCreateTabGoal(event.target.value)}
-            placeholder="Summarize the task or outcome this workspace should drive."
-            className={cn(
-              "min-h-[116px] rounded-md",
-              workspaceDialogInputClass,
-            )}
-          />
-        </WorkspaceDialogField>
-        <WorkspaceDialogField label="Blueprint" hint="Optional">
-          <div className="space-y-3">
-            <Input
-              aria-label="Search blueprints"
-              value={createTabBlueprintQuery}
-              onChange={(event) =>
-                setCreateTabBlueprintQuery(event.target.value)
-              }
-              placeholder="Search blueprints"
-              className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-            />
-            {selectedCreateTabBlueprint ? (
-              <div className={workspaceChoiceCardClass}>
-                <div className="text-[13px] font-medium text-foreground">
-                  {selectedCreateTabBlueprint.name}
-                </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  {selectedCreateTabBlueprint.description || "No description"}
-                </p>
-                <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
-                  {selectedCreateTabBlueprint.node_count} nodes ·{" "}
-                  {selectedCreateTabBlueprint.edge_count} edges
-                </p>
-              </div>
-            ) : null}
-            <div className={workspaceChoiceListClass}>
-              <button
-                type="button"
-                onClick={() => setCreateTabBlueprintId("")}
-                className={cn(
-                  workspaceChoiceButtonBaseClass,
-                  !createTabBlueprintId
-                    ? "border-border bg-accent/70"
-                    : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
-                )}
-              >
-                <div className="text-[13px] font-medium text-foreground">
-                  Start blank
-                </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  Create a tab with only its bound Leader. Permissions do not
-                  inherit from a blueprint.
-                </p>
-              </button>
-              {loadingBlueprints ? (
-                <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                  Loading blueprints...
-                </p>
-              ) : filteredCreateTabBlueprints.length === 0 ? (
-                <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                  No blueprints match your search.
-                </p>
-              ) : (
-                filteredCreateTabBlueprints.map((blueprint) => (
-                  <button
-                    key={blueprint.id}
-                    type="button"
-                    onClick={() => setCreateTabBlueprintId(blueprint.id)}
-                    className={cn(
-                      workspaceChoiceButtonBaseClass,
-                      createTabBlueprintId === blueprint.id
-                        ? "border-border bg-accent/70"
-                        : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-[13px] font-medium text-foreground">
-                        {blueprint.name}
-                      </div>
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">
-                        v{blueprint.version}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                      {blueprint.description || "No description"}
-                    </p>
-                    <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
-                      {blueprint.node_count} nodes · {blueprint.edge_count}{" "}
-                      edges
-                    </p>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </WorkspaceDialogField>
-        <WorkspaceDialogMeta>
-          The selected Network Access and Write Dirs initialize the bound Leader
-          for this tab. MCP servers are provided globally after they connect,
-          and they do not inherit from a blueprint.
-        </WorkspaceDialogMeta>
-        <WorkspaceDialogField
-          label="Network Access"
-          hint="Allow the leader to connect to the internet"
-        >
-          <button
-            type="button"
-            role="switch"
-            aria-checked={createTabAllowNetwork}
-            onClick={() => setCreateTabAllowNetwork(!createTabAllowNetwork)}
-            className={cn(
-              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-              createTabAllowNetwork ? "bg-primary" : "bg-muted/80",
-            )}
-          >
-            <span className="sr-only">Network Access</span>
-            <span
-              aria-hidden="true"
-              className={cn(
-                "pointer-events-none inline-block size-4 transform rounded-full bg-background shadow-xs ring-0 transition duration-200 ease-in-out",
-                createTabAllowNetwork ? "translate-x-4" : "translate-x-0",
-              )}
-            />
-          </button>
-        </WorkspaceDialogField>
-        <WorkspaceDialogField
-          label="Write Dirs"
-          hint="One absolute path per line"
-        >
-          <Textarea
-            value={createTabWriteDirs}
-            aria-label="Write directories"
-            onChange={(event) => setCreateTabWriteDirs(event.target.value)}
-            placeholder="/workspace/output&#10;/workspace/cache"
-            className={cn(
-              "min-h-[80px] rounded-md font-mono text-[13px]",
-              workspaceDialogInputClass,
-            )}
-          />
-        </WorkspaceDialogField>
-      </WorkspaceCommandDialog>
+        pending={pendingAction === "create-tab"}
+        title={createTabTitle}
+        onTitleChange={setCreateTabTitle}
+        goal={createTabGoal}
+        onGoalChange={setCreateTabGoal}
+        blueprintQuery={createTabBlueprintQuery}
+        onBlueprintQueryChange={setCreateTabBlueprintQuery}
+        blueprintId={createTabBlueprintId}
+        onBlueprintIdChange={setCreateTabBlueprintId}
+        selectedBlueprint={selectedCreateTabBlueprint}
+        filteredBlueprints={filteredCreateTabBlueprints}
+        loadingBlueprints={loadingBlueprints}
+        allowNetwork={createTabAllowNetwork}
+        onAllowNetworkChange={setCreateTabAllowNetwork}
+        writeDirs={createTabWriteDirs}
+        onWriteDirsChange={setCreateTabWriteDirs}
+        onSubmit={() => void handleCreateTab()}
+      />
 
-      <WorkspaceCommandDialog
+      <SaveBlueprintDialog
         open={activeDialog === "save-blueprint"}
         onOpenChange={(open) => {
           if (!open) {
             setActiveDialog(null);
           }
         }}
-        title="Save as Blueprint"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setActiveDialog(null)}
-              disabled={pendingAction === "save-blueprint"}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleSaveCurrentNetworkAsBlueprint()}
-              disabled={
-                !saveBlueprintName.trim() || pendingAction === "save-blueprint"
-              }
-            >
-              {pendingAction === "save-blueprint"
-                ? "Saving..."
-                : "Save as Blueprint"}
-            </Button>
-          </>
-        }
-      >
-        <WorkspaceDialogMeta>
-          This only saves the current Agent Network structure. History, runtime
-          state, todos, and permissions are not copied into the Agent Blueprint.
-        </WorkspaceDialogMeta>
-        <WorkspaceDialogField label="Name" hint="Required">
-          <Input
-            autoFocus
-            aria-label="Blueprint name"
-            value={saveBlueprintName}
-            onChange={(event) => setSaveBlueprintName(event.target.value)}
-            placeholder="Review Pipeline"
-            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-          />
-        </WorkspaceDialogField>
-        <WorkspaceDialogField label="Description" hint="Optional">
-          <Textarea
-            aria-label="Blueprint description"
-            value={saveBlueprintDescription}
-            onChange={(event) =>
-              setSaveBlueprintDescription(event.target.value)
-            }
-            placeholder="Describe the reusable collaboration architecture."
-            className={cn(
-              "min-h-[116px] rounded-md",
-              workspaceDialogInputClass,
-            )}
-          />
-        </WorkspaceDialogField>
-      </WorkspaceCommandDialog>
+        pending={pendingAction === "save-blueprint"}
+        name={saveBlueprintName}
+        onNameChange={setSaveBlueprintName}
+        description={saveBlueprintDescription}
+        onDescriptionChange={setSaveBlueprintDescription}
+        onSubmit={() => void handleSaveCurrentNetworkAsBlueprint()}
+      />
 
-      <WorkspaceCommandDialog
+      <CreateAgentDialog
         open={activeDialog === "create-agent"}
         onOpenChange={(open) => {
           if (!open) {
             setActiveDialog(null);
           }
         }}
-        title="Add Agent"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setActiveDialog(null)}
-              disabled={pendingAction === "create-agent"}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleCreateAgent()}
-              disabled={
-                !activeTabId ||
-                !selectedCreateAgentRole ||
-                pendingAction === "create-agent"
-              }
-            >
-              {pendingAction === "create-agent" ? "Adding..." : "Add Agent"}
-            </Button>
-          </>
+        pending={pendingAction === "create-agent"}
+        activeTabTitle={activeTab?.title ?? null}
+        roleQuery={createAgentRoleQuery}
+        onRoleQueryChange={setCreateAgentRoleQuery}
+        selectedRole={selectedCreateAgentRole}
+        selectedRoleName={createAgentRoleName}
+        onRoleNameChange={setCreateAgentRoleName}
+        filteredRoles={filteredCreateAgentRoles}
+        loadingRoles={loadingRoles}
+        agentName={createAgentName}
+        onAgentNameChange={setCreateAgentName}
+        onSubmit={() => void handleCreateAgent()}
+        submitDisabled={
+          !activeTabId ||
+          !selectedCreateAgentRole ||
+          pendingAction === "create-agent"
         }
-      >
-        <WorkspaceDialogMeta>
-          Adding a regular node to{" "}
-          <span className="font-semibold text-foreground">
-            {activeTab?.title ?? "No active tab"}
-          </span>
-        </WorkspaceDialogMeta>
-        <WorkspaceDialogField
-          label="Role"
-          hint="Required · Leader is managed by the tab"
-        >
-          <div className="space-y-3">
-            <Input
-              autoFocus
-              aria-label="Search roles"
-              value={createAgentRoleQuery}
-              onChange={(event) => setCreateAgentRoleQuery(event.target.value)}
-              placeholder="Search roles"
-              className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-            />
-            {selectedCreateAgentRole ? (
-              <div className={workspaceChoiceCardClass}>
-                <div className="text-[13px] font-medium text-foreground">
-                  {selectedCreateAgentRole.name}
-                </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                  {selectedCreateAgentRole.description}
-                </p>
-              </div>
-            ) : null}
-            <div className={workspaceChoiceListClass}>
-              {loadingRoles ? (
-                <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                  Loading roles...
-                </p>
-              ) : filteredCreateAgentRoles.length === 0 ? (
-                <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                  No roles match your search.
-                </p>
-              ) : (
-                filteredCreateAgentRoles.map((role) => (
-                  <button
-                    key={role.name}
-                    type="button"
-                    onClick={() => setCreateAgentRoleName(role.name)}
-                    className={cn(
-                      workspaceChoiceButtonBaseClass,
-                      createAgentRoleName === role.name
-                        ? "border-border bg-accent/70"
-                        : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
-                    )}
-                  >
-                    <div className="text-[13px] font-medium text-foreground">
-                      {role.name}
-                    </div>
-                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                      {role.description}
-                    </p>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </WorkspaceDialogField>
-        <WorkspaceDialogField label="Display Name" hint="Optional">
-          <Input
-            value={createAgentName}
-            aria-label="Agent display name"
-            onChange={(event) => setCreateAgentName(event.target.value)}
-            placeholder="Docs Worker"
-            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-          />
-        </WorkspaceDialogField>
-      </WorkspaceCommandDialog>
+      />
 
-      <WorkspaceCommandDialog
+      <ConnectAgentsDialog
         open={activeDialog === "connect-agents"}
         onOpenChange={(open) => {
           if (!open) {
             setActiveDialog(null);
           }
         }}
-        title="Connect Agents"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setActiveDialog(null)}
-              disabled={pendingAction === "connect-agents"}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleConnectAgents()}
-              disabled={
-                !connectSourceId ||
-                !connectTargetId ||
-                connectSourceId === connectTargetId ||
-                pendingAction === "connect-agents"
-              }
-            >
-              {pendingAction === "connect-agents"
-                ? "Connecting..."
-                : "Create Connection"}
-            </Button>
-          </>
-        }
-      >
-        <WorkspaceDialogMeta>
-          {activeTab ? (
-            <>
-              Tab{" "}
-              <span className="font-semibold text-foreground">
-                {activeTab.title}
-              </span>{" "}
-              · {tabAgentOptions.length} agents available
-            </>
-          ) : (
-            "No active tab"
-          )}
-        </WorkspaceDialogMeta>
-        <WorkspaceDialogField label="Agent A" hint="First endpoint">
-          <Select
-            value={connectSourceId}
-            onValueChange={(value) => {
-              setConnectSourceId(value);
-              if (value === connectTargetId) {
-                const nextTarget =
-                  tabAgentOptions.find((agent) => agent.id !== value)?.id ?? "";
-                setConnectTargetId(nextTarget);
-              }
-            }}
-          >
-            <SelectTrigger
-              aria-label="Agent A"
-              className={cn(
-                "h-10 rounded-md data-[placeholder]:text-muted-foreground",
-                workspaceDialogInputClass,
-              )}
-            >
-              <SelectValue placeholder="Choose first agent" />
-            </SelectTrigger>
-            <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
-              {tabAgentOptions.map((agent) => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  {agent.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </WorkspaceDialogField>
-        <WorkspaceDialogField label="Agent B" hint="Second endpoint">
-          <Select value={connectTargetId} onValueChange={setConnectTargetId}>
-            <SelectTrigger
-              aria-label="Agent B"
-              className={cn(
-                "h-10 rounded-md data-[placeholder]:text-muted-foreground",
-                workspaceDialogInputClass,
-              )}
-            >
-              <SelectValue placeholder="Choose second agent" />
-            </SelectTrigger>
-            <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
-              {tabAgentOptions
-                .filter((agent) => agent.id !== connectSourceId)
-                .map((agent) => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.label}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </WorkspaceDialogField>
-      </WorkspaceCommandDialog>
+        pending={pendingAction === "connect-agents"}
+        activeTabTitle={activeTab?.title ?? null}
+        agentOptions={tabAgentOptions}
+        sourceId={connectSourceId}
+        targetId={connectTargetId}
+        onSourceChange={(value) => {
+          setConnectSourceId(value);
+          if (value === connectTargetId) {
+            const nextTarget =
+              tabAgentOptions.find((agent) => agent.id !== value)?.id ?? "";
+            setConnectTargetId(nextTarget);
+          }
+        }}
+        onTargetChange={setConnectTargetId}
+        onSubmit={() => void handleConnectAgents()}
+      />
 
-      <AlertDialog
+      <DeleteTabDialog
         open={Boolean(deleteTabTarget)}
         onOpenChange={(open) => {
           if (!open) {
             setDeleteTabTarget(null);
           }
         }}
-      >
-        <AlertDialogContent className="max-w-[30rem]">
-          <AlertDialogHeader className="gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-xl border border-border bg-accent/45 text-foreground shadow-xs">
-                <Trash2 className="size-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
-                  Destructive Action
-                </p>
-                <AlertDialogTitle className="mt-1 text-foreground">
-                  Delete tab?
-                </AlertDialogTitle>
-              </div>
-            </div>
-            <AlertDialogDescription className="text-muted-foreground">
-              {deleteTabTarget ? (
-                <>
-                  Remove{" "}
-                  <span className="font-semibold text-foreground">
-                    {deleteTabTarget.title}
-                  </span>{" "}
-                  and clean up its persisted agent network.
-                  {typeof deleteTabTarget.nodeCount === "number"
-                    ? ` ${deleteTabTarget.nodeCount} node${deleteTabTarget.nodeCount === 1 ? "" : "s"} will be removed with it.`
-                    : ""}
-                </>
-              ) : (
-                "This action cannot be undone."
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button
-                variant="destructive"
-                onClick={() => void handleDeleteTab()}
-                disabled={pendingAction === "delete-tab"}
-              >
-                {pendingAction === "delete-tab" ? "Deleting..." : "Delete Tab"}
-              </Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        pending={pendingAction === "delete-tab"}
+        target={deleteTabTarget}
+        onDelete={() => void handleDeleteTab()}
+      />
     </div>
   );
 }

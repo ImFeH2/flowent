@@ -22,6 +22,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  FilterPill,
+  MountToggle,
+  mcpEyebrowClass,
+  ReadonlyBlock,
+  SummaryCard,
+} from "@/components/mcp/McpPrimitives";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -228,18 +235,10 @@ function resultClassName(result: string) {
   }
 }
 
-const mcpEyebrowClass =
-  "text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80";
-const mcpMetricEyebrowClass =
-  "text-[11px] uppercase tracking-[0.16em] text-muted-foreground/80";
 const mcpPanelClass = "bg-card/20";
 const mcpPanelTextClass = "text-[13px] text-muted-foreground";
-const mcpMetricCardClass =
-  "rounded-xl border border-border bg-card/20 px-4 py-4";
 const mcpCardSurfaceClass =
   "rounded-xl border border-border bg-card/20 px-4 py-3";
-const mcpReadonlyBlockClass =
-  "min-h-[44px] whitespace-pre-wrap break-all rounded-xl border border-border bg-background/40 px-4 py-3 text-[12px] leading-6 text-foreground/80";
 const mcpCodeBlockClass =
   "mt-4 max-h-48 overflow-auto rounded-xl border border-border bg-background/55 p-3 text-[11px] text-foreground/70";
 const mcpOutlineButtonClass =
@@ -250,10 +249,6 @@ const mcpTagClass =
   "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]";
 const mcpInfoIconClass =
   "flex size-14 items-center justify-center rounded-xl border border-border bg-accent/20 text-muted-foreground";
-const mcpFilterPillBaseClass =
-  "inline-flex h-8 items-center rounded-full border px-3 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
-const mcpLineTabBaseClass =
-  "inline-flex h-8 -mb-px items-center border-b-2 px-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
 
 function capabilitySummary(record: MCPServerRecord) {
   const counts = record.snapshot.capability_counts;
@@ -556,111 +551,6 @@ function matchesServerFilter(
 
 function renderValueOrFallback(value: string, fallback = "Not set") {
   return value.trim() ? value : fallback;
-}
-
-function SummaryCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className={mcpMetricCardClass}>
-      <p className={mcpMetricEyebrowClass}>{label}</p>
-      <p className="mt-2 text-[26px] font-medium text-foreground">{value}</p>
-    </div>
-  );
-}
-
-function FilterPill({
-  active,
-  label,
-  onClick,
-  variant = "pill",
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  variant?: "pill" | "tab";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        variant === "pill" ? mcpFilterPillBaseClass : mcpLineTabBaseClass,
-        variant === "pill"
-          ? active
-            ? "border-border bg-card/30 text-foreground"
-            : "border-transparent bg-card/20 text-muted-foreground hover:bg-accent/25 hover:text-foreground"
-          : active
-            ? "border-primary text-foreground"
-            : "border-transparent text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {label}
-    </button>
-  );
-}
-
-function ReadonlyBlock({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <p className={mcpEyebrowClass}>{label}</p>
-      <pre
-        className={cn(mcpReadonlyBlockClass, mono && "font-mono text-[11px]")}
-      >
-        {value}
-      </pre>
-    </div>
-  );
-}
-
-function MountToggle({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange: (nextValue: boolean) => void;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex items-center justify-between gap-4 rounded-xl border border-border bg-card/20 px-4 py-3 text-sm",
-        disabled && "opacity-50",
-      )}
-    >
-      <span className="text-foreground/85">{label}</span>
-      <button
-        type="button"
-        disabled={disabled}
-        aria-pressed={checked}
-        className={cn(
-          "relative h-6 w-11 rounded-full border transition-colors",
-          checked
-            ? "border-graph-status-running/28 bg-graph-status-running/15"
-            : "border-border bg-accent/30",
-        )}
-        onClick={() => onChange(!checked)}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 size-4.5 rounded-full transition-transform",
-            checked
-              ? "translate-x-[22px] bg-graph-status-running text-background"
-              : "translate-x-0.5 bg-foreground/85",
-          )}
-        />
-      </button>
-    </label>
-  );
 }
 
 function ServerDialog({

@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { ModelParams } from "@/types";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -105,7 +106,7 @@ export function ModelParamsFields({
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Max Output Tokens</label>
-          <input
+          <Input
             type="number"
             min={1}
             step={1}
@@ -129,7 +130,7 @@ export function ModelParamsFields({
 
         <div className="space-y-2">
           <label className="text-sm font-medium">Temperature</label>
-          <input
+          <Input
             type="number"
             min={0}
             max={2}
@@ -154,7 +155,7 @@ export function ModelParamsFields({
 
         <div className="space-y-2 md:col-span-2">
           <label className="text-sm font-medium">Top P</label>
-          <input
+          <Input
             type="number"
             min={0.01}
             max={1}

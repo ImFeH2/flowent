@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { SecretInput, formHelpTextClass } from "@/components/form/FormControls";
+import { describe, expect, it, vi } from "vitest";
+import {
+  FormSwitch,
+  SecretInput,
+  formHelpTextClass,
+} from "@/components/form/FormControls";
 import { PageLoadingState } from "@/components/layout/PageLoadingState";
 
 describe("FormControls", () => {
@@ -39,5 +43,21 @@ describe("FormControls", () => {
     expect(screen.getByText("Loading shared UI...")).toHaveClass(
       "text-muted-foreground",
     );
+  });
+
+  it("toggles switches through the shared control", () => {
+    const handleChange = vi.fn();
+
+    render(
+      <FormSwitch
+        checked={false}
+        label="Network Access"
+        onCheckedChange={handleChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("switch", { name: "Network Access" }));
+
+    expect(handleChange).toHaveBeenCalledWith(true);
   });
 });

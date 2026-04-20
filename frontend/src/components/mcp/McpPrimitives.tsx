@@ -1,3 +1,5 @@
+import { FormSwitch } from "@/components/form/FormControls";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const mcpEyebrowClass =
@@ -41,8 +43,10 @@ export function FilterPill({
   variant?: "pill" | "tab";
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={onClick}
       className={cn(
         variant === "pill" ? mcpFilterPillBaseClass : mcpLineTabBaseClass,
@@ -56,7 +60,7 @@ export function FilterPill({
       )}
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -100,27 +104,13 @@ export function MountToggle({
       )}
     >
       <span className="text-foreground/85">{label}</span>
-      <button
-        type="button"
+      <FormSwitch
+        checked={checked}
         disabled={disabled}
-        aria-pressed={checked}
-        className={cn(
-          "relative h-6 w-11 rounded-full border transition-colors",
-          checked
-            ? "border-graph-status-running/28 bg-graph-status-running/15"
-            : "border-border bg-accent/30",
-        )}
-        onClick={() => onChange(!checked)}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 size-4.5 rounded-full transition-transform",
-            checked
-              ? "translate-x-[22px] bg-graph-status-running text-background"
-              : "translate-x-0.5 bg-foreground/85",
-          )}
-        />
-      </button>
+        label={label}
+        onCheckedChange={onChange}
+        className="h-6 w-11"
+      />
     </label>
   );
 }

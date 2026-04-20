@@ -48,8 +48,10 @@ export function ToolbarButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="xs"
       onClick={onClick}
       disabled={disabled}
       className={cn(
@@ -58,7 +60,7 @@ export function ToolbarButton({
       )}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -615,8 +617,10 @@ export function PanelToggleButton({
   const title = expanded ? "Hide panel" : "Show panel";
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon"
       onClick={onClick}
       title={title}
       aria-label={title}
@@ -632,7 +636,7 @@ export function PanelToggleButton({
           <PanelRightOpen className="size-4" />
         )}
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -642,15 +646,17 @@ function PanelActionButton({
   title,
 }: PanelActionButtonProps) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-xs"
       onClick={onClick}
       title={title}
       aria-label={title}
       className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-accent/45 hover:text-foreground"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 

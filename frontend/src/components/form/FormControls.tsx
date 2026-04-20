@@ -128,3 +128,66 @@ export function SecretInput({
     </div>
   );
 }
+
+interface FormSwitchProps {
+  checked: boolean;
+  className?: string;
+  disabled?: boolean;
+  label?: string;
+  offText?: string;
+  onCheckedChange: (nextValue: boolean) => void;
+  onText?: string;
+  showStateText?: boolean;
+}
+
+export function FormSwitch({
+  checked,
+  className,
+  disabled = false,
+  label,
+  offText = "OFF",
+  onCheckedChange,
+  onText = "ON",
+  showStateText = false,
+}: FormSwitchProps) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onCheckedChange(!checked)}
+      className={cn(
+        "relative inline-flex shrink-0 items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+        showStateText
+          ? "h-8 w-[72px] px-1"
+          : "h-5 w-9 justify-center border-2 border-transparent focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        checked
+          ? "border-graph-status-running/30 bg-graph-status-running/15"
+          : "border-border bg-accent/30",
+        className,
+      )}
+    >
+      {label ? <span className="sr-only">{label}</span> : null}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none inline-flex items-center justify-center rounded-full transition-all duration-200 ease-in-out",
+          showStateText
+            ? "h-6 w-6 text-[10px] font-semibold"
+            : "size-4 bg-background shadow-xs ring-0",
+          checked
+            ? showStateText
+              ? "translate-x-[40px] bg-graph-status-running text-background"
+              : "translate-x-2"
+            : showStateText
+              ? "translate-x-0 bg-foreground text-background"
+              : "-translate-x-2",
+        )}
+      >
+        {showStateText ? (checked ? onText : offText) : null}
+      </span>
+    </button>
+  );
+}

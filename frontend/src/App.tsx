@@ -15,6 +15,8 @@ import {
   ShellSurface,
 } from "@/components/layout/ShellBackground";
 import { PageLoadingState } from "@/components/layout/PageLoadingState";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
 import { AccessProvider } from "@/context/AccessContext";
@@ -170,8 +172,10 @@ function AppContent() {
         >
           {isCompactLayout ? (
             <>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 aria-label={
                   sidebarOpen ? "Close navigation" : "Open navigation"
                 }
@@ -186,9 +190,10 @@ function AppContent() {
                 ) : (
                   <PanelLeftOpen className="size-4" />
                 )}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
                 aria-label="Logout"
                 onClick={() => {
                   void logout();
@@ -200,7 +205,7 @@ function AppContent() {
               >
                 <LogOut className="size-3.5" />
                 Logout
-              </button>
+              </Button>
             </>
           ) : null}
           <AnimatePresence mode="wait">
@@ -294,7 +299,7 @@ function AccessGate() {
                 >
                   Access Code
                 </label>
-                <input
+                <Input
                   id="access-code"
                   type="password"
                   autoComplete="current-password"
@@ -323,8 +328,9 @@ function AccessGate() {
                 </p>
               )}
 
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 disabled={submitting || accessUnavailable}
                 onClick={() => void handleSubmit()}
                 className={accessButtonClass}
@@ -333,7 +339,7 @@ function AccessGate() {
                   <LoaderCircle className="size-4 animate-spin" />
                 ) : null}
                 {submitting ? "Verifying..." : "Unlock"}
-              </button>
+              </Button>
             </div>
           </div>
         </ShellSurface>

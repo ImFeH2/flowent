@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
+import { FormTextarea } from "@/components/form/FormControls";
 import { PageScaffold } from "@/components/layout/PageScaffold";
 import { PageLoadingState } from "@/components/layout/PageLoadingState";
 import { Button } from "@/components/ui/button";
@@ -89,12 +90,13 @@ export function PromptsPage() {
               </p>
             </div>
             <div className={promptEditorSurfaceClass}>
-              <textarea
+              <FormTextarea
                 aria-label="Custom Prompt"
                 value={customPrompt}
                 onChange={(event) => setCustomPrompt(event.target.value)}
                 placeholder="Add a custom prompt appended to every agent's system prompt..."
                 className={promptEditorTextareaClass}
+                mono
               />
             </div>
           </div>
@@ -113,12 +115,13 @@ export function PromptsPage() {
               </p>
             </div>
             <div className={promptEditorSurfaceClass}>
-              <textarea
+              <FormTextarea
                 aria-label="Custom Post Prompt"
                 value={customPostPrompt}
                 onChange={(event) => setCustomPostPrompt(event.target.value)}
                 placeholder="Add custom runtime instructions appended after the built-in post prompt..."
                 className={promptEditorTextareaClass}
+                mono
               />
             </div>
           </div>

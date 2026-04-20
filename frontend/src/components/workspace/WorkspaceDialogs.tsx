@@ -26,6 +26,7 @@ import {
   WorkspaceDialogField,
   WorkspaceDialogMeta,
 } from "@/components/WorkspaceCommandDialog";
+import { FormSwitch } from "@/components/form/FormControls";
 
 const workspaceDialogInputClass =
   "bg-background/40 text-foreground shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50";
@@ -147,8 +148,9 @@ export function CreateTabDialog({
             </div>
           ) : null}
           <div className={workspaceChoiceListClass}>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => onBlueprintIdChange("")}
               className={cn(
                 workspaceChoiceButtonBaseClass,
@@ -164,7 +166,7 @@ export function CreateTabDialog({
                 Create a tab with only its bound Leader. Permissions do not
                 inherit from a blueprint.
               </p>
-            </button>
+            </Button>
             {loadingBlueprints ? (
               <p className="px-2 py-3 text-[12px] text-muted-foreground">
                 Loading blueprints...
@@ -175,9 +177,10 @@ export function CreateTabDialog({
               </p>
             ) : (
               filteredBlueprints.map((blueprint) => (
-                <button
+                <Button
                   key={blueprint.id}
                   type="button"
+                  variant="ghost"
                   onClick={() => onBlueprintIdChange(blueprint.id)}
                   className={cn(
                     workspaceChoiceButtonBaseClass,
@@ -200,7 +203,7 @@ export function CreateTabDialog({
                   <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
                     {blueprint.node_count} nodes · {blueprint.edge_count} edges
                   </p>
-                </button>
+                </Button>
               ))
             )}
           </div>
@@ -215,25 +218,11 @@ export function CreateTabDialog({
         label="Network Access"
         hint="Allow the leader to connect to the internet"
       >
-        <button
-          type="button"
-          role="switch"
-          aria-checked={allowNetwork}
-          onClick={() => onAllowNetworkChange(!allowNetwork)}
-          className={cn(
-            "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            allowNetwork ? "bg-primary" : "bg-muted/80",
-          )}
-        >
-          <span className="sr-only">Network Access</span>
-          <span
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none inline-block size-4 transform rounded-full bg-background shadow-xs ring-0 transition duration-200 ease-in-out",
-              allowNetwork ? "translate-x-4" : "translate-x-0",
-            )}
-          />
-        </button>
+        <FormSwitch
+          checked={allowNetwork}
+          label="Network Access"
+          onCheckedChange={onAllowNetworkChange}
+        />
       </WorkspaceDialogField>
       <WorkspaceDialogField
         label="Write Dirs"
@@ -417,9 +406,10 @@ export function CreateAgentDialog({
               </p>
             ) : (
               filteredRoles.map((role) => (
-                <button
+                <Button
                   key={role.name}
                   type="button"
+                  variant="ghost"
                   onClick={() => onRoleNameChange(role.name)}
                   className={cn(
                     workspaceChoiceButtonBaseClass,
@@ -434,7 +424,7 @@ export function CreateAgentDialog({
                   <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                     {role.description}
                   </p>
-                </button>
+                </Button>
               ))
             )}
           </div>

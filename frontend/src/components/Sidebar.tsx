@@ -8,6 +8,7 @@ import { useAccess } from "@/context/useAccess";
 import { usePanelDrag } from "@/hooks/usePanelDrag";
 import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
+import { Button } from "@/components/ui/button";
 import {
   BookCopy,
   LayoutDashboard,
@@ -116,9 +117,10 @@ export function Sidebar({
 
         <nav className="min-h-0 flex-1 space-y-0.5 px-3 py-2 overflow-y-auto scrollbar-none">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-            <button
+            <Button
               key={id}
               type="button"
+              variant="ghost"
               onClick={() => navigate(id)}
               className={cn(
                 "group flex w-full items-center gap-3 rounded-md px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
@@ -138,13 +140,14 @@ export function Sidebar({
               <span className="block truncate text-[13px] font-medium tracking-wide">
                 {label}
               </span>
-            </button>
+            </Button>
           ))}
         </nav>
 
         <div className="shrink-0 border-t border-sidebar-border bg-sidebar/80 px-4 py-3">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => {
               void logout();
             }}
@@ -152,7 +155,7 @@ export function Sidebar({
           >
             <span>Logout</span>
             <LogOut className="size-3.5" />
-          </button>
+          </Button>
           <SidebarActivityTicker width={width} />
         </div>
       </div>

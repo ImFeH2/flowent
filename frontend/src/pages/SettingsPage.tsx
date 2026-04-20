@@ -4,11 +4,11 @@ import { Save } from "lucide-react";
 import { toast } from "sonner";
 import {
   FormInput,
+  FormSwitch,
+  FormTextarea,
   SecretInput,
   formHelpTextClass,
-  formInputClass,
   formLabelClass,
-  formMonoInputClass,
   formSelectTriggerClass,
 } from "@/components/form/FormControls";
 import { fetchSettingsBootstrap, saveSettings } from "@/lib/api";
@@ -449,38 +449,20 @@ export function SettingsPage() {
                 description="Hard network permission boundary"
               >
                 <div className="space-y-2">
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={settings.assistant.allow_network}
-                    aria-label="Network Access"
-                    onClick={() =>
+                  <FormSwitch
+                    checked={settings.assistant.allow_network}
+                    label="Network Access"
+                    onCheckedChange={(nextValue) =>
                       setLocalSettings({
                         ...settings,
                         assistant: {
                           ...settings.assistant,
-                          allow_network: !settings.assistant.allow_network,
+                          allow_network: nextValue,
                         },
                       })
                     }
-                    className={cn(
-                      "inline-flex h-8 w-[72px] items-center rounded-full border px-1 transition-colors",
-                      settings.assistant.allow_network
-                        ? "border-graph-status-running/30 bg-graph-status-running/15"
-                        : "border-border bg-accent/30",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold transition-all",
-                        settings.assistant.allow_network
-                          ? "translate-x-[40px] bg-graph-status-running text-background"
-                          : "translate-x-0 bg-foreground text-background",
-                      )}
-                    >
-                      {settings.assistant.allow_network ? "ON" : "OFF"}
-                    </span>
-                  </button>
+                    showStateText
+                  />
                   <p className={formHelpTextClass}>
                     When disabled, the Assistant cannot make networked tool
                     calls even if its role still includes network-capable tools.
@@ -493,7 +475,7 @@ export function SettingsPage() {
                 description="Writable directory boundaries"
               >
                 <div className="space-y-2">
-                  <textarea
+                  <FormTextarea
                     aria-label="Write Dirs"
                     value={settings.assistant.write_dirs.join("\n")}
                     onChange={(e) =>
@@ -508,7 +490,8 @@ export function SettingsPage() {
                     rows={4}
                     spellCheck={false}
                     placeholder="/workspace/output"
-                    className={`min-h-[108px] ${formMonoInputClass}`}
+                    className="min-h-[108px]"
+                    mono
                   />
                   <p className={formHelpTextClass}>
                     One directory per line. Empty lines are ignored. These paths
@@ -616,15 +599,13 @@ export function SettingsPage() {
                         <label className={formLabelClass}>
                           Provider Models
                         </label>
-                        <input
+                        <FormInput
                           aria-label="Search Provider Models"
-                          type="text"
                           value={providerModelQuery}
                           onChange={(event) =>
                             setProviderModelQuery(event.target.value)
                           }
                           placeholder="Search provider models"
-                          className={formInputClass}
                         />
                         <Select
                           value={
@@ -670,8 +651,7 @@ export function SettingsPage() {
                     )
                   ) : null}
 
-                  <input
-                    type="text"
+                  <FormInput
                     value={settings.model.active_model}
                     onChange={(e) =>
                       setLocalSettings({
@@ -687,7 +667,6 @@ export function SettingsPage() {
                         ? "Enter model ID manually"
                         : "Select a provider first"
                     }
-                    className="w-full rounded-md border border-input bg-background/50 px-3 py-2 text-sm text-foreground shadow-xs transition-[border-color,background-color,box-shadow] placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-[3px] focus:ring-ring/50"
                   />
                 </div>
                 {settings.model.active_model ? (
@@ -726,10 +705,9 @@ export function SettingsPage() {
                         Context Window
                       </label>
                       <div className="flex items-center gap-2">
-                        <input
+                        <FormInput
                           id="model-context-window"
                           aria-label="Context Window"
-                          type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           value={
@@ -759,7 +737,7 @@ export function SettingsPage() {
                             });
                           }}
                           placeholder="Auto"
-                          className={formMonoInputClass}
+                          mono
                         />
                         <span className="text-[13px] font-medium text-muted-foreground">
                           tokens
@@ -867,9 +845,8 @@ export function SettingsPage() {
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <input
+                    <FormInput
                       aria-label="Request Timeout"
-                      type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
                       value={String(settings.model.timeout_ms)}
@@ -890,7 +867,7 @@ export function SettingsPage() {
                           },
                         });
                       }}
-                      className={formMonoInputClass}
+                      mono
                     />
                     <span className="text-[13px] font-medium text-muted-foreground">
                       ms
@@ -941,10 +918,9 @@ export function SettingsPage() {
                         >
                           Retry Attempts
                         </label>
-                        <input
+                        <FormInput
                           id="retry-attempts"
                           aria-label="Retry Attempts"
-                          type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           value={String(settings.model.max_retries)}
@@ -965,7 +941,7 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className={formMonoInputClass}
+                          mono
                         />
                       </div>
                     </div>
@@ -994,10 +970,9 @@ export function SettingsPage() {
                         Initial Delay
                       </label>
                       <div className="flex items-center gap-2">
-                        <input
+                        <FormInput
                           id="retry-initial-delay"
                           aria-label="Initial Delay"
-                          type="text"
                           inputMode="decimal"
                           value={String(
                             settings.model.retry_initial_delay_seconds,
@@ -1019,7 +994,7 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className={formMonoInputClass}
+                          mono
                         />
                         <span className="text-[13px] font-medium text-muted-foreground">
                           s
@@ -1035,10 +1010,9 @@ export function SettingsPage() {
                         Max Delay
                       </label>
                       <div className="flex items-center gap-2">
-                        <input
+                        <FormInput
                           id="retry-max-delay"
                           aria-label="Max Delay"
-                          type="text"
                           inputMode="decimal"
                           value={String(settings.model.retry_max_delay_seconds)}
                           onChange={(e) => {
@@ -1058,7 +1032,7 @@ export function SettingsPage() {
                               },
                             });
                           }}
-                          className={formMonoInputClass}
+                          mono
                         />
                         <span className="text-[13px] font-medium text-muted-foreground">
                           s
@@ -1073,10 +1047,9 @@ export function SettingsPage() {
                       >
                         Cap Retries
                       </label>
-                      <input
+                      <FormInput
                         id="retry-backoff-cap-retries"
                         aria-label="Cap Retries"
-                        type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
                         value={String(settings.model.retry_backoff_cap_retries)}
@@ -1097,7 +1070,7 @@ export function SettingsPage() {
                             },
                           });
                         }}
-                        className={formMonoInputClass}
+                        mono
                       />
                     </div>
                   </div>
@@ -1122,10 +1095,9 @@ export function SettingsPage() {
                       Token Limit
                     </label>
                     <div className="flex items-center gap-2">
-                      <input
+                      <FormInput
                         id="auto-compact-token-limit"
                         aria-label="Automatic Compact Token Limit"
-                        type="text"
                         inputMode="numeric"
                         pattern="[0-9]*"
                         value={
@@ -1155,7 +1127,7 @@ export function SettingsPage() {
                           });
                         }}
                         placeholder="Disabled"
-                        className={formMonoInputClass}
+                        mono
                       />
                       <span className="text-[13px] font-medium text-muted-foreground">
                         tokens

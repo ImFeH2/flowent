@@ -522,8 +522,10 @@ export function RolesPage() {
 
               <div className="space-y-6">
                 <div className="flex flex-wrap gap-3">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(false)}
                     className={cn(
@@ -535,9 +537,11 @@ export function RolesPage() {
                     )}
                   >
                     Use Settings Default
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     disabled={isReadOnly}
                     onClick={() => handleModelModeChange(true)}
                     className={cn(
@@ -549,7 +553,7 @@ export function RolesPage() {
                     )}
                   >
                     Set Role Override
-                  </button>
+                  </Button>
                 </div>
 
                 {draft.model ? (
@@ -696,8 +700,10 @@ export function RolesPage() {
 
               <div className="space-y-6">
                 <div className="flex flex-wrap gap-3">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(false)}
                     className={cn(
@@ -709,9 +715,11 @@ export function RolesPage() {
                     )}
                   >
                     Use Settings Default
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     disabled={isReadOnly}
                     onClick={() => handleModelParamsModeChange(true)}
                     className={cn(
@@ -723,7 +731,7 @@ export function RolesPage() {
                     )}
                   >
                     Set Parameter Overrides
-                  </button>
+                  </Button>
                 </div>
 
                 {!isEmptyModelParams(draft.model_params) ? (
@@ -774,8 +782,10 @@ export function RolesPage() {
                           {tool.description}
                         </p>
                       </div>
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => cycleToolState(tool.name)}
                         disabled={isReadOnly || lockBuiltinFields}
                         className={cn(
@@ -795,7 +805,7 @@ export function RolesPage() {
                           : state === "included"
                             ? "Included"
                             : "Excluded"}
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
@@ -975,15 +985,14 @@ export function RolesPage() {
                         <Edit2 className="size-3.5" />
                       </FormIconButton>
                       {!role.is_builtin && (
-                        <button
-                          type="button"
+                        <FormIconButton
                           onClick={() => setRoleToDelete(role)}
                           aria-label={`Delete ${role.name}`}
                           title={`Delete ${role.name}`}
                           className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Trash2 className="size-3.5" />
-                        </button>
+                        </FormIconButton>
                       )}
                     </div>
                   </motion.div>

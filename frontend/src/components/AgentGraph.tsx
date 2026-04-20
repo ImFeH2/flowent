@@ -29,6 +29,8 @@ import { AgentNode } from "@/components/AgentNode";
 import { AgentTooltip } from "@/components/AgentTooltip";
 import { ContextMenu, type ContextMenuEntry } from "@/components/ContextMenu";
 import { ViewportPortal } from "@/components/ViewportPortal";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { AGENT_NODE_HEIGHT, getAgentNodeWidth } from "@/lib/layout";
 import { cn, formatZoomPercentage } from "@/lib/utils";
 import {
@@ -1705,17 +1707,19 @@ function GraphQuickCreatePopover({
               Choose a role and optionally set a display name.
             </p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             className="flex h-8 items-center rounded-md px-2.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
           >
             Close
-          </button>
+          </Button>
         </div>
 
         <div className="mt-4 space-y-3">
-          <input
+          <Input
             aria-label="Search roles"
             autoFocus
             value={roleQuery}
@@ -1734,9 +1738,10 @@ function GraphQuickCreatePopover({
               </p>
             ) : (
               filteredRoles.map((role) => (
-                <button
+                <Button
                   key={role.name}
                   type="button"
+                  variant="ghost"
                   onClick={() => onSelectRole(role.name)}
                   className={cn(
                     quickCreateButtonClass,
@@ -1751,11 +1756,11 @@ function GraphQuickCreatePopover({
                   <div className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                     {role.description}
                   </div>
-                </button>
+                </Button>
               ))
             )}
           </div>
-          <input
+          <Input
             aria-label="Display Name"
             value={displayName}
             onChange={(event) => onDisplayNameChange(event.target.value)}
@@ -1765,21 +1770,24 @@ function GraphQuickCreatePopover({
         </div>
 
         <div className="mt-4 flex items-center justify-end gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             className="flex h-8 items-center rounded-md px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent/35 hover:text-foreground"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             disabled={!selectedRoleName || submitting}
             onClick={onSubmit}
             className="flex h-8 items-center rounded-md bg-primary px-3.5 text-[12px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Saving..." : title}
-          </button>
+          </Button>
         </div>
       </div>
     </ViewportPortal>

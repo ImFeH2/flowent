@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -18,7 +17,6 @@ from app.runtime import bootstrap_runtime, shutdown_runtime
 
 config = Config()
 setup_logging(config)
-session_secret = config.SESSION_SECRET or secrets.token_urlsafe(32)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -59,6 +57,16 @@ async def lifespan(app: FastAPI):
 
 
 def create_app(*, serve_frontend: bool = True) -> FastAPI:
+    from app.access import ensure_session_signing_secret
+    from app.settings import get_settings, save_settings
+
+    settings = get_settings()
+    if ensure_session_signing_secret(settings):
+        save_settings(settings)
+    session_secret = (
+        config.SESSION_SECRET.strip() or settings.access.session_signing_secret
+    )
+
     app = FastAPI(
         title=config.APP_NAME,
         debug=config.DEBUG,

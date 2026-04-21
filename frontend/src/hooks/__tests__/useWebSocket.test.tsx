@@ -192,4 +192,43 @@ describe("useWebSocket", () => {
       expect(MockWebSocket.instances).toHaveLength(2);
     },
   );
+
+  it("keeps the shell in reconnect flow for normal backend disconnects", () => {
+    const { result } = renderHook(() =>
+      useWebSocket({
+        onDisplayEvent: vi.fn(),
+        onUpdateEvent: vi.fn(),
+      }),
+    );
+
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+
+    act(() => {
+      for (const instance of MockWebSocket.instances) {
+        instance.emitOpen();
+      }
+    });
+
+    expect(result.current.connected).toBe(true);
+
+    act(() => {
+      MockWebSocket.instances[0]?.emitClose({
+        code: 1012,
+        reason: "Service restart",
+      });
+    });
+
+    expect(result.current.connected).toBe(false);
+    expect(dispatchAccessDeniedEventMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.runOnlyPendingTimers();
+      vi.runOnlyPendingTimers();
+    });
+
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
 });

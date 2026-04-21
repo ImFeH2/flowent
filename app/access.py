@@ -30,7 +30,7 @@ ACCESS_PUBLIC_PATHS = frozenset(
 @dataclass
 class _AccessRuntimeState:
     bootstrap_generated: bool = False
-    live_signature: tuple[bool, int] | None = None
+    live_signature: tuple[bool, int, str] | None = None
 
 
 _runtime_state = _AccessRuntimeState()
@@ -57,10 +57,12 @@ def is_access_configured(access: AccessSettings) -> bool:
 def set_access_code(settings: Settings, code: str) -> None:
     salt = secrets.token_hex(16)
     current_generation = settings.access.session_generation
+    session_signing_secret = settings.access.session_signing_secret
     settings.access = AccessSettings(
         code_hash=_hash_access_code(code, salt),
         code_salt=salt,
         session_generation=1 if current_generation <= 0 else current_generation + 1,
+        session_signing_secret=session_signing_secret,
     )
     with _runtime_lock:
         _runtime_state.bootstrap_generated = False
@@ -73,7 +75,10 @@ def clear_access_code(settings: Settings) -> bool:
         if settings.access.session_generation <= 0
         else settings.access.session_generation + 1
     )
-    settings.access = AccessSettings(session_generation=next_generation)
+    settings.access = AccessSettings(
+        session_generation=next_generation,
+        session_signing_secret=settings.access.session_signing_secret,
+    )
     with _runtime_lock:
         _runtime_state.bootstrap_generated = False
     return was_configured
@@ -97,6 +102,13 @@ def ensure_access_bootstrap(settings: Settings) -> str | None:
     return generated_code
 
 
+def ensure_session_signing_secret(settings: Settings) -> bool:
+    if settings.access.session_signing_secret.strip():
+        return False
+    settings.access.session_signing_secret = secrets.token_urlsafe(32)
+    return True
+
+
 def _read_live_access_settings() -> AccessSettings:
     from app.settings import _SETTINGS_FILE, _read_settings_file
 
@@ -114,8 +126,12 @@ def _read_live_access_settings() -> AccessSettings:
     return get_settings().access
 
 
-def _build_live_signature(access: AccessSettings) -> tuple[bool, int]:
-    return (is_access_configured(access), access.session_generation)
+def _build_live_signature(access: AccessSettings) -> tuple[bool, int, str]:
+    return (
+        is_access_configured(access),
+        access.session_generation,
+        access.session_signing_secret,
+    )
 
 
 def initialize_live_access_signature() -> None:
@@ -216,6 +232,7 @@ __all__ = [
     "build_access_state_payload",
     "clear_access_code",
     "ensure_access_bootstrap",
+    "ensure_session_signing_secret",
     "initialize_live_access_signature",
     "is_access_configured",
     "is_authenticated_session",

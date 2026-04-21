@@ -205,6 +205,7 @@ class AccessSettings:
     code_hash: str = ""
     code_salt: str = ""
     session_generation: int = 0
+    session_signing_secret: str = ""
 
 
 @dataclass
@@ -1741,15 +1742,26 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
     raw_access_code_hash = access_data.get("code_hash", "")
     raw_access_code_salt = access_data.get("code_salt", "")
     raw_access_session_generation = access_data.get("session_generation", 0)
+    raw_access_session_signing_secret = access_data.get("session_signing_secret", "")
     access_code_hash = (
         raw_access_code_hash.strip() if isinstance(raw_access_code_hash, str) else ""
     )
     access_code_salt = (
         raw_access_code_salt.strip() if isinstance(raw_access_code_salt, str) else ""
     )
+    access_session_signing_secret = (
+        raw_access_session_signing_secret.strip()
+        if isinstance(raw_access_session_signing_secret, str)
+        else ""
+    )
     if raw_access_code_hash is not None and not isinstance(raw_access_code_hash, str):
         migrated = True
     if raw_access_code_salt is not None and not isinstance(raw_access_code_salt, str):
+        migrated = True
+    if raw_access_session_signing_secret is not None and not isinstance(
+        raw_access_session_signing_secret,
+        str,
+    ):
         migrated = True
     if isinstance(raw_access_session_generation, bool) or not isinstance(
         raw_access_session_generation,
@@ -1771,6 +1783,7 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         code_hash=access_code_hash,
         code_salt=access_code_salt,
         session_generation=access_session_generation,
+        session_signing_secret=access_session_signing_secret,
     )
 
     assistant_data = data.get("assistant", {})
@@ -2177,6 +2190,14 @@ def _preserve_newer_live_access(settings: Settings) -> None:
         return
     if live_settings.access.session_generation > settings.access.session_generation:
         settings.access = live_settings.access
+        return
+    if (
+        live_settings.access.session_signing_secret.strip()
+        and not settings.access.session_signing_secret.strip()
+    ):
+        settings.access.session_signing_secret = (
+            live_settings.access.session_signing_secret
+        )
 
 
 def load_settings() -> Settings:

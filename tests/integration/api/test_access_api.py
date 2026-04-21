@@ -56,6 +56,64 @@ def test_access_login_and_logout_flow(monkeypatch, tmp_path):
     assert denied_response.status_code == 401
 
 
+def test_admin_session_survives_backend_restart(monkeypatch, tmp_path):
+    import app.settings as settings_module
+
+    with _create_client(monkeypatch, tmp_path, configured=True) as client:
+        login_response = client.post(
+            "/api/access/login",
+            json={"code": "TEST-ACCESS-CODE"},
+        )
+        session_cookie = client.cookies.get("autopoe_admin_session")
+
+    assert login_response.status_code == 200
+    assert session_cookie
+    persisted_settings, _ = settings_module._read_settings_file()
+    assert persisted_settings.access.session_signing_secret
+
+    with _create_client(monkeypatch, tmp_path, configured=True) as restarted_client:
+        restarted_client.cookies.set("autopoe_admin_session", session_cookie)
+        access_state = restarted_client.get("/api/access/state")
+        protected_response = restarted_client.get("/api/settings/bootstrap")
+
+    assert access_state.status_code == 200
+    assert access_state.json()["authenticated"] is True
+    assert protected_response.status_code == 200
+
+
+def test_access_code_rotation_invalidates_existing_admin_session(
+    monkeypatch,
+    tmp_path,
+):
+    import app.settings as settings_module
+    from app.access import set_access_code
+
+    with _create_client(monkeypatch, tmp_path, configured=True) as client:
+        login_response = client.post(
+            "/api/access/login",
+            json={"code": "TEST-ACCESS-CODE"},
+        )
+        session_cookie = client.cookies.get("autopoe_admin_session")
+
+    assert login_response.status_code == 200
+    assert session_cookie
+
+    rotated_settings = settings_module.get_settings()
+    set_access_code(rotated_settings, "NEW-ACCESS-CODE")
+    settings_module.save_settings(rotated_settings)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    with TestClient(create_app()) as restarted_client:
+        restarted_client.cookies.set("autopoe_admin_session", session_cookie)
+        access_state = restarted_client.get("/api/access/state")
+        protected_response = restarted_client.get("/api/settings/bootstrap")
+
+    assert access_state.status_code == 200
+    assert access_state.json()["authenticated"] is False
+    assert protected_response.status_code == 401
+    assert protected_response.json() == {"detail": "Access denied"}
+
+
 def test_websocket_requires_admin_session(monkeypatch, tmp_path):
     with _create_client(monkeypatch, tmp_path, configured=True) as client:
         with pytest.raises(WebSocketDisconnect), client.websocket_connect("/ws/events"):

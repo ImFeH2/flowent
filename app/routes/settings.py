@@ -10,35 +10,19 @@ from pydantic import BaseModel, ConfigDict
 from app.access import initialize_live_access_signature, set_access_code
 from app.events import event_bus
 from app.settings import (
-    AssistantSettings,
-    EventLogSettings,
-    LeaderSettings,
-    ModelSettings,
     TelegramApprovedChat,
     TelegramSettings,
-    build_assistant_allow_network,
-    build_assistant_write_dirs,
-    build_default_model_params,
-    build_model_auto_compact_token_limit,
-    build_model_context_window_tokens,
-    build_model_input_image,
-    build_model_max_retries,
-    build_model_output_image,
-    build_model_params_from_mapping,
-    build_model_retry_backoff_cap_retries,
-    build_model_retry_initial_delay_seconds,
-    build_model_retry_max_delay_seconds,
-    build_model_retry_policy,
-    build_model_timeout_ms,
-    build_working_dir,
-    find_role,
     get_settings,
     save_settings,
     serialize_provider,
     serialize_role,
     serialize_settings,
     serialize_telegram_settings,
-    validate_model_retry_backoff_settings,
+)
+from app.settings_management import (
+    MISSING,
+    apply_resolved_settings_update,
+    resolve_settings_update,
 )
 
 router = APIRouter()
@@ -87,7 +71,6 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
     current = deepcopy(source_settings)
     next_access_code: str | None = None
     reauth_required = False
-    next_working_dir = current.working_dir
 
     if req.access is not None:
         raw_new_code = req.access.get("new_code", "")
@@ -116,13 +99,9 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                 )
             next_access_code = new_code
 
-    if req.working_dir is not None:
-        try:
-            next_working_dir = build_working_dir(req.working_dir)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        current.working_dir = next_working_dir
-
+    assistant_role_name: str | None = None
+    assistant_allow_network: object = MISSING
+    assistant_write_dirs: object = MISSING
     if req.assistant is not None:
         assistant_unknown_fields = sorted(
             set(req.assistant) - {"role_name", "allow_network", "write_dirs"}
@@ -134,167 +113,96 @@ async def update_settings(req: UpdateSettingsRequest) -> dict[str, object]:
                     "Unknown assistant fields: " + ", ".join(assistant_unknown_fields)
                 ),
             )
-        role_name = req.assistant.get("role_name", current.assistant.role_name)
-        next_role_name = (
-            role_name if isinstance(role_name, str) else current.assistant.role_name
-        ).strip()
-        if not next_role_name:
-            next_role_name = current.assistant.role_name
-        if find_role(current, next_role_name) is None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Role '{next_role_name}' not found",
-            )
-        next_allow_network = current.assistant.allow_network
         if "allow_network" in req.assistant:
-            try:
-                next_allow_network = build_assistant_allow_network(
-                    req.assistant.get("allow_network")
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        next_write_dirs = list(current.assistant.write_dirs)
+            assistant_allow_network = req.assistant.get("allow_network")
         if "write_dirs" in req.assistant:
-            try:
-                next_write_dirs = build_assistant_write_dirs(
-                    req.assistant.get("write_dirs"),
-                    base_dir=next_working_dir,
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        current.assistant = AssistantSettings(
-            role_name=next_role_name,
-            allow_network=next_allow_network,
-            write_dirs=next_write_dirs,
-        )
+            assistant_write_dirs = req.assistant.get("write_dirs")
+        raw_role_name = req.assistant.get("role_name")
+        if isinstance(raw_role_name, str) and raw_role_name.strip():
+            assistant_role_name = raw_role_name
 
+    leader_role_name: str | None = None
     if req.leader is not None:
-        role_name = req.leader.get("role_name", current.leader.role_name)
-        next_role_name = (
-            role_name if isinstance(role_name, str) else current.leader.role_name
-        ).strip()
-        if not next_role_name:
-            next_role_name = current.leader.role_name
-        if find_role(current, next_role_name) is None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Role '{next_role_name}' not found",
-            )
-        current.leader = LeaderSettings(role_name=next_role_name)
+        raw_role_name = req.leader.get("role_name")
+        if isinstance(raw_role_name, str) and raw_role_name.strip():
+            leader_role_name = raw_role_name
 
+    timestamp_format: str | None = None
     if req.event_log is not None:
-        timestamp_format = req.event_log.get("timestamp_format")
-        if isinstance(timestamp_format, str):
-            current.event_log = EventLogSettings(timestamp_format=timestamp_format)
+        raw_timestamp_format = req.event_log.get("timestamp_format")
+        if isinstance(raw_timestamp_format, str):
+            timestamp_format = raw_timestamp_format
 
+    active_provider_id: str | None = None
+    active_model: str | None = None
+    context_window_tokens: object = MISSING
+    input_image: object = MISSING
+    output_image: object = MISSING
+    timeout_ms: object = MISSING
+    retry_policy: object = MISSING
+    max_retries: object = MISSING
+    retry_initial_delay_seconds: object = MISSING
+    retry_max_delay_seconds: object = MISSING
+    retry_backoff_cap_retries: object = MISSING
+    auto_compact_token_limit: object = MISSING
+    model_params: object = MISSING
     if req.model is not None:
-        active_provider_id = req.model.get(
-            "active_provider_id", current.model.active_provider_id
-        )
-        active_model = req.model.get("active_model", current.model.active_model)
-        params = current.model.params
-        timeout_ms = current.model.timeout_ms
-        retry_policy = current.model.retry_policy
-        max_retries = current.model.max_retries
-        retry_initial_delay_seconds = current.model.retry_initial_delay_seconds
-        retry_max_delay_seconds = current.model.retry_max_delay_seconds
-        retry_backoff_cap_retries = current.model.retry_backoff_cap_retries
-        input_image = current.model.input_image
-        output_image = current.model.output_image
-        context_window_tokens = current.model.context_window_tokens
-        auto_compact_token_limit = current.model.auto_compact_token_limit
-        if "params" in req.model:
-            try:
-                parsed_params = build_model_params_from_mapping(req.model.get("params"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-            params = parsed_params or build_default_model_params()
-        if "timeout_ms" in req.model:
-            try:
-                timeout_ms = build_model_timeout_ms(req.model.get("timeout_ms"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "retry_policy" in req.model:
-            try:
-                retry_policy = build_model_retry_policy(req.model.get("retry_policy"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "max_retries" in req.model:
-            try:
-                max_retries = build_model_max_retries(req.model.get("max_retries"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "retry_initial_delay_seconds" in req.model:
-            try:
-                retry_initial_delay_seconds = build_model_retry_initial_delay_seconds(
-                    req.model.get("retry_initial_delay_seconds")
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "retry_max_delay_seconds" in req.model:
-            try:
-                retry_max_delay_seconds = build_model_retry_max_delay_seconds(
-                    req.model.get("retry_max_delay_seconds")
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "retry_backoff_cap_retries" in req.model:
-            try:
-                retry_backoff_cap_retries = build_model_retry_backoff_cap_retries(
-                    req.model.get("retry_backoff_cap_retries")
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "input_image" in req.model:
-            try:
-                input_image = build_model_input_image(req.model.get("input_image"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        if "output_image" in req.model:
-            try:
-                output_image = build_model_output_image(req.model.get("output_image"))
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raw_active_provider_id = req.model.get("active_provider_id")
+        if isinstance(raw_active_provider_id, str):
+            active_provider_id = raw_active_provider_id
+        raw_active_model = req.model.get("active_model")
+        if isinstance(raw_active_model, str):
+            active_model = raw_active_model
         if "context_window_tokens" in req.model:
-            try:
-                context_window_tokens = build_model_context_window_tokens(
-                    req.model.get("context_window_tokens")
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            context_window_tokens = req.model.get("context_window_tokens")
+        if "input_image" in req.model:
+            input_image = req.model.get("input_image")
+        if "output_image" in req.model:
+            output_image = req.model.get("output_image")
+        if "timeout_ms" in req.model:
+            timeout_ms = req.model.get("timeout_ms")
+        if "retry_policy" in req.model:
+            retry_policy = req.model.get("retry_policy")
+        if "max_retries" in req.model:
+            max_retries = req.model.get("max_retries")
+        if "retry_initial_delay_seconds" in req.model:
+            retry_initial_delay_seconds = req.model.get("retry_initial_delay_seconds")
+        if "retry_max_delay_seconds" in req.model:
+            retry_max_delay_seconds = req.model.get("retry_max_delay_seconds")
+        if "retry_backoff_cap_retries" in req.model:
+            retry_backoff_cap_retries = req.model.get("retry_backoff_cap_retries")
         if "auto_compact_token_limit" in req.model:
-            try:
-                auto_compact_token_limit = build_model_auto_compact_token_limit(
-                    req.model.get("auto_compact_token_limit")
-                )
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
-        try:
-            validate_model_retry_backoff_settings(
-                retry_initial_delay_seconds=retry_initial_delay_seconds,
-                retry_max_delay_seconds=retry_max_delay_seconds,
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        current.model = ModelSettings(
-            active_provider_id=active_provider_id
-            if isinstance(active_provider_id, str)
-            else current.model.active_provider_id,
-            active_model=active_model
-            if isinstance(active_model, str)
-            else current.model.active_model,
+            auto_compact_token_limit = req.model.get("auto_compact_token_limit")
+        if "params" in req.model:
+            model_params = req.model.get("params")
+
+    try:
+        resolved = resolve_settings_update(
+            current,
+            working_dir=req.working_dir,
+            assistant_role_name=assistant_role_name,
+            assistant_allow_network=assistant_allow_network,
+            assistant_write_dirs=assistant_write_dirs,
+            leader_role_name=leader_role_name,
+            active_provider_id=active_provider_id,
+            active_model=active_model,
+            context_window_tokens=context_window_tokens,
             input_image=input_image,
             output_image=output_image,
-            context_window_tokens=context_window_tokens,
-            params=params,
-            timeout_ms=timeout_ms,
-            retry_policy=retry_policy,
             max_retries=max_retries,
+            retry_policy=retry_policy,
+            timeout_ms=timeout_ms,
             retry_initial_delay_seconds=retry_initial_delay_seconds,
             retry_max_delay_seconds=retry_max_delay_seconds,
             retry_backoff_cap_retries=retry_backoff_cap_retries,
             auto_compact_token_limit=auto_compact_token_limit,
+            model_params=model_params,
+            timestamp_format=timestamp_format,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    apply_resolved_settings_update(current, resolved)
 
     if next_access_code is not None:
         set_access_code(current, next_access_code)

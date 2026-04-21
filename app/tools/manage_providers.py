@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -10,16 +9,15 @@ from loguru import logger
 if TYPE_CHECKING:
     from app.agent import Agent
 
-from app.providers.configuration import (
-    apply_provider_update,
-    build_provider_config,
-    serialize_discovered_model_catalog_entry,
-    serialize_provider,
+from app.providers.configuration import serialize_discovered_model_catalog_entry
+from app.providers.management import (
+    ProviderNotFoundError,
+    create_provider_entry,
+    delete_provider_entry,
+    list_provider_payloads,
+    update_provider_entry,
 )
-from app.settings import (
-    build_provider_headers,
-    build_provider_retry_429_delay_seconds,
-)
+from app.settings import build_provider_headers, build_provider_retry_429_delay_seconds
 from app.tools import Tool, re_raise_interrupt
 
 
@@ -72,11 +70,7 @@ class ManageProvidersTool(Tool):
 
     def execute(self, agent: Agent, args: dict[str, Any], **kwargs: Any) -> str:
         from app.providers.gateway import gateway
-        from app.settings import (
-            clear_provider_references,
-            get_settings,
-            save_settings,
-        )
+        from app.settings import get_settings, save_settings
 
         on_output: Callable[[str], None] | None = kwargs.get("on_output")
         action = args.get("action")
@@ -119,12 +113,7 @@ class ManageProvidersTool(Tool):
         settings = get_settings()
 
         if action == "list":
-            return json.dumps(
-                [
-                    serialize_provider(provider, include_api_key=False)
-                    for provider in settings.providers
-                ]
-            )
+            return json.dumps(list_provider_payloads(settings, include_api_key=False))
 
         if action == "create":
             if not isinstance(name, str) or not name.strip():
@@ -134,8 +123,8 @@ class ManageProvidersTool(Tool):
             if not isinstance(base_url, str) or not base_url.strip():
                 return json.dumps({"error": "base_url is required"})
             try:
-                provider = build_provider_config(
-                    provider_id=str(uuid.uuid4()),
+                provider = create_provider_entry(
+                    settings,
                     name=name,
                     provider_type=provider_type,
                     base_url=base_url,
@@ -150,50 +139,50 @@ class ManageProvidersTool(Tool):
                 )
             except ValueError as exc:
                 return json.dumps({"error": str(exc)})
-            settings.providers.append(provider)
             save_settings(settings)
             gateway.invalidate_cache()
-            return json.dumps(serialize_provider(provider, include_api_key=False))
+            return json.dumps(
+                list_provider_payloads(settings, include_api_key=False)[-1]
+            )
 
         if action == "update":
             if not isinstance(provider_id, str) or not provider_id:
                 return json.dumps({"error": "id is required"})
 
-            for provider in settings.providers:
-                if provider.id != provider_id:
-                    continue
-                try:
-                    apply_provider_update(
-                        provider,
-                        name=name,
-                        provider_type=provider_type,
-                        base_url=base_url,
-                        api_key=api_key,
-                        raw_headers=headers,
-                        raw_retry_429_delay_seconds=retry_429_delay_seconds,
-                    )
-                except ValueError as exc:
-                    return json.dumps({"error": str(exc)})
-                save_settings(settings)
-                gateway.invalidate_cache()
-                return json.dumps(serialize_provider(provider, include_api_key=False))
-
-            return json.dumps({"error": f"Provider '{provider_id}' not found"})
+            try:
+                provider = update_provider_entry(
+                    settings,
+                    provider_id,
+                    name=name,
+                    provider_type=provider_type,
+                    base_url=base_url,
+                    api_key=api_key,
+                    raw_headers=headers,
+                    raw_retry_429_delay_seconds=retry_429_delay_seconds,
+                )
+            except ValueError as exc:
+                return json.dumps({"error": str(exc)})
+            except ProviderNotFoundError:
+                return json.dumps({"error": f"Provider '{provider_id}' not found"})
+            save_settings(settings)
+            gateway.invalidate_cache()
+            return json.dumps(
+                list_provider_payloads(settings, include_api_key=False)[
+                    settings.providers.index(provider)
+                ]
+            )
 
         if action == "delete":
             if not isinstance(provider_id, str) or not provider_id:
                 return json.dumps({"error": "id is required"})
 
-            for index, provider in enumerate(settings.providers):
-                if provider.id != provider_id:
-                    continue
-                settings.providers.pop(index)
-                clear_provider_references(settings, provider_id)
-                save_settings(settings)
-                gateway.invalidate_cache()
-                return json.dumps({"status": "deleted"})
-
-            return json.dumps({"error": f"Provider '{provider_id}' not found"})
+            try:
+                delete_provider_entry(settings, provider_id)
+            except ProviderNotFoundError:
+                return json.dumps({"error": f"Provider '{provider_id}' not found"})
+            save_settings(settings)
+            gateway.invalidate_cache()
+            return json.dumps({"status": "deleted"})
 
         if action == "list_models":
             if not isinstance(provider_id, str) or not provider_id:

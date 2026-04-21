@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-import uuid
 
 from fastapi import APIRouter, HTTPException
 from loguru import logger
@@ -11,20 +10,20 @@ from starlette.concurrency import run_in_threadpool
 from app.models import ModelInfo
 from app.network import truncate_text
 from app.providers.configuration import (
-    apply_provider_update,
     build_provider_config,
     coerce_provider_model_catalog,
     serialize_discovered_model_catalog_entry,
     serialize_provider,
 )
-from app.providers.registry import create_provider as create_llm_provider
-from app.settings import (
-    ProviderConfig,
-    clear_provider_references,
-    find_provider,
-    get_settings,
-    save_settings,
+from app.providers.management import (
+    ProviderNotFoundError,
+    create_provider_entry,
+    delete_provider_entry,
+    list_provider_payloads,
+    update_provider_entry,
 )
+from app.providers.registry import create_provider as create_llm_provider
+from app.settings import ProviderConfig, find_provider, get_settings, save_settings
 
 router = APIRouter()
 
@@ -221,9 +220,7 @@ def _test_provider_model(provider: ProviderConfig, model: str) -> dict[str, obje
 @router.get("/api/providers")
 async def list_providers() -> dict[str, object]:
     settings = get_settings()
-    return {
-        "providers": [serialize_provider(provider) for provider in settings.providers]
-    }
+    return {"providers": list_provider_payloads(settings)}
 
 
 @router.post("/api/providers")
@@ -232,8 +229,8 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
 
     settings = get_settings()
     try:
-        provider = build_provider_config(
-            provider_id=str(uuid.uuid4()),
+        provider = create_provider_entry(
+            settings,
             name=req.name,
             provider_type=req.type,
             base_url=req.base_url,
@@ -244,7 +241,6 @@ async def create_provider(req: CreateProviderRequest) -> dict[str, object]:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    settings.providers.append(provider)
     save_settings(settings)
     gateway.invalidate_cache()
     return serialize_provider(provider)
@@ -257,30 +253,29 @@ async def update_provider(
     from app.providers.gateway import gateway
 
     settings = get_settings()
-    for provider in settings.providers:
-        if provider.id != provider_id:
-            continue
-        try:
-            apply_provider_update(
-                provider,
-                name=req.name,
-                provider_type=req.type,
-                base_url=req.base_url,
-                api_key=req.api_key,
-                raw_headers=req.headers,
-                raw_retry_429_delay_seconds=req.retry_429_delay_seconds,
-                models=(
-                    coerce_provider_model_catalog(req.models)
-                    if req.models is not None
-                    else None
-                ),
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        save_settings(settings)
-        gateway.invalidate_cache()
-        return serialize_provider(provider)
-    raise HTTPException(status_code=404, detail="Provider not found")
+    try:
+        provider = update_provider_entry(
+            settings,
+            provider_id,
+            name=req.name,
+            provider_type=req.type,
+            base_url=req.base_url,
+            api_key=req.api_key,
+            raw_headers=req.headers,
+            raw_retry_429_delay_seconds=req.retry_429_delay_seconds,
+            models=(
+                coerce_provider_model_catalog(req.models)
+                if req.models is not None
+                else None
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProviderNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Provider not found") from exc
+    save_settings(settings)
+    gateway.invalidate_cache()
+    return serialize_provider(provider)
 
 
 @router.delete("/api/providers/{provider_id}")
@@ -288,11 +283,10 @@ async def delete_provider(provider_id: str) -> dict[str, object]:
     from app.providers.gateway import gateway
 
     settings = get_settings()
-    before = len(settings.providers)
-    settings.providers = [p for p in settings.providers if p.id != provider_id]
-    if len(settings.providers) == before:
-        raise HTTPException(status_code=404, detail="Provider not found")
-    clear_provider_references(settings, provider_id)
+    try:
+        delete_provider_entry(settings, provider_id)
+    except ProviderNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Provider not found") from exc
     save_settings(settings)
     gateway.invalidate_cache()
     return {"status": "deleted"}

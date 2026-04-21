@@ -124,6 +124,31 @@ function AppContent() {
     );
   };
 
+  const pageContent = (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={currentPage}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6 }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+        className="relative h-full"
+      >
+        {isWorkspace ? (
+          renderPage()
+        ) : (
+          <div className="mx-auto flex h-full w-full max-w-[1320px] min-h-0 flex-col px-4 sm:px-6 lg:px-8">
+            <ShellHeader
+              compact={isCompactLayout}
+              onOpenNavigation={() => setSidebarDrawerOpen(true)}
+            />
+            <div className="min-h-0 flex-1">{renderPage()}</div>
+          </div>
+        )}
+      </motion.div>
+    </AnimatePresence>
+  );
+
   return (
     <ShellBackground variant="app">
       {isCompactLayout ? (
@@ -172,71 +197,54 @@ function AppContent() {
               }
         }
       >
-        <ShellSurface
-          variant={isWorkspace ? "workspace" : "page"}
-          className={cn("h-full backdrop-blur-xl [contain:paint]")}
-        >
-          {isCompactLayout && isWorkspace ? (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={
-                  sidebarOpen ? "Close navigation" : "Open navigation"
-                }
-                onClick={() => setSidebarDrawerOpen((current) => !current)}
-                className={cn(
-                  shellFloatingButtonClass,
-                  "absolute left-3.5 top-3.5 size-9 rounded-md",
-                )}
-              >
-                {sidebarOpen ? (
-                  <PanelLeftClose className="size-4" />
-                ) : (
-                  <PanelLeftOpen className="size-4" />
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label="Logout"
-                onClick={() => {
-                  void logout();
-                }}
-                className={cn(
-                  shellFloatingButtonClass,
-                  "absolute right-3.5 top-3.5 h-9 gap-2 rounded-full px-3 text-[12px] font-medium",
-                )}
-              >
-                <LogOut className="size-3.5" />
-                Logout
-              </Button>
-            </>
-          ) : null}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPage}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
-              className="relative h-full"
-            >
-              {isWorkspace ? (
-                renderPage()
-              ) : (
-                <div className="mx-auto flex h-full w-full max-w-[1320px] min-h-0 flex-col px-4 sm:px-6 lg:px-8">
-                  <ShellHeader
-                    compact={isCompactLayout}
-                    onOpenNavigation={() => setSidebarDrawerOpen(true)}
-                  />
-                  <div className="min-h-0 flex-1">{renderPage()}</div>
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
-        </ShellSurface>
+        {isWorkspace ? (
+          <ShellSurface
+            variant="workspace"
+            className={cn("h-full backdrop-blur-xl [contain:paint]")}
+          >
+            {isCompactLayout ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={
+                    sidebarOpen ? "Close navigation" : "Open navigation"
+                  }
+                  onClick={() => setSidebarDrawerOpen((current) => !current)}
+                  className={cn(
+                    shellFloatingButtonClass,
+                    "absolute left-3.5 top-3.5 size-9 rounded-md",
+                  )}
+                >
+                  {sidebarOpen ? (
+                    <PanelLeftClose className="size-4" />
+                  ) : (
+                    <PanelLeftOpen className="size-4" />
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label="Logout"
+                  onClick={() => {
+                    void logout();
+                  }}
+                  className={cn(
+                    shellFloatingButtonClass,
+                    "absolute right-3.5 top-3.5 h-9 gap-2 rounded-full px-3 text-[12px] font-medium",
+                  )}
+                >
+                  <LogOut className="size-3.5" />
+                  Logout
+                </Button>
+              </>
+            ) : null}
+            {pageContent}
+          </ShellSurface>
+        ) : (
+          <div className="h-full [contain:paint]">{pageContent}</div>
+        )}
       </main>
     </ShellBackground>
   );

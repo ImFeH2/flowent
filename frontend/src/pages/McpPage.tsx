@@ -1,20 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import useSWR from "swr";
 import { Plus, RefreshCw, Search, Unplug, X } from "lucide-react";
-import { toast } from "sonner";
-import {
-  createMcpServer,
-  deleteMcpServer,
-  fetchMcpState,
-  loginMcpServer,
-  logoutMcpServer,
-  previewMcpPrompt,
-  refreshAllMcpServers,
-  refreshMcpServer,
-  updateMcpServer,
-} from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { McpServerDialog } from "@/components/mcp/McpServerDialog";
 import {
   FilterPill,
@@ -22,6 +7,7 @@ import {
   ReadonlyBlock,
   SummaryCard,
 } from "@/components/mcp/McpPrimitives";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   PageScaffold,
@@ -29,160 +15,32 @@ import {
   SoftPanel,
 } from "@/components/layout/PageScaffold";
 import { WorkspaceDialogField } from "@/components/WorkspaceCommandDialog";
-import { formatLocalTimestamp } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
-import type {
-  MCPActivityRecord,
-  MCPServerConfig,
-  MCPServerRecord,
-} from "@/types";
-
-type DetailTab = "overview" | "capabilities" | "activity";
-type CapabilityTab = "tools" | "resources" | "resource_templates" | "prompts";
-type ServerStatusFilter =
-  | "all"
-  | "connected"
-  | "auth_required"
-  | "error"
-  | "disabled"
-  | "connecting";
-type ActivityFilter =
-  | "all"
-  | "refresh"
-  | "auth"
-  | "tool"
-  | "resource"
-  | "prompt";
-
-const EMPTY_SERVER_DRAFT: MCPServerConfig = {
-  name: "",
-  transport: "stdio",
-  enabled: true,
-  required: false,
-  startup_timeout_sec: 10,
-  tool_timeout_sec: 30,
-  enabled_tools: [],
-  disabled_tools: [],
-  scopes: [],
-  oauth_resource: "",
-  launcher: "",
-  command: "",
-  args: [],
-  env: {},
-  env_vars: [],
-  cwd: "",
-  url: "",
-  bearer_token_env_var: "",
-  http_headers: {},
-  env_http_headers: [],
-};
-
-const SERVER_FILTER_OPTIONS: Array<{
-  value: ServerStatusFilter;
-  label: string;
-}> = [
-  { value: "all", label: "All" },
-  { value: "connected", label: "Connected" },
-  { value: "auth_required", label: "Auth Required" },
-  { value: "error", label: "Error" },
-  { value: "disabled", label: "Disabled" },
-  { value: "connecting", label: "Connecting" },
-];
-
-const ACTIVITY_FILTER_OPTIONS: Array<{
-  value: ActivityFilter;
-  label: string;
-}> = [
-  { value: "all", label: "All" },
-  { value: "refresh", label: "Refresh" },
-  { value: "auth", label: "Auth" },
-  { value: "tool", label: "Tool" },
-  { value: "resource", label: "Resource" },
-  { value: "prompt", label: "Prompt" },
-];
-
-function formatTimestamp(value?: number | null) {
-  return formatLocalTimestamp(value, { fallback: "Never" });
-}
-
-function formatSentenceCase(value: string) {
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatAuthStatus(value: string) {
-  switch (value) {
-    case "unsupported":
-      return "Unsupported";
-    case "not_logged_in":
-      return "Not logged in";
-    case "logging_in":
-      return "Logging in";
-    case "connected":
-      return "Connected";
-    case "error":
-      return "Error";
-    default:
-      return formatSentenceCase(value);
-  }
-}
-
-function formatTimestampShort(value?: number | null) {
-  return formatLocalTimestamp(value, {
-    fallback: "Never",
-    format: {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  });
-}
-
-function statusLabel(status: string) {
-  switch (status) {
-    case "disabled":
-      return "Disabled";
-    case "connecting":
-      return "Connecting";
-    case "connected":
-      return "Connected";
-    case "auth_required":
-      return "Auth required";
-    case "error":
-      return "Error";
-    default:
-      return status;
-  }
-}
-
-function statusClassName(status: string) {
-  switch (status) {
-    case "connected":
-      return "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running";
-    case "auth_required":
-      return "border-graph-status-idle/18 bg-graph-status-idle/[0.12] text-graph-status-idle";
-    case "error":
-      return "border-destructive/30 bg-destructive/10 text-destructive";
-    case "disabled":
-      return "border-border bg-accent/20 text-muted-foreground";
-    default:
-      return "border-primary/20 bg-primary/[0.1] text-primary";
-  }
-}
-
-function resultClassName(result: string) {
-  switch (result) {
-    case "success":
-      return "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running";
-    case "rejected":
-      return "border-graph-status-idle/18 bg-graph-status-idle/[0.12] text-graph-status-idle";
-    default:
-      return "border-destructive/30 bg-destructive/10 text-destructive";
-  }
-}
+import {
+  ACTIVITY_FILTER_OPTIONS,
+  CAPABILITY_TABS,
+  DETAIL_TABS,
+  SERVER_FILTER_OPTIONS,
+  activityCategoryLabel,
+  authActionDisabled,
+  authActionLabel,
+  capabilitySummary,
+  formatAuthStatus,
+  formatSentenceCase,
+  formatTimestamp,
+  formatTimestampShort,
+  globalAvailabilityLabel,
+  parsedLauncherSummary,
+  readonlyList,
+  readonlyMapKeys,
+  readonlyText,
+  renderValueOrFallback,
+  resultClassName,
+  statusClassName,
+  statusLabel,
+  toolFilterSummary,
+} from "@/pages/mcp/lib";
+import { useMcpPageState } from "@/pages/mcp/useMcpPageState";
 
 const mcpPanelClass = "bg-card/20";
 const mcpPanelTextClass = "text-[13px] text-muted-foreground";
@@ -199,637 +57,31 @@ const mcpTagClass =
 const mcpInfoIconClass =
   "flex size-14 items-center justify-center rounded-xl border border-border bg-accent/20 text-muted-foreground";
 
-function capabilitySummary(record: MCPServerRecord) {
-  const counts = record.snapshot.capability_counts;
-  return `${counts.tools} tools · ${counts.resources} resources · ${counts.prompts} prompts`;
-}
-
-function globalAvailabilityLabel(record: MCPServerRecord) {
-  if (!record.visibility.active) {
-    return null;
-  }
-  return "Global";
-}
-
-function stripShellQuotes(token: string) {
-  if (token.length < 2) {
-    return token;
-  }
-  if (
-    (token.startsWith('"') && token.endsWith('"')) ||
-    (token.startsWith("'") && token.endsWith("'"))
-  ) {
-    return token.slice(1, -1);
-  }
-  return token;
-}
-
-function tokenizeLauncher(value: string) {
-  const matches = value.match(/'[^']*'|"[^"]*"|\S+/g);
-  return (matches ?? []).map((token) => stripShellQuotes(token));
-}
-
-function normalizeSuggestedName(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-}
-
-function deriveNameFromPackageToken(token: string) {
-  const withoutVersion = token.startsWith("@")
-    ? token.replace(/@[^/@]+$/u, "")
-    : token.replace(/@[^/]+$/u, "");
-  const segments = withoutVersion.split("/").filter(Boolean);
-  return normalizeSuggestedName(segments.join("-"));
-}
-
-function deriveNameFromUrl(value: string) {
-  try {
-    const url = new URL(value);
-    const candidates = url.hostname
-      .replace(/^www\./u, "")
-      .split(".")
-      .filter((segment) => segment && !["mcp", "api"].includes(segment));
-    return normalizeSuggestedName(candidates[0] ?? url.hostname);
-  } catch {
-    return "";
-  }
-}
-
-function suggestServerName(input: string, tokens: string[]) {
-  if (/^https?:\/\//u.test(input)) {
-    return deriveNameFromUrl(input);
-  }
-  const runner = tokens[0] ?? "";
-  const packageTokenStart =
-    runner === "pnpm" || runner === "yarn" ? 2 : runner === "npm" ? 3 : 1;
-  const packageToken = tokens
-    .slice(packageTokenStart)
-    .find((token) => token && !token.startsWith("-"));
-  if (packageToken) {
-    const derived = deriveNameFromPackageToken(packageToken);
-    if (derived) {
-      return derived;
-    }
-  }
-  if (!runner) {
-    return "";
-  }
-  return normalizeSuggestedName(runner.split("/").pop() ?? runner);
-}
-
-function buildQuickAddDraft(
-  input: string,
-  name: string,
-): { draft: MCPServerConfig | null; error: string | null } {
-  const trimmedInput = input.trim();
-  const trimmedName = normalizeSuggestedName(name);
-  if (!trimmedInput) {
-    return { draft: null, error: "Enter a launcher command or URL." };
-  }
-  if (!trimmedName) {
-    return { draft: null, error: "Quick Add needs a valid server name." };
-  }
-  if (/^https?:\/\//u.test(trimmedInput)) {
-    try {
-      const normalizedUrl = new URL(trimmedInput).toString();
-      return {
-        draft: {
-          ...EMPTY_SERVER_DRAFT,
-          name: trimmedName,
-          transport: "streamable_http",
-          launcher: trimmedInput,
-          url: normalizedUrl,
-        },
-        error: null,
-      };
-    } catch {
-      return { draft: null, error: "Quick Add URL is not valid." };
-    }
-  }
-  const tokens = tokenizeLauncher(trimmedInput);
-  if (tokens.length === 0) {
-    return {
-      draft: null,
-      error: "Quick Add needs a single-line launcher command.",
-    };
-  }
-  return {
-    draft: {
-      ...EMPTY_SERVER_DRAFT,
-      name: trimmedName,
-      transport: "stdio",
-      launcher: trimmedInput,
-      command: tokens[0],
-      args: tokens.slice(1),
-    },
-    error: null,
-  };
-}
-
-function parsedLauncherSummary(record: MCPServerRecord) {
-  if (record.config.transport === "streamable_http") {
-    return record.config.url.trim() || "No URL configured";
-  }
-  return [record.config.command, ...record.config.args]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function buildPendingServerRecord(config: MCPServerConfig): MCPServerRecord {
-  return {
-    config,
-    snapshot: {
-      server_name: config.name,
-      transport: config.transport,
-      status: "connecting",
-      auth_status:
-        config.transport === "stdio" ? "unsupported" : "not_logged_in",
-      last_auth_result: null,
-      last_refresh_at: null,
-      last_refresh_result: "never",
-      last_error: null,
-      tools: [],
-      resources: [],
-      resource_templates: [],
-      prompts: [],
-      capability_counts: {
-        tools: 0,
-        resources: 0,
-        resource_templates: 0,
-        prompts: 0,
-      },
-    },
-    visibility: {
-      scope: "global",
-      active: false,
-    },
-    activity: [],
-  };
-}
-
-function toolFilterSummary(record: MCPServerRecord) {
-  if (record.config.enabled_tools.length > 0) {
-    return `Enabled tools limited to ${record.config.enabled_tools.length} entries`;
-  }
-  if (record.config.disabled_tools.length > 0) {
-    return `${record.config.disabled_tools.length} tools excluded`;
-  }
-  return "All discovered tools remain available";
-}
-
-function authActionLabel(record: MCPServerRecord) {
-  if (record.config.transport === "stdio") {
-    return "Auth N/A";
-  }
-  return record.snapshot.auth_status === "connected" ? "Logout" : "Login";
-}
-
-function authActionDisabled(record: MCPServerRecord) {
-  return record.config.transport === "stdio";
-}
-
-function readonlyText(value: string | null | undefined, fallback = "Not set") {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-  const trimmed = value.trim();
-  return trimmed || fallback;
-}
-
-function readonlyList(values: string[], fallback = "None") {
-  if (values.length === 0) {
-    return fallback;
-  }
-  return values.join("\n");
-}
-
-function readonlyMapKeys(values: Record<string, string>, fallback = "None") {
-  const keys = Object.keys(values);
-  if (keys.length === 0) {
-    return fallback;
-  }
-  return keys.join("\n");
-}
-
-function isAuthRelatedActivity(record: MCPActivityRecord) {
-  if (record.action === "login" || record.action === "logout") {
-    return true;
-  }
-  if (record.action !== "refresh") {
-    return false;
-  }
-  const haystack = `${record.summary} ${record.target ?? ""}`.toLowerCase();
-  return [
-    "auth",
-    "authentication",
-    "oauth",
-    "token",
-    "bearer",
-    "login",
-    "logged out",
-    "env var",
-  ].some((keyword) => haystack.includes(keyword));
-}
-
-function activityFilterForRecord(record: MCPActivityRecord): ActivityFilter {
-  if (isAuthRelatedActivity(record)) {
-    return "auth";
-  }
-  switch (record.action) {
-    case "refresh":
-      return "refresh";
-    case "login":
-    case "logout":
-      return "auth";
-    case "tool_call":
-      return "tool";
-    case "resource_read":
-      return "resource";
-    case "prompt_get":
-      return "prompt";
-    default:
-      return "all";
-  }
-}
-
-function activityCategoryLabel(record: MCPActivityRecord) {
-  switch (activityFilterForRecord(record)) {
-    case "refresh":
-      return "Refresh";
-    case "auth":
-      return "Auth";
-    case "tool":
-      return "Tool";
-    case "resource":
-      return "Resource";
-    case "prompt":
-      return "Prompt";
-    default:
-      return formatSentenceCase(record.action);
-  }
-}
-
-function matchesServerFilter(
-  record: MCPServerRecord,
-  statusFilter: ServerStatusFilter,
-) {
-  if (statusFilter !== "all" && record.snapshot.status !== statusFilter) {
-    return false;
-  }
-  return true;
-}
-
-function renderValueOrFallback(value: string, fallback = "Not set") {
-  return value.trim() ? value : fallback;
-}
-
 export function McpPage() {
-  const { data, error, isLoading, mutate } = useSWR("mcp-state", fetchMcpState);
-  const [selectedServerName, setSelectedServerName] = useState<string | null>(
-    null,
-  );
-  const [detailTab, setDetailTab] = useState<DetailTab>("overview");
-  const [capabilityTab, setCapabilityTab] = useState<CapabilityTab>("tools");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingServerName, setEditingServerName] = useState<string | null>(
-    null,
-  );
-  const [draft, setDraft] = useState<MCPServerConfig>(EMPTY_SERVER_DRAFT);
-  const [pending, setPending] = useState(false);
-  const [selectedPromptName, setSelectedPromptName] = useState<string | null>(
-    null,
-  );
-  const [promptPreview, setPromptPreview] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
-  const [promptPreviewLoading, setPromptPreviewLoading] = useState(false);
-  const [promptPreviewArgumentsText, setPromptPreviewArgumentsText] =
-    useState("{}");
-  const [serverStatusFilter, setServerStatusFilter] =
-    useState<ServerStatusFilter>("all");
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
-  const [quickAddInput, setQuickAddInput] = useState("");
-  const [quickAddName, setQuickAddName] = useState("");
-  const [quickAddNameDirty, setQuickAddNameDirty] = useState(false);
-  const [quickAddPending, setQuickAddPending] = useState(false);
-  const [quickAddError, setQuickAddError] = useState<string | null>(null);
-
-  const quickAddTokens = useMemo(
-    () => tokenizeLauncher(quickAddInput.trim()),
-    [quickAddInput],
-  );
-  const quickAddSuggestedName = useMemo(
-    () => suggestServerName(quickAddInput.trim(), quickAddTokens),
-    [quickAddInput, quickAddTokens],
-  );
-  const quickAddNameValue = quickAddNameDirty
-    ? quickAddName
-    : quickAddSuggestedName;
-  const quickAddParse = useMemo(
-    () => buildQuickAddDraft(quickAddInput, quickAddNameValue),
-    [quickAddInput, quickAddNameValue],
-  );
-  const servers = useMemo(() => {
-    const base = data?.servers ?? [];
-    if (!quickAddPending || quickAddParse.draft === null) {
-      return base;
-    }
-    if (
-      base.some((record) => record.config.name === quickAddParse.draft?.name)
-    ) {
-      return base;
-    }
-    return [buildPendingServerRecord(quickAddParse.draft), ...base];
-  }, [data, quickAddParse.draft, quickAddPending]);
-
-  const filteredServers = useMemo(
-    () =>
-      servers.filter((record) =>
-        matchesServerFilter(record, serverStatusFilter),
-      ),
-    [serverStatusFilter, servers],
-  );
-
-  const selectedServer = useMemo(
-    () =>
-      filteredServers.find(
-        (record) => record.config.name === selectedServerName,
-      ) ??
-      filteredServers[0] ??
-      null,
-    [filteredServers, selectedServerName],
-  );
-
-  useEffect(() => {
-    if (
-      filteredServers.length > 0 &&
-      !filteredServers.some(
-        (record) => record.config.name === selectedServerName,
-      )
-    ) {
-      setSelectedServerName(filteredServers[0]?.config.name ?? null);
-    }
-  }, [filteredServers, selectedServerName]);
-
-  useEffect(() => {
-    setSelectedPromptName(null);
-    setPromptPreview(null);
-    setPromptPreviewLoading(false);
-    setPromptPreviewArgumentsText("{}");
-    setActivityFilter("all");
-  }, [selectedServer?.config.name]);
-
-  useEffect(() => {
-    if (quickAddNameDirty) {
-      return;
-    }
-    setQuickAddName(quickAddSuggestedName);
-  }, [quickAddNameDirty, quickAddSuggestedName]);
-
-  const summaryCounts = useMemo(
-    () => ({
-      configured: servers.length,
-      connected: servers.filter(
-        (record) => record.snapshot.status === "connected",
-      ).length,
-      authRequired: servers.filter(
-        (record) => record.snapshot.status === "auth_required",
-      ).length,
-      error: servers.filter((record) => record.snapshot.status === "error")
-        .length,
-    }),
-    [servers],
-  );
-
-  const selectedPrompt = useMemo(
-    () =>
-      selectedServer?.snapshot.prompts.find(
-        (prompt) => prompt.name === selectedPromptName,
-      ) ?? null,
-    [selectedPromptName, selectedServer],
-  );
-
-  const filteredActivity = useMemo(() => {
-    if (!selectedServer) {
-      return [];
-    }
-    return selectedServer.activity.filter((entry) => {
-      if (activityFilter === "all") {
-        return true;
-      }
-      return activityFilterForRecord(entry) === activityFilter;
-    });
-  }, [activityFilter, selectedServer]);
-
-  const openCreateDialog = () => {
-    setEditingServerName(null);
-    setDraft(EMPTY_SERVER_DRAFT);
-    setDialogOpen(true);
-  };
-
-  const focusQuickAdd = () => {
-    document.getElementById("mcp-quick-add-input")?.focus();
-  };
-
-  const openEditDialog = (record: MCPServerRecord) => {
-    setEditingServerName(record.config.name);
-    setDraft(record.config);
-    setDialogOpen(true);
-  };
-
-  const clearServerFilters = () => {
-    setServerStatusFilter("all");
-  };
-
-  const handleRefreshAll = async () => {
-    try {
-      await refreshAllMcpServers();
-      await mutate();
-      toast.success("MCP servers refreshed");
-    } catch (refreshError) {
-      toast.error(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "Failed to refresh MCP servers",
-      );
-    }
-  };
-
-  const handleSaveServer = async () => {
-    setPending(true);
-    try {
-      if (editingServerName) {
-        await updateMcpServer(editingServerName, draft);
-      } else {
-        await createMcpServer(draft);
-      }
-      await mutate();
-      setSelectedServerName(draft.name.trim());
-      setDialogOpen(false);
-      toast.success("MCP server saved");
-    } catch (saveError) {
-      toast.error(
-        saveError instanceof Error
-          ? saveError.message
-          : "Failed to save MCP server",
-      );
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const handleQuickAdd = async () => {
-    if (quickAddParse.error || quickAddParse.draft === null) {
-      setQuickAddError(quickAddParse.error ?? "Quick Add is not ready yet.");
-      return;
-    }
-    setQuickAddPending(true);
-    setQuickAddError(null);
-    setSelectedServerName(quickAddParse.draft.name);
-    try {
-      await createMcpServer(quickAddParse.draft);
-      await mutate();
-      setSelectedServerName(quickAddParse.draft.name);
-      setQuickAddInput("");
-      setQuickAddName("");
-      setQuickAddNameDirty(false);
-      toast.success("MCP server added");
-    } catch (quickAddFailure) {
-      await mutate();
-      setSelectedServerName(quickAddParse.draft.name);
-      setQuickAddError(
-        quickAddFailure instanceof Error
-          ? quickAddFailure.message
-          : "Failed to add MCP server",
-      );
-      toast.error(
-        quickAddFailure instanceof Error
-          ? quickAddFailure.message
-          : "Failed to add MCP server",
-      );
-    } finally {
-      setQuickAddPending(false);
-    }
-  };
-
-  const handleDeleteServer = async (serverName: string) => {
-    try {
-      await deleteMcpServer(serverName);
-      await mutate();
-      toast.success("MCP server removed");
-    } catch (deleteError) {
-      toast.error(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Failed to remove MCP server",
-      );
-    }
-  };
-
-  const handleToggleEnabled = async (record: MCPServerRecord) => {
-    try {
-      await updateMcpServer(record.config.name, {
-        ...record.config,
-        enabled: !record.config.enabled,
-      });
-      await mutate();
-    } catch (toggleError) {
-      toast.error(
-        toggleError instanceof Error
-          ? toggleError.message
-          : "Failed to update MCP server",
-      );
-    }
-  };
-
-  const handleRefreshServer = async (serverName: string) => {
-    try {
-      await refreshMcpServer(serverName);
-      await mutate();
-      toast.success("Server refreshed");
-    } catch (refreshError) {
-      toast.error(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "Failed to refresh server",
-      );
-    }
-  };
-
-  const handleLogin = async (serverName: string) => {
-    try {
-      await loginMcpServer(serverName);
-      await mutate();
-      toast.success("Server refreshed after login");
-    } catch (loginError) {
-      toast.error(
-        loginError instanceof Error
-          ? loginError.message
-          : "Failed to login MCP server",
-      );
-    }
-  };
-
-  const handleLogout = async (serverName: string) => {
-    try {
-      await logoutMcpServer(serverName);
-      await mutate();
-      toast.success("Logout request sent");
-    } catch (logoutError) {
-      toast.error(
-        logoutError instanceof Error
-          ? logoutError.message
-          : "Failed to logout MCP server",
-      );
-    }
-  };
-
-  const handlePreviewPrompt = async (
-    serverName: string,
-    promptName: string,
-    argumentsPayload: Record<string, unknown> = {},
-  ) => {
-    setPromptPreviewLoading(true);
-    try {
-      const preview = await previewMcpPrompt(
-        serverName,
-        promptName,
-        argumentsPayload,
-      );
-      setPromptPreview(preview);
-    } catch (previewError) {
-      setPromptPreview({
-        error:
-          previewError instanceof Error
-            ? previewError.message
-            : "Failed to preview prompt",
-      });
-    } finally {
-      setPromptPreviewLoading(false);
-    }
-  };
-
-  const handleSelectPrompt = (serverName: string, promptName: string) => {
-    setSelectedPromptName(promptName);
-    const promptDefinition =
-      selectedServer?.snapshot.prompts.find(
-        (prompt) => prompt.name === promptName,
-      ) ?? null;
-    const initialArguments = Object.fromEntries(
-      (promptDefinition?.arguments ?? [])
-        .map((argument) => argument.name)
-        .filter(
-          (name): name is string => typeof name === "string" && name.length > 0,
-        )
-        .map((name) => [name, ""]),
-    );
-    setPromptPreviewArgumentsText(JSON.stringify(initialArguments, null, 2));
-    void handlePreviewPrompt(serverName, promptName, initialArguments);
-  };
+  const {
+    actions,
+    activityFilter,
+    capabilityTab,
+    clearServerFilters,
+    detailTab,
+    dialog,
+    error,
+    filteredActivity,
+    filteredServers,
+    focusQuickAdd,
+    isLoading,
+    promptPreviewState,
+    quickAdd,
+    selectedServer,
+    serverStatusFilter,
+    servers,
+    setActivityFilter,
+    setCapabilityTab,
+    setDetailTab,
+    setSelectedServerName,
+    setServerStatusFilter,
+    summaryCounts,
+  } = useMcpPageState();
 
   const quickAddPanel = (
     <SoftPanel className={cn("mt-4", mcpPanelClass)}>
@@ -850,18 +102,18 @@ export function McpPage() {
               automatically.
             </p>
           </div>
-          {quickAddParse.draft ? (
+          {quickAdd.parse.draft ? (
             <span
               className={cn(
                 "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
                 statusClassName(
-                  quickAddParse.draft.transport === "streamable_http"
+                  quickAdd.parse.draft.transport === "streamable_http"
                     ? "connected"
                     : "connecting",
                 ),
               )}
             >
-              {quickAddParse.draft.transport === "streamable_http"
+              {quickAdd.parse.draft.transport === "streamable_http"
                 ? "URL"
                 : "Launcher"}
             </span>
@@ -871,56 +123,49 @@ export function McpPage() {
           <WorkspaceDialogField label="Launcher or URL">
             <Input
               id="mcp-quick-add-input"
-              value={quickAddInput}
-              onChange={(event) => {
-                setQuickAddInput(event.target.value);
-                setQuickAddError(null);
-              }}
+              value={quickAdd.input}
+              onChange={(event) => quickAdd.setInput(event.target.value)}
               placeholder="npx @playwright/mcp@latest"
             />
           </WorkspaceDialogField>
           <WorkspaceDialogField label="Name">
             <Input
-              value={quickAddNameValue}
-              onChange={(event) => {
-                setQuickAddNameDirty(true);
-                setQuickAddName(event.target.value);
-                setQuickAddError(null);
-              }}
+              value={quickAdd.nameValue}
+              onChange={(event) => quickAdd.setName(event.target.value)}
               placeholder="playwright-mcp"
             />
           </WorkspaceDialogField>
         </div>
-        {quickAddParse.draft ? (
+        {quickAdd.parse.draft ? (
           <div className="grid gap-3 xl:grid-cols-3">
             <SoftPanel className={mcpPanelClass}>
               <p className={mcpEyebrowClass}>Transport</p>
               <p className="mt-2 text-[14px] font-medium text-foreground">
-                {quickAddParse.draft.transport}
+                {quickAdd.parse.draft.transport}
               </p>
             </SoftPanel>
             <SoftPanel className={mcpPanelClass}>
               <p className={mcpEyebrowClass}>Parsed Name</p>
               <p className="mt-2 text-[14px] font-medium text-foreground">
-                {quickAddParse.draft.name}
+                {quickAdd.parse.draft.name}
               </p>
             </SoftPanel>
             <SoftPanel className={cn("xl:col-span-1", mcpPanelClass)}>
               <p className={mcpEyebrowClass}>Parsed Result</p>
               <p className="mt-2 break-all font-mono text-[12px] text-foreground/80">
-                {quickAddParse.draft.transport === "streamable_http"
-                  ? quickAddParse.draft.url
+                {quickAdd.parse.draft.transport === "streamable_http"
+                  ? quickAdd.parse.draft.url
                   : [
-                      quickAddParse.draft.command,
-                      ...quickAddParse.draft.args,
+                      quickAdd.parse.draft.command,
+                      ...quickAdd.parse.draft.args,
                     ].join(" ")}
               </p>
             </SoftPanel>
           </div>
         ) : null}
-        {quickAddError || (quickAddInput.trim() && quickAddParse.error) ? (
+        {quickAdd.error || (quickAdd.input.trim() && quickAdd.parse.error) ? (
           <p className="text-[13px] text-destructive">
-            {quickAddError ?? quickAddParse.error}
+            {quickAdd.error ?? quickAdd.parse.error}
           </p>
         ) : (
           <p className="text-[12px] text-muted-foreground">
@@ -932,16 +177,16 @@ export function McpPage() {
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
-            disabled={quickAddPending || quickAddParse.draft === null}
-            onClick={() => void handleQuickAdd()}
+            disabled={quickAdd.pending || quickAdd.parse.draft === null}
+            onClick={() => void quickAdd.submit()}
           >
-            {quickAddPending ? "Adding..." : "Quick Add"}
+            {quickAdd.pending ? "Adding..." : "Quick Add"}
           </Button>
           <Button
             type="button"
             variant="outline"
             className={mcpOutlineButtonClass}
-            onClick={openCreateDialog}
+            onClick={dialog.openCreateDialog}
           >
             Advanced Add
           </Button>
@@ -961,7 +206,7 @@ export function McpPage() {
                 type="button"
                 variant="outline"
                 className={mcpOutlineButtonClass}
-                onClick={handleRefreshAll}
+                onClick={actions.refreshAll}
               >
                 <RefreshCw className="mr-2 size-4" />
                 Refresh
@@ -975,7 +220,7 @@ export function McpPage() {
                 <Plus className="mr-2 size-4" />
                 Quick Add
               </Button>
-              <Button type="button" onClick={openCreateDialog}>
+              <Button type="button" onClick={dialog.openCreateDialog}>
                 <Plus className="mr-2 size-4" />
                 Advanced Add
               </Button>
@@ -1158,7 +403,7 @@ export function McpPage() {
                                         mcpOutlineButtonClass,
                                       )}
                                       onClick={() =>
-                                        handleToggleEnabled(record)
+                                        actions.toggleEnabled(record)
                                       }
                                     >
                                       {record.config.enabled
@@ -1176,8 +421,8 @@ export function McpPage() {
                                       onClick={() =>
                                         record.snapshot.auth_status ===
                                         "connected"
-                                          ? handleLogout(record.config.name)
-                                          : handleLogin(record.config.name)
+                                          ? actions.logout(record.config.name)
+                                          : actions.login(record.config.name)
                                       }
                                     >
                                       {authActionLabel(record)}
@@ -1189,7 +434,9 @@ export function McpPage() {
                                         "h-7 px-2 text-[11px]",
                                         mcpOutlineButtonClass,
                                       )}
-                                      onClick={() => openEditDialog(record)}
+                                      onClick={() =>
+                                        dialog.openEditDialog(record)
+                                      }
                                     >
                                       Edit
                                     </Button>
@@ -1201,7 +448,9 @@ export function McpPage() {
                                         mcpOutlineButtonClass,
                                       )}
                                       onClick={() =>
-                                        handleRefreshServer(record.config.name)
+                                        actions.refreshServer(
+                                          record.config.name,
+                                        )
                                       }
                                     >
                                       Refresh
@@ -1214,7 +463,7 @@ export function McpPage() {
                                         mcpDestructiveButtonClass,
                                       )}
                                       onClick={() =>
-                                        handleDeleteServer(record.config.name)
+                                        actions.deleteServer(record.config.name)
                                       }
                                     >
                                       Remove
@@ -1271,7 +520,7 @@ export function McpPage() {
                                 variant="outline"
                                 className={mcpOutlineButtonClass}
                                 onClick={() =>
-                                  handleToggleEnabled(selectedServer)
+                                  actions.toggleEnabled(selectedServer)
                                 }
                               >
                                 {selectedServer.config.enabled
@@ -1286,8 +535,8 @@ export function McpPage() {
                                 onClick={() =>
                                   selectedServer.snapshot.auth_status ===
                                   "connected"
-                                    ? handleLogout(selectedServer.config.name)
-                                    : handleLogin(selectedServer.config.name)
+                                    ? actions.logout(selectedServer.config.name)
+                                    : actions.login(selectedServer.config.name)
                                 }
                               >
                                 {authActionLabel(selectedServer)}
@@ -1296,7 +545,9 @@ export function McpPage() {
                                 type="button"
                                 variant="outline"
                                 className={mcpOutlineButtonClass}
-                                onClick={() => openEditDialog(selectedServer)}
+                                onClick={() =>
+                                  dialog.openEditDialog(selectedServer)
+                                }
                               >
                                 Edit
                               </Button>
@@ -1305,7 +556,7 @@ export function McpPage() {
                                 variant="outline"
                                 className={mcpOutlineButtonClass}
                                 onClick={() =>
-                                  handleRefreshServer(
+                                  actions.refreshServer(
                                     selectedServer.config.name,
                                   )
                                 }
@@ -1317,7 +568,9 @@ export function McpPage() {
                                 variant="outline"
                                 className={mcpDestructiveButtonClass}
                                 onClick={() =>
-                                  handleDeleteServer(selectedServer.config.name)
+                                  actions.deleteServer(
+                                    selectedServer.config.name,
+                                  )
                                 }
                               >
                                 Remove
@@ -1326,13 +579,7 @@ export function McpPage() {
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-4 border-b border-border">
-                            {(
-                              [
-                                "overview",
-                                "capabilities",
-                                "activity",
-                              ] as DetailTab[]
-                            ).map((tab) => (
+                            {DETAIL_TABS.map((tab) => (
                               <FilterPill
                                 key={tab}
                                 active={detailTab === tab}
@@ -1594,14 +841,7 @@ export function McpPage() {
                             {detailTab === "capabilities" ? (
                               <div className="space-y-4">
                                 <div className="flex flex-wrap gap-4 border-b border-border">
-                                  {(
-                                    [
-                                      "tools",
-                                      "resources",
-                                      "resource_templates",
-                                      "prompts",
-                                    ] as CapabilityTab[]
-                                  ).map((tab) => (
+                                  {CAPABILITY_TABS.map((tab) => (
                                     <FilterPill
                                       key={tab}
                                       active={capabilityTab === tab}
@@ -1785,14 +1025,14 @@ export function McpPage() {
                                               type="button"
                                               variant="ghost"
                                               onClick={() =>
-                                                handleSelectPrompt(
+                                                promptPreviewState.selectPrompt(
                                                   selectedServer.config.name,
                                                   prompt.name,
                                                 )
                                               }
                                               className={cn(
                                                 "h-auto w-full flex-col items-stretch rounded-xl border border-border bg-card/20 p-5 text-left transition-colors hover:text-inherit",
-                                                selectedPromptName ===
+                                                promptPreviewState.selectedPromptName ===
                                                   prompt.name
                                                   ? "border-border bg-accent/20"
                                                   : "hover:bg-accent/20",
@@ -1824,18 +1064,22 @@ export function McpPage() {
                                       <p className={mcpEyebrowClass}>
                                         Prompt Preview
                                       </p>
-                                      {selectedPromptName ? (
+                                      {promptPreviewState.selectedPromptName ? (
                                         <>
                                           <p className="mt-3 text-[15px] font-medium text-foreground">
-                                            {selectedPromptName}
+                                            {
+                                              promptPreviewState.selectedPromptName
+                                            }
                                           </p>
                                           <p className="mt-4 text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">
                                             Arguments
                                           </p>
                                           <Textarea
-                                            value={promptPreviewArgumentsText}
+                                            value={
+                                              promptPreviewState.argumentsText
+                                            }
                                             onChange={(event) =>
-                                              setPromptPreviewArgumentsText(
+                                              promptPreviewState.setArgumentsText(
                                                 event.target.value,
                                               )
                                             }
@@ -1850,28 +1094,15 @@ export function McpPage() {
                                               type="button"
                                               variant="outline"
                                               className={mcpOutlineButtonClass}
-                                              onClick={() => {
-                                                try {
-                                                  const parsed = JSON.parse(
-                                                    promptPreviewArgumentsText,
-                                                  ) as Record<string, unknown>;
-                                                  void handlePreviewPrompt(
-                                                    selectedServer.config.name,
-                                                    selectedPromptName,
-                                                    parsed,
-                                                  );
-                                                } catch {
-                                                  setPromptPreview({
-                                                    error:
-                                                      "Arguments must be valid JSON",
-                                                  });
-                                                }
-                                              }}
+                                              onClick={
+                                                promptPreviewState.previewCurrent
+                                              }
                                             >
                                               Preview
                                             </Button>
                                           </div>
-                                          {selectedPrompt?.arguments?.length ? (
+                                          {promptPreviewState.selectedPrompt
+                                            ?.arguments?.length ? (
                                             <pre
                                               className={cn(
                                                 mcpCodeBlockClass,
@@ -1879,7 +1110,8 @@ export function McpPage() {
                                               )}
                                             >
                                               {JSON.stringify(
-                                                selectedPrompt.arguments,
+                                                promptPreviewState
+                                                  .selectedPrompt.arguments,
                                                 null,
                                                 2,
                                               )}
@@ -1891,10 +1123,11 @@ export function McpPage() {
                                               "max-h-[420px]",
                                             )}
                                           >
-                                            {promptPreviewLoading
+                                            {promptPreviewState.loading
                                               ? "Loading preview..."
                                               : JSON.stringify(
-                                                  promptPreview ?? {},
+                                                  promptPreviewState.preview ??
+                                                    {},
                                                   null,
                                                   2,
                                                 )}
@@ -2018,15 +1251,17 @@ export function McpPage() {
       </div>
 
       <McpServerDialog
-        draft={draft}
-        onChange={setDraft}
-        open={dialogOpen}
-        pending={pending}
+        draft={dialog.draft}
+        onChange={dialog.setDraft}
+        open={dialog.open}
+        pending={dialog.pending}
         title={
-          editingServerName ? "Edit MCP Server" : "Advanced Add MCP Server"
+          dialog.editingServerName
+            ? "Edit MCP Server"
+            : "Advanced Add MCP Server"
         }
-        onOpenChange={setDialogOpen}
-        onSubmit={handleSaveServer}
+        onOpenChange={dialog.setOpen}
+        onSubmit={dialog.saveServer}
       />
     </PageScaffold>
   );

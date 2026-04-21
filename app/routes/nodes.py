@@ -271,6 +271,18 @@ async def retry_node_message(node_id: str, message_id: str) -> dict:
     node = registry.get(node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
+    from app.models import NodeType
+
+    if node.config.node_type == NodeType.ASSISTANT:
+        raise HTTPException(
+            status_code=400,
+            detail="Use /api/assistant/messages/{message_id}/retry for Assistant retry",
+        )
+    if not is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Only a Workflow Leader can retry chat history",
+        )
     try:
         retried_message_id = node.retry_received_message(message_id=message_id)
     except LookupError as exc:

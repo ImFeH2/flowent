@@ -925,6 +925,34 @@ def test_retry_human_message_rolls_back_when_persist_fails(monkeypatch):
     )
 
 
+def test_leader_retry_received_message_requires_human_anchor(monkeypatch):
+    leader = _register_tab_leader()
+    leader.history.extend(
+        [
+            ReceivedMessage(
+                content="Assistant brief",
+                from_id="assistant",
+                message_id="brief-1",
+            ),
+            ReceivedMessage(
+                content="Human follow-up",
+                from_id="human",
+                message_id="msg-human",
+            ),
+        ]
+    )
+    monkeypatch.setattr(
+        "app.graph_service.is_tab_leader",
+        lambda **kwargs: kwargs["node_id"] == leader.uuid,
+    )
+
+    with pytest.raises(
+        LookupError,
+        match=r"Leader human message `brief-1` was not found\.",
+    ):
+        leader.retry_received_message(message_id="brief-1")
+
+
 def test_execute_compact_command_replaces_history_with_summary(monkeypatch):
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     assistant.history.extend(

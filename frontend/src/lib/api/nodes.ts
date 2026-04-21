@@ -71,3 +71,22 @@ export async function dispatchNodeMessageRequest(
     }),
   });
 }
+
+export async function retryNodeMessageRequest(
+  nodeId: string,
+  messageId: string,
+): Promise<{ message_id: string }> {
+  return requestJson<
+    { status: string; message_id?: string | null },
+    { message_id: string }
+  >(`/api/nodes/${nodeId}/messages/${messageId}/retry`, {
+    method: "POST",
+    errorMessage: "Failed to retry node message",
+    map: (data) => {
+      if (typeof data?.message_id !== "string") {
+        throw new Error("Failed to retry node message");
+      }
+      return { message_id: data.message_id };
+    },
+  });
+}

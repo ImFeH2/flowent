@@ -499,6 +499,8 @@ export function LeaderChatPanel({
     navigateInputHistory,
     onMessagesScroll,
     removeImage = () => {},
+    retryMessage,
+    retryingMessageId,
     scrollRef,
     sending,
     sendMessage,
@@ -546,11 +548,14 @@ export function LeaderChatPanel({
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <AssistantChatMessages
-          allowHumanMessageRetry={false}
+          allowHumanMessageRetry
           bottomInset={composerHeight}
           items={timelineItems}
           nodes={agents}
+          onRetryHumanMessage={(messageId) => void retryMessage(messageId)}
           onScroll={onMessagesScroll}
+          retryImageInputEnabled={supportsInputImage}
+          retryingMessageId={retryingMessageId}
           runningHint={leaderActivity.runningHint}
           scrollRef={scrollRef}
           variant="workspace"

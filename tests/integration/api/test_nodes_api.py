@@ -1,9 +1,10 @@
 import os
+import time
 from uuid import UUID
 
 from fastapi.testclient import TestClient
 
-from app.models import AgentState, AssistantText, ReceivedMessage
+from app.models import AgentState, AssistantText, ImagePart, ReceivedMessage, TextPart
 from app.registry import registry
 from app.routes.nodes import router as nodes_router
 from app.settings import STEWARD_ROLE_INCLUDED_TOOLS
@@ -162,6 +163,17 @@ def test_tab_leader_cannot_be_terminated_directly(client: TestClient):
     assert response.json() == {"detail": "Cannot terminate a tab Leader directly"}
 
 
+def test_assistant_retry_is_not_available_via_nodes_api(client: TestClient):
+    assistant_id = _get_assistant_id(client)
+
+    response = client.post(f"/api/nodes/{assistant_id}/messages/msg-1/retry")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Use /api/assistant/messages/{message_id}/retry for Assistant retry"
+    }
+
+
 def test_assistant_can_be_interrupted_via_nodes_api_when_running(client: TestClient):
     assistant_id = _get_assistant_id(client)
     assistant = registry.get(assistant_id)
@@ -230,14 +242,152 @@ def test_human_input_can_be_sent_directly_to_workflow_leader(client: TestClient)
     message_id = response.json()["message_id"]
     assert isinstance(message_id, str)
 
-    detail = client.get(f"/api/nodes/{tab['leader_id']}").json()
+    history = []
+    for _ in range(20):
+        detail = client.get(f"/api/nodes/{tab['leader_id']}").json()
+        history = detail["history"]
+        if any(
+            entry["type"] == "ReceivedMessage"
+            and entry["from_id"] == "human"
+            and entry["message_id"] == message_id
+            and entry["content"] == "/help investigate the failure"
+            for entry in history
+        ):
+            break
+        time.sleep(0.01)
+
     assert any(
         entry["type"] == "ReceivedMessage"
         and entry["from_id"] == "human"
         and entry["message_id"] == message_id
         and entry["content"] == "/help investigate the failure"
+        for entry in history
+    )
+
+
+def test_leader_retry_rewrites_tail_and_reuses_image_parts(monkeypatch, client):
+    assistant_id = _get_assistant_id(client)
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+    leader = registry.get(tab["leader_id"])
+    assert leader is not None
+    queued_messages = []
+
+    upload_response = client.post(
+        "/api/image-assets",
+        files={"file": ("pixel.png", _ONE_PIXEL_PNG, "image/png")},
+    )
+    assert upload_response.status_code == 200
+    asset_id = upload_response.json()["id"]
+
+    leader.history.extend(
+        [
+            ReceivedMessage(
+                content="Initial brief",
+                from_id=assistant_id,
+                message_id="brief-1",
+            ),
+            AssistantText(content="Leader summary"),
+            ReceivedMessage(
+                from_id="human",
+                parts=[
+                    TextPart(text="Retry this leader request"),
+                    ImagePart(
+                        asset_id=asset_id,
+                        mime_type="image/png",
+                        width=1,
+                        height=1,
+                    ),
+                ],
+                message_id="msg-2",
+            ),
+            AssistantText(content="Discard this leader reply"),
+        ]
+    )
+
+    monkeypatch.setattr(leader, "supports_input_image", lambda: True)
+    monkeypatch.setattr(
+        leader,
+        "enqueue_message",
+        lambda message: queued_messages.append(message),
+    )
+
+    response = client.post(f"/api/nodes/{tab['leader_id']}/messages/msg-2/retry")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "retried"
+    assert payload["message_id"] != "msg-2"
+
+    detail = client.get(f"/api/nodes/{tab['leader_id']}").json()
+
+    assert any(
+        entry["type"] == "ReceivedMessage"
+        and entry.get("message_id") == "brief-1"
+        and entry.get("from_id") == assistant_id
         for entry in detail["history"]
     )
+    assert not any(
+        entry["type"] == "ReceivedMessage" and entry.get("message_id") == "msg-2"
+        for entry in detail["history"]
+    )
+    assert not any(
+        entry["type"] == "AssistantText"
+        and entry.get("content") == "Discard this leader reply"
+        for entry in detail["history"]
+    )
+    assert any(
+        entry["type"] == "ReceivedMessage"
+        and entry.get("message_id") == payload["message_id"]
+        and entry.get("content") == "Retry this leader request[image]"
+        for entry in detail["history"]
+    )
+    assert len(queued_messages) == 1
+    assert queued_messages[0].message_id == payload["message_id"]
+    assert queued_messages[0].parts[0].text == "Retry this leader request"
+    assert queued_messages[0].parts[1].asset_id == asset_id
+
+
+def test_leader_retry_rejects_non_human_anchor(client: TestClient):
+    assistant_id = _get_assistant_id(client)
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+    leader = registry.get(tab["leader_id"])
+    assert leader is not None
+    leader.history.append(
+        ReceivedMessage(
+            content="Initial brief",
+            from_id=assistant_id,
+            message_id="brief-1",
+        )
+    )
+
+    response = client.post(f"/api/nodes/{tab['leader_id']}/messages/brief-1/retry")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Leader human message `brief-1` was not found."
+
+
+def test_regular_worker_retry_is_not_available_via_nodes_api(client: TestClient):
+    tab = client.post(
+        "/api/tabs",
+        json={"title": "Execution", "goal": "Coordinate work"},
+    ).json()
+    worker = client.post(
+        f"/api/tabs/{tab['id']}/nodes",
+        json={"role_name": "Worker", "name": "Worker"},
+    ).json()
+
+    response = client.post(f"/api/nodes/{worker['id']}/messages/msg-1/retry")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "Only a Workflow Leader can retry chat history"
+    }
 
 
 def test_human_input_cannot_target_regular_worker(client: TestClient):

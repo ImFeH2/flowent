@@ -731,6 +731,15 @@ class Agent:
         if not normalized_message_id:
             raise ValueError("Retry message_id cannot be empty")
 
+        leader_human_only = False
+        if self.node_type != NodeType.ASSISTANT and self.config.tab_id:
+            from app.graph_service import is_tab_leader
+
+            leader_human_only = is_tab_leader(
+                node_id=self.uuid,
+                tab_id=self.config.tab_id,
+            )
+
         paused_for_command = self._pause_for_command_execution(
             timeout=interrupt_timeout
         )
@@ -753,6 +762,7 @@ class Agent:
                     if (
                         isinstance(entry, ReceivedMessage)
                         and entry.message_id == normalized_message_id
+                        and (not leader_human_only or entry.from_id == "human")
                     ):
                         anchor_index = index
                         anchor_parts = list(entry.parts)
@@ -760,6 +770,10 @@ class Agent:
                         break
 
             if anchor_index < 0:
+                if leader_human_only:
+                    raise LookupError(
+                        f"Leader human message `{normalized_message_id}` was not found."
+                    )
                 raise LookupError(
                     f"Received message `{normalized_message_id}` was not found."
                 )

@@ -15,6 +15,7 @@ import {
   fetchNodeDetail,
   getImageAssetUrl,
   interruptNode,
+  retryNodeMessageRequest,
   uploadImageAssetRequest,
 } from "@/lib/api";
 import {
@@ -212,6 +213,9 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
   const [draftImages, setDraftImages] = useState<DraftLeaderImage[]>([]);
   const [historyCursor, setHistoryCursor] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
+  const [retryingMessageId, setRetryingMessageId] = useState<string | null>(
+    null,
+  );
   const [pendingMessages, setPendingMessages] = useState<
     PendingAssistantChatMessage[]
   >([]);
@@ -280,6 +284,7 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
     setDraftImages([]);
     setHistoryCursor(null);
     setPendingMessages([]);
+    setRetryingMessageId(null);
   }, [inputHistoryScope]);
 
   useEffect(() => {
@@ -771,6 +776,50 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
     throw new Error("Leader did not stop in time");
   }, [leaderId, leaderNode?.state]);
 
+  const retryMessage = useCallback(
+    async (messageId: string) => {
+      if (!leaderId || !messageId || retryingMessageId) {
+        return;
+      }
+
+      setRetryingMessageId(messageId);
+      try {
+        try {
+          await stopLeader();
+          await retryNodeMessageRequest(leaderId, messageId);
+        } catch (error) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Failed to retry Leader message",
+          );
+          return;
+        }
+
+        clearAgentHistory(leaderId);
+        try {
+          const data = await fetchNodeDetail(leaderId);
+          if (data) {
+            setDetail(data);
+            setFetchedAt(Date.now());
+            clearHistorySnapshot(leaderId);
+          }
+        } catch {
+          return;
+        }
+      } finally {
+        setRetryingMessageId(null);
+      }
+    },
+    [
+      clearAgentHistory,
+      clearHistorySnapshot,
+      leaderId,
+      retryingMessageId,
+      stopLeader,
+    ],
+  );
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -792,6 +841,8 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
     navigateInputHistory,
     onMessagesScroll,
     removeImage,
+    retryMessage,
+    retryingMessageId,
     scrollRef,
     sendMessage,
     sending,

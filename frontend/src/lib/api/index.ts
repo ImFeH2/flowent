@@ -6,6 +6,7 @@ export {
   interruptNode,
   clearAssistantChatRequest,
   dispatchNodeMessageRequest,
+  retryNodeMessageRequest,
 } from "./nodes";
 export {
   fetchTabs,

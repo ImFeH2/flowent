@@ -7,18 +7,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
-import {
-  Suspense,
-  lazy,
-  useEffect,
-  useMemo,
-  useState,
-  type ComponentType,
-} from "react";
+import { Suspense, lazy, useState, type ComponentType } from "react";
 import { Toaster } from "sonner";
 import { ImageViewerProvider } from "@/components/ImageViewer";
 import { Sidebar } from "@/components/Sidebar";
-import { GlobalCommandPalette } from "@/components/layout/GlobalCommandPalette";
 import {
   ShellBackground,
   ShellSurface,
@@ -28,12 +20,7 @@ import { ShellHeader } from "@/components/layout/ShellHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-  AgentProvider,
-  useAgentTabsRuntime,
-  useAgentUI,
-  type PageId,
-} from "@/context/AgentContext";
+import { AgentProvider, useAgentUI, type PageId } from "@/context/AgentContext";
 import { AccessProvider } from "@/context/AccessContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { useAccess } from "@/context/useAccess";
@@ -106,16 +93,8 @@ const accessInputClass =
 const accessButtonClass =
   "flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-[13px] font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
 
-function getCommandShortcutLabel(): string {
-  if (typeof navigator === "undefined") {
-    return "Ctrl+K";
-  }
-  return /mac/i.test(navigator.platform) ? "⌘K" : "Ctrl+K";
-}
-
 function AppContent() {
-  const { currentPage, setActiveTabId, setCurrentPage } = useAgentUI();
-  const { tabs } = useAgentTabsRuntime();
+  const { currentPage } = useAgentUI();
   const { logout } = useAccess();
   const isWorkspace = currentPage === "workspace";
   const isCompactLayout = useMediaQuery("(max-width: 980px)");
@@ -126,38 +105,9 @@ function AppContent() {
     320,
   );
   const [sidebarDrawerOpen, setSidebarDrawerOpen] = useState(false);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   const LazyPage = lazyPageMap[currentPage];
   const sidebarOpen = isCompactLayout && sidebarDrawerOpen;
-  const commandShortcutLabel = useMemo(() => getCommandShortcutLabel(), []);
-  const workflows = useMemo(
-    () =>
-      Array.from(tabs.values()).map((tab) => ({
-        id: tab.id,
-        shortId: tab.id.slice(0, 8),
-        title: tab.title,
-      })),
-    [tabs],
-  );
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        !(event.metaKey || event.ctrlKey) ||
-        event.key.toLowerCase() !== "k"
-      ) {
-        return;
-      }
-      event.preventDefault();
-      setCommandPaletteOpen(true);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
 
   const renderPage = () => {
     return (
@@ -172,17 +122,6 @@ function AppContent() {
         <LazyPage />
       </Suspense>
     );
-  };
-
-  const handleSelectPage = (page: PageId) => {
-    setCurrentPage(page);
-    setSidebarDrawerOpen(false);
-  };
-
-  const handleSelectWorkflow = (workflowId: string) => {
-    setCurrentPage("workspace");
-    setActiveTabId(workflowId);
-    setSidebarDrawerOpen(false);
   };
 
   return (
@@ -290,8 +229,6 @@ function AppContent() {
                 <div className="mx-auto flex h-full w-full max-w-[1320px] min-h-0 flex-col px-4 sm:px-6 lg:px-8">
                   <ShellHeader
                     compact={isCompactLayout}
-                    commandShortcutLabel={commandShortcutLabel}
-                    onOpenCommandPalette={() => setCommandPaletteOpen(true)}
                     onOpenNavigation={() => setSidebarDrawerOpen(true)}
                   />
                   <div className="min-h-0 flex-1">{renderPage()}</div>
@@ -299,13 +236,6 @@ function AppContent() {
               )}
             </motion.div>
           </AnimatePresence>
-          <GlobalCommandPalette
-            open={commandPaletteOpen}
-            onOpenChange={setCommandPaletteOpen}
-            onSelectPage={handleSelectPage}
-            onSelectWorkflow={handleSelectWorkflow}
-            workflows={workflows}
-          />
         </ShellSurface>
       </main>
     </ShellBackground>

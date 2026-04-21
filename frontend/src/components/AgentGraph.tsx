@@ -375,7 +375,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       string | null
     >(null);
     const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-    const [quickCreateRoleQuery, setQuickCreateRoleQuery] = useState("");
     const [quickCreateRoleName, setQuickCreateRoleName] = useState("");
     const [quickCreateName, setQuickCreateName] = useState("");
     const [submittingQuickCreate, setSubmittingQuickCreate] = useState(false);
@@ -523,7 +522,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
 
     const closeQuickCreate = useCallback(() => {
       setQuickCreate(null);
-      setQuickCreateRoleQuery("");
       setQuickCreateRoleName("");
       setQuickCreateName("");
     }, []);
@@ -545,7 +543,6 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
 
     const openQuickCreate = useCallback((state: QuickCreateState) => {
       setContextMenu(null);
-      setQuickCreateRoleQuery("");
       setQuickCreateRoleName("");
       setQuickCreateName("");
       setQuickCreate(state);
@@ -1320,17 +1317,7 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
       return { left, top };
     }, [tooltip, tooltipSize]);
 
-    const filteredRoles = useMemo(() => {
-      const normalizedQuery = quickCreateRoleQuery.trim().toLowerCase();
-      if (!normalizedQuery) {
-        return roles;
-      }
-      return roles.filter((role) =>
-        `${role.name} ${role.description}`
-          .toLowerCase()
-          .includes(normalizedQuery),
-      );
-    }, [quickCreateRoleQuery, roles]);
+    const availableRoles = roles;
 
     const submitQuickCreate = useCallback(async () => {
       if (!quickCreate || !activeTabId || !quickCreateRoleName.trim()) {
@@ -1589,14 +1576,12 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
         {quickCreate ? (
           <GraphQuickCreatePopover
             displayName={quickCreateName}
-            filteredRoles={filteredRoles}
+            roles={availableRoles}
             loadingRoles={loadingRoles}
             onClose={closeQuickCreate}
             onDisplayNameChange={setQuickCreateName}
-            onRoleQueryChange={setQuickCreateRoleQuery}
             onSelectRole={setQuickCreateRoleName}
             onSubmit={() => void submitQuickCreate()}
-            roleQuery={quickCreateRoleQuery}
             selectedRoleName={quickCreateRoleName}
             submitting={submittingQuickCreate}
             title={getQuickCreateTitle(quickCreate)}
@@ -1634,13 +1619,11 @@ function GraphQuickCreatePopover({
   x,
   y,
   title,
-  roleQuery,
   selectedRoleName,
   displayName,
-  filteredRoles,
+  roles,
   loadingRoles,
   submitting,
-  onRoleQueryChange,
   onSelectRole,
   onDisplayNameChange,
   onSubmit,
@@ -1649,13 +1632,11 @@ function GraphQuickCreatePopover({
   x: number;
   y: number;
   title: string;
-  roleQuery: string;
   selectedRoleName: string;
   displayName: string;
-  filteredRoles: Role[];
+  roles: Role[];
   loadingRoles: boolean;
   submitting: boolean;
-  onRoleQueryChange: (value: string) => void;
   onSelectRole: (value: string) => void;
   onDisplayNameChange: (value: string) => void;
   onSubmit: () => void;
@@ -1680,7 +1661,7 @@ function GraphQuickCreatePopover({
       });
     });
     return () => cancelAnimationFrame(raf);
-  }, [filteredRoles.length, loadingRoles, title, x, y]);
+  }, [loadingRoles, roles.length, title, x, y]);
 
   useEffect(() => {
     const handleMouseDown = (event: globalThis.MouseEvent) => {
@@ -1719,25 +1700,17 @@ function GraphQuickCreatePopover({
         </div>
 
         <div className="mt-4 space-y-3">
-          <Input
-            aria-label="Search roles"
-            autoFocus
-            value={roleQuery}
-            onChange={(event) => onRoleQueryChange(event.target.value)}
-            placeholder="Search roles"
-            className={quickCreateInputClass}
-          />
           <div className={quickCreateListClass}>
             {loadingRoles ? (
               <p className="px-2 py-3 text-[12px] text-muted-foreground">
                 Loading roles...
               </p>
-            ) : filteredRoles.length === 0 ? (
+            ) : roles.length === 0 ? (
               <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                No roles match your search.
+                No roles available.
               </p>
             ) : (
-              filteredRoles.map((role) => (
+              roles.map((role) => (
                 <Button
                   key={role.name}
                   type="button"

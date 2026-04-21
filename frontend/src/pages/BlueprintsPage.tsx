@@ -352,7 +352,6 @@ export function BlueprintsPage() {
     null,
   );
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [draft, setDraft] = useState<BlueprintDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingBlueprintId, setDeletingBlueprintId] = useState<string | null>(
@@ -466,18 +465,6 @@ export function BlueprintsPage() {
     [blueprints, selectedBlueprintId],
   );
 
-  const filteredBlueprints = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return blueprints;
-    }
-    return blueprints.filter((blueprint) =>
-      `${blueprint.name} ${blueprint.description}`
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [blueprints, searchQuery]);
-
   const displayBlueprint = useMemo<BlueprintViewModel | null>(() => {
     if (draft) {
       return {
@@ -562,19 +549,6 @@ export function BlueprintsPage() {
             ]
           : [],
     [displayBlueprint],
-  );
-
-  const filteredRoles = useCallback(
-    (query: string) => {
-      const normalized = query.trim().toLowerCase();
-      if (!normalized) {
-        return roles;
-      }
-      return roles.filter((role) =>
-        `${role.name} ${role.description}`.toLowerCase().includes(normalized),
-      );
-    },
-    [roles],
   );
 
   const beginCreateDraft = useCallback(() => {
@@ -807,13 +781,11 @@ export function BlueprintsPage() {
 
   const libraryPanel = (
     <BlueprintLibraryColumn
-      blueprints={filteredBlueprints}
+      blueprints={blueprints}
       loading={loadingBlueprints}
-      searchQuery={searchQuery}
       selectedBlueprintId={selectedBlueprintId}
       totalCount={blueprints.length}
       onCreateBlueprint={beginCreateDraft}
-      onSearchChange={setSearchQuery}
       onSelectBlueprint={(blueprintId) => {
         setDraft(null);
         setSelectedSlotId(null);
@@ -830,7 +802,7 @@ export function BlueprintsPage() {
       blueprint={displayBlueprint}
       deletingDisabled={!selectedBlueprint}
       draft={draft}
-      filteredRoles={filteredRoles}
+      roles={roles}
       loadingRoles={loadingRoles}
       saving={saving}
       selectedSlot={selectedSlot}
@@ -1068,20 +1040,16 @@ export function BlueprintsPage() {
 function BlueprintLibraryColumn({
   blueprints,
   loading,
-  searchQuery,
   selectedBlueprintId,
   totalCount,
   onCreateBlueprint,
-  onSearchChange,
   onSelectBlueprint,
 }: {
   blueprints: AgentBlueprint[];
   loading: boolean;
-  searchQuery: string;
   selectedBlueprintId: string | null;
   totalCount: number;
   onCreateBlueprint: () => void;
-  onSearchChange: (value: string) => void;
   onSelectBlueprint: (blueprintId: string) => void;
 }) {
   return (
@@ -1098,7 +1066,7 @@ function BlueprintLibraryColumn({
               </span>
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-              Browse, search, and pick the latest blueprint revision.
+              Browse and pick the latest blueprint revision.
             </p>
           </div>
           <Button size="sm" onClick={onCreateBlueprint}>
@@ -1106,13 +1074,6 @@ function BlueprintLibraryColumn({
             New
           </Button>
         </div>
-        <Input
-          aria-label="Search blueprints"
-          value={searchQuery}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search by name or description"
-          className={`mt-4 ${blueprintFormInputClass}`}
-        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 scrollbar-none">
@@ -1340,7 +1301,7 @@ function BlueprintInspectorColumn({
   blueprint,
   deletingDisabled,
   draft,
-  filteredRoles,
+  roles,
   loadingRoles,
   saving,
   selectedSlot,
@@ -1359,7 +1320,7 @@ function BlueprintInspectorColumn({
   blueprint: BlueprintViewModel | null;
   deletingDisabled: boolean;
   draft: BlueprintDraft | null;
-  filteredRoles: (query: string) => Role[];
+  roles: Role[];
   loadingRoles: boolean;
   saving: boolean;
   selectedSlot: BlueprintSlot | null;
@@ -1383,12 +1344,6 @@ function BlueprintInspectorColumn({
     value: string,
   ) => void;
 }) {
-  const [roleSearch, setRoleSearch] = useState("");
-  const visibleRoles = useMemo(
-    () => filteredRoles(roleSearch),
-    [filteredRoles, roleSearch],
-  );
-
   if (!blueprint) {
     return (
       <div className="flex h-full items-center justify-center px-6 text-center text-[12px] leading-relaxed text-muted-foreground">
@@ -1452,27 +1407,20 @@ function BlueprintInspectorColumn({
               <>
                 <InspectorSection
                   title="Role"
-                  description="Search and choose a role for this slot."
+                  description="Choose a role for this slot."
                 >
                   <div className="space-y-3">
-                    <Input
-                      aria-label="Search roles"
-                      value={roleSearch}
-                      onChange={(event) => setRoleSearch(event.target.value)}
-                      placeholder="Search roles"
-                      className={blueprintFormInputClass}
-                    />
                     <div className={blueprintChoiceListClass}>
                       {loadingRoles ? (
                         <p className="px-2 py-3 text-[12px] text-muted-foreground">
                           Loading roles...
                         </p>
-                      ) : visibleRoles.length === 0 ? (
+                      ) : roles.length === 0 ? (
                         <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                          No roles match your search.
+                          No roles available.
                         </p>
                       ) : (
-                        visibleRoles.map((role) => (
+                        roles.map((role) => (
                           <Button
                             key={role.name}
                             type="button"

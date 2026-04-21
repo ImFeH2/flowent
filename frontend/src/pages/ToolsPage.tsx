@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import useSWR from "swr";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -14,7 +14,6 @@ import {
   ListTodo,
   Network,
   Plug,
-  Search,
   Send,
   Settings,
   Shield,
@@ -25,11 +24,7 @@ import {
 } from "lucide-react";
 import { fetchTools, type ToolInfo } from "@/lib/api";
 import { PageScaffold, PageTitleBar } from "@/components/layout/PageScaffold";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-
-const toolSearchInputClass =
-  "bg-background/50 pl-10 pr-3 text-[13px] focus:bg-background/65";
 const toolChipClass =
   "inline-flex h-5 shrink-0 items-center rounded-full border border-border bg-accent/20 px-2.5 text-[11px] font-medium text-muted-foreground";
 
@@ -153,19 +148,7 @@ function ToolCard({
 export function ToolsPage() {
   const { data: tools = [], isLoading: loading } = useSWR("tools", fetchTools);
 
-  const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const filteredTools = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return tools;
-    return tools.filter(
-      (tool) =>
-        tool.name.toLowerCase().includes(normalizedQuery) ||
-        tool.description.toLowerCase().includes(normalizedQuery) ||
-        (tool.server_name ?? "").toLowerCase().includes(normalizedQuery),
-    );
-  }, [query, tools]);
 
   const toggle = (name: string) => {
     setExpanded((prev) => {
@@ -183,17 +166,11 @@ export function ToolsPage() {
     <PageScaffold>
       <div className="flex h-full flex-col px-8 pt-6">
         <PageTitleBar title="Tools" />
-        <div className="mb-6 mt-6 flex items-center gap-4">
-          <div className="relative max-w-md flex-1">
-            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tools..."
-              className={toolSearchInputClass}
-            />
-          </div>
-          <span className={toolChipClass}>{filteredTools.length} tools</span>
+        <div className="mb-6 mt-6 flex items-center justify-between gap-4">
+          <p className="text-[13px] text-muted-foreground">
+            Built-in and connected MCP tools appear here.
+          </p>
+          <span className={toolChipClass}>{tools.length} tools</span>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-2 scrollbar-none">
@@ -206,7 +183,7 @@ export function ToolsPage() {
                 />
               ))}
             </div>
-          ) : filteredTools.length === 0 ? (
+          ) : tools.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -216,15 +193,15 @@ export function ToolsPage() {
                 <Wrench className="size-6 text-muted-foreground" />
               </div>
               <h3 className="mt-5 text-[15px] font-medium text-foreground">
-                No Tools Found
+                No Tools Available
               </h3>
               <p className="mt-1.5 text-[13px] text-muted-foreground">
-                Try adjusting your search criteria.
+                Connect an MCP server to expand this catalog.
               </p>
             </motion.div>
           ) : (
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 pb-8">
-              {filteredTools.map((tool, i) => (
+              {tools.map((tool, i) => (
                 <motion.div
                   key={tool.name}
                   initial={{ opacity: 0, y: 8 }}

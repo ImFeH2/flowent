@@ -613,11 +613,7 @@ describe("AgentGraph", () => {
 
     fireEvent.click(screen.getByTestId("connect-end-empty-first"));
 
-    expect(
-      await screen.findByRole("textbox", {
-        name: "Search roles",
-      }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No roles available.")).toBeInTheDocument();
   });
 
   it("blocks self and duplicate connections before calling onCreateConnection", async () => {

@@ -78,13 +78,11 @@ export function useHomePageState() {
   const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
   const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
   const [createTabBlueprintId, setCreateTabBlueprintId] = useState("");
-  const [createTabBlueprintQuery, setCreateTabBlueprintQuery] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
   const [blueprints, setBlueprints] = useState<AgentBlueprint[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingBlueprints, setLoadingBlueprints] = useState(false);
   const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
-  const [createAgentRoleQuery, setCreateAgentRoleQuery] = useState("");
   const [createAgentName, setCreateAgentName] = useState("");
   const [saveBlueprintName, setSaveBlueprintName] = useState("");
   const [saveBlueprintDescription, setSaveBlueprintDescription] = useState("");
@@ -242,26 +240,8 @@ export function useHomePageState() {
     () => roles.find((role) => role.name === createAgentRoleName) ?? null,
     [createAgentRoleName, roles],
   );
-  const filteredCreateAgentRoles = useMemo(() => {
-    const query = createAgentRoleQuery.trim().toLowerCase();
-    if (!query) {
-      return roles;
-    }
-    return roles.filter((role) =>
-      `${role.name} ${role.description}`.toLowerCase().includes(query),
-    );
-  }, [createAgentRoleQuery, roles]);
-  const filteredCreateTabBlueprints = useMemo(() => {
-    const query = createTabBlueprintQuery.trim().toLowerCase();
-    if (!query) {
-      return blueprints;
-    }
-    return blueprints.filter((blueprint) =>
-      `${blueprint.name} ${blueprint.description}`
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [blueprints, createTabBlueprintQuery]);
+  const availableCreateAgentRoles = roles;
+  const availableCreateTabBlueprints = blueprints;
 
   const panelVisible = panelOpen || !!selectedAgent;
   const resolvedPanelWidth = useMemo(() => {
@@ -364,7 +344,6 @@ export function useHomePageState() {
     setCreateTabAllowNetwork(false);
     setCreateTabWriteDirs("");
     setCreateTabBlueprintId("");
-    setCreateTabBlueprintQuery("");
     setActiveDialog("create-tab");
   }, []);
 
@@ -393,7 +372,6 @@ export function useHomePageState() {
       setCreateTabAllowNetwork(false);
       setCreateTabWriteDirs("");
       setCreateTabBlueprintId("");
-      setCreateTabBlueprintQuery("");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to create tab",
@@ -464,7 +442,6 @@ export function useHomePageState() {
       return;
     }
     setCreateAgentRoleName("Worker");
-    setCreateAgentRoleQuery("");
     setCreateAgentName("");
     setActiveDialog("create-agent");
   }, [activeTabId]);
@@ -483,7 +460,6 @@ export function useHomePageState() {
       });
       setActiveDialog(null);
       setCreateAgentRoleName("Worker");
-      setCreateAgentRoleQuery("");
       setCreateAgentName("");
     } catch (error) {
       toast.error(
@@ -580,16 +556,14 @@ export function useHomePageState() {
     connectTargetId,
     createAgentName,
     createAgentRoleName,
-    createAgentRoleQuery,
     createTabAllowNetwork,
     createTabBlueprintId,
-    createTabBlueprintQuery,
     createTabGoal,
     createTabTitle,
     createTabWriteDirs,
     deleteTabTarget,
-    filteredCreateAgentRoles,
-    filteredCreateTabBlueprints,
+    availableCreateAgentRoles,
+    availableCreateTabBlueprints,
     graphConnectMode,
     graphHistory,
     graphRef,
@@ -629,10 +603,8 @@ export function useHomePageState() {
     setConnectTargetId,
     setCreateAgentName,
     setCreateAgentRoleName,
-    setCreateAgentRoleQuery,
     setCreateTabAllowNetwork,
     setCreateTabBlueprintId,
-    setCreateTabBlueprintQuery,
     setCreateTabGoal,
     setCreateTabTitle,
     setCreateTabWriteDirs,

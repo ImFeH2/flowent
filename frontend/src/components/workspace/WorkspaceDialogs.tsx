@@ -45,13 +45,11 @@ export interface WorkspaceAgentOption {
 interface CreateTabDialogProps {
   allowNetwork: boolean;
   blueprintId: string;
-  blueprintQuery: string;
-  filteredBlueprints: AgentBlueprint[];
+  blueprints: AgentBlueprint[];
   goal: string;
   loadingBlueprints: boolean;
   onAllowNetworkChange: (nextValue: boolean) => void;
   onBlueprintIdChange: (nextValue: string) => void;
-  onBlueprintQueryChange: (nextValue: string) => void;
   onGoalChange: (nextValue: string) => void;
   onOpenChange: (open: boolean) => void;
   onSubmit: () => void;
@@ -67,13 +65,11 @@ interface CreateTabDialogProps {
 export function CreateTabDialog({
   allowNetwork,
   blueprintId,
-  blueprintQuery,
-  filteredBlueprints,
+  blueprints,
   goal,
   loadingBlueprints,
   onAllowNetworkChange,
   onBlueprintIdChange,
-  onBlueprintQueryChange,
   onGoalChange,
   onOpenChange,
   onSubmit,
@@ -126,13 +122,6 @@ export function CreateTabDialog({
       </WorkspaceDialogField>
       <WorkspaceDialogField label="Blueprint" hint="Optional">
         <div className="space-y-3">
-          <Input
-            aria-label="Search blueprints"
-            value={blueprintQuery}
-            onChange={(event) => onBlueprintQueryChange(event.target.value)}
-            placeholder="Search blueprints"
-            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-          />
           {selectedBlueprint ? (
             <div className={workspaceChoiceCardClass}>
               <div className="text-[13px] font-medium text-foreground">
@@ -171,12 +160,12 @@ export function CreateTabDialog({
               <p className="px-2 py-3 text-[12px] text-muted-foreground">
                 Loading blueprints...
               </p>
-            ) : filteredBlueprints.length === 0 ? (
+            ) : blueprints.length === 0 ? (
               <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                No blueprints match your search.
+                No blueprints available.
               </p>
             ) : (
-              filteredBlueprints.map((blueprint) => (
+              blueprints.map((blueprint) => (
                 <Button
                   key={blueprint.id}
                   type="button"
@@ -314,16 +303,14 @@ export function SaveBlueprintDialog({
 interface CreateAgentDialogProps {
   activeTabTitle: string | null;
   agentName: string;
-  filteredRoles: Role[];
+  roles: Role[];
   loadingRoles: boolean;
   onAgentNameChange: (nextValue: string) => void;
   onOpenChange: (open: boolean) => void;
   onRoleNameChange: (nextValue: string) => void;
-  onRoleQueryChange: (nextValue: string) => void;
   onSubmit: () => void;
   open: boolean;
   pending: boolean;
-  roleQuery: string;
   selectedRole: Role | null;
   selectedRoleName: string;
   submitDisabled: boolean;
@@ -332,16 +319,14 @@ interface CreateAgentDialogProps {
 export function CreateAgentDialog({
   activeTabTitle,
   agentName,
-  filteredRoles,
+  roles,
   loadingRoles,
   onAgentNameChange,
   onOpenChange,
   onRoleNameChange,
-  onRoleQueryChange,
   onSubmit,
   open,
   pending,
-  roleQuery,
   selectedRole,
   selectedRoleName,
   submitDisabled,
@@ -377,14 +362,6 @@ export function CreateAgentDialog({
         hint="Required · Leader is managed by the tab"
       >
         <div className="space-y-3">
-          <Input
-            autoFocus
-            aria-label="Search roles"
-            value={roleQuery}
-            onChange={(event) => onRoleQueryChange(event.target.value)}
-            placeholder="Search roles"
-            className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-          />
           {selectedRole ? (
             <div className={workspaceChoiceCardClass}>
               <div className="text-[13px] font-medium text-foreground">
@@ -400,12 +377,12 @@ export function CreateAgentDialog({
               <p className="px-2 py-3 text-[12px] text-muted-foreground">
                 Loading roles...
               </p>
-            ) : filteredRoles.length === 0 ? (
+            ) : roles.length === 0 ? (
               <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                No roles match your search.
+                No roles available.
               </p>
             ) : (
-              filteredRoles.map((role) => (
+              roles.map((role) => (
                 <Button
                   key={role.name}
                   type="button"

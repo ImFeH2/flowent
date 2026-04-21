@@ -73,7 +73,6 @@ export function RolesPage() {
   const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
   const [saving, setSaving] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
-  const [providerModelQuery, setProviderModelQuery] = useState("");
 
   const {
     data: bootstrapData,
@@ -109,15 +108,7 @@ export function RolesPage() {
       activeProviderId ? (providersById[activeProviderId]?.models ?? []) : [],
     [activeProviderId, providersById],
   );
-  const filteredActiveProviderModelOptions = useMemo(() => {
-    const normalizedQuery = providerModelQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return activeProviderModelOptions;
-    }
-    return activeProviderModelOptions.filter((option) =>
-      option.model.toLowerCase().includes(normalizedQuery),
-    );
-  }, [activeProviderModelOptions, providerModelQuery]);
+  const availableActiveProviderModelOptions = activeProviderModelOptions;
 
   const refreshRoles = async () => {
     await mutateRolesBootstrap();
@@ -127,13 +118,11 @@ export function RolesPage() {
     setPanelMode("create");
     setActiveRoleName(null);
     setDraft(emptyDraft());
-    setProviderModelQuery("");
   };
 
   const handleView = (role: Role) => {
     setPanelMode("view");
     setActiveRoleName(role.name);
-    setProviderModelQuery("");
     setDraft({
       name: role.name,
       description: role.description,
@@ -155,7 +144,6 @@ export function RolesPage() {
   const handleEdit = (role: Role) => {
     setPanelMode("edit");
     setActiveRoleName(role.name);
-    setProviderModelQuery("");
     setDraft({
       name: role.name,
       description: role.description,
@@ -178,7 +166,6 @@ export function RolesPage() {
     setPanelMode(null);
     setActiveRoleName(null);
     setDraft(emptyDraft());
-    setProviderModelQuery("");
   };
 
   const handleModelModeChange = (enabled: boolean) => {
@@ -202,7 +189,6 @@ export function RolesPage() {
   };
 
   const handleProviderChange = (providerId: string) => {
-    setProviderModelQuery("");
     setDraft((current) => ({
       ...current,
       model: current.model
@@ -636,7 +622,7 @@ export function RolesPage() {
                             </label>
                             <Select
                               value={
-                                activeProviderModelOptions.some(
+                                availableActiveProviderModelOptions.some(
                                   (option) =>
                                     option.model === draft.model?.model,
                                 )
@@ -654,20 +640,21 @@ export function RolesPage() {
                               disabled={
                                 isReadOnly ||
                                 !draft.model.provider_id ||
-                                activeProviderModelOptions.length === 0
+                                availableActiveProviderModelOptions.length === 0
                               }
                             >
                               <SelectTrigger className={formSelectTriggerClass}>
                                 <SelectValue
                                   placeholder={
-                                    activeProviderModelOptions.length > 0
+                                    availableActiveProviderModelOptions.length >
+                                    0
                                       ? "Pick a provider model"
                                       : "No saved provider models"
                                   }
                                 />
                               </SelectTrigger>
                               <SelectContent className="max-h-[300px] rounded-xl border-border bg-popover">
-                                {filteredActiveProviderModelOptions.map(
+                                {availableActiveProviderModelOptions.map(
                                   (option) => (
                                     <SelectItem
                                       key={option.model}
@@ -680,28 +667,11 @@ export function RolesPage() {
                                 )}
                               </SelectContent>
                             </Select>
-                            {activeProviderModelOptions.length > 0 ? (
-                              <FormInput
-                                value={providerModelQuery}
-                                onChange={(event) =>
-                                  setProviderModelQuery(event.target.value)
-                                }
-                                readOnly={isReadOnly}
-                                placeholder="Search provider models"
-                                className={cn(
-                                  isReadOnly ? formReadOnlyClass : "",
-                                )}
-                              />
-                            ) : (
+                            {availableActiveProviderModelOptions.length ===
+                            0 ? (
                               <p className="text-[11px] text-muted-foreground leading-relaxed">
                                 No saved provider models. Manage this provider
                                 catalog in Providers.
-                              </p>
-                            )}
-                            {activeProviderModelOptions.length > 0 &&
-                            filteredActiveProviderModelOptions.length === 0 ? (
-                              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                No provider models match the current search.
                               </p>
                             ) : null}
                           </div>

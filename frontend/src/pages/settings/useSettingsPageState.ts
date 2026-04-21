@@ -37,7 +37,6 @@ export function useSettingsPageState() {
   } = useSWR("settingsBootstrap", () => fetchSettingsBootstrap<UserSettings>());
 
   const [localSettings, setLocalSettings] = useState<UserSettings | null>(null);
-  const [providerModelQuery, setProviderModelQuery] = useState("");
   const [saving, setSaving] = useState(false);
   const [accessDraft, setAccessDraft] = useState<AccessDraft>({
     newCode: "",
@@ -95,15 +94,7 @@ export function useSettingsPageState() {
     [activeProvider],
   );
 
-  const filteredActiveProviderModels = useMemo(() => {
-    const normalizedQuery = providerModelQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return activeProviderModels;
-    }
-    return activeProviderModels.filter((model) =>
-      model.model.toLowerCase().includes(normalizedQuery),
-    );
-  }, [activeProviderModels, providerModelQuery]);
+  const availableActiveProviderModels = activeProviderModels;
 
   const selectedCatalogModel = useMemo(() => {
     if (!settings) {
@@ -231,21 +222,19 @@ export function useSettingsPageState() {
     accessDraftError,
     activeProvider,
     activeProviderModels,
+    availableActiveProviderModels,
     appVersion,
     assistantRole,
     effectiveContextWindowTokens,
     effectiveModelCapabilities,
-    filteredActiveProviderModels,
     handleSave,
     knownSafeInputTokens,
     leaderRole,
     loading,
-    providerModelQuery,
     providers,
     roles,
     saving,
     settings,
-    setProviderModelQuery,
     updateAccessDraft,
     updateSettings,
   };

@@ -17,21 +17,19 @@ export function SettingsPage() {
     accessDraftError,
     activeProvider,
     activeProviderModels,
+    availableActiveProviderModels,
     appVersion,
     assistantRole,
     effectiveContextWindowTokens,
     effectiveModelCapabilities,
-    filteredActiveProviderModels,
     handleSave,
     knownSafeInputTokens,
     leaderRole,
     loading,
-    providerModelQuery,
     providers,
     roles,
     saving,
     settings,
-    setProviderModelQuery,
     updateAccessDraft,
     updateSettings,
   } = useSettingsPageState();
@@ -81,13 +79,11 @@ export function SettingsPage() {
           <ModelConfigurationSection
             activeProvider={activeProvider}
             activeProviderModels={activeProviderModels}
+            availableActiveProviderModels={availableActiveProviderModels}
             effectiveContextWindowTokens={effectiveContextWindowTokens}
             effectiveModelCapabilities={effectiveModelCapabilities}
-            filteredActiveProviderModels={filteredActiveProviderModels}
             knownSafeInputTokens={knownSafeInputTokens}
-            onProviderModelQueryChange={setProviderModelQuery}
             onSettingsChange={updateSettings}
-            providerModelQuery={providerModelQuery}
             providers={providers}
             settings={settings}
           />

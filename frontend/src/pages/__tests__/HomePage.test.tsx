@@ -436,8 +436,14 @@ describe("HomePage", () => {
     render(<HomePage />);
 
     fireEvent.click(screen.getAllByRole("button", { name: "Add Agent" })[0]);
-    await screen.findByText("Review results carefully");
-    fireEvent.click(screen.getByRole("button", { name: /Reviewer/ }));
+    const dialog = await screen.findByRole("dialog");
+    const reviewerButton = within(dialog)
+      .getByText("Reviewer")
+      .closest("button");
+    if (!reviewerButton) {
+      throw new Error("Reviewer role button not found");
+    }
+    fireEvent.click(reviewerButton);
     fireEvent.change(screen.getByLabelText("Agent display name"), {
       target: { value: "Release Reviewer" },
     });

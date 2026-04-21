@@ -1,10 +1,4 @@
-import {
-  startTransition,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { Plus, RefreshCw, Search, Unplug, X } from "lucide-react";
 import { toast } from "sonner";
@@ -480,28 +474,12 @@ function activityCategoryLabel(record: MCPActivityRecord) {
 
 function matchesServerFilter(
   record: MCPServerRecord,
-  query: string,
   statusFilter: ServerStatusFilter,
 ) {
   if (statusFilter !== "all" && record.snapshot.status !== statusFilter) {
     return false;
   }
-  if (!query) {
-    return true;
-  }
-  const visibility = globalAvailabilityLabel(record);
-  const haystack = [
-    record.config.name,
-    record.config.transport,
-    statusLabel(record.snapshot.status),
-    formatAuthStatus(record.snapshot.auth_status),
-    capabilitySummary(record),
-    visibility ?? "",
-    record.snapshot.last_error ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(query);
+  return true;
 }
 
 function renderValueOrFallback(value: string, fallback = "Not set") {
@@ -531,7 +509,6 @@ export function McpPage() {
   const [promptPreviewLoading, setPromptPreviewLoading] = useState(false);
   const [promptPreviewArgumentsText, setPromptPreviewArgumentsText] =
     useState("{}");
-  const [serverSearch, setServerSearch] = useState("");
   const [serverStatusFilter, setServerStatusFilter] =
     useState<ServerStatusFilter>("all");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
@@ -541,9 +518,6 @@ export function McpPage() {
   const [quickAddPending, setQuickAddPending] = useState(false);
   const [quickAddError, setQuickAddError] = useState<string | null>(null);
 
-  const deferredServerSearch = useDeferredValue(
-    serverSearch.trim().toLowerCase(),
-  );
   const quickAddTokens = useMemo(
     () => tokenizeLauncher(quickAddInput.trim()),
     [quickAddInput],
@@ -575,9 +549,9 @@ export function McpPage() {
   const filteredServers = useMemo(
     () =>
       servers.filter((record) =>
-        matchesServerFilter(record, deferredServerSearch, serverStatusFilter),
+        matchesServerFilter(record, serverStatusFilter),
       ),
-    [deferredServerSearch, serverStatusFilter, servers],
+    [serverStatusFilter, servers],
   );
 
   const selectedServer = useMemo(
@@ -668,7 +642,6 @@ export function McpPage() {
   };
 
   const clearServerFilters = () => {
-    setServerSearch("");
     setServerStatusFilter("all");
   };
 
@@ -1069,30 +1042,15 @@ export function McpPage() {
               {quickAddPanel}
 
               <SoftPanel className="mt-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="relative w-full max-w-xl">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70" />
-                    <Input
-                      value={serverSearch}
-                      onChange={(event) =>
-                        startTransition(() =>
-                          setServerSearch(event.target.value),
-                        )
-                      }
-                      placeholder="Search MCP servers"
-                      className="pl-10"
+                <div className="flex flex-wrap gap-2">
+                  {SERVER_FILTER_OPTIONS.map((option) => (
+                    <FilterPill
+                      key={option.value}
+                      active={serverStatusFilter === option.value}
+                      label={option.label}
+                      onClick={() => setServerStatusFilter(option.value)}
                     />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {SERVER_FILTER_OPTIONS.map((option) => (
-                      <FilterPill
-                        key={option.value}
-                        active={serverStatusFilter === option.value}
-                        label={option.label}
-                        onClick={() => setServerStatusFilter(option.value)}
-                      />
-                    ))}
-                  </div>
+                  ))}
                 </div>
               </SoftPanel>
 
@@ -1106,8 +1064,8 @@ export function McpPage() {
                       No matching MCP servers
                     </h2>
                     <p className="mt-2 max-w-lg text-[13px] leading-6 text-muted-foreground">
-                      Adjust the search term or status filter to see matching
-                      servers again.
+                      Choose another status filter to see matching servers
+                      again.
                     </p>
                     <Button
                       type="button"
@@ -1116,7 +1074,7 @@ export function McpPage() {
                       onClick={clearServerFilters}
                     >
                       <X className="mr-2 size-4" />
-                      Clear Filters
+                      Show All Servers
                     </Button>
                   </SoftPanel>
                 ) : (
@@ -1142,9 +1100,7 @@ export function McpPage() {
                                   type="button"
                                   variant="ghost"
                                   onClick={() =>
-                                    startTransition(() =>
-                                      setSelectedServerName(record.config.name),
-                                    )
+                                    setSelectedServerName(record.config.name)
                                   }
                                   className="h-auto min-w-0 flex-1 justify-start p-0 text-left hover:bg-transparent hover:text-inherit"
                                 >

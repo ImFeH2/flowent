@@ -16,18 +16,16 @@ export function HomePage() {
     connected,
     connectSourceId,
     connectTargetId,
+    availableCreateAgentRoles,
+    availableCreateTabBlueprints,
     createAgentName,
     createAgentRoleName,
-    createAgentRoleQuery,
     createTabAllowNetwork,
     createTabBlueprintId,
-    createTabBlueprintQuery,
     createTabGoal,
     createTabTitle,
     createTabWriteDirs,
     deleteTabTarget,
-    filteredCreateAgentRoles,
-    filteredCreateTabBlueprints,
     graphConnectMode,
     graphHistory,
     graphRef,
@@ -67,10 +65,8 @@ export function HomePage() {
     setConnectTargetId,
     setCreateAgentName,
     setCreateAgentRoleName,
-    setCreateAgentRoleQuery,
     setCreateTabAllowNetwork,
     setCreateTabBlueprintId,
-    setCreateTabBlueprintQuery,
     setCreateTabGoal,
     setCreateTabTitle,
     setCreateTabWriteDirs,
@@ -133,12 +129,10 @@ export function HomePage() {
         onTitleChange={setCreateTabTitle}
         goal={createTabGoal}
         onGoalChange={setCreateTabGoal}
-        blueprintQuery={createTabBlueprintQuery}
-        onBlueprintQueryChange={setCreateTabBlueprintQuery}
         blueprintId={createTabBlueprintId}
         onBlueprintIdChange={setCreateTabBlueprintId}
         selectedBlueprint={selectedCreateTabBlueprint}
-        filteredBlueprints={filteredCreateTabBlueprints}
+        blueprints={availableCreateTabBlueprints}
         loadingBlueprints={loadingBlueprints}
         allowNetwork={createTabAllowNetwork}
         onAllowNetworkChange={setCreateTabAllowNetwork}
@@ -171,12 +165,10 @@ export function HomePage() {
         }}
         pending={pendingAction === "create-agent"}
         activeTabTitle={activeTab?.title ?? null}
-        roleQuery={createAgentRoleQuery}
-        onRoleQueryChange={setCreateAgentRoleQuery}
         selectedRole={selectedCreateAgentRole}
         selectedRoleName={createAgentRoleName}
         onRoleNameChange={setCreateAgentRoleName}
-        filteredRoles={filteredCreateAgentRoles}
+        roles={availableCreateAgentRoles}
         loadingRoles={loadingRoles}
         agentName={createAgentName}
         onAgentNameChange={setCreateAgentName}

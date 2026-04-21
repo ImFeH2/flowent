@@ -227,15 +227,37 @@ describe("McpPage", () => {
       screen.getByPlaceholderText("npx @playwright/mcp@latest"),
     ).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText("Search MCP servers"),
-    ).toBeInTheDocument();
+      screen.queryByPlaceholderText("Search MCP servers"),
+    ).not.toBeInTheDocument();
   });
 
-  it("filters the server list in-page and can clear back to the full list", async () => {
+  it("filters the server list by status and can clear back to the full list", async () => {
     fetchMcpStateMock.mockResolvedValue(
       buildState([
         buildServer({ config: buildConfig({ name: "filesystem" }) }),
-        buildServer({ config: buildConfig({ name: "github" }) }),
+        buildServer({
+          config: buildConfig({ name: "github" }),
+          snapshot: {
+            server_name: "github",
+            transport: "stdio",
+            status: "error",
+            auth_status: "unsupported",
+            last_auth_result: null,
+            last_refresh_at: 1710000000,
+            last_refresh_result: "error",
+            last_error: "Refresh failed",
+            tools: [],
+            resources: [],
+            resource_templates: [],
+            prompts: [],
+            capability_counts: {
+              tools: 0,
+              resources: 0,
+              resource_templates: 0,
+              prompts: 0,
+            },
+          },
+        }),
       ]),
     );
 
@@ -246,15 +268,13 @@ describe("McpPage", () => {
     );
     expect(screen.getByText("github")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText("Search MCP servers"), {
-      target: { value: "missing" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Disabled" }));
 
     expect(
       await screen.findByText("No matching MCP servers"),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear Filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show All Servers" }));
 
     await waitFor(() =>
       expect(screen.getAllByText("filesystem").length).toBeGreaterThan(0),

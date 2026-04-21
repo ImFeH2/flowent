@@ -410,16 +410,14 @@ export function LeaderConfigurationSection({
 interface ModelConfigurationSectionProps {
   activeProvider: Provider | null;
   activeProviderModels: Provider["models"];
+  availableActiveProviderModels: Provider["models"];
   effectiveContextWindowTokens: number | null;
   effectiveModelCapabilities: {
     input_image: boolean;
     output_image: boolean;
   };
-  filteredActiveProviderModels: Provider["models"];
   knownSafeInputTokens: number | null;
-  onProviderModelQueryChange: (value: string) => void;
   onSettingsChange: UpdateSettings;
-  providerModelQuery: string;
   providers: Provider[];
   settings: UserSettings;
 }
@@ -427,13 +425,11 @@ interface ModelConfigurationSectionProps {
 export function ModelConfigurationSection({
   activeProvider,
   activeProviderModels,
+  availableActiveProviderModels,
   effectiveContextWindowTokens,
   effectiveModelCapabilities,
-  filteredActiveProviderModels,
   knownSafeInputTokens,
-  onProviderModelQueryChange,
   onSettingsChange,
-  providerModelQuery,
   providers,
   settings,
 }: ModelConfigurationSectionProps) {
@@ -456,7 +452,6 @@ export function ModelConfigurationSection({
                   active_model: "",
                 },
               }));
-              onProviderModelQueryChange("");
             }}
           >
             <SelectTrigger className={formSelectTriggerClass}>
@@ -483,17 +478,9 @@ export function ModelConfigurationSection({
               activeProviderModels.length > 0 ? (
                 <div className="space-y-2">
                   <label className={formLabelClass}>Provider Models</label>
-                  <FormInput
-                    aria-label="Search Provider Models"
-                    value={providerModelQuery}
-                    onChange={(event) =>
-                      onProviderModelQueryChange(event.target.value)
-                    }
-                    placeholder="Search provider models"
-                  />
                   <Select
                     value={
-                      activeProviderModels.some(
+                      availableActiveProviderModels.some(
                         (model) => model.model === settings.model.active_model,
                       )
                         ? settings.model.active_model
@@ -513,18 +500,13 @@ export function ModelConfigurationSection({
                       <SelectValue placeholder="Select a provider model" />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredActiveProviderModels.map((model) => (
+                      {availableActiveProviderModels.map((model) => (
                         <SelectItem key={model.model} value={model.model}>
                           {model.model}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {filteredActiveProviderModels.length === 0 ? (
-                    <p className={formHelpTextClass}>
-                      No provider models match the current search.
-                    </p>
-                  ) : null}
                 </div>
               ) : (
                 <p className={formHelpTextClass}>

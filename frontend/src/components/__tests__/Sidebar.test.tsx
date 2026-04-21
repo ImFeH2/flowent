@@ -85,4 +85,17 @@ describe("Sidebar", () => {
     expect(setCurrentPage).toHaveBeenCalledWith("stats");
     expect(onNavigate).toHaveBeenCalledTimes(1);
   });
+
+  it("left aligns navigation and logout actions", () => {
+    render(<Sidebar width={232} onWidthChange={() => {}} />);
+
+    expect(screen.getByRole("button", { name: "Workspace" })).toHaveClass(
+      "justify-start",
+      "text-left",
+    );
+    expect(screen.getByRole("button", { name: "Logout" })).toHaveClass(
+      "justify-start",
+      "text-left",
+    );
+  });
 });

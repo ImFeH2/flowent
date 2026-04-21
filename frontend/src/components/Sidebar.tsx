@@ -98,7 +98,7 @@ export function Sidebar({
               variant="ghost"
               onClick={() => navigate(id)}
               className={cn(
-                "group relative flex w-full items-center gap-3 rounded-md px-3 py-2 transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                "group relative flex w-full items-center justify-start gap-3 rounded-md px-3 py-2 text-left transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                 currentPage === id
                   ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
                   : "text-sidebar-foreground/60 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
@@ -127,17 +127,17 @@ export function Sidebar({
           ))}
         </nav>
 
-        <div className="shrink-0 border-t border-sidebar-border bg-sidebar/80 px-4 py-3">
+        <div className="shrink-0 border-t border-sidebar-border bg-sidebar/80 px-3 py-3">
           <Button
             type="button"
             variant="ghost"
             onClick={() => {
               void logout();
             }}
-            className="mb-3 flex w-full items-center justify-between rounded-md border border-sidebar-border bg-sidebar-accent/25 px-3 py-2 text-left text-[12px] font-medium text-sidebar-foreground/74 transition-colors hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="mb-3 flex w-full items-center justify-start gap-2.5 rounded-md border border-sidebar-border bg-sidebar-accent/25 px-3 py-2 text-left text-[12px] font-medium text-sidebar-foreground/74 transition-colors hover:bg-sidebar-accent/45 hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
-            <span>Logout</span>
             <LogOut className="size-3.5" />
+            <span>Logout</span>
           </Button>
           <SidebarActivityTicker width={width} />
         </div>

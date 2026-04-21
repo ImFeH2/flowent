@@ -8,6 +8,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.state_db import get_images_dir, get_legacy_image_assets_dir, open_state_db
+
 ALLOWED_IMAGE_MIME_TYPES = frozenset(
     {
         "image/png",
@@ -55,13 +57,15 @@ class ImageAsset:
 
 
 def _get_assets_dir() -> Path:
-    from app import settings as settings_module
-
-    return settings_module.get_app_data_dir_path() / "image-assets"
+    return get_images_dir()
 
 
-def _get_metadata_path(asset_id: str) -> Path:
-    return _get_assets_dir() / f"{asset_id}.json"
+def _get_legacy_metadata_path(asset_id: str) -> Path:
+    return get_legacy_image_assets_dir() / f"{asset_id}.json"
+
+
+def _get_legacy_file_path(stored_name: str) -> Path:
+    return get_legacy_image_assets_dir() / stored_name
 
 
 def _detect_mime_type(data: bytes) -> str | None:
@@ -200,24 +204,89 @@ def create_image_asset(
         handle.write(data)
         temp_file_path = Path(handle.name)
     temp_file_path.replace(asset.file_path)
-
-    metadata = json.dumps(asset.serialize(), ensure_ascii=False, indent=2) + "\n"
-    with tempfile.NamedTemporaryFile(
-        "w",
-        dir=asset_dir,
-        delete=False,
-        encoding="utf-8",
-    ) as handle:
-        handle.write(metadata)
-        temp_metadata_path = Path(handle.name)
-    temp_metadata_path.replace(_get_metadata_path(asset.id))
+    _persist_image_asset(asset)
     return asset
 
 
 def get_image_asset(asset_id: str) -> ImageAsset | None:
     if not asset_id.strip():
         return None
-    metadata_path = _get_metadata_path(asset_id)
+    asset = _load_persisted_image_asset(asset_id)
+    if asset is not None:
+        if asset.file_path.is_file():
+            return asset
+        if _restore_legacy_image_file(asset):
+            return asset
+        return None
+    legacy_asset = _load_legacy_image_asset(asset_id)
+    if legacy_asset is None:
+        return None
+    _persist_image_asset(legacy_asset)
+    if _restore_legacy_image_file(legacy_asset):
+        return legacy_asset
+    return None
+
+
+def _persist_image_asset(asset: ImageAsset) -> None:
+    connection = open_state_db(create=True)
+    assert connection is not None
+    try:
+        with connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO image_assets (
+                    id,
+                    stored_name,
+                    mime_type,
+                    width,
+                    height,
+                    original_name
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    asset.id,
+                    asset.stored_name,
+                    asset.mime_type,
+                    asset.width,
+                    asset.height,
+                    asset.original_name,
+                ),
+            )
+    finally:
+        connection.close()
+
+
+def _load_persisted_image_asset(asset_id: str) -> ImageAsset | None:
+    connection = open_state_db(create=False)
+    if connection is None:
+        return None
+    try:
+        row = connection.execute(
+            """
+            SELECT id, stored_name, mime_type, width, height, original_name
+            FROM image_assets
+            WHERE id = ?
+            """,
+            (asset_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        return None
+    return ImageAsset(
+        id=row["id"],
+        stored_name=row["stored_name"],
+        mime_type=row["mime_type"],
+        width=row["width"] if isinstance(row["width"], int) else None,
+        height=row["height"] if isinstance(row["height"], int) else None,
+        original_name=(
+            row["original_name"] if isinstance(row["original_name"], str) else None
+        ),
+    )
+
+
+def _load_legacy_image_asset(asset_id: str) -> ImageAsset | None:
+    metadata_path = _get_legacy_metadata_path(asset_id)
     if not metadata_path.is_file():
         return None
     raw = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -227,7 +296,9 @@ def get_image_asset(asset_id: str) -> ImageAsset | None:
     mime_type = raw.get("mime_type")
     if not isinstance(stored_name, str) or not isinstance(mime_type, str):
         return None
-    asset = ImageAsset(
+    if not _get_legacy_file_path(stored_name).is_file():
+        return None
+    return ImageAsset(
         id=asset_id,
         stored_name=stored_name,
         mime_type=mime_type,
@@ -239,9 +310,22 @@ def get_image_asset(asset_id: str) -> ImageAsset | None:
             else None
         ),
     )
-    if not asset.file_path.is_file():
-        return None
-    return asset
+
+
+def _restore_legacy_image_file(asset: ImageAsset) -> bool:
+    target_path = asset.file_path
+    if target_path.is_file():
+        return True
+    legacy_file_path = _get_legacy_file_path(asset.stored_name)
+    if not legacy_file_path.is_file():
+        return False
+    asset_dir = _get_assets_dir()
+    asset_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("wb", dir=asset_dir, delete=False) as handle:
+        handle.write(legacy_file_path.read_bytes())
+        temp_file_path = Path(handle.name)
+    temp_file_path.replace(target_path)
+    return True
 
 
 def require_image_asset(asset_id: str) -> ImageAsset:

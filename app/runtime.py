@@ -58,12 +58,10 @@ def bootstrap_runtime() -> None:
         get_settings,
         save_settings,
     )
-    from app.stats_service import stats_store
     from app.workspace_store import workspace_store
 
     workspace_store.reset_cache()
-    stats_store.reset()
-    mcp_service.reset()
+    mcp_service.clear_runtime_state()
     settings = get_settings()
     settings_changed = ensure_builtin_roles(settings)
     generated_access_code = ensure_access_bootstrap(settings)
@@ -194,7 +192,7 @@ def shutdown_runtime(timeout: float = SYSTEM_NODE_TIMEOUT) -> None:
 
     logger.info("Shutting down runtime")
     _stop_telegram_channel()
-    mcp_service.reset()
+    mcp_service.clear_runtime_state()
     persistent_agents = []
     for agent in registry.get_all():
         if agent.node_type == NodeType.ASSISTANT or agent.config.tab_id:

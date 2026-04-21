@@ -179,7 +179,7 @@ export function PathConfigurationSection({
             />
             <div className={cn("space-y-2", formHelpTextClass)}>
               <p>
-                Autopoe stores settings, workspace snapshots, image assets, and
+                Autopoe stores settings.json, state.sqlite, assets/images, and
                 other instance data here. It is not the project working tree.
               </p>
               <p>

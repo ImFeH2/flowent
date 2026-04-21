@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import threading
 import time
 import uuid
@@ -8,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from app.models import LLMUsage
+from app.state_db import open_state_db
 
 MAX_STATS_RETENTION_SECONDS = 30 * 24 * 60 * 60
 
@@ -67,98 +69,150 @@ class CompactRecordInput:
 class StatsStore:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._request_records: list[dict[str, Any]] = []
-        self._compact_records: list[dict[str, Any]] = []
 
     def reset(self) -> None:
-        with self._lock:
-            self._request_records.clear()
-            self._compact_records.clear()
+        connection = open_state_db(create=False)
+        if connection is None:
+            return
+        try:
+            with connection:
+                connection.execute("DELETE FROM llm_request_records")
+                connection.execute("DELETE FROM compact_records")
+        finally:
+            connection.close()
 
-    def _prune_locked(self, now: float) -> None:
+    def _prune_locked(self, connection, now: float) -> None:
         min_timestamp = now - MAX_STATS_RETENTION_SECONDS
-        self._request_records = [
-            record
-            for record in self._request_records
-            if record["ended_at"] >= min_timestamp
-        ]
-        self._compact_records = [
-            record
-            for record in self._compact_records
-            if record["ended_at"] >= min_timestamp
-        ]
+        connection.execute(
+            "DELETE FROM llm_request_records WHERE ended_at < ?",
+            (min_timestamp,),
+        )
+        connection.execute(
+            "DELETE FROM compact_records WHERE ended_at < ?",
+            (min_timestamp,),
+        )
 
     def record_request(self, record: RequestRecordInput) -> None:
+        payload = {
+            "id": str(uuid.uuid4()),
+            "node_id": record.node_id,
+            "node_label": record.node_label,
+            "role_name": record.role_name,
+            "tab_id": record.tab_id,
+            "tab_title": record.tab_title,
+            "provider_id": record.provider_id,
+            "provider_name": record.provider_name,
+            "provider_type": record.provider_type,
+            "model": record.model,
+            "started_at": record.started_at,
+            "ended_at": record.ended_at,
+            "duration_ms": max(0.0, (record.ended_at - record.started_at) * 1000),
+            "retry_count": max(record.retry_count, 0),
+            "result": record.result,
+            "error_summary": record.error_summary,
+            "normalized_usage": serialize_usage(record.normalized_usage),
+            "raw_usage": copy.deepcopy(record.raw_usage),
+        }
         with self._lock:
-            now = time.time()
-            self._prune_locked(now)
-            self._request_records.append(
-                {
-                    "id": str(uuid.uuid4()),
-                    "node_id": record.node_id,
-                    "node_label": record.node_label,
-                    "role_name": record.role_name,
-                    "tab_id": record.tab_id,
-                    "tab_title": record.tab_title,
-                    "provider_id": record.provider_id,
-                    "provider_name": record.provider_name,
-                    "provider_type": record.provider_type,
-                    "model": record.model,
-                    "started_at": record.started_at,
-                    "ended_at": record.ended_at,
-                    "duration_ms": max(
-                        0.0, (record.ended_at - record.started_at) * 1000
-                    ),
-                    "retry_count": max(record.retry_count, 0),
-                    "result": record.result,
-                    "error_summary": record.error_summary,
-                    "normalized_usage": serialize_usage(record.normalized_usage),
-                    "raw_usage": copy.deepcopy(record.raw_usage),
-                }
-            )
+            connection = open_state_db(create=True)
+            assert connection is not None
+            try:
+                with connection:
+                    self._prune_locked(connection, time.time())
+                    connection.execute(
+                        """
+                        INSERT INTO llm_request_records (id, ended_at, payload)
+                        VALUES (?, ?, ?)
+                        """,
+                        (
+                            payload["id"],
+                            payload["ended_at"],
+                            json.dumps(payload, ensure_ascii=False),
+                        ),
+                    )
+            finally:
+                connection.close()
 
     def record_compact(self, record: CompactRecordInput) -> None:
+        payload = {
+            "id": str(uuid.uuid4()),
+            "node_id": record.node_id,
+            "node_label": record.node_label,
+            "role_name": record.role_name,
+            "tab_id": record.tab_id,
+            "tab_title": record.tab_title,
+            "provider_id": record.provider_id,
+            "provider_name": record.provider_name,
+            "provider_type": record.provider_type,
+            "model": record.model,
+            "trigger_type": record.trigger_type,
+            "started_at": record.started_at,
+            "ended_at": record.ended_at,
+            "duration_ms": max(0.0, (record.ended_at - record.started_at) * 1000),
+            "result": record.result,
+            "error_summary": record.error_summary,
+        }
         with self._lock:
-            now = time.time()
-            self._prune_locked(now)
-            self._compact_records.append(
-                {
-                    "id": str(uuid.uuid4()),
-                    "node_id": record.node_id,
-                    "node_label": record.node_label,
-                    "role_name": record.role_name,
-                    "tab_id": record.tab_id,
-                    "tab_title": record.tab_title,
-                    "provider_id": record.provider_id,
-                    "provider_name": record.provider_name,
-                    "provider_type": record.provider_type,
-                    "model": record.model,
-                    "trigger_type": record.trigger_type,
-                    "started_at": record.started_at,
-                    "ended_at": record.ended_at,
-                    "duration_ms": max(
-                        0.0, (record.ended_at - record.started_at) * 1000
-                    ),
-                    "result": record.result,
-                    "error_summary": record.error_summary,
-                }
-            )
+            connection = open_state_db(create=True)
+            assert connection is not None
+            try:
+                with connection:
+                    self._prune_locked(connection, time.time())
+                    connection.execute(
+                        """
+                        INSERT INTO compact_records (id, ended_at, payload)
+                        VALUES (?, ?, ?)
+                        """,
+                        (
+                            payload["id"],
+                            payload["ended_at"],
+                            json.dumps(payload, ensure_ascii=False),
+                        ),
+                    )
+            finally:
+                connection.close()
 
     def list_requests(self, *, since: float) -> list[dict[str, Any]]:
         with self._lock:
-            return [
-                copy.deepcopy(record)
-                for record in self._request_records
-                if record["ended_at"] >= since
-            ]
+            return self._list_records(
+                table_name="llm_request_records",
+                since=since,
+            )
 
     def list_compacts(self, *, since: float) -> list[dict[str, Any]]:
         with self._lock:
-            return [
-                copy.deepcopy(record)
-                for record in self._compact_records
-                if record["ended_at"] >= since
-            ]
+            return self._list_records(
+                table_name="compact_records",
+                since=since,
+            )
+
+    def _list_records(self, *, table_name: str, since: float) -> list[dict[str, Any]]:
+        connection = open_state_db(create=False)
+        if connection is None:
+            return []
+        try:
+            with connection:
+                self._prune_locked(connection, time.time())
+                rows = connection.execute(
+                    f"""
+                    SELECT payload
+                    FROM {table_name}
+                    WHERE ended_at >= ?
+                    ORDER BY ended_at
+                    """,
+                    (since,),
+                ).fetchall()
+        finally:
+            connection.close()
+        records: list[dict[str, Any]] = []
+        for row in rows:
+            payload = row["payload"]
+            if not isinstance(payload, str):
+                continue
+            parsed = json.loads(payload)
+            if isinstance(parsed, dict):
+                records.append(parsed)
+        return records
 
 
 stats_store = StatsStore()

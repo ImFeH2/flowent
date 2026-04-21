@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import json
-import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from app.models import (
     AgentBlueprint,
@@ -14,12 +12,7 @@ from app.models import (
     GraphNodeRecord,
     Tab,
 )
-
-
-def _get_workspace_file() -> Path:
-    from app import settings as settings_module
-
-    return settings_module.get_app_data_dir_path() / "workspace.json"
+from app.state_db import get_legacy_workspace_file_path, open_state_db
 
 
 @dataclass
@@ -89,35 +82,139 @@ class WorkspaceStore:
     def _load_snapshot(self) -> WorkspaceSnapshot:
         if self._snapshot is not None:
             return self._snapshot
-        workspace_file = _get_workspace_file()
-        if not workspace_file.exists():
-            self._snapshot = WorkspaceSnapshot()
-            return self._snapshot
-        raw = json.loads(workspace_file.read_text(encoding="utf-8"))
-        snapshot = (
-            WorkspaceSnapshot.from_mapping(raw)
-            if isinstance(raw, dict)
-            else WorkspaceSnapshot()
-        )
-        if isinstance(raw, dict) and snapshot.serialize() != raw:
+        snapshot = self._load_snapshot_from_state_db()
+        legacy_snapshot = self._load_snapshot_from_legacy_file()
+        if self._snapshot_has_content(
+            legacy_snapshot
+        ) and not self._snapshot_has_content(snapshot):
+            assert legacy_snapshot is not None
+            snapshot = legacy_snapshot
             self._persist_snapshot(snapshot)
+        if snapshot is None:
+            snapshot = (
+                legacy_snapshot if legacy_snapshot is not None else WorkspaceSnapshot()
+            )
         self._snapshot = snapshot
         return snapshot
 
-    def _persist_snapshot(self, snapshot: WorkspaceSnapshot) -> None:
-        workspace_file = _get_workspace_file()
-        workspace_file.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            "w",
-            dir=workspace_file.parent,
-            delete=False,
-            encoding="utf-8",
-        ) as handle:
-            handle.write(
-                json.dumps(snapshot.serialize(), ensure_ascii=False, indent=2) + "\n"
+    def _load_snapshot_from_state_db(self) -> WorkspaceSnapshot | None:
+        connection = open_state_db(create=False)
+        if connection is None:
+            return None
+        try:
+            raw: dict[str, object] = {
+                "tabs": self._read_payload_rows(connection, "tabs"),
+                "nodes": self._read_payload_rows(connection, "nodes"),
+                "edges": self._read_payload_rows(connection, "edges"),
+                "blueprints": self._read_payload_rows(connection, "blueprints"),
+            }
+        finally:
+            connection.close()
+        snapshot = WorkspaceSnapshot.from_mapping(raw)
+        if snapshot.serialize() != raw:
+            self._persist_snapshot(snapshot)
+        return snapshot
+
+    def _load_snapshot_from_legacy_file(self) -> WorkspaceSnapshot | None:
+        workspace_file = get_legacy_workspace_file_path()
+        if not workspace_file.exists():
+            return None
+        raw = json.loads(workspace_file.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            return WorkspaceSnapshot()
+        return WorkspaceSnapshot.from_mapping(raw)
+
+    def _snapshot_has_content(self, snapshot: WorkspaceSnapshot | None) -> bool:
+        return bool(
+            snapshot is not None
+            and (
+                snapshot.tabs or snapshot.nodes or snapshot.edges or snapshot.blueprints
             )
-            temp_path = Path(handle.name)
-        temp_path.replace(workspace_file)
+        )
+
+    def _read_payload_rows(
+        self,
+        connection,
+        table_name: str,
+    ) -> list[dict[str, object]]:
+        try:
+            rows = connection.execute(
+                f"SELECT payload FROM {table_name} ORDER BY rowid"
+            ).fetchall()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to read workspace table `{table_name}` from state store: {exc}"
+            ) from exc
+        payloads: list[dict[str, object]] = []
+        for row in rows:
+            payload = row["payload"]
+            if not isinstance(payload, str):
+                continue
+            parsed = json.loads(payload)
+            if isinstance(parsed, dict):
+                payloads.append(parsed)
+        return payloads
+
+    def _persist_snapshot(self, snapshot: WorkspaceSnapshot) -> None:
+        connection = open_state_db(create=True)
+        assert connection is not None
+        try:
+            with connection:
+                connection.execute("DELETE FROM tabs")
+                connection.execute("DELETE FROM nodes")
+                connection.execute("DELETE FROM edges")
+                connection.execute("DELETE FROM blueprints")
+                connection.executemany(
+                    "INSERT INTO tabs (id, payload, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (
+                            tab.id,
+                            json.dumps(tab.serialize(), ensure_ascii=False),
+                            tab.updated_at,
+                        )
+                        for tab in snapshot.tabs.values()
+                    ],
+                )
+                connection.executemany(
+                    """
+                    INSERT INTO nodes (id, payload, tab_id, node_type, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            record.id,
+                            json.dumps(record.serialize(), ensure_ascii=False),
+                            record.config.tab_id,
+                            record.config.node_type.value,
+                            record.updated_at,
+                        )
+                        for record in snapshot.nodes.values()
+                    ],
+                )
+                connection.executemany(
+                    "INSERT INTO edges (id, payload, tab_id) VALUES (?, ?, ?)",
+                    [
+                        (
+                            edge.id,
+                            json.dumps(edge.serialize(), ensure_ascii=False),
+                            edge.tab_id,
+                        )
+                        for edge in snapshot.edges.values()
+                    ],
+                )
+                connection.executemany(
+                    "INSERT INTO blueprints (id, payload, updated_at) VALUES (?, ?, ?)",
+                    [
+                        (
+                            blueprint.id,
+                            json.dumps(blueprint.serialize(), ensure_ascii=False),
+                            blueprint.updated_at,
+                        )
+                        for blueprint in snapshot.blueprints.values()
+                    ],
+                )
+        finally:
+            connection.close()
 
     def reset_cache(self) -> None:
         with self._lock:

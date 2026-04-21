@@ -21,6 +21,7 @@ from app.settings import (
     get_settings,
     save_settings,
 )
+from app.state_db import open_state_db
 
 if TYPE_CHECKING:
     from app.agent import Agent
@@ -186,6 +187,238 @@ class MCPActivityRecord:
             "target": self.target,
             "approval_result": self.approval_result,
         }
+
+
+def _deserialize_tool_descriptor(data: dict[str, object]) -> MCPToolDescriptor | None:
+    server_name = data.get("server_name")
+    tool_name = data.get("tool_name")
+    fully_qualified_id = data.get("fully_qualified_id")
+    if (
+        not isinstance(server_name, str)
+        or not isinstance(tool_name, str)
+        or not isinstance(fully_qualified_id, str)
+    ):
+        return None
+    title = data.get("title")
+    description = data.get("description")
+    parameters = data.get("parameters")
+    return MCPToolDescriptor(
+        server_name=server_name,
+        tool_name=tool_name,
+        fully_qualified_id=fully_qualified_id,
+        title=title if isinstance(title, str) else None,
+        description=description if isinstance(description, str) else "",
+        input_schema=parameters if isinstance(parameters, dict) else {},
+        read_only_hint=bool(data.get("read_only_hint", False)),
+        destructive_hint=bool(data.get("destructive_hint", False)),
+        open_world_hint=bool(data.get("open_world_hint", False)),
+    )
+
+
+def _deserialize_resource_descriptor(
+    data: dict[str, object],
+) -> MCPResourceDescriptor | None:
+    server_name = data.get("server_name")
+    name = data.get("name")
+    uri = data.get("uri")
+    if (
+        not isinstance(server_name, str)
+        or not isinstance(name, str)
+        or not isinstance(uri, str)
+    ):
+        return None
+    mime_type = data.get("mime_type")
+    description = data.get("description")
+    return MCPResourceDescriptor(
+        server_name=server_name,
+        name=name,
+        uri=uri,
+        mime_type=mime_type if isinstance(mime_type, str) else None,
+        description=description if isinstance(description, str) else None,
+    )
+
+
+def _deserialize_resource_template_descriptor(
+    data: dict[str, object],
+) -> MCPResourceTemplateDescriptor | None:
+    server_name = data.get("server_name")
+    name = data.get("name")
+    uri_template = data.get("uri_template")
+    if (
+        not isinstance(server_name, str)
+        or not isinstance(name, str)
+        or not isinstance(uri_template, str)
+    ):
+        return None
+    description = data.get("description")
+    return MCPResourceTemplateDescriptor(
+        server_name=server_name,
+        name=name,
+        uri_template=uri_template,
+        description=description if isinstance(description, str) else None,
+    )
+
+
+def _deserialize_prompt_descriptor(
+    data: dict[str, object],
+) -> MCPPromptDescriptor | None:
+    server_name = data.get("server_name")
+    name = data.get("name")
+    if not isinstance(server_name, str) or not isinstance(name, str):
+        return None
+    description = data.get("description")
+    arguments = data.get("arguments")
+    return MCPPromptDescriptor(
+        server_name=server_name,
+        name=name,
+        description=description if isinstance(description, str) else None,
+        arguments=[
+            dict(argument) for argument in arguments if isinstance(argument, dict)
+        ]
+        if isinstance(arguments, list)
+        else [],
+    )
+
+
+def _snapshot_from_mapping(data: dict[str, object]) -> MCPDiscoverySnapshot | None:
+    server_name = data.get("server_name")
+    transport = data.get("transport")
+    status = data.get("status")
+    auth_status = data.get("auth_status")
+    if (
+        not isinstance(server_name, str)
+        or not isinstance(transport, str)
+        or not isinstance(status, str)
+        or not isinstance(auth_status, str)
+    ):
+        return None
+    raw_tools = data.get("tools")
+    raw_resources = data.get("resources")
+    raw_resource_templates = data.get("resource_templates")
+    raw_prompts = data.get("prompts")
+    raw_last_auth_result = data.get("last_auth_result")
+    raw_last_refresh_at = data.get("last_refresh_at")
+    raw_last_refresh_result = data.get("last_refresh_result")
+    raw_last_error = data.get("last_error")
+    tools = (
+        [
+            descriptor
+            for descriptor in (
+                _deserialize_tool_descriptor(item)
+                for item in raw_tools
+                if isinstance(item, dict)
+            )
+            if descriptor is not None
+        ]
+        if isinstance(raw_tools, list)
+        else []
+    )
+    resources = (
+        [
+            descriptor
+            for descriptor in (
+                _deserialize_resource_descriptor(item)
+                for item in raw_resources
+                if isinstance(item, dict)
+            )
+            if descriptor is not None
+        ]
+        if isinstance(raw_resources, list)
+        else []
+    )
+    resource_templates = (
+        [
+            descriptor
+            for descriptor in (
+                _deserialize_resource_template_descriptor(item)
+                for item in raw_resource_templates
+                if isinstance(item, dict)
+            )
+            if descriptor is not None
+        ]
+        if isinstance(raw_resource_templates, list)
+        else []
+    )
+    prompts = (
+        [
+            descriptor
+            for descriptor in (
+                _deserialize_prompt_descriptor(item)
+                for item in raw_prompts
+                if isinstance(item, dict)
+            )
+            if descriptor is not None
+        ]
+        if isinstance(raw_prompts, list)
+        else []
+    )
+    return MCPDiscoverySnapshot(
+        server_name=server_name,
+        transport=transport,
+        status=status,
+        auth_status=auth_status,
+        last_auth_result=(
+            raw_last_auth_result if isinstance(raw_last_auth_result, str) else None
+        ),
+        last_refresh_at=(
+            float(raw_last_refresh_at)
+            if isinstance(raw_last_refresh_at, (int, float))
+            else None
+        ),
+        last_refresh_result=(
+            raw_last_refresh_result
+            if isinstance(raw_last_refresh_result, str)
+            else "never"
+        ),
+        last_error=raw_last_error if isinstance(raw_last_error, str) else None,
+        tools=tools,
+        resources=resources,
+        resource_templates=resource_templates,
+        prompts=prompts,
+    )
+
+
+def _activity_from_mapping(data: dict[str, object]) -> MCPActivityRecord | None:
+    record_id = data.get("id")
+    server_name = data.get("server_name")
+    action = data.get("action")
+    started_at = data.get("started_at")
+    ended_at = data.get("ended_at")
+    result = data.get("result")
+    summary = data.get("summary")
+    if (
+        not isinstance(record_id, str)
+        or not isinstance(server_name, str)
+        or not isinstance(action, str)
+        or not isinstance(started_at, (int, float))
+        or not isinstance(ended_at, (int, float))
+        or not isinstance(result, str)
+        or not isinstance(summary, str)
+    ):
+        return None
+    actor_node_id = data.get("actor_node_id")
+    tab_id = data.get("tab_id")
+    tool_name = data.get("tool_name")
+    fully_qualified_id = data.get("fully_qualified_id")
+    target = data.get("target")
+    approval_result = data.get("approval_result")
+    return MCPActivityRecord(
+        id=record_id,
+        server_name=server_name,
+        action=action,
+        actor_node_id=actor_node_id if isinstance(actor_node_id, str) else None,
+        tab_id=tab_id if isinstance(tab_id, str) else None,
+        started_at=float(started_at),
+        ended_at=float(ended_at),
+        result=result,
+        summary=summary,
+        tool_name=tool_name if isinstance(tool_name, str) else None,
+        fully_qualified_id=(
+            fully_qualified_id if isinstance(fully_qualified_id, str) else None
+        ),
+        target=target if isinstance(target, str) else None,
+        approval_result=approval_result if isinstance(approval_result, str) else None,
+    )
 
 
 def _escape_identifier(value: str) -> str:
@@ -745,13 +978,25 @@ class MCPService:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._snapshots: dict[str, MCPDiscoverySnapshot] = {}
-        self._activities: list[MCPActivityRecord] = []
         self._logged_out_servers: set[str] = set()
 
     def reset(self) -> None:
         with self._lock:
             self._snapshots.clear()
-            self._activities.clear()
+            self._logged_out_servers.clear()
+        connection = open_state_db(create=False)
+        if connection is None:
+            return
+        try:
+            with connection:
+                connection.execute("DELETE FROM mcp_snapshots")
+                connection.execute("DELETE FROM mcp_activities")
+        finally:
+            connection.close()
+
+    def clear_runtime_state(self) -> None:
+        with self._lock:
+            self._snapshots.clear()
             self._logged_out_servers.clear()
 
     def bootstrap(self) -> None:
@@ -775,13 +1020,12 @@ class MCPService:
                 if server.required:
                     raise RuntimeError(str(exc)) from exc
 
-    def _prune_activities_locked(self, now: float) -> None:
+    def _prune_activities_locked(self, connection, now: float) -> None:
         min_timestamp = now - ACTIVITY_RETENTION_SECONDS
-        self._activities = [
-            activity
-            for activity in self._activities
-            if activity.ended_at >= min_timestamp
-        ]
+        connection.execute(
+            "DELETE FROM mcp_activities WHERE ended_at < ?",
+            (min_timestamp,),
+        )
 
     def _record_activity(
         self,
@@ -815,16 +1059,99 @@ class MCPService:
             approval_result=approval_result,
         )
         with self._lock:
-            self._prune_activities_locked(ended_at)
-            self._activities.append(record)
+            connection = open_state_db(create=True)
+            assert connection is not None
+            try:
+                with connection:
+                    self._prune_activities_locked(connection, ended_at)
+                    connection.execute(
+                        """
+                        INSERT INTO mcp_activities (
+                            id,
+                            server_name,
+                            ended_at,
+                            payload
+                        ) VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            record.id,
+                            record.server_name,
+                            record.ended_at,
+                            json.dumps(record.serialize(), ensure_ascii=False),
+                        ),
+                    )
+            finally:
+                connection.close()
+
+    def _persist_snapshot_locked(self, snapshot: MCPDiscoverySnapshot) -> None:
+        connection = open_state_db(create=True)
+        assert connection is not None
+        try:
+            with connection:
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO mcp_snapshots (server_name, payload)
+                    VALUES (?, ?)
+                    """,
+                    (
+                        snapshot.server_name,
+                        json.dumps(snapshot.serialize(), ensure_ascii=False),
+                    ),
+                )
+        finally:
+            connection.close()
+
+    def _delete_snapshot_locked(self, server_name: str) -> None:
+        connection = open_state_db(create=False)
+        if connection is None:
+            return
+        try:
+            with connection:
+                connection.execute(
+                    "DELETE FROM mcp_snapshots WHERE server_name = ?",
+                    (server_name,),
+                )
+        finally:
+            connection.close()
+
+    def _load_snapshot_from_db_locked(
+        self,
+        server_name: str,
+    ) -> MCPDiscoverySnapshot | None:
+        connection = open_state_db(create=False)
+        if connection is None:
+            return None
+        try:
+            row = connection.execute(
+                "SELECT payload FROM mcp_snapshots WHERE server_name = ?",
+                (server_name,),
+            ).fetchone()
+        finally:
+            connection.close()
+        if row is None:
+            return None
+        payload = row["payload"]
+        if not isinstance(payload, str):
+            return None
+        parsed = json.loads(payload)
+        if not isinstance(parsed, dict):
+            return None
+        return _snapshot_from_mapping(parsed)
 
     def _set_snapshot(self, snapshot: MCPDiscoverySnapshot) -> None:
         with self._lock:
             self._snapshots[snapshot.server_name] = snapshot
+            self._persist_snapshot_locked(snapshot)
 
     def _get_snapshot(self, server_name: str) -> MCPDiscoverySnapshot | None:
         with self._lock:
-            return self._snapshots.get(server_name)
+            snapshot = self._snapshots.get(server_name)
+            if snapshot is not None:
+                return snapshot
+            snapshot = self._load_snapshot_from_db_locked(server_name)
+            if snapshot is not None:
+                self._snapshots[server_name] = snapshot
+            return snapshot
 
     def _build_connection(
         self,
@@ -1004,12 +1331,44 @@ class MCPService:
         self, *, server_name: str | None = None
     ) -> list[MCPActivityRecord]:
         with self._lock:
-            now = time.time()
-            self._prune_activities_locked(now)
-            records = list(self._activities)
-        if server_name is None:
-            return records
-        return [record for record in records if record.server_name == server_name]
+            connection = open_state_db(create=False)
+            if connection is None:
+                return []
+            try:
+                with connection:
+                    self._prune_activities_locked(connection, time.time())
+                    if server_name is None:
+                        rows = connection.execute(
+                            """
+                            SELECT payload
+                            FROM mcp_activities
+                            ORDER BY ended_at DESC
+                            """
+                        ).fetchall()
+                    else:
+                        rows = connection.execute(
+                            """
+                            SELECT payload
+                            FROM mcp_activities
+                            WHERE server_name = ?
+                            ORDER BY ended_at DESC
+                            """,
+                            (server_name,),
+                        ).fetchall()
+            finally:
+                connection.close()
+        records: list[MCPActivityRecord] = []
+        for row in rows:
+            payload = row["payload"]
+            if not isinstance(payload, str):
+                continue
+            parsed = json.loads(payload)
+            if not isinstance(parsed, dict):
+                continue
+            record = _activity_from_mapping(parsed)
+            if record is not None:
+                records.append(record)
+        return records
 
     def refresh_server(self, server_name: str) -> dict[str, object]:
         settings = get_settings()
@@ -1115,6 +1474,7 @@ class MCPService:
             with self._lock:
                 self._snapshots.pop(current_name, None)
                 self._logged_out_servers.discard(current_name)
+                self._delete_snapshot_locked(current_name)
         replaced = False
         for index, existing_server in enumerate(settings.mcp_servers):
             if existing_server.name != (current_name or next_name):
@@ -1154,6 +1514,7 @@ class MCPService:
         with self._lock:
             self._snapshots.pop(server_name, None)
             self._logged_out_servers.discard(server_name)
+            self._delete_snapshot_locked(server_name)
 
     def login_server(self, server_name: str) -> dict[str, object]:
         self._logged_out_servers.discard(server_name)

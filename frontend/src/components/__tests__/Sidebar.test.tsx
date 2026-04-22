@@ -60,13 +60,13 @@ describe("Sidebar", () => {
     ).toEqual([
       "Assistant",
       "Workspace",
+      "Stats",
       "Providers",
       "Roles",
       "Prompts",
       "Tools",
       "MCP",
       "Channels",
-      "Stats",
       "Settings",
       "Logout",
     ]);
@@ -89,11 +89,9 @@ describe("Sidebar", () => {
     render(<Sidebar width={232} onWidthChange={() => {}} />);
 
     expect(screen.getByRole("button", { name: "Workspace" })).toHaveClass(
-      "justify-start",
       "text-left",
     );
     expect(screen.getByRole("button", { name: "Logout" })).toHaveClass(
-      "justify-start",
       "text-left",
     );
   });

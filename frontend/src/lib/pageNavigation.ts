@@ -19,18 +19,41 @@ export interface PageNavigationItem {
   icon: LucideIcon;
 }
 
-export const PAGE_NAVIGATION_ITEMS: PageNavigationItem[] = [
-  { id: "assistant", label: "Assistant", icon: Shield },
-  { id: "workspace", label: "Workspace", icon: LayoutDashboard },
-  { id: "providers", label: "Providers", icon: Server },
-  { id: "roles", label: "Roles", icon: Users },
-  { id: "prompts", label: "Prompts", icon: MessageSquareQuote },
-  { id: "tools", label: "Tools", icon: Wrench },
-  { id: "mcp", label: "MCP", icon: PlugZap },
-  { id: "channels", label: "Channels", icon: Radio },
-  { id: "stats", label: "Stats", icon: ChartNoAxesCombined },
-  { id: "settings", label: "Settings", icon: Settings },
+export interface PageNavigationGroup {
+  label: string;
+  items: PageNavigationItem[];
+}
+
+export const PAGE_NAVIGATION_GROUPS: PageNavigationGroup[] = [
+  {
+    label: "Core",
+    items: [
+      { id: "assistant", label: "Assistant", icon: Shield },
+      { id: "workspace", label: "Workspace", icon: LayoutDashboard },
+      { id: "stats", label: "Stats", icon: ChartNoAxesCombined },
+    ],
+  },
+  {
+    label: "Configuration",
+    items: [
+      { id: "providers", label: "Providers", icon: Server },
+      { id: "roles", label: "Roles", icon: Users },
+      { id: "prompts", label: "Prompts", icon: MessageSquareQuote },
+      { id: "tools", label: "Tools", icon: Wrench },
+    ],
+  },
+  {
+    label: "Integrations & System",
+    items: [
+      { id: "mcp", label: "MCP", icon: PlugZap },
+      { id: "channels", label: "Channels", icon: Radio },
+      { id: "settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
+
+export const PAGE_NAVIGATION_ITEMS: PageNavigationItem[] =
+  PAGE_NAVIGATION_GROUPS.flatMap((group) => group.items);
 
 export function getPageNavigationLabel(pageId: PageId): string {
   return (

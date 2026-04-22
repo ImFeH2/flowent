@@ -10,7 +10,7 @@ import { PanelResizer } from "@/components/PanelResizer";
 import { SidebarActivityTicker } from "@/components/SidebarActivityTicker";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-import { PAGE_NAVIGATION_ITEMS } from "@/lib/pageNavigation";
+import { PAGE_NAVIGATION_GROUPS } from "@/lib/pageNavigation";
 
 interface SidebarProps {
   autoHide?: boolean;
@@ -90,42 +90,55 @@ export function Sidebar({
           </div>
         </div>
 
-        <nav className="min-h-0 flex-1 space-y-0.5 px-3 py-2 overflow-y-auto scrollbar-none">
-          {PAGE_NAVIGATION_ITEMS.map(({ id, label, icon: Icon }) => (
-            <Button
-              key={id}
-              type="button"
-              variant="ghost"
-              onClick={() => navigate(id)}
-              className={cn(
-                "group relative flex w-full items-center justify-start gap-3 rounded-md px-3 py-2 text-left transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                currentPage === id
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs"
-                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
-              )}
-            >
-              <span
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto scrollbar-none">
+          <div className="flex flex-col gap-2 p-2">
+            {PAGE_NAVIGATION_GROUPS.map((group, index) => (
+              <div
+                key={group.label}
                 className={cn(
-                  "absolute inset-y-2 left-0 w-px rounded-full bg-sidebar-accent-foreground/80 transition-opacity",
-                  currentPage === id
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-60",
+                  "relative flex w-full min-w-0 flex-col py-0",
+                  index > 0 && "pt-4",
                 )}
-              />
-              <Icon
-                className={cn(
-                  "size-4 shrink-0 transition-colors duration-200",
-                  currentPage === id
-                    ? "text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/48 group-hover:text-sidebar-accent-foreground/88",
-                )}
-              />
-              <span className="block truncate text-[13px] font-medium tracking-wide">
-                {label}
-              </span>
-            </Button>
-          ))}
-        </nav>
+              >
+                <div className="ring-sidebar-ring flex h-8 shrink-0 items-center rounded-md px-2 outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 text-xs font-normal text-muted-foreground">
+                  {group.label}
+                </div>
+                <div className="w-full text-sm py-1">
+                  <ul className="flex w-full min-w-0 flex-col gap-1">
+                    {group.items.map(({ id, label, icon: Icon }) => {
+                      const isActive = currentPage === id;
+                      return (
+                        <li key={id} className="group/menu-item relative">
+                          <button
+                            type="button"
+                            onClick={() => navigate(id)}
+                            data-active={isActive}
+                            className={cn(
+                              "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left outline-hidden ring-sidebar-ring transition-[width,height,padding] focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 data-[active=true]:font-bold data-[active=true]:text-[#6366F1] data-[active=true]:bg-sidebar-accent/50 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-8 text-sm",
+                              !isActive && "text-sidebar-foreground/70",
+                            )}
+                          >
+                            <Icon
+                              className={cn(
+                                "size-4 shrink-0 transition-colors duration-200",
+                                isActive
+                                  ? "text-[#6366F1]"
+                                  : "text-sidebar-foreground/48 group-hover:text-sidebar-accent-foreground/88",
+                              )}
+                            />
+                            <span className="block truncate flex-1">
+                              {label}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="shrink-0 border-t border-sidebar-border bg-sidebar/80 px-3 py-3">
           <Button

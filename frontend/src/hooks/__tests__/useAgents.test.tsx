@@ -81,4 +81,52 @@ describe("useAgents", () => {
       "assistant",
     ]);
   });
+
+  it("falls back to the deleted tab id when removed node ids are missing", async () => {
+    fetchNodesMock.mockResolvedValue([
+      buildNode({
+        id: "assistant",
+        node_type: "assistant",
+        role_name: "Steward",
+      }),
+      buildNode({
+        id: "leader",
+        tab_id: "tab-1",
+        is_leader: true,
+        connections: ["worker"],
+      }),
+      buildNode({
+        id: "worker",
+        tab_id: "tab-1",
+      }),
+      buildNode({
+        id: "observer",
+        tab_id: "tab-2",
+        connections: ["leader", "assistant"],
+      }),
+    ]);
+
+    const { result } = renderHook(() => useAgents());
+
+    await waitFor(() => {
+      expect(result.current.agents.size).toBe(4);
+    });
+
+    act(() => {
+      result.current.handleUpdateEvent({
+        type: "tab_deleted",
+        agent_id: "assistant",
+        data: {
+          id: "tab-1",
+        },
+        timestamp: Date.now(),
+      });
+    });
+
+    expect(result.current.agents.has("leader")).toBe(false);
+    expect(result.current.agents.has("worker")).toBe(false);
+    expect(result.current.agents.get("observer")?.connections).toEqual([
+      "assistant",
+    ]);
+  });
 });

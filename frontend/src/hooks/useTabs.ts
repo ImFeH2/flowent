@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchTabs } from "@/lib/api";
-import type { AgentEvent, NetworkSource, TaskTab } from "@/types";
-
-const MANUAL_NETWORK_SOURCE: NetworkSource = {
-  state: "manual",
-  blueprint_id: null,
-  blueprint_name: null,
-  blueprint_version: null,
-  blueprint_available: false,
-};
+import {
+  createTaskTabFromEvent,
+  getTabEventId,
+  mergeTaskTabUpdate,
+} from "@/lib/tabEvents";
+import type { AgentEvent, TaskTab } from "@/types";
 
 export function useTabs() {
   const [tabs, setTabs] = useState<Map<string, TaskTab>>(new Map());
@@ -26,34 +23,31 @@ export function useTabs() {
   }, []);
 
   const handleUpdateEvent = useCallback((event: AgentEvent) => {
-    if (event.type === "tab_created" || event.type === "tab_updated") {
-      const data = event.data as Partial<TaskTab>;
-      if (typeof data.id !== "string" || typeof data.title !== "string") {
+    if (event.type === "tab_created") {
+      const tab = createTaskTabFromEvent(event.data);
+      if (!tab) {
         return;
       }
-      const id = data.id;
-      const title = data.title;
       setTabs((prev) => {
         const next = new Map(prev);
-        next.set(id, {
-          id,
-          title,
-          goal: typeof data.goal === "string" ? data.goal : "",
-          leader_id: typeof data.leader_id === "string" ? data.leader_id : null,
-          created_at:
-            typeof data.created_at === "number" ? data.created_at : Date.now(),
-          updated_at:
-            typeof data.updated_at === "number" ? data.updated_at : Date.now(),
-          network_source:
-            typeof data.network_source === "object" &&
-            data.network_source !== null
-              ? (data.network_source as NetworkSource)
-              : MANUAL_NETWORK_SOURCE,
-          node_count:
-            typeof data.node_count === "number" ? data.node_count : undefined,
-          edge_count:
-            typeof data.edge_count === "number" ? data.edge_count : undefined,
-        });
+        next.set(tab.id, tab);
+        return next;
+      });
+      return;
+    }
+
+    if (event.type === "tab_updated") {
+      const id = getTabEventId(event.data);
+      if (id === null) {
+        return;
+      }
+      setTabs((prev) => {
+        const nextTab = mergeTaskTabUpdate(prev.get(id), event.data);
+        if (!nextTab) {
+          return prev;
+        }
+        const next = new Map(prev);
+        next.set(nextTab.id, nextTab);
         return next;
       });
       return;
@@ -63,11 +57,10 @@ export function useTabs() {
       return;
     }
 
-    const data = event.data as Partial<TaskTab>;
-    if (typeof data.id !== "string") {
+    const id = getTabEventId(event.data);
+    if (id === null) {
       return;
     }
-    const id = data.id;
     setTabs((prev) => {
       if (!prev.has(id)) {
         return prev;

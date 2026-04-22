@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { Node, AgentEvent } from "@/types";
 import { fetchNodes } from "@/lib/api";
+import { getDeletedTabNodeIds } from "@/lib/tabEvents";
 
 export function useAgents() {
   const [agents, setAgents] = useState<Map<string, Node>>(new Map());
@@ -94,26 +95,12 @@ export function useAgents() {
         return next;
       });
     } else if (event.type === "tab_deleted") {
-      const removedNodeIds = Array.isArray(event.data.removed_node_ids)
-        ? event.data.removed_node_ids.filter(
-            (value): value is string => typeof value === "string",
-          )
-        : [];
-      const deletedTabId =
-        typeof event.data.id === "string" ? event.data.id : null;
       setAgents((prev) => {
-        const next = new Map(prev);
-        const removedNodeIdSet = new Set(removedNodeIds);
-        if (removedNodeIdSet.size === 0 && deletedTabId) {
-          for (const [nodeId, node] of next.entries()) {
-            if (node.tab_id === deletedTabId) {
-              removedNodeIdSet.add(nodeId);
-            }
-          }
-        }
+        const removedNodeIdSet = getDeletedTabNodeIds(event.data, prev);
         if (removedNodeIdSet.size === 0) {
           return prev;
         }
+        const next = new Map(prev);
         for (const nodeId of removedNodeIdSet) {
           next.delete(nodeId);
         }

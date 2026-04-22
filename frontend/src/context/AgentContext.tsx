@@ -25,6 +25,7 @@ import {
   removePendingAssistantMessage,
 } from "@/context/agentRuntimeState";
 import { contentPartsToText } from "@/lib/contentParts";
+import { getDeletedTabNodeIds, getTabEventId } from "@/lib/tabEvents";
 import type {
   AgentEvent,
   AssistantChatMessage,
@@ -267,14 +268,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       handleTabEvent(event);
 
       if (event.type === "tab_deleted") {
-        const removedNodeIds = Array.isArray(event.data.removed_node_ids)
-          ? event.data.removed_node_ids.filter(
-              (value): value is string => typeof value === "string",
-            )
-          : [];
-        const removedNodeIdSet = new Set(removedNodeIds);
-        const deletedTabId =
-          typeof event.data.id === "string" ? event.data.id : null;
+        const removedNodeIdSet = getDeletedTabNodeIds(event.data, agents);
+        const deletedTabId = getTabEventId(event.data);
 
         if (deletedTabId) {
           setSelectedTabId((current) =>
@@ -579,7 +574,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [handleTabEvent, handleUpdateEvent],
+    [agents, handleTabEvent, handleUpdateEvent],
   );
 
   const { connected } = useWebSocket({ onDisplayEvent, onUpdateEvent });

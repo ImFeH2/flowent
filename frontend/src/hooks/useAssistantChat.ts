@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import {
   clearAssistantChatRequest,
   fetchNodeDetail,
-  getImageAssetUrl,
   interruptNode,
   retryAssistantMessageRequest,
   uploadImageAssetRequest,
@@ -36,135 +35,28 @@ import {
   getAssistantInputHistorySnapshot,
   subscribeAssistantInputHistory,
 } from "@/lib/assistantInputHistory";
+import {
+  buildMessageParts,
+  createUploadingImageDrafts,
+  draftImagesMatchHistoryEntry,
+  isReadyDraftImage,
+  isScrolledToBottom,
+  revokeDraftImageUrl,
+  revokeDraftImageUrls,
+  toDraftImagesFromHistory,
+  toInputHistoryImages,
+  type DraftChatImage,
+} from "@/hooks/chat/shared";
 import type {
   AssistantChatItem,
   AssistantInputHistoryEntry,
-  AssistantInputHistoryImage,
   ContentPart,
   HistoryEntry,
   NodeDetail,
 } from "@/types";
 
-const SCROLL_BOTTOM_EPSILON = 10;
-
-function isScrolledToBottom(element: HTMLDivElement) {
-  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-  return maxScrollTop - element.scrollTop <= SCROLL_BOTTOM_EPSILON;
-}
-
 interface UseAssistantChatOptions {
   bottomInset?: number;
-}
-
-interface DraftAssistantImage {
-  id: string;
-  assetId: string | null;
-  previewUrl: string;
-  mimeType: string | null;
-  width: number | null;
-  height: number | null;
-  name: string;
-  status: "uploading" | "ready";
-}
-
-function createDraftImageId() {
-  return (
-    globalThis.crypto?.randomUUID?.() ?? `draft-${Date.now()}-${Math.random()}`
-  );
-}
-
-function revokeDraftImageUrl(image: DraftAssistantImage) {
-  if (image.previewUrl.startsWith("blob:")) {
-    URL.revokeObjectURL(image.previewUrl);
-  }
-}
-
-function revokeDraftImageUrls(images: DraftAssistantImage[]) {
-  for (const image of images) {
-    revokeDraftImageUrl(image);
-  }
-}
-
-function toInputHistoryImages(
-  images: DraftAssistantImage[],
-): AssistantInputHistoryImage[] {
-  return images
-    .filter(
-      (image): image is DraftAssistantImage & { assetId: string } =>
-        image.status === "ready" && Boolean(image.assetId),
-    )
-    .map((image) => ({
-      assetId: image.assetId,
-      mimeType: image.mimeType,
-      width: image.width,
-      height: image.height,
-      name: image.name,
-    }));
-}
-
-function toDraftImagesFromHistory(
-  entry: AssistantInputHistoryEntry,
-): DraftAssistantImage[] {
-  return entry.images.map((image, index) => ({
-    id: `history-${entry.timestamp}-${index}`,
-    assetId: image.assetId,
-    previewUrl: getImageAssetUrl(image.assetId),
-    mimeType: image.mimeType,
-    width: image.width,
-    height: image.height,
-    name: image.name,
-    status: "ready",
-  }));
-}
-
-function draftImagesMatchHistoryEntry(
-  images: DraftAssistantImage[],
-  entry: AssistantInputHistoryEntry,
-) {
-  if (images.length !== entry.images.length) {
-    return false;
-  }
-
-  return entry.images.every((image, index) => {
-    const draft = images[index];
-
-    return (
-      Boolean(draft) &&
-      draft?.status === "ready" &&
-      draft.assetId === image.assetId &&
-      draft.mimeType === image.mimeType &&
-      draft.width === image.width &&
-      draft.height === image.height &&
-      draft.name === image.name
-    );
-  });
-}
-
-function readImageSize(
-  file: File,
-): Promise<{ width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const previewUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      const width = image.naturalWidth;
-      const height = image.naturalHeight;
-      URL.revokeObjectURL(previewUrl);
-      resolve(
-        width > 0 && height > 0
-          ? {
-              width,
-              height,
-            }
-          : null,
-      );
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(previewUrl);
-      resolve(null);
-    };
-    image.src = previewUrl;
-  });
 }
 
 export function useAssistantChat(options: UseAssistantChatOptions = {}) {
@@ -185,7 +77,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [input, setInputState] = useState("");
-  const [draftImages, setDraftImages] = useState<DraftAssistantImage[]>([]);
+  const [draftImages, setDraftImages] = useState<DraftChatImage[]>([]);
   const [historyCursor, setHistoryCursor] = useState<number | null>(null);
   const [clearing, setClearing] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(
@@ -194,7 +86,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
-  const draftImagesRef = useRef<DraftAssistantImage[]>([]);
+  const draftImagesRef = useRef<DraftChatImage[]>([]);
   const assistantId = useMemo(() => getAssistantNodeId(agents), [agents]);
   const assistantNode = useMemo(
     () => (assistantId ? (agents.get(assistantId) ?? null) : null),
@@ -213,10 +105,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   const hasUploadingImages = draftImages.some(
     (image) => image.status === "uploading",
   );
-  const readyImages = draftImages.filter(
-    (image): image is DraftAssistantImage & { assetId: string } =>
-      image.status === "ready" && Boolean(image.assetId),
-  );
+  const readyImages = draftImages.filter(isReadyDraftImage);
   const inputHistoryEntries = useSyncExternalStore(
     subscribeAssistantInputHistory,
     getAssistantInputHistorySnapshot,
@@ -459,20 +348,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       return;
     }
 
-    const parts: ContentPart[] = [];
-    if (content) {
-      parts.push({ type: "text", text: content });
-    }
-    for (const image of readyImages) {
-      parts.push({
-        type: "image",
-        asset_id: image.assetId,
-        mime_type: image.mimeType,
-        width: image.width,
-        height: image.height,
-        alt: image.name,
-      });
-    }
+    const parts: ContentPart[] = buildMessageParts(content, readyImages);
 
     const previousInput = input;
     const previousDraftImages = draftImages;
@@ -520,21 +396,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
         return;
       }
 
-      const drafts = await Promise.all(
-        selectedFiles.map(async (file) => {
-          const size = await readImageSize(file);
-          return {
-            id: createDraftImageId(),
-            assetId: null,
-            previewUrl: URL.createObjectURL(file),
-            mimeType: file.type || null,
-            width: size?.width ?? null,
-            height: size?.height ?? null,
-            name: file.name,
-            status: "uploading" as const,
-          };
-        }),
-      );
+      const drafts = await createUploadingImageDrafts(selectedFiles);
 
       setDraftImages((current) => [...current, ...drafts]);
 

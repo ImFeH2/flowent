@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import {
   dispatchNodeMessageRequest,
   fetchNodeDetail,
-  getImageAssetUrl,
   interruptNode,
   retryNodeMessageRequest,
   uploadImageAssetRequest,
@@ -33,137 +32,30 @@ import {
   getChatInputHistorySnapshot,
   subscribeChatInputHistory,
 } from "@/lib/chatInputHistory";
+import {
+  buildMessageParts,
+  createUploadingImageDrafts,
+  draftImagesMatchHistoryEntry,
+  isReadyDraftImage,
+  isScrolledToBottom,
+  revokeDraftImageUrl,
+  revokeDraftImageUrls,
+  toDraftImagesFromHistory,
+  toInputHistoryImages,
+  type DraftChatImage,
+} from "@/hooks/chat/shared";
 import { getWorkflowLeaderNode } from "@/lib/workflow";
 import type {
   AssistantChatItem,
   AssistantInputHistoryEntry,
-  AssistantInputHistoryImage,
   ContentPart,
   HistoryEntry,
   NodeDetail,
   PendingAssistantChatMessage,
 } from "@/types";
 
-const SCROLL_BOTTOM_EPSILON = 10;
-
-function isScrolledToBottom(element: HTMLDivElement) {
-  const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-  return maxScrollTop - element.scrollTop <= SCROLL_BOTTOM_EPSILON;
-}
-
 interface UseLeaderChatOptions {
   bottomInset?: number;
-}
-
-interface DraftLeaderImage {
-  id: string;
-  assetId: string | null;
-  previewUrl: string;
-  mimeType: string | null;
-  width: number | null;
-  height: number | null;
-  name: string;
-  status: "uploading" | "ready";
-}
-
-function createDraftImageId() {
-  return (
-    globalThis.crypto?.randomUUID?.() ?? `draft-${Date.now()}-${Math.random()}`
-  );
-}
-
-function revokeDraftImageUrl(image: DraftLeaderImage) {
-  if (image.previewUrl.startsWith("blob:")) {
-    URL.revokeObjectURL(image.previewUrl);
-  }
-}
-
-function revokeDraftImageUrls(images: DraftLeaderImage[]) {
-  for (const image of images) {
-    revokeDraftImageUrl(image);
-  }
-}
-
-function toInputHistoryImages(
-  images: DraftLeaderImage[],
-): AssistantInputHistoryImage[] {
-  return images
-    .filter(
-      (image): image is DraftLeaderImage & { assetId: string } =>
-        image.status === "ready" && Boolean(image.assetId),
-    )
-    .map((image) => ({
-      assetId: image.assetId,
-      mimeType: image.mimeType,
-      width: image.width,
-      height: image.height,
-      name: image.name,
-    }));
-}
-
-function toDraftImagesFromHistory(
-  entry: AssistantInputHistoryEntry,
-): DraftLeaderImage[] {
-  return entry.images.map((image, index) => ({
-    id: `history-${entry.timestamp}-${index}`,
-    assetId: image.assetId,
-    previewUrl: getImageAssetUrl(image.assetId),
-    mimeType: image.mimeType,
-    width: image.width,
-    height: image.height,
-    name: image.name,
-    status: "ready",
-  }));
-}
-
-function draftImagesMatchHistoryEntry(
-  images: DraftLeaderImage[],
-  entry: AssistantInputHistoryEntry,
-) {
-  if (images.length !== entry.images.length) {
-    return false;
-  }
-
-  return entry.images.every((image, index) => {
-    const draft = images[index];
-
-    return (
-      Boolean(draft) &&
-      draft?.status === "ready" &&
-      draft.assetId === image.assetId &&
-      draft.mimeType === image.mimeType &&
-      draft.width === image.width &&
-      draft.height === image.height &&
-      draft.name === image.name
-    );
-  });
-}
-
-function readImageSize(
-  file: File,
-): Promise<{ width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const previewUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      const width = image.naturalWidth;
-      const height = image.naturalHeight;
-      URL.revokeObjectURL(previewUrl);
-      resolve(
-        width > 0 && height > 0
-          ? {
-              width,
-              height,
-            }
-          : null,
-      );
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(previewUrl);
-      resolve(null);
-    };
-    image.src = previewUrl;
-  });
 }
 
 function createPendingMessage(
@@ -210,7 +102,7 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [input, setInputState] = useState("");
-  const [draftImages, setDraftImages] = useState<DraftLeaderImage[]>([]);
+  const [draftImages, setDraftImages] = useState<DraftChatImage[]>([]);
   const [historyCursor, setHistoryCursor] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(
@@ -221,7 +113,7 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
   >([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
-  const draftImagesRef = useRef<DraftLeaderImage[]>([]);
+  const draftImagesRef = useRef<DraftChatImage[]>([]);
   const supportsInputImage = leaderNode?.capabilities?.input_image ?? false;
   const historyClearedAtMs = leaderId
     ? (historyClearedAt.get(leaderId) ?? 0)
@@ -235,10 +127,7 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
   const hasUploadingImages = draftImages.some(
     (image) => image.status === "uploading",
   );
-  const readyImages = draftImages.filter(
-    (image): image is DraftLeaderImage & { assetId: string } =>
-      image.status === "ready" && Boolean(image.assetId),
-  );
+  const readyImages = draftImages.filter(isReadyDraftImage);
   const inputHistoryEntries = useSyncExternalStore(
     (listener) => subscribeChatInputHistory(inputHistoryScope, listener),
     () => getChatInputHistorySnapshot(inputHistoryScope),
@@ -531,20 +420,7 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
       return;
     }
 
-    const parts: ContentPart[] = [];
-    if (content) {
-      parts.push({ type: "text", text: content });
-    }
-    for (const image of readyImages) {
-      parts.push({
-        type: "image",
-        asset_id: image.assetId,
-        mime_type: image.mimeType,
-        width: image.width,
-        height: image.height,
-        alt: image.name,
-      });
-    }
+    const parts: ContentPart[] = buildMessageParts(content, readyImages);
 
     const previousInput = input;
     const previousDraftImages = draftImages;
@@ -612,21 +488,7 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
         return;
       }
 
-      const drafts = await Promise.all(
-        selectedFiles.map(async (file) => {
-          const size = await readImageSize(file);
-          return {
-            id: createDraftImageId(),
-            assetId: null,
-            previewUrl: URL.createObjectURL(file),
-            mimeType: file.type || null,
-            width: size?.width ?? null,
-            height: size?.height ?? null,
-            name: file.name,
-            status: "uploading" as const,
-          };
-        }),
-      );
+      const drafts = await createUploadingImageDrafts(selectedFiles);
 
       setDraftImages((current) => [...current, ...drafts]);
 

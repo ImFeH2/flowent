@@ -67,15 +67,13 @@ ENV PATH="/src/.venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-WORKDIR /data
+WORKDIR /workspace
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends bubblewrap \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=backend-build /src/.venv /src/.venv
-
-VOLUME ["/data"]
 
 EXPOSE 6873
 

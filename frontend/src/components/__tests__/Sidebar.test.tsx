@@ -52,7 +52,7 @@ describe("Sidebar", () => {
     useAccess.mockReturnValue({ logout });
   });
 
-  it("renders navigation items in the spec order", () => {
+  it("renders navigation items in the expected order", () => {
     render(<Sidebar width={232} onWidthChange={() => {}} />);
 
     expect(

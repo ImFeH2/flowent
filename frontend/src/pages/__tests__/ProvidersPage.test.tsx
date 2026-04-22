@@ -15,7 +15,6 @@ const {
   createProviderMock,
   deleteProviderMock,
   fetchProviderCatalogPreviewMock,
-  fetchProvidersMock,
   testProviderModelRequestMock,
   toastErrorMock,
   toastSuccessMock,
@@ -24,11 +23,14 @@ const {
   createProviderMock: vi.fn(),
   deleteProviderMock: vi.fn(),
   fetchProviderCatalogPreviewMock: vi.fn(),
-  fetchProvidersMock: vi.fn(),
   testProviderModelRequestMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   updateProviderMock: vi.fn(),
+}));
+
+const { swrMock } = vi.hoisted(() => ({
+  swrMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -36,10 +38,15 @@ vi.mock("@/lib/api", () => ({
   deleteProvider: (...args: unknown[]) => deleteProviderMock(...args),
   fetchProviderCatalogPreview: (...args: unknown[]) =>
     fetchProviderCatalogPreviewMock(...args),
-  fetchProviders: (...args: unknown[]) => fetchProvidersMock(...args),
+  fetchProviders: vi.fn(),
   testProviderModelRequest: (...args: unknown[]) =>
     testProviderModelRequestMock(...args),
   updateProvider: (...args: unknown[]) => updateProviderMock(...args),
+}));
+
+vi.mock("swr", () => ({
+  SWRConfig: ({ children }: { children?: unknown }) => children,
+  default: (...args: unknown[]) => swrMock(...args),
 }));
 
 vi.mock("@/hooks/usePanelDrag", () => ({
@@ -76,6 +83,11 @@ function buildProvider(
   };
 }
 
+let swrProvidersState: {
+  data: Provider[];
+  mutate: ReturnType<typeof vi.fn>;
+};
+
 function renderPage() {
   return render(
     <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
@@ -87,6 +99,15 @@ function renderPage() {
 describe("ProvidersPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    swrProvidersState = {
+      data: [],
+      mutate: vi.fn().mockResolvedValue(undefined),
+    };
+    swrMock.mockImplementation(() => ({
+      data: swrProvidersState.data,
+      isLoading: false,
+      mutate: swrProvidersState.mutate,
+    }));
   });
 
   afterEach(() => {
@@ -94,22 +115,20 @@ describe("ProvidersPage", () => {
   });
 
   it("loads the selected provider draft into the editor", async () => {
-    fetchProvidersMock.mockResolvedValue([
+    swrProvidersState.data = [
       buildProvider({
         id: "provider-1",
         name: "Primary",
         base_url: "https://api.example.com/v1",
       }),
-    ]);
+    ];
 
     renderPage();
 
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
 
     expect(
-      await screen.findByRole("heading", { name: "Primary" }),
+      screen.getByRole("heading", { name: "Primary" }),
     ).toBeInTheDocument();
     expect(
       screen.getByDisplayValue("https://api.example.com/v1"),
@@ -117,9 +136,9 @@ describe("ProvidersPage", () => {
   });
 
   it("fetches discovered models into the current provider draft", async () => {
-    fetchProvidersMock.mockResolvedValue([
+    swrProvidersState.data = [
       buildProvider({ id: "provider-1", name: "Primary" }),
-    ]);
+    ];
     fetchProviderCatalogPreviewMock.mockResolvedValue([
       {
         model: "gpt-5",
@@ -132,9 +151,7 @@ describe("ProvidersPage", () => {
 
     renderPage();
 
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Fetch Models" }));
 
     expect(await screen.findByText("gpt-5")).toBeInTheDocument();
@@ -147,7 +164,7 @@ describe("ProvidersPage", () => {
   });
 
   it("adds a manual model and submits the updated catalog", async () => {
-    fetchProvidersMock.mockResolvedValue([
+    swrProvidersState.data = [
       buildProvider({
         id: "provider-1",
         name: "Primary",
@@ -161,7 +178,7 @@ describe("ProvidersPage", () => {
           },
         ],
       }),
-    ]);
+    ];
     updateProviderMock.mockResolvedValue(
       buildProvider({
         id: "provider-1",
@@ -187,18 +204,16 @@ describe("ProvidersPage", () => {
 
     renderPage();
 
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Add Model" }));
 
-    const dialog = await screen.findByRole("dialog");
+    const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Model ID"), {
       target: { value: "manual-model" },
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Add Model" }));
 
-    expect(await screen.findByText("manual-model")).toBeInTheDocument();
+    expect(screen.getByText("manual-model")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -222,7 +237,7 @@ describe("ProvidersPage", () => {
   }, 10000);
 
   it("shows inline model test feedback for the current provider draft", async () => {
-    fetchProvidersMock.mockResolvedValue([
+    swrProvidersState.data = [
       buildProvider({
         id: "provider-1",
         name: "Primary",
@@ -236,7 +251,7 @@ describe("ProvidersPage", () => {
           },
         ],
       }),
-    ]);
+    ];
     testProviderModelRequestMock.mockResolvedValue({
       ok: true,
       duration_ms: 321,
@@ -244,9 +259,7 @@ describe("ProvidersPage", () => {
 
     renderPage();
 
-    fireEvent.click(
-      (await screen.findAllByRole("button", { name: /Primary/i }))[0]!,
-    );
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Test" }));
 
     expect(testProviderModelRequestMock).toHaveBeenCalledWith(

@@ -1,14 +1,15 @@
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HomePage } from "@/pages/HomePage";
 import type { Node, TaskTab } from "@/types";
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 const {
   clearChatMock,
@@ -60,6 +61,10 @@ const {
   useAgentHistoryRuntimeMock: vi.fn(),
   useAgentDetailMock: vi.fn(),
   useAgentUIMock: vi.fn(),
+}));
+
+const { useHomePageStateMock } = vi.hoisted(() => ({
+  useHomePageStateMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -134,6 +139,15 @@ vi.mock("@/hooks/useMeasuredHeight", () => ({
     height: 0,
     ref: { current: null },
   }),
+}));
+
+vi.mock("@/pages/home/useHomePageState", () => ({
+  useHomePageState: () =>
+    (
+      useHomePageStateMock as unknown as () => ReturnType<
+        typeof useMockHomePageState
+      >
+    )(),
 }));
 
 vi.mock("@/hooks/usePanelDrag", () => ({
@@ -219,7 +233,240 @@ function buildRole(
   };
 }
 
+interface HomePageScenario {
+  activeTabId?: string | null;
+  connected?: boolean;
+  leaderNode?: Node | null;
+  regularTabAgents?: Node[];
+  roles?: ReturnType<typeof buildRole>[];
+  selectedAgent?: Node | null;
+  setActiveTabIdSpy?: (nextValue: string | null) => void;
+  tabs?: Map<string, TaskTab>;
+}
+
+let homePageScenario: HomePageScenario = {};
+
+function useMockHomePageState() {
+  const roles = homePageScenario.roles ?? [
+    buildRole({ name: "Worker", description: "General execution role" }),
+    buildRole({ name: "Reviewer", description: "Review results carefully" }),
+    buildRole({ name: "Designer", description: "Frontend design role" }),
+  ];
+  const tabs =
+    homePageScenario.tabs ??
+    new Map([["tab-1", buildTab({ leader_id: "leader-1" })]]);
+  const [activeTabIdState, setActiveTabIdState] = useState<string | null>(
+    homePageScenario.activeTabId ?? "tab-1",
+  );
+  const [activeDialog, setActiveDialog] = useState<
+    "create-tab" | "create-node" | "connect-ports" | "delete-tab" | null
+  >(null);
+  const [pendingAction, setPendingAction] = useState<
+    | "create-tab"
+    | "create-node"
+    | "connect-ports"
+    | "delete-tab"
+    | "duplicate-tab"
+    | "save-definition"
+    | null
+  >(null);
+  const [createTabTitle, setCreateTabTitle] = useState("");
+  const [createTabGoal, setCreateTabGoal] = useState("");
+  const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
+  const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
+  const [createNodeType, setCreateNodeType] = useState<
+    "agent" | "trigger" | "code" | "if" | "merge"
+  >("agent");
+  const [createNodeRoleName, setCreateNodeRoleName] = useState("Worker");
+  const [createNodeName, setCreateNodeName] = useState("");
+  const [connectSourceId, setConnectSourceId] = useState("");
+  const [connectSourcePortKey, setConnectSourcePortKey] = useState("");
+  const [connectTargetId, setConnectTargetId] = useState("");
+  const [connectTargetPortKey, setConnectTargetPortKey] = useState("");
+  const [deleteTabTarget, setDeleteTabTarget] = useState<{
+    id: string;
+    title: string;
+    nodeCount?: number;
+  } | null>(null);
+  const [definitionDraft, setDefinitionDraft] = useState(
+    JSON.stringify({ version: 1, nodes: [], edges: [] }, null, 2),
+  );
+  const [editorMode, setEditorMode] = useState<"graph" | "json">("graph");
+  const [graphConnectMode, setGraphConnectMode] = useState(false);
+  const [leaderDetailVisible, setLeaderDetailVisible] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const graphRef = useRef(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const selectedAgent = homePageScenario.selectedAgent ?? null;
+  const activeTab = activeTabIdState
+    ? (tabs.get(activeTabIdState) ?? null)
+    : null;
+  const leaderNode =
+    homePageScenario.leaderNode ??
+    buildNode({
+      id: "leader-1",
+      is_leader: true,
+      role_name: "Conductor",
+    });
+  const setActiveTabId = (nextValue: string | null) => {
+    homePageScenario.setActiveTabIdSpy?.(nextValue);
+    setActiveTabIdState(nextValue);
+  };
+  const selectedCreateNodeRole =
+    roles.find((role) => role.name === createNodeRoleName) ?? null;
+
+  return {
+    activeDialog,
+    activeTab,
+    activeTabId: activeTabIdState,
+    connected: homePageScenario.connected ?? true,
+    connectSourceId,
+    connectSourcePortKey,
+    connectTargetId,
+    connectTargetPortKey,
+    createNodeName,
+    createNodeRoleName,
+    createNodeType,
+    createTabAllowNetwork,
+    createTabGoal,
+    createTabTitle,
+    createTabWriteDirs,
+    definitionDraft,
+    deleteTabTarget,
+    editorMode,
+    graphConnectMode,
+    graphHistory: {
+      canRedo: () => false,
+      canUndo: () => false,
+      createConnection: async () => {},
+      createLinkedAgent: async () => undefined,
+      createStandaloneAgent: async () => undefined,
+      createStandaloneNode: async () => undefined,
+      deleteAgent: async () => {},
+      deleteConnection: async () => {},
+      insertAgentBetween: async () => undefined,
+      redo: async () => false,
+      undo: async () => false,
+    },
+    graphRef,
+    handleCloseLeaderDetails: () => {
+      setLeaderDetailVisible(false);
+    },
+    handleConnectPorts: async () => {
+      setPendingAction("connect-ports");
+      await createTabEdgeRequestMock(
+        activeTabIdState,
+        connectSourceId,
+        connectTargetId,
+        connectSourcePortKey,
+        connectTargetPortKey,
+      );
+      setPendingAction(null);
+      setActiveDialog(null);
+    },
+    handleCreateNode: async () => {
+      setPendingAction("create-node");
+      await createTabNodeRequestMock(activeTabIdState, {
+        node_type: createNodeType,
+        role_name: createNodeRoleName,
+        name: createNodeName,
+      });
+      setPendingAction(null);
+      setActiveDialog(null);
+    },
+    handleCreateTab: async () => {
+      setPendingAction("create-tab");
+      const createdTab = await createTabRequestMock(
+        createTabTitle,
+        createTabGoal,
+        createTabAllowNetwork,
+        createTabWriteDirs
+          .split("\n")
+          .map((value) => value.trim())
+          .filter(Boolean),
+      );
+      setPendingAction(null);
+      setActiveDialog(null);
+      if (createdTab?.id) {
+        setActiveTabId(createdTab.id);
+      }
+    },
+    handleDeleteTab: async () => {
+      if (!deleteTabTarget) {
+        return;
+      }
+      setPendingAction("delete-tab");
+      await deleteTabRequestMock(deleteTabTarget.id);
+      setPendingAction(null);
+      setDeleteTabTarget(null);
+    },
+    handleDuplicateTab: () => {},
+    handleOpenLeaderDetails: () => {
+      setLeaderDetailVisible(true);
+    },
+    handleSaveDefinition: async () => {},
+    isCompactWorkspace: false,
+    isDragging: false,
+    leaderDetailVisible,
+    leaderNode,
+    leaderPanelRunning: false,
+    loadingRoles: false,
+    openConnectDialog: () => {
+      setActiveDialog("connect-ports");
+    },
+    openCreateNodeDialog: () => {
+      setActiveDialog("create-node");
+    },
+    openCreateTabDialog: () => {
+      setActiveDialog("create-tab");
+    },
+    panelVisible: panelOpen || Boolean(selectedAgent),
+    pendingAction,
+    regularTabAgents:
+      homePageScenario.regularTabAgents ??
+      (selectedAgent && !selectedAgent.is_leader ? [selectedAgent] : []),
+    requestDeleteTab: (tabId: string, title: string, nodeCount?: number) => {
+      setDeleteTabTarget({ id: tabId, title, nodeCount });
+    },
+    resolvedPanelWidth: 560,
+    roles,
+    selectAgent: vi.fn(),
+    selectedAgent,
+    selectedCreateNodeRole,
+    setActiveDialog,
+    setActiveTabId,
+    setConnectSourceId,
+    setConnectSourcePortKey,
+    setConnectTargetId,
+    setConnectTargetPortKey,
+    setCreateNodeName,
+    setCreateNodeRoleName,
+    setCreateNodeType,
+    setCreateTabAllowNetwork,
+    setCreateTabGoal,
+    setCreateTabTitle,
+    setCreateTabWriteDirs,
+    setDefinitionDraft,
+    setDeleteTabTarget,
+    setEditorMode,
+    setGraphConnectMode,
+    sourcePortOptions: [],
+    startDrag: vi.fn(),
+    tabs,
+    targetPortOptions: [],
+    togglePanel: () => {
+      setPanelOpen((value) => !value);
+    },
+    workflowNodeOptions: [],
+    workspaceRef,
+  };
+}
+
 describe("HomePage", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     clearChatMock.mockReset();
     createBlueprintRequestMock.mockReset();
@@ -236,6 +483,8 @@ describe("HomePage", () => {
     toastErrorMock.mockReset();
     toastSuccessMock.mockReset();
     updateBlueprintRequestMock.mockReset();
+    useHomePageStateMock.mockImplementation(useMockHomePageState);
+    homePageScenario = {};
 
     const assistant = buildNode({
       id: "assistant",
@@ -301,13 +550,7 @@ describe("HomePage", () => {
 
   it("creates a tab through the custom dialog instead of a browser prompt", async () => {
     const setActiveTabId = vi.fn();
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-1",
-      pendingAssistantMessages: [],
-      selectedAgentId: null,
-      selectAgent: vi.fn(),
-      setActiveTabId,
-    });
+    homePageScenario = { setActiveTabIdSpy: setActiveTabId };
     createTabRequestMock.mockResolvedValue({
       id: "tab-2",
       title: "Release Prep",
@@ -404,13 +647,7 @@ describe("HomePage", () => {
     useAgentNodesRuntimeMock.mockReturnValue({
       agents: new Map([[leader.id, leader]]),
     });
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-1",
-      pendingAssistantMessages: [],
-      selectedAgentId: null,
-      selectAgent: vi.fn(),
-      setActiveTabId: vi.fn(),
-    });
+    homePageScenario = { leaderNode: leader, selectedAgent: null };
     useAgentDetailMock.mockReturnValue({
       detail: {
         id: leader.id,
@@ -499,13 +736,7 @@ describe("HomePage", () => {
         [worker.id, worker],
       ]),
     });
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-1",
-      pendingAssistantMessages: [],
-      selectedAgentId: worker.id,
-      selectAgent: vi.fn(),
-      setActiveTabId: vi.fn(),
-    });
+    homePageScenario = { selectedAgent: worker };
     useAgentDetailMock.mockReturnValue({
       detail: {
         id: worker.id,
@@ -560,13 +791,7 @@ describe("HomePage", () => {
         [worker.id, worker],
       ]),
     });
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-1",
-      pendingAssistantMessages: [],
-      selectedAgentId: worker.id,
-      selectAgent: vi.fn(),
-      setActiveTabId: vi.fn(),
-    });
+    homePageScenario = { selectedAgent: worker };
     useAgentDetailMock.mockReturnValue({
       detail: {
         id: worker.id,
@@ -619,7 +844,9 @@ describe("HomePage", () => {
   it("middle-clicks a tab into the same delete flow without activating it first", async () => {
     const setActiveTabId = vi.fn();
     deleteTabRequestMock.mockResolvedValue(undefined);
-    useAgentTabsRuntimeMock.mockReturnValue({
+    homePageScenario = {
+      activeTabId: "tab-2",
+      setActiveTabIdSpy: setActiveTabId,
       tabs: new Map([
         ["tab-1", buildTab()],
         [
@@ -631,14 +858,7 @@ describe("HomePage", () => {
           }),
         ],
       ]),
-    });
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-2",
-      pendingAssistantMessages: [],
-      selectedAgentId: null,
-      selectAgent: vi.fn(),
-      setActiveTabId,
-    });
+    };
 
     render(<HomePage />);
 

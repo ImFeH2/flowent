@@ -18,7 +18,6 @@ import type {
 const {
   createMcpServerMock,
   deleteMcpServerMock,
-  fetchMcpStateMock,
   loginMcpServerMock,
   logoutMcpServerMock,
   previewMcpPromptMock,
@@ -30,7 +29,6 @@ const {
 } = vi.hoisted(() => ({
   createMcpServerMock: vi.fn(),
   deleteMcpServerMock: vi.fn(),
-  fetchMcpStateMock: vi.fn(),
   loginMcpServerMock: vi.fn(),
   logoutMcpServerMock: vi.fn(),
   previewMcpPromptMock: vi.fn(),
@@ -41,10 +39,14 @@ const {
   updateMcpServerMock: vi.fn(),
 }));
 
+const { swrMock } = vi.hoisted(() => ({
+  swrMock: vi.fn(),
+}));
+
 vi.mock("@/lib/api", () => ({
   createMcpServer: (...args: unknown[]) => createMcpServerMock(...args),
   deleteMcpServer: (...args: unknown[]) => deleteMcpServerMock(...args),
-  fetchMcpState: (...args: unknown[]) => fetchMcpStateMock(...args),
+  fetchMcpState: vi.fn(),
   loginMcpServer: (...args: unknown[]) => loginMcpServerMock(...args),
   logoutMcpServer: (...args: unknown[]) => logoutMcpServerMock(...args),
   previewMcpPrompt: (...args: unknown[]) => previewMcpPromptMock(...args),
@@ -52,6 +54,11 @@ vi.mock("@/lib/api", () => ({
     refreshAllMcpServersMock(...args),
   refreshMcpServer: (...args: unknown[]) => refreshMcpServerMock(...args),
   updateMcpServer: (...args: unknown[]) => updateMcpServerMock(...args),
+}));
+
+vi.mock("swr", () => ({
+  SWRConfig: ({ children }: { children?: unknown }) => children,
+  default: (...args: unknown[]) => swrMock(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -163,6 +170,12 @@ function buildState(servers: MCPServerRecord[]): MCPStatePayload {
   return { servers };
 }
 
+let swrState: {
+  data: MCPStatePayload | undefined;
+  error: unknown;
+  mutate: ReturnType<typeof vi.fn>;
+};
+
 function renderPage() {
   return render(
     <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
@@ -174,6 +187,17 @@ function renderPage() {
 describe("McpPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    swrState = {
+      data: undefined,
+      error: null,
+      mutate: vi.fn().mockResolvedValue(undefined),
+    };
+    swrMock.mockImplementation(() => ({
+      data: swrState.data,
+      error: swrState.error,
+      isLoading: false,
+      mutate: swrState.mutate,
+    }));
   });
 
   afterEach(() => {
@@ -181,44 +205,42 @@ describe("McpPage", () => {
   });
 
   it("renders the external MCP summary and removes the old Autopoe server card", async () => {
-    fetchMcpStateMock.mockResolvedValue(
-      buildState([
-        buildServer({ config: buildConfig({ name: "filesystem" }) }),
-        buildServer({
-          config: buildConfig({
-            name: "github",
-            transport: "streamable_http",
-            bearer_token_env_var: "GITHUB_TOKEN",
-            url: "https://mcp.github.example",
-          }),
-          snapshot: {
-            server_name: "github",
-            transport: "streamable_http",
-            status: "auth_required",
-            auth_status: "not_logged_in",
-            last_auth_result: "logged_out",
-            last_refresh_at: 1710000000,
-            last_refresh_result: "error",
-            last_error:
-              "Authentication is required before refreshing this server",
-            tools: [],
-            resources: [],
-            resource_templates: [],
-            prompts: [],
-            capability_counts: {
-              tools: 0,
-              resources: 0,
-              resource_templates: 0,
-              prompts: 0,
-            },
-          },
+    swrState.data = buildState([
+      buildServer({ config: buildConfig({ name: "filesystem" }) }),
+      buildServer({
+        config: buildConfig({
+          name: "github",
+          transport: "streamable_http",
+          bearer_token_env_var: "GITHUB_TOKEN",
+          url: "https://mcp.github.example",
         }),
-      ]),
-    );
+        snapshot: {
+          server_name: "github",
+          transport: "streamable_http",
+          status: "auth_required",
+          auth_status: "not_logged_in",
+          last_auth_result: "logged_out",
+          last_refresh_at: 1710000000,
+          last_refresh_result: "error",
+          last_error:
+            "Authentication is required before refreshing this server",
+          tools: [],
+          resources: [],
+          resource_templates: [],
+          prompts: [],
+          capability_counts: {
+            tools: 0,
+            resources: 0,
+            resource_templates: 0,
+            prompts: 0,
+          },
+        },
+      }),
+    ]);
 
     renderPage();
 
-    expect(await screen.findByText("Configured")).toBeInTheDocument();
+    expect(screen.getByText("Configured")).toBeInTheDocument();
     expect(screen.getAllByText("Connected").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Auth Required").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Error").length).toBeGreaterThan(0);
@@ -232,47 +254,41 @@ describe("McpPage", () => {
   });
 
   it("filters the server list by status and can clear back to the full list", async () => {
-    fetchMcpStateMock.mockResolvedValue(
-      buildState([
-        buildServer({ config: buildConfig({ name: "filesystem" }) }),
-        buildServer({
-          config: buildConfig({ name: "github" }),
-          snapshot: {
-            server_name: "github",
-            transport: "stdio",
-            status: "error",
-            auth_status: "unsupported",
-            last_auth_result: null,
-            last_refresh_at: 1710000000,
-            last_refresh_result: "error",
-            last_error: "Refresh failed",
-            tools: [],
-            resources: [],
-            resource_templates: [],
-            prompts: [],
-            capability_counts: {
-              tools: 0,
-              resources: 0,
-              resource_templates: 0,
-              prompts: 0,
-            },
+    swrState.data = buildState([
+      buildServer({ config: buildConfig({ name: "filesystem" }) }),
+      buildServer({
+        config: buildConfig({ name: "github" }),
+        snapshot: {
+          server_name: "github",
+          transport: "stdio",
+          status: "error",
+          auth_status: "unsupported",
+          last_auth_result: null,
+          last_refresh_at: 1710000000,
+          last_refresh_result: "error",
+          last_error: "Refresh failed",
+          tools: [],
+          resources: [],
+          resource_templates: [],
+          prompts: [],
+          capability_counts: {
+            tools: 0,
+            resources: 0,
+            resource_templates: 0,
+            prompts: 0,
           },
-        }),
-      ]),
-    );
+        },
+      }),
+    ]);
 
     renderPage();
 
-    expect((await screen.findAllByText("filesystem")).length).toBeGreaterThan(
-      0,
-    );
+    expect(screen.getAllByText("filesystem").length).toBeGreaterThan(0);
     expect(screen.getByText("github")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Disabled" }));
 
-    expect(
-      await screen.findByText("No matching MCP servers"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No matching MCP servers")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show All Servers" }));
 
@@ -283,13 +299,11 @@ describe("McpPage", () => {
   });
 
   it("parses a Quick Add launcher and submits the derived server config", async () => {
-    fetchMcpStateMock.mockResolvedValue(
-      buildState([
-        buildServer({
-          config: buildConfig({ name: "filesystem" }),
-        }),
-      ]),
-    );
+    swrState.data = buildState([
+      buildServer({
+        config: buildConfig({ name: "filesystem" }),
+      }),
+    ]);
     let resolveCreate: (value: Record<string, unknown>) => void = () => {};
     createMcpServerMock.mockImplementation(
       () =>
@@ -300,7 +314,6 @@ describe("McpPage", () => {
 
     renderPage();
 
-    await screen.findByText("Configured");
     fireEvent.change(
       screen.getByPlaceholderText("npx @playwright/mcp@latest"),
       {
@@ -352,51 +365,48 @@ describe("McpPage", () => {
   });
 
   it("shows global availability, launcher mapping, and filters activity categories", async () => {
-    fetchMcpStateMock.mockResolvedValue(
-      buildState([
-        buildServer({
-          config: buildConfig({
-            name: "filesystem",
-            launcher: "npx @modelcontextprotocol/server-filesystem /workspace",
-            args: ["/workspace"],
-          }),
-          activity: [
-            buildActivity({
-              id: "activity-refresh",
-              server_name: "filesystem",
-              action: "refresh",
-              summary: "Capabilities refreshed",
-            }),
-            buildActivity({
-              id: "activity-auth-check",
-              server_name: "filesystem",
-              action: "refresh",
-              result: "error",
-              summary:
-                "Authentication is required before refreshing this server",
-            }),
-            buildActivity({
-              id: "activity-tool",
-              server_name: "filesystem",
-              action: "tool_call",
-              summary: "Tool call completed",
-              tool_name: "list_files",
-            }),
-          ],
+    swrState.data = buildState([
+      buildServer({
+        config: buildConfig({
+          name: "filesystem",
+          launcher: "npx @modelcontextprotocol/server-filesystem /workspace",
+          args: ["/workspace"],
         }),
-      ]),
-    );
+        activity: [
+          buildActivity({
+            id: "activity-refresh",
+            server_name: "filesystem",
+            action: "refresh",
+            summary: "Capabilities refreshed",
+          }),
+          buildActivity({
+            id: "activity-auth-check",
+            server_name: "filesystem",
+            action: "refresh",
+            result: "error",
+            summary: "Authentication is required before refreshing this server",
+          }),
+          buildActivity({
+            id: "activity-tool",
+            server_name: "filesystem",
+            action: "tool_call",
+            summary: "Tool call completed",
+            tool_name: "list_files",
+          }),
+        ],
+      }),
+    ]);
 
     renderPage();
 
-    expect((await screen.findAllByText("Global")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Global").length).toBeGreaterThan(0);
     expect(screen.getByText("Original Launcher")).toBeInTheDocument();
     expect(screen.getByText("Parsed Result")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Activity" }));
     fireEvent.click(screen.getByRole("button", { name: "Tool" }));
 
-    expect(await screen.findByText("Tool call completed")).toBeInTheDocument();
+    expect(screen.getByText("Tool call completed")).toBeInTheDocument();
     expect(
       screen.queryByText("Capabilities refreshed"),
     ).not.toBeInTheDocument();
@@ -404,7 +414,7 @@ describe("McpPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Auth" }));
 
     expect(
-      await screen.findByText(
+      screen.getByText(
         "Authentication is required before refreshing this server",
       ),
     ).toBeInTheDocument();

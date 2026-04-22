@@ -1,7 +1,6 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { availableParallelism } from "os";
 import path from "path";
 
 const devProxyTarget =
@@ -73,6 +72,6 @@ export default defineConfig({
     clearMocks: true,
     restoreMocks: true,
     fileParallelism: true,
-    maxWorkers: Math.min(4, availableParallelism()),
+    maxWorkers: "50%",
   },
 });

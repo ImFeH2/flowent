@@ -1,12 +1,11 @@
 services:
   autopoe:
     image: ${AUTOPOE_IMAGE:-imfeh2/autopoe:latest}
+    working_dir: /workspace
     ports:
       - "${AUTOPOE_PORT:-6873}:6873"
     volumes:
-      - autopoe-data:/data
+      - ./data:/root/.autopoe
+      - ./workspace:/workspace
     restart: unless-stopped
     init: true
-
-volumes:
-  autopoe-data:

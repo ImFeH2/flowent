@@ -135,15 +135,6 @@ export function AccessConfigurationSection({
         </div>
 
         <div className={cn("space-y-2", formHelpTextClass)}>
-          <p>
-            Saving a new access code invalidates all current admin sessions. You
-            will need to unlock the console again with the new code.
-          </p>
-          <p>
-            The first access code is not created here. When Autopoe starts
-            without one, it automatically generates a code and writes it to the
-            local startup log.
-          </p>
           {accessDraftError ? (
             <p className="text-destructive">{accessDraftError}</p>
           ) : null}
@@ -177,16 +168,7 @@ export function PathConfigurationSection({
               readOnly
               mono
             />
-            <div className={cn("space-y-2", formHelpTextClass)}>
-              <p>
-                Autopoe stores settings.json, state.sqlite, assets/images, and
-                other instance data here. It is not the project working tree.
-              </p>
-              <p>
-                This path is fixed before startup and cannot be changed from the
-                running Settings page.
-              </p>
-            </div>
+            <div className={cn("space-y-2", formHelpTextClass)}></div>
           </div>
         </SettingsRow>
 
@@ -208,14 +190,6 @@ export function PathConfigurationSection({
               mono
             />
             <div className={cn("space-y-2", formHelpTextClass)}>
-              <p>
-                This directory becomes the default cwd, the relative-path base,
-                and the MCP project root for future execution.
-              </p>
-              <p>
-                Changing it does not automatically widen or rewrite any existing
-                write directory boundary.
-              </p>
               {!settings.working_dir.trim() ? (
                 <p className="text-destructive">
                   Working Directory must not be empty.

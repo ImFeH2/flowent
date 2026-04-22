@@ -128,38 +128,30 @@ function StatsErrorState({
 function StatsValueCard({
   title,
   value,
-  description,
   icon: Icon,
   accentClassName,
 }: {
   title: string;
   value: string;
-  description: string;
   icon: typeof Activity;
   accentClassName?: string;
 }) {
   return (
-    <SoftPanel className="relative overflow-hidden">
-      <div className="absolute inset-x-0 top-0 h-px bg-border" />
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            {title}
-          </p>
-          <p className="mt-3 text-[28px] font-medium tracking-[-0.04em] text-foreground">
-            {value}
-          </p>
-          <p className="mt-2 text-[12px] leading-5 text-muted-foreground">
-            {description}
-          </p>
-        </div>
+    <SoftPanel className="flex flex-col gap-4 py-4 min-h-[140px] justify-between">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium text-muted-foreground">{title}</div>
         <div
           className={cn(
-            "flex size-9 items-center justify-center rounded-lg border border-border bg-accent/20 text-muted-foreground",
+            "flex size-8 items-center justify-center rounded-md bg-accent/20 text-muted-foreground",
             accentClassName,
           )}
         >
-          <Icon className="size-4.5" />
+          <Icon className="size-4" />
+        </div>
+      </div>
+      <div>
+        <div className="text-2xl font-semibold leading-none tracking-tight">
+          {value}
         </div>
       </div>
     </SoftPanel>
@@ -498,41 +490,32 @@ export function StatsPage() {
     {
       title: "Active Tabs",
       value: formatInteger(overview.activeTabs),
-      description:
-        "Current tabs that still exist and match the selected scope.",
       icon: Layers3,
     },
     {
       title: "Running Agents",
       value: formatInteger(overview.runningAgents),
-      description: "Current nodes whose stable state is running right now.",
       icon: Bot,
     },
     {
       title: "LLM Requests",
       value: formatInteger(overview.llmRequests),
-      description:
-        "Formal request rounds. Internal retries still count as one request.",
       icon: Sparkles,
     },
     {
       title: "Total Tokens",
       value: formatInteger(overview.totalTokens),
-      description: "Aggregated real token usage from successful requests only.",
       icon: Workflow,
     },
     {
       title: "Error Rate",
       value: formatRate(overview.errorRate),
-      description:
-        "Failed requests divided by all requests in the selected scope.",
       icon: FileWarning,
       accentClassName: "text-destructive",
     },
     {
       title: "Avg Latency",
       value: formatDuration(overview.avgLatencyMs),
-      description: "Average full-request duration, not a single retry attempt.",
       icon: Clock3,
       accentClassName: "text-graph-status-idle",
     },
@@ -541,24 +524,18 @@ export function StatsPage() {
           {
             title: "Cache Read",
             value: formatInteger(overview.cacheRead),
-            description:
-              "Normalized cache hit tokens returned by providers when known.",
             icon: Database,
             accentClassName: "text-graph-status-running",
           },
           {
             title: "Cache Write",
             value: formatInteger(overview.cacheWrite),
-            description:
-              "Normalized cache creation or write tokens when known.",
             icon: Server,
             accentClassName: "text-primary",
           },
           {
             title: "Cache Hit Rate",
             value: formatRate(overview.cacheHitRate),
-            description:
-              "Derived only when both cache-hit tokens and a reliable input denominator are known.",
             icon: Gauge,
             accentClassName: "text-graph-status-running",
           },
@@ -737,7 +714,6 @@ export function StatsPage() {
                     key={card.title}
                     title={card.title}
                     value={card.value}
-                    description={card.description}
                     icon={card.icon}
                     accentClassName={card.accentClassName}
                   />

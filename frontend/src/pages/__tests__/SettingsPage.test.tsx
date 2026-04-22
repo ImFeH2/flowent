@@ -206,11 +206,6 @@ describe("SettingsPage", () => {
     expect(screen.getByLabelText("Working Directory")).toHaveValue(
       "/workspace/project",
     );
-    expect(
-      screen.getByText(
-        /Autopoe stores settings\.json, state\.sqlite, assets\/images/i,
-      ),
-    ).toBeInTheDocument();
     expect(screen.getByText("Context window: 128,000")).toBeInTheDocument();
     expect(
       screen.getByText("Capabilities: input_image=true, output_image=false"),

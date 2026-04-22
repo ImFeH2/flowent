@@ -109,12 +109,11 @@ export function SectionHeader({
 
 export function SettingsRow({
   label,
-  description,
   children,
   valueClassName,
 }: {
   label: string;
-  description?: string;
+  description?: string; // Kept in interface so usages don't break
   children: ReactNode;
   valueClassName?: string;
 }) {
@@ -124,11 +123,6 @@ export function SettingsRow({
         <label className="text-[13px] font-medium text-foreground/80">
           {label}
         </label>
-        {description ? (
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        ) : null}
       </div>
       <div className={cn("w-full min-w-0 flex-1", valueClassName)}>
         {children}

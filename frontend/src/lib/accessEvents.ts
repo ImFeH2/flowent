@@ -1,16 +1,14 @@
-const ACCESS_DENIED_EVENT = "autopoe:access-denied";
+const listeners = new Set<() => void>();
 
 export function dispatchAccessDeniedEvent() {
-  if (typeof window === "undefined") {
-    return;
+  for (const listener of [...listeners]) {
+    listener();
   }
-  window.dispatchEvent(new CustomEvent(ACCESS_DENIED_EVENT));
 }
 
 export function subscribeAccessDeniedEvent(listener: () => void) {
-  if (typeof window === "undefined") {
-    return () => undefined;
-  }
-  window.addEventListener(ACCESS_DENIED_EVENT, listener);
-  return () => window.removeEventListener(ACCESS_DENIED_EVENT, listener);
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }

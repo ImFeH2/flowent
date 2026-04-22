@@ -1,14 +1,5 @@
-import { useMemo, useState } from "react";
-import useSWR from "swr";
 import { motion } from "motion/react";
 import { Edit2, Eye, Plus, RefreshCw, Trash2, Users, X } from "lucide-react";
-import { toast } from "sonner";
-import {
-  createRole,
-  deleteRole,
-  fetchRolesBootstrap,
-  updateRole,
-} from "@/lib/api";
 import { ModelParamsFields } from "@/components/ModelParamsFields";
 import {
   PageScaffold,
@@ -43,360 +34,33 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  cloneModelParams,
-  isEmptyModelParams,
-  modelParamsToPayload,
-} from "@/lib/modelParams";
+import { cloneModelParams, isEmptyModelParams } from "@/lib/modelParams";
 import { cn } from "@/lib/utils";
-import type { Role, RoleModelConfig } from "@/types";
-
-type RoleDraft = Omit<Role, "is_builtin">;
-type ToolState = "allowed" | "included" | "excluded";
-type PanelMode = "create" | "edit" | "view";
-
-const MINIMUM_TOOLS = new Set(["idle", "sleep", "todo", "contacts"]);
-
-const emptyDraft = (): RoleDraft => ({
-  name: "",
-  description: "",
-  system_prompt: "",
-  model: null,
-  model_params: null,
-  included_tools: [],
-  excluded_tools: [],
-});
+import { useRolesPageState } from "@/pages/roles/useRolesPageState";
 
 export function RolesPage() {
-  const [panelMode, setPanelMode] = useState<PanelMode | null>(null);
-  const [activeRoleName, setActiveRoleName] = useState<string | null>(null);
-  const [draft, setDraft] = useState<RoleDraft>(emptyDraft());
-  const [saving, setSaving] = useState(false);
-  const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
-
   const {
-    data: bootstrapData,
-    isLoading: loading,
-    mutate: mutateRolesBootstrap,
-  } = useSWR("rolesBootstrap", fetchRolesBootstrap);
-
-  const roles = useMemo(
-    () => bootstrapData?.roles ?? [],
-    [bootstrapData?.roles],
-  );
-  const tools = useMemo(
-    () => bootstrapData?.tools ?? [],
-    [bootstrapData?.tools],
-  );
-  const providers = useMemo(
-    () => bootstrapData?.providers ?? [],
-    [bootstrapData?.providers],
-  );
-
-  const configurableTools = useMemo(
-    () => tools.filter((tool) => !MINIMUM_TOOLS.has(tool.name)),
-    [tools],
-  );
-  const providersById = useMemo(
-    () =>
-      Object.fromEntries(providers.map((provider) => [provider.id, provider])),
-    [providers],
-  );
-  const activeProviderId = draft.model?.provider_id ?? "";
-  const activeProviderModelOptions = useMemo(
-    () =>
-      activeProviderId ? (providersById[activeProviderId]?.models ?? []) : [],
-    [activeProviderId, providersById],
-  );
-  const availableActiveProviderModelOptions = activeProviderModelOptions;
-
-  const refreshRoles = async () => {
-    await mutateRolesBootstrap();
-  };
-
-  const handleCreate = () => {
-    setPanelMode("create");
-    setActiveRoleName(null);
-    setDraft(emptyDraft());
-  };
-
-  const handleView = (role: Role) => {
-    setPanelMode("view");
-    setActiveRoleName(role.name);
-    setDraft({
-      name: role.name,
-      description: role.description,
-      system_prompt: role.system_prompt,
-      model: role.model
-        ? {
-            provider_id: role.model.provider_id,
-            model: role.model.model,
-          }
-        : null,
-      model_params: role.model_params
-        ? cloneModelParams(role.model_params)
-        : null,
-      included_tools: [...role.included_tools],
-      excluded_tools: [...role.excluded_tools],
-    });
-  };
-
-  const handleEdit = (role: Role) => {
-    setPanelMode("edit");
-    setActiveRoleName(role.name);
-    setDraft({
-      name: role.name,
-      description: role.description,
-      system_prompt: role.system_prompt,
-      model: role.model
-        ? {
-            provider_id: role.model.provider_id,
-            model: role.model.model,
-          }
-        : null,
-      model_params: role.model_params
-        ? cloneModelParams(role.model_params)
-        : null,
-      included_tools: [...role.included_tools],
-      excluded_tools: [...role.excluded_tools],
-    });
-  };
-
-  const handleCancel = () => {
-    setPanelMode(null);
-    setActiveRoleName(null);
-    setDraft(emptyDraft());
-  };
-
-  const handleModelModeChange = (enabled: boolean) => {
-    if (!enabled) {
-      setDraft((current) => ({ ...current, model: null }));
-      return;
-    }
-    if (providers.length === 0) {
-      toast.error("Create a provider before setting a role model");
-      return;
-    }
-    setDraft((current) => ({
-      ...current,
-      model:
-        current.model ??
-        ({
-          provider_id: providers[0]?.id ?? "",
-          model: "",
-        } satisfies RoleModelConfig),
-    }));
-  };
-
-  const handleProviderChange = (providerId: string) => {
-    setDraft((current) => ({
-      ...current,
-      model: current.model
-        ? {
-            provider_id: providerId,
-            model: "",
-          }
-        : null,
-    }));
-  };
-
-  const handleModelParamsModeChange = (enabled: boolean) => {
-    setDraft((current) => ({
-      ...current,
-      model_params: enabled ? cloneModelParams(current.model_params) : null,
-    }));
-  };
-
-  const handleSave = async () => {
-    const nextName = draft.name.trim();
-
-    if (!nextName) {
-      toast.error("Role name is required");
-      return;
-    }
-    if (!draft.description.trim()) {
-      toast.error("Role description is required");
-      return;
-    }
-    if (!draft.system_prompt.trim()) {
-      toast.error("System prompt is required");
-      return;
-    }
-    if (draft.model) {
-      if (!draft.model.provider_id.trim()) {
-        toast.error("Provider is required for a role model override");
-        return;
-      }
-      if (!draft.model.model.trim()) {
-        toast.error("Model is required for a role model override");
-        return;
-      }
-    }
-
-    const nameExists = roles.some(
-      (role) => role.name === nextName && role.name !== activeRoleName,
-    );
-    if (nameExists) {
-      toast.error("Role name already exists");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const nextDraft = {
-        name: nextName,
-        description: draft.description.trim(),
-        system_prompt: draft.system_prompt,
-        model: draft.model
-          ? {
-              provider_id: draft.model.provider_id.trim(),
-              model: draft.model.model.trim(),
-            }
-          : null,
-        model_params: modelParamsToPayload(draft.model_params),
-        included_tools: draft.included_tools,
-        excluded_tools: draft.excluded_tools,
-      };
-
-      if (panelMode === "edit" && activeRoleName) {
-        const activeRole =
-          roles.find((role) => role.name === activeRoleName) ?? null;
-        const updates = activeRole?.is_builtin
-          ? {
-              model: nextDraft.model,
-              model_params: nextDraft.model_params,
-            }
-          : nextDraft;
-        const updated = await updateRole(activeRoleName, updates);
-        void mutateRolesBootstrap(
-          {
-            roles: roles.map((role) =>
-              role.name === activeRoleName ? updated : role,
-            ),
-            tools,
-            providers,
-          },
-          false,
-        );
-        toast.success("Role updated");
-      } else {
-        const created = await createRole(nextDraft);
-        void mutateRolesBootstrap(
-          {
-            roles: [created, ...roles],
-            tools,
-            providers,
-          },
-          false,
-        );
-        toast.success("Role created");
-      }
-      handleCancel();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save role",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!roleToDelete) return;
-    const name = roleToDelete.name;
-    setRoleToDelete(null);
-    try {
-      await deleteRole(name);
-      void mutateRolesBootstrap(
-        {
-          roles: roles.filter((role) => role.name !== name),
-          tools,
-          providers,
-        },
-        false,
-      );
-      if (activeRoleName === name) {
-        handleCancel();
-      }
-      toast.success("Role deleted");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete role",
-      );
-    }
-  };
-
-  const isPanelOpen = panelMode !== null;
-  const isReadOnly = panelMode === "view";
-  const activeRole = activeRoleName
-    ? (roles.find((role) => role.name === activeRoleName) ?? null)
-    : null;
-  const lockBuiltinFields =
-    panelMode !== "create" &&
-    panelMode !== null &&
-    activeRole?.is_builtin === true;
-  const panelEyebrow =
-    panelMode === "create"
-      ? "New Role"
-      : activeRole?.is_builtin
-        ? "Built-in"
-        : "Custom";
-  const panelTitle =
-    panelMode === "create"
-      ? "Create Role"
-      : activeRole?.is_builtin
-        ? "Role Details"
-        : (activeRole?.name ?? "Role Details");
-
-  const getToolState = (toolName: string): ToolState => {
-    if (draft.included_tools.includes(toolName)) {
-      return "included";
-    }
-    if (draft.excluded_tools.includes(toolName)) {
-      return "excluded";
-    }
-    return "allowed";
-  };
-
-  const cycleToolState = (toolName: string) => {
-    setDraft((current) => {
-      const currentState = current.included_tools.includes(toolName)
-        ? "included"
-        : current.excluded_tools.includes(toolName)
-          ? "excluded"
-          : "allowed";
-
-      if (currentState === "allowed") {
-        return {
-          ...current,
-          included_tools: [...current.included_tools, toolName],
-          excluded_tools: current.excluded_tools.filter(
-            (name) => name !== toolName,
-          ),
-        };
-      }
-
-      if (currentState === "included") {
-        return {
-          ...current,
-          included_tools: current.included_tools.filter(
-            (name) => name !== toolName,
-          ),
-          excluded_tools: [...current.excluded_tools, toolName],
-        };
-      }
-
-      return {
-        ...current,
-        included_tools: current.included_tools.filter(
-          (name) => name !== toolName,
-        ),
-        excluded_tools: current.excluded_tools.filter(
-          (name) => name !== toolName,
-        ),
-      };
-    });
-  };
+    activeRole,
+    availableActiveProviderModelOptions,
+    canSave,
+    configurableTools,
+    draft,
+    getToolState,
+    isPanelOpen,
+    isReadOnly,
+    loading,
+    lockBuiltinFields,
+    panelEyebrow,
+    panelMode,
+    panelTitle,
+    providers,
+    providersById,
+    refreshRoles,
+    roleToDelete,
+    roles,
+    saving,
+    actions,
+  } = useRolesPageState();
 
   if (loading && !isPanelOpen) {
     return <PageLoadingState label="Loading roles..." />;
@@ -424,7 +88,7 @@ export function RolesPage() {
               <Button
                 type="button"
                 size="sm"
-                onClick={handleCreate}
+                onClick={actions.openCreate}
                 disabled={isPanelOpen}
               >
                 <Plus className="size-4" />
@@ -453,7 +117,7 @@ export function RolesPage() {
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    onClick={handleCancel}
+                    onClick={actions.closePanel}
                     className="text-muted-foreground hover:bg-accent/45 hover:text-foreground"
                   >
                     <X className="size-3.5" />
@@ -473,8 +137,11 @@ export function RolesPage() {
                     >
                       <FormInput
                         value={draft.name}
-                        onChange={(e) =>
-                          setDraft({ ...draft, name: e.target.value })
+                        onChange={(event) =>
+                          actions.updateDraft((current) => ({
+                            ...current,
+                            name: event.target.value,
+                          }))
                         }
                         readOnly={isReadOnly || lockBuiltinFields}
                         placeholder="e.g., Code Reviewer"
@@ -492,8 +159,11 @@ export function RolesPage() {
                     >
                       <FormTextarea
                         value={draft.description}
-                        onChange={(e) =>
-                          setDraft({ ...draft, description: e.target.value })
+                        onChange={(event) =>
+                          actions.updateDraft((current) => ({
+                            ...current,
+                            description: event.target.value,
+                          }))
                         }
                         readOnly={isReadOnly || lockBuiltinFields}
                         placeholder="Briefly explain what this role is best suited for"
@@ -514,11 +184,11 @@ export function RolesPage() {
                       <div className="space-y-2">
                         <FormTextarea
                           value={draft.system_prompt}
-                          onChange={(e) =>
-                            setDraft({
-                              ...draft,
-                              system_prompt: e.target.value,
-                            })
+                          onChange={(event) =>
+                            actions.updateDraft((current) => ({
+                              ...current,
+                              system_prompt: event.target.value,
+                            }))
                           }
                           readOnly={isReadOnly || lockBuiltinFields}
                           placeholder="You are a helpful assistant that..."
@@ -558,7 +228,7 @@ export function RolesPage() {
                         variant="ghost"
                         size="sm"
                         disabled={isReadOnly}
-                        onClick={() => handleModelModeChange(false)}
+                        onClick={() => actions.handleModelModeChange(false)}
                         className={cn(
                           "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                           draft.model === null
@@ -574,7 +244,7 @@ export function RolesPage() {
                         variant="ghost"
                         size="sm"
                         disabled={isReadOnly}
-                        onClick={() => handleModelModeChange(true)}
+                        onClick={() => actions.handleModelModeChange(true)}
                         className={cn(
                           "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                           draft.model !== null
@@ -596,7 +266,7 @@ export function RolesPage() {
                             </label>
                             <Select
                               value={draft.model.provider_id || undefined}
-                              onValueChange={handleProviderChange}
+                              onValueChange={actions.handleProviderChange}
                               disabled={isReadOnly}
                             >
                               <SelectTrigger className={formSelectTriggerClass}>
@@ -630,7 +300,7 @@ export function RolesPage() {
                                   : undefined
                               }
                               onValueChange={(value) =>
-                                setDraft((current) => ({
+                                actions.updateDraft((current) => ({
                                   ...current,
                                   model: current.model
                                     ? { ...current.model, model: value }
@@ -669,7 +339,7 @@ export function RolesPage() {
                             </Select>
                             {availableActiveProviderModelOptions.length ===
                             0 ? (
-                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              <p className="text-[11px] leading-relaxed text-muted-foreground">
                                 No saved provider models. Manage this provider
                                 catalog in Providers.
                               </p>
@@ -682,13 +352,13 @@ export function RolesPage() {
                             </label>
                             <FormInput
                               value={draft.model.model}
-                              onChange={(e) =>
-                                setDraft((current) => ({
+                              onChange={(event) =>
+                                actions.updateDraft((current) => ({
                                   ...current,
                                   model: current.model
                                     ? {
                                         ...current.model,
-                                        model: e.target.value,
+                                        model: event.target.value,
                                       }
                                     : null,
                                 }))
@@ -728,7 +398,9 @@ export function RolesPage() {
                         variant="ghost"
                         size="sm"
                         disabled={isReadOnly}
-                        onClick={() => handleModelParamsModeChange(false)}
+                        onClick={() =>
+                          actions.handleModelParamsModeChange(false)
+                        }
                         className={cn(
                           "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                           isEmptyModelParams(draft.model_params)
@@ -744,7 +416,9 @@ export function RolesPage() {
                         variant="ghost"
                         size="sm"
                         disabled={isReadOnly}
-                        onClick={() => handleModelParamsModeChange(true)}
+                        onClick={() =>
+                          actions.handleModelParamsModeChange(true)
+                        }
                         className={cn(
                           "h-8 rounded-md border px-3 text-[13px] font-medium transition-colors",
                           !isEmptyModelParams(draft.model_params)
@@ -762,7 +436,7 @@ export function RolesPage() {
                         <ModelParamsFields
                           value={cloneModelParams(draft.model_params)}
                           onChange={(params) =>
-                            setDraft((current) => ({
+                            actions.updateDraft((current) => ({
                               ...current,
                               model_params: params,
                             }))
@@ -812,7 +486,9 @@ export function RolesPage() {
                             type="button"
                             variant="ghost"
                             size="xs"
-                            onClick={() => cycleToolState(tool.name)}
+                            onClick={() =>
+                              actions.cycleRoleToolState(tool.name)
+                            }
                             disabled={isReadOnly || lockBuiltinFields}
                             className={cn(
                               "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
@@ -843,22 +519,17 @@ export function RolesPage() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={handleCancel}
+                    onClick={actions.closePanel}
                     disabled={saving}
                   >
                     Cancel
                   </Button>
-                  {!isReadOnly && (
+                  {!isReadOnly ? (
                     <Button
                       type="button"
                       size="sm"
-                      onClick={() => void handleSave()}
-                      disabled={
-                        saving ||
-                        !draft.name.trim() ||
-                        !draft.description.trim() ||
-                        !draft.system_prompt.trim()
-                      }
+                      onClick={() => void actions.handleSave()}
+                      disabled={!canSave}
                     >
                       {saving
                         ? "Saving..."
@@ -866,17 +537,17 @@ export function RolesPage() {
                           ? "Create Role"
                           : "Save Changes"}
                     </Button>
-                  )}
-                  {isReadOnly && activeRole && !activeRole.is_builtin && (
+                  ) : null}
+                  {isReadOnly && activeRole && !activeRole.is_builtin ? (
                     <Button
                       type="button"
                       variant="secondary"
                       size="sm"
-                      onClick={() => handleEdit(activeRole)}
+                      onClick={() => actions.openEdit(activeRole)}
                     >
                       Edit Role
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -934,7 +605,7 @@ export function RolesPage() {
                         transition={{ delay: index * 0.03 }}
                         className={cn(
                           "group grid grid-cols-[220px_1fr_100px_80px] items-center gap-4 rounded-xl px-4 py-3.5 transition-colors",
-                          activeRoleName === role.name
+                          activeRole?.name === role.name
                             ? "bg-accent/25"
                             : "hover:bg-accent/15",
                         )}
@@ -944,11 +615,11 @@ export function RolesPage() {
                             <span className="truncate text-[13px] font-medium text-foreground">
                               {role.name}
                             </span>
-                            {role.is_builtin && (
+                            {role.is_builtin ? (
                               <span className="shrink-0 rounded-full border border-border bg-accent/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">
                                 Built-in
                               </span>
-                            )}
+                            ) : null}
                           </div>
                           <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
                             {role.description}
@@ -971,7 +642,7 @@ export function RolesPage() {
 
                         <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                           <FormIconButton
-                            onClick={() => handleView(role)}
+                            onClick={() => actions.openView(role)}
                             aria-label={`View ${role.name}`}
                             title={`View ${role.name}`}
                             className="size-7"
@@ -979,23 +650,23 @@ export function RolesPage() {
                             <Eye className="size-3.5" />
                           </FormIconButton>
                           <FormIconButton
-                            onClick={() => handleEdit(role)}
+                            onClick={() => actions.openEdit(role)}
                             aria-label={`Edit ${role.name}`}
                             title={`Edit ${role.name}`}
                             className="size-7"
                           >
                             <Edit2 className="size-3.5" />
                           </FormIconButton>
-                          {!role.is_builtin && (
+                          {!role.is_builtin ? (
                             <FormIconButton
-                              onClick={() => setRoleToDelete(role)}
+                              onClick={() => actions.requestDeleteRole(role)}
                               aria-label={`Delete ${role.name}`}
                               title={`Delete ${role.name}`}
                               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                             >
                               <Trash2 className="size-3.5" />
                             </FormIconButton>
-                          )}
+                          ) : null}
                         </div>
                       </motion.div>
                     );
@@ -1010,7 +681,7 @@ export function RolesPage() {
         open={roleToDelete !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setRoleToDelete(null);
+            actions.clearRoleToDelete();
           }
         }}
       >
@@ -1028,7 +699,10 @@ export function RolesPage() {
               <Button variant="ghost">Cancel</Button>
             </AlertDialogCancel>
             <AlertDialogAction asChild>
-              <Button variant="destructive" onClick={() => void handleDelete()}>
+              <Button
+                variant="destructive"
+                onClick={() => void actions.handleDelete()}
+              >
                 Delete
               </Button>
             </AlertDialogAction>

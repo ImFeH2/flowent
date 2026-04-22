@@ -12,9 +12,11 @@ from app.models import (
     EventType,
     GraphEdge,
     GraphNodeRecord,
+    Message,
     NodeConfig,
     NodeType,
     PortDirection,
+    ReceivedMessage,
     Tab,
     WorkflowDefinition,
     WorkflowNodeDefinition,
@@ -1274,19 +1276,27 @@ def dispatch_node_message(
     parts: list | None = None,
     from_id: str = "human",
 ) -> tuple[str | None, str | None]:
-    from app.models import Message
-
     target = registry.get(node_id)
     if target is None:
         return f"Node '{node_id}' is not active", None
     message_id = str(uuid.uuid4())
+    normalized_parts = list(parts or [])
+    target._append_history(
+        ReceivedMessage(
+            from_id=from_id,
+            parts=normalized_parts,
+            content=content,
+            message_id=message_id,
+        )
+    )
     target.enqueue_message(
         Message(
             from_id=from_id,
             to_id=node_id,
-            parts=list(parts or []),
+            parts=normalized_parts,
             content=content,
             message_id=message_id,
+            history_recorded=True,
         )
     )
     return None, message_id

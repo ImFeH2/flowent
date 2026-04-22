@@ -118,13 +118,18 @@ export function SettingsRow({
   valueClassName?: string;
 }) {
   return (
-    <div className="flex flex-col gap-2 py-4 first:pt-0 md:flex-row md:items-start md:justify-between md:gap-8">
-      <div className="min-w-0 flex-1 md:max-w-[200px]">
-        <label className="text-[13px] font-medium text-foreground/80">
+    <div className="px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-dashed last:border-b-0 gap-4">
+      <div className="min-w-0 shrink-0 md:max-w-[30%]">
+        <label className="text-[13px] font-medium text-muted-foreground">
           {label}
         </label>
       </div>
-      <div className={cn("w-full min-w-0 flex-1", valueClassName)}>
+      <div
+        className={cn(
+          "w-full min-w-0 flex-1 md:max-w-[70%] flex md:justify-end",
+          valueClassName,
+        )}
+      >
         {children}
       </div>
     </div>

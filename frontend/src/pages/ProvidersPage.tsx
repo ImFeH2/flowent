@@ -149,7 +149,7 @@ export function ProvidersPage() {
                     title="Identity"
                     description="Set the provider name and runtime type."
                   />
-                  <div className="mb-10 space-y-2">
+                  <div className="mb-10 border border-dashed border-border rounded-lg bg-card/30">
                     <SettingsRow label="Name">
                       <FormInput
                         value={draft.name}
@@ -189,7 +189,7 @@ export function ProvidersPage() {
                       title="Endpoint & Auth"
                       description="Configure connection details, request preview, credentials, and retry behavior."
                     />
-                    <div className="space-y-2">
+                    <div className="border border-dashed border-border rounded-lg bg-card/30">
                       <SettingsRow label="Base URL">
                         <FormInput
                           value={draft.base_url}
@@ -462,11 +462,16 @@ export function ProvidersPage() {
 
                   {!isCreating && selectedProvider ? (
                     <div className="border-t border-border pt-8">
-                      <SettingsRow label="Provider ID" description="Read-only">
-                        <div className="select-text rounded-md border border-border bg-card/30 px-3 py-2 font-mono text-[12px] text-foreground/80">
-                          {selectedProvider.id}
-                        </div>
-                      </SettingsRow>
+                      <div className="border border-dashed border-border rounded-lg bg-card/30">
+                        <SettingsRow
+                          label="Provider ID"
+                          description="Read-only"
+                        >
+                          <div className="select-text rounded-md border border-border bg-card/30 px-3 py-2 font-mono text-[12px] text-foreground/80">
+                            {selectedProvider.id}
+                          </div>
+                        </SettingsRow>
+                      </div>
                     </div>
                   ) : null}
                 </div>

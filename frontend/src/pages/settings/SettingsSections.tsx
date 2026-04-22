@@ -156,7 +156,7 @@ export function PathConfigurationSection({
   return (
     <section className="mt-12 border-t border-border pt-8">
       <SectionHeader title="Path Configuration" />
-      <div>
+      <div className="border border-dashed border-border rounded-lg bg-card/30">
         <SettingsRow
           label="App Data Directory"
           description="Instance storage root"
@@ -219,7 +219,7 @@ export function AssistantConfigurationSection({
   return (
     <section className="mt-12 border-t border-border pt-8">
       <SectionHeader title="Assistant Configuration" />
-      <div>
+      <div className="border border-dashed border-border rounded-lg bg-card/30">
         <SettingsRow label="Assistant Role" description="System role">
           <Select
             value={settings.assistant.role_name}
@@ -341,7 +341,7 @@ export function LeaderConfigurationSection({
   return (
     <section className="mt-12 border-t border-border pt-8">
       <SectionHeader title="Leader Configuration" />
-      <div>
+      <div className="border border-dashed border-border rounded-lg bg-card/30">
         <SettingsRow label="Leader Role" description="Default tab owner role">
           <Select
             value={settings.leader.role_name}
@@ -410,7 +410,7 @@ export function ModelConfigurationSection({
   return (
     <section className="mt-12 border-t border-border pt-8">
       <SectionHeader title="Model Configuration" />
-      <div>
+      <div className="border border-dashed border-border rounded-lg bg-card/30">
         <SettingsRow
           label="Active Provider"
           description="Used when roles do not override"

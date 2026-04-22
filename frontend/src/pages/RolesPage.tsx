@@ -130,7 +130,7 @@ export function RolesPage() {
                     description="Define the role name, selection description, and baseline prompt used by agents created with this role."
                   />
 
-                  <div className="space-y-4">
+                  <div className="border border-dashed border-border rounded-lg bg-card/30">
                     <SettingsRow
                       label="Role Name"
                       description="Unique identifier"

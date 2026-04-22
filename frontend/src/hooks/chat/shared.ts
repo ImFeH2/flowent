@@ -3,6 +3,7 @@ import type {
   AssistantInputHistoryEntry,
   AssistantInputHistoryImage,
   ContentPart,
+  PendingAssistantChatMessage,
 } from "@/types";
 
 const SCROLL_BOTTOM_EPSILON = 10;
@@ -116,6 +117,22 @@ export function buildMessageParts(
     });
   }
   return parts;
+}
+
+export function createPendingHumanMessage(
+  content: string,
+  parts: ContentPart[],
+  timestamp: number,
+): PendingAssistantChatMessage {
+  return {
+    id: `pending-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "PendingHumanMessage",
+    from: "human",
+    content,
+    parts,
+    timestamp,
+    message_id: null,
+  };
 }
 
 export async function readImageSize(

@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { sendAssistantMessageRequest } from "@/lib/api";
 import { useAgents } from "@/hooks/useAgents";
 import { useTabs } from "@/hooks/useTabs";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -22,17 +21,12 @@ import {
   deleteMapEntries,
   deleteMapEntry,
   filterStreamingDeltas,
-  removePendingAssistantMessage,
 } from "@/context/agentRuntimeState";
-import { contentPartsToText } from "@/lib/contentParts";
 import { getDeletedTabNodeIds, getTabEventId } from "@/lib/tabEvents";
 import type {
   AgentEvent,
-  AssistantChatMessage,
   HistoryEntry,
   Node,
-  PendingAssistantChatMessage,
-  ContentPart,
   TaskTab,
   StreamingDelta,
 } from "@/types";
@@ -104,11 +98,6 @@ interface AgentUIContextValue {
   selectAgent: (id: string | null) => void;
   hoveredAgentId: string | null;
   setHoveredAgentId: (id: string | null) => void;
-  pendingAssistantMessages: PendingAssistantChatMessage[];
-  sendAssistantMessage: (input: {
-    content: string;
-    parts?: ContentPart[];
-  }) => Promise<void>;
   activeTabId: string | null;
   setActiveTabId: (id: string | null) => void;
   currentPage: PageId;
@@ -170,9 +159,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [recentActivities, setRecentActivities] = useState<ActivityFeedEntry[]>(
     [],
   );
-  const [pendingAssistantMessages, setPendingAssistantMessages] = useState<
-    PendingAssistantChatMessage[]
-  >([]);
   const [currentPage, setCurrentPage] = useState<PageId>("assistant");
   const msgTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
@@ -180,7 +166,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const toolTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(
     new Map(),
   );
-  const assistantMessageCounterRef = useRef(0);
   const activityEntryCounterRef = useRef(0);
   const seenToolCallIdsRef = useRef<Set<string>>(new Set());
   const activeTabId = useMemo(() => {
@@ -190,67 +175,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     const firstTabId = tabs.keys().next().value;
     return typeof firstTabId === "string" ? firstTabId : null;
   }, [selectedTabId, tabs]);
-
-  const nextAssistantMessageId = useCallback(
-    (from: AssistantChatMessage["from"], timestamp: number) =>
-      `${from}-${timestamp}-${assistantMessageCounterRef.current++}`,
-    [],
-  );
-
-  const createAssistantMessage = useCallback(
-    (
-      from: AssistantChatMessage["from"],
-      content: string,
-      timestamp: number,
-      parts?: ContentPart[],
-    ): AssistantChatMessage => ({
-      id: nextAssistantMessageId(from, timestamp),
-      from,
-      content,
-      parts,
-      timestamp,
-    }),
-    [nextAssistantMessageId],
-  );
-
-  const sendAssistantMessage = useCallback(
-    async (input: { content: string; parts?: ContentPart[] }) => {
-      const timestamp = Date.now();
-      const content = input.content;
-      setPendingAssistantMessages((prev) => [
-        ...prev,
-        {
-          ...createAssistantMessage("human", content, timestamp, input.parts),
-          type: "PendingHumanMessage",
-        },
-      ]);
-
-      try {
-        const response = await sendAssistantMessageRequest(input);
-        if (response.status === "command_executed") {
-          setPendingAssistantMessages((prev) =>
-            removePendingAssistantMessage(prev, { content, timestamp }),
-          );
-          return;
-        }
-        if (response.message_id) {
-          setPendingAssistantMessages((prev) =>
-            prev.map((message) =>
-              message.timestamp === timestamp && message.content === content
-                ? { ...message, message_id: response.message_id }
-                : message,
-            ),
-          );
-        }
-      } catch (error) {
-        setPendingAssistantMessages((prev) =>
-          removePendingAssistantMessage(prev, { content, timestamp }),
-        );
-        throw error;
-      }
-    },
-    [createAssistantMessage],
-  );
 
   const clearAgentHistory = useCallback((agentId: string) => {
     setAgentHistories((prev) => deleteMapEntry(prev, agentId));
@@ -397,7 +321,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         setRecentActivities((prev) =>
           prev.filter((activity) => activity.agentId !== agentId),
         );
-        setPendingAssistantMessages([]);
       }
 
       if (event.type === "history_replaced") {
@@ -426,7 +349,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
         setRecentActivities((prev) =>
           prev.filter((activity) => activity.agentId !== agentId),
         );
-        setPendingAssistantMessages([]);
       }
 
       if (event.type === "history_entry_added") {
@@ -485,20 +407,6 @@ export function AgentProvider({ children }: { children: ReactNode }) {
               return next;
             });
           }
-        }
-
-        if (
-          entry.type === "ReceivedMessage" &&
-          entry.from_id === "human" &&
-          (entry.content || entry.message_id)
-        ) {
-          setPendingAssistantMessages((prev) =>
-            removePendingAssistantMessage(prev, {
-              content:
-                entry.content ?? contentPartsToText(entry.parts, entry.content),
-              messageId: entry.message_id,
-            }),
-          );
         }
 
         if (
@@ -655,22 +563,12 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       selectAgent,
       hoveredAgentId,
       setHoveredAgentId,
-      pendingAssistantMessages,
-      sendAssistantMessage,
       activeTabId,
       setActiveTabId: setSelectedTabId,
       currentPage,
       setCurrentPage,
     }),
-    [
-      selectedAgentId,
-      selectAgent,
-      hoveredAgentId,
-      pendingAssistantMessages,
-      sendAssistantMessage,
-      activeTabId,
-      currentPage,
-    ],
+    [selectedAgentId, selectAgent, hoveredAgentId, activeTabId, currentPage],
   );
 
   return (

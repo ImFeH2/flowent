@@ -15,6 +15,7 @@ import {
   fetchNodeDetail,
   interruptNode,
   retryAssistantMessageRequest,
+  sendAssistantMessageRequest,
   uploadImageAssetRequest,
 } from "@/lib/api";
 import {
@@ -22,8 +23,8 @@ import {
   useAgentConnectionRuntime,
   useAgentHistoryRuntime,
   useAgentNodesRuntime,
-  useAgentUI,
 } from "@/context/AgentContext";
+import { removePendingAssistantMessage } from "@/context/agentRuntimeState";
 import { getAssistantNodeId } from "@/lib/assistant";
 import {
   clearConversationHistory,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/assistantInputHistory";
 import {
   buildMessageParts,
+  createPendingHumanMessage,
   createUploadingImageDrafts,
   draftImagesMatchHistoryEntry,
   isReadyDraftImage,
@@ -53,6 +55,7 @@ import type {
   ContentPart,
   HistoryEntry,
   NodeDetail,
+  PendingAssistantChatMessage,
 } from "@/types";
 
 interface UseAssistantChatOptions {
@@ -73,7 +76,6 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     streamingDeltas,
   } = useAgentHistoryRuntime();
   const { activeToolCalls } = useAgentActivityRuntime();
-  const { pendingAssistantMessages, sendAssistantMessage } = useAgentUI();
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [input, setInputState] = useState("");
@@ -84,6 +86,9 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     null,
   );
   const [sending, setSending] = useState(false);
+  const [pendingAssistantMessages, setPendingAssistantMessages] = useState<
+    PendingAssistantChatMessage[]
+  >([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const draftImagesRef = useRef<DraftChatImage[]>([]);
@@ -150,6 +155,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       return;
     }
 
+    setPendingAssistantMessages([]);
     setDetail((current) =>
       current
         ? {
@@ -162,10 +168,14 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
   }, [assistantHistoryClearedAt]);
 
   useEffect(() => {
-    if (!assistantHistoryInvalidatedAt || !assistantHistorySnapshot) {
+    if (!assistantHistoryInvalidatedAt) {
       return;
     }
 
+    setPendingAssistantMessages([]);
+    if (!assistantHistorySnapshot) {
+      return;
+    }
     setDetail((current) =>
       current
         ? {
@@ -218,29 +228,63 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     connected,
   ]);
 
-  const timelineItems = useMemo<AssistantChatItem[]>(() => {
-    const history = assistantId
-      ? mergeHistoryWithDeltas({
-          history: assistantHistorySnapshot ?? detail?.history ?? [],
-          incremental: agentHistories.get(assistantId),
-          deltas: streamingDeltas.get(assistantId),
-          fetchedAt: fetchedAt || Date.now(),
-        })
-      : [];
-
-    return [
-      ...history,
-      ...pendingAssistantMessages.map((message) => ({ ...message })),
-    ];
+  const mergedHistory = useMemo(() => {
+    if (!assistantId) {
+      return [];
+    }
+    return mergeHistoryWithDeltas({
+      history: assistantHistorySnapshot ?? detail?.history ?? [],
+      incremental: agentHistories.get(assistantId),
+      deltas: streamingDeltas.get(assistantId),
+      fetchedAt: fetchedAt || Date.now(),
+    });
   }, [
     agentHistories,
     assistantHistorySnapshot,
     detail,
     fetchedAt,
-    pendingAssistantMessages,
     streamingDeltas,
     assistantId,
   ]);
+
+  useEffect(() => {
+    if (!assistantId || pendingAssistantMessages.length === 0) {
+      return;
+    }
+
+    const confirmedMessages = mergedHistory.filter(
+      (entry): entry is HistoryEntry & { type: "ReceivedMessage" } =>
+        entry.type === "ReceivedMessage" &&
+        entry.from_id === "human" &&
+        (Boolean(entry.content) ||
+          Boolean(entry.message_id) ||
+          Boolean(entry.parts?.length)),
+    );
+
+    if (confirmedMessages.length === 0) {
+      return;
+    }
+
+    setPendingAssistantMessages((current) =>
+      confirmedMessages.reduce(
+        (messages, entry) =>
+          removePendingAssistantMessage(messages, {
+            content:
+              entry.content ?? contentPartsToText(entry.parts, entry.content),
+            messageId: entry.message_id,
+          }),
+        current,
+      ),
+    );
+  }, [assistantId, mergedHistory, pendingAssistantMessages.length]);
+
+  const timelineItems = useMemo<AssistantChatItem[]>(
+    () => [
+      ...mergedHistory,
+      ...pendingAssistantMessages.map((message) => ({ ...message })),
+    ],
+    [mergedHistory, pendingAssistantMessages],
+  );
 
   const assistantActivity = useMemo(() => {
     const pendingCount = pendingAssistantMessages.length;
@@ -354,16 +398,40 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     const previousDraftImages = draftImages;
     const previousHistoryCursor = historyCursor;
     const submittedAt = Date.now();
+    const normalizedContent = content || contentPartsToText(parts);
+    const pendingMessage = createPendingHumanMessage(
+      normalizedContent,
+      parts,
+      submittedAt,
+    );
     setSending(true);
     setHistoryCursor(null);
     setInputState("");
     setDraftImages([]);
+    setPendingAssistantMessages((current) => [...current, pendingMessage]);
 
     try {
-      await sendAssistantMessage({
-        content: content || contentPartsToText(parts),
+      const response = await sendAssistantMessageRequest({
+        content: normalizedContent,
         parts,
       });
+      if (response.status === "command_executed") {
+        setPendingAssistantMessages((current) =>
+          removePendingAssistantMessage(current, {
+            content: normalizedContent,
+            timestamp: submittedAt,
+          }),
+        );
+      } else if (response.message_id) {
+        setPendingAssistantMessages((current) =>
+          current.map((message) =>
+            message.timestamp === submittedAt &&
+            message.content === normalizedContent
+              ? { ...message, message_id: response.message_id }
+              : message,
+          ),
+        );
+      }
       appendAssistantInputHistoryEntry({
         text: previousInput,
         images: toInputHistoryImages(previousDraftImages),
@@ -371,6 +439,12 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
       });
       revokeDraftImageUrls(previousDraftImages);
     } catch (error) {
+      setPendingAssistantMessages((current) =>
+        removePendingAssistantMessage(current, {
+          content: normalizedContent,
+          timestamp: submittedAt,
+        }),
+      );
       setInputState(previousInput);
       setDraftImages(previousDraftImages);
       setHistoryCursor(previousHistoryCursor);
@@ -527,6 +601,7 @@ export function useAssistantChat(options: UseAssistantChatOptions = {}) {
     setClearing(true);
     try {
       await clearAssistantChatRequest(assistantId);
+      setPendingAssistantMessages([]);
       clearAgentHistory(assistantId);
       const data = await fetchNodeDetail(assistantId);
       setDetail(data);

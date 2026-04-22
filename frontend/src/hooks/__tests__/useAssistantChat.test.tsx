@@ -19,6 +19,7 @@ const clearAssistantChatRequestMock = vi.fn();
 const getImageAssetUrlMock = vi.fn();
 const interruptNodeMock = vi.fn();
 const retryAssistantMessageRequestMock = vi.fn();
+const sendAssistantMessageRequestMock = vi.fn();
 const toastErrorMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
 const useAgentConnectionRuntimeMock = vi.fn();
@@ -51,6 +52,8 @@ vi.mock("@/lib/api", () => ({
   interruptNode: (...args: unknown[]) => interruptNodeMock(...args),
   retryAssistantMessageRequest: (...args: unknown[]) =>
     retryAssistantMessageRequestMock(...args),
+  sendAssistantMessageRequest: (...args: unknown[]) =>
+    sendAssistantMessageRequestMock(...args),
   uploadImageAssetRequest: (...args: unknown[]) =>
     uploadImageAssetRequestMock(...args),
 }));
@@ -178,6 +181,7 @@ describe("useAssistantChat", () => {
     getImageAssetUrlMock.mockReset();
     interruptNodeMock.mockReset();
     retryAssistantMessageRequestMock.mockReset();
+    sendAssistantMessageRequestMock.mockReset();
     toastErrorMock.mockReset();
     useAgentActivityRuntimeMock.mockReset();
     useAgentConnectionRuntimeMock.mockReset();
@@ -198,10 +202,6 @@ describe("useAssistantChat", () => {
       historyClearedAt: new Map(),
       historySnapshots: new Map(),
       streamingDeltas: new Map(),
-    });
-    useAgentUIMock.mockReturnValue({
-      pendingAssistantMessages: [],
-      sendAssistantMessage: vi.fn(),
     });
     getImageAssetUrlMock.mockImplementation(
       (assetId: string) => `/api/image-assets/${assetId}`,
@@ -625,8 +625,6 @@ describe("useAssistantChat", () => {
   });
 
   it("records submitted inputs and browses them with ArrowUp and ArrowDown", async () => {
-    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
-
     useAgentNodesRuntimeMock.mockReturnValue({
       agents: new Map([["assistant", buildAssistantNode("idle")]]),
     });
@@ -634,10 +632,7 @@ describe("useAssistantChat", () => {
       activeMessages: [],
       activeToolCalls: new Map(),
     });
-    useAgentUIMock.mockReturnValue({
-      pendingAssistantMessages: [],
-      sendAssistantMessage: sendAssistantMessageMock,
-    });
+    sendAssistantMessageRequestMock.mockResolvedValue({ status: "sent" });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
 
     const { result } = renderHook(() => useAssistantChat());
@@ -662,11 +657,11 @@ describe("useAssistantChat", () => {
       await result.current.sendMessage();
     });
 
-    expect(sendAssistantMessageMock).toHaveBeenNthCalledWith(1, {
+    expect(sendAssistantMessageRequestMock).toHaveBeenNthCalledWith(1, {
       content: "first request",
       parts: [{ type: "text", text: "first request" }],
     });
-    expect(sendAssistantMessageMock).toHaveBeenNthCalledWith(2, {
+    expect(sendAssistantMessageRequestMock).toHaveBeenNthCalledWith(2, {
       content: "/help",
       parts: [{ type: "text", text: "/help" }],
     });
@@ -706,7 +701,6 @@ describe("useAssistantChat", () => {
   });
 
   it("restores recalled images in the same session and reloads only text history after a new session", async () => {
-    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
     const originalImage = globalThis.Image;
@@ -756,10 +750,7 @@ describe("useAssistantChat", () => {
       activeMessages: [],
       activeToolCalls: new Map(),
     });
-    useAgentUIMock.mockReturnValue({
-      pendingAssistantMessages: [],
-      sendAssistantMessage: sendAssistantMessageMock,
-    });
+    sendAssistantMessageRequestMock.mockResolvedValue({ status: "sent" });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
     uploadImageAssetRequestMock.mockResolvedValue({
       id: "asset-1",
@@ -838,7 +829,6 @@ describe("useAssistantChat", () => {
   });
 
   it("does not persist a blank history slot for image-only messages across sessions", async () => {
-    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
     const originalImage = globalThis.Image;
@@ -888,10 +878,7 @@ describe("useAssistantChat", () => {
       activeMessages: [],
       activeToolCalls: new Map(),
     });
-    useAgentUIMock.mockReturnValue({
-      pendingAssistantMessages: [],
-      sendAssistantMessage: sendAssistantMessageMock,
-    });
+    sendAssistantMessageRequestMock.mockResolvedValue({ status: "sent" });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
     uploadImageAssetRequestMock.mockResolvedValue({
       id: "asset-image-only",
@@ -960,8 +947,6 @@ describe("useAssistantChat", () => {
   });
 
   it("only continues history browsing at text boundaries for recalled entries", async () => {
-    const sendAssistantMessageMock = vi.fn().mockResolvedValue(undefined);
-
     useAgentNodesRuntimeMock.mockReturnValue({
       agents: new Map([["assistant", buildAssistantNode("idle")]]),
     });
@@ -969,10 +954,7 @@ describe("useAssistantChat", () => {
       activeMessages: [],
       activeToolCalls: new Map(),
     });
-    useAgentUIMock.mockReturnValue({
-      pendingAssistantMessages: [],
-      sendAssistantMessage: sendAssistantMessageMock,
-    });
+    sendAssistantMessageRequestMock.mockResolvedValue({ status: "sent" });
     fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
 
     const { result } = renderHook(() => useAssistantChat());
@@ -1011,6 +993,70 @@ describe("useAssistantChat", () => {
       expect(
         result.current.navigateInputHistory(-1, { start: 0, end: 0 }),
       ).toBe(false);
+    });
+  });
+
+  it("keeps pending messages across unrelated history resets and clears them for the assistant only", async () => {
+    const historyRuntime = {
+      agentHistories: new Map(),
+      clearAgentHistory: vi.fn(),
+      clearHistorySnapshot: vi.fn(),
+      historyInvalidatedAt: new Map(),
+      historyClearedAt: new Map(),
+      historySnapshots: new Map(),
+      streamingDeltas: new Map(),
+    };
+
+    useAgentNodesRuntimeMock.mockReturnValue({
+      agents: new Map([["assistant", buildAssistantNode("idle")]]),
+    });
+    useAgentActivityRuntimeMock.mockReturnValue({
+      activeMessages: [],
+      activeToolCalls: new Map(),
+    });
+    useAgentHistoryRuntimeMock.mockImplementation(() => historyRuntime);
+    sendAssistantMessageRequestMock.mockResolvedValue({
+      status: "sent",
+      message_id: "msg-pending",
+    });
+    fetchNodeDetailMock.mockResolvedValue(buildDetail([], "idle"));
+
+    const { result, rerender } = renderHook(() => useAssistantChat());
+
+    await waitFor(() => {
+      expect(fetchNodeDetailMock).toHaveBeenCalled();
+    });
+
+    act(() => {
+      result.current.setInput("keep pending");
+    });
+
+    await act(async () => {
+      await result.current.sendMessage();
+    });
+
+    expect(result.current.timelineItems).toHaveLength(1);
+    expect(result.current.timelineItems[0]).toMatchObject({
+      type: "PendingHumanMessage",
+      content: "keep pending",
+      message_id: "msg-pending",
+    });
+
+    historyRuntime.historyClearedAt = new Map([["worker", 1]]);
+    rerender();
+
+    expect(result.current.timelineItems).toHaveLength(1);
+    expect(result.current.timelineItems[0]).toMatchObject({
+      type: "PendingHumanMessage",
+      content: "keep pending",
+      message_id: "msg-pending",
+    });
+
+    historyRuntime.historyClearedAt = new Map([["assistant", 2]]);
+    rerender();
+
+    await waitFor(() => {
+      expect(result.current.timelineItems).toEqual([]);
     });
   });
 

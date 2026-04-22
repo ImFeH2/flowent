@@ -34,6 +34,7 @@ import {
 } from "@/lib/chatInputHistory";
 import {
   buildMessageParts,
+  createPendingHumanMessage,
   createUploadingImageDrafts,
   draftImagesMatchHistoryEntry,
   isReadyDraftImage,
@@ -56,22 +57,6 @@ import type {
 
 interface UseLeaderChatOptions {
   bottomInset?: number;
-}
-
-function createPendingMessage(
-  content: string,
-  parts: ContentPart[],
-  timestamp: number,
-): PendingAssistantChatMessage {
-  return {
-    id: `pending-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
-    type: "PendingHumanMessage",
-    from: "human",
-    content,
-    parts,
-    timestamp,
-    message_id: null,
-  };
 }
 
 export function useLeaderChat(options: UseLeaderChatOptions = {}) {
@@ -426,7 +411,7 @@ export function useLeaderChat(options: UseLeaderChatOptions = {}) {
     const previousDraftImages = draftImages;
     const previousHistoryCursor = historyCursor;
     const submittedAt = Date.now();
-    const pendingMessage = createPendingMessage(
+    const pendingMessage = createPendingHumanMessage(
       content || contentPartsToText(parts),
       parts,
       submittedAt,

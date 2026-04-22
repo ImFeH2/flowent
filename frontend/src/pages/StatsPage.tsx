@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import useSWR from "swr";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -15,22 +14,11 @@ import {
   Sparkles,
   Workflow,
 } from "lucide-react";
-import { fetchStats } from "@/lib/api";
 import {
-  buildAgentGroups,
-  buildChartBuckets,
-  buildFilterOptions,
-  buildOverview,
-  buildProviderGroups,
-  buildRecentEvents,
-  buildTabGroups,
-  filterStatsRecords,
   getBucketMetricValue,
   type StatsBucket,
   type StatsEvent,
-  type StatsFilters,
   type StatsMetric,
-  type StatsSortKey,
 } from "@/lib/stats";
 import {
   PageScaffold,
@@ -38,7 +26,6 @@ import {
   SoftPanel,
 } from "@/components/layout/PageScaffold";
 import { Button } from "@/components/ui/button";
-import { formatLocalTimestamp } from "@/lib/datetime";
 import {
   Select,
   SelectContent,
@@ -48,89 +35,20 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { stateBadgeColor } from "@/lib/constants";
-import type { StatsPayload, StatsRange } from "@/types";
-
-const RANGE_OPTIONS: Array<{ value: StatsRange; label: string }> = [
-  { value: "1h", label: "1h" },
-  { value: "24h", label: "24h" },
-  { value: "7d", label: "7d" },
-  { value: "30d", label: "30d" },
-];
-
-const FILTER_ALL = "__all__";
-
-const METRIC_OPTIONS: Array<{ value: StatsMetric; label: string }> = [
-  { value: "requests", label: "Requests" },
-  { value: "tokens", label: "Tokens" },
-  { value: "errors", label: "Errors" },
-  { value: "latency", label: "Latency" },
-  { value: "compacts", label: "Compacts" },
-  { value: "cache_read", label: "Cache Read" },
-  { value: "cache_write", label: "Cache Write" },
-  { value: "cache_hit_rate", label: "Cache Hit Rate" },
-];
-
-const SORT_OPTIONS: Array<{ value: StatsSortKey; label: string }> = [
-  { value: "requests", label: "Requests" },
-  { value: "tokens", label: "Tokens" },
-  { value: "errors", label: "Errors" },
-  { value: "latency", label: "Latency" },
-  { value: "cache_hit_rate", label: "Cache Hit Rate" },
-];
-
-const statsSelectTriggerClass =
-  "h-8 rounded-md bg-background/50 text-foreground";
-const statsFilterLabelClass =
-  "text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80";
-
-function formatTimestamp(timestamp: number | null | undefined): string {
-  return formatLocalTimestamp(timestamp, { fallback: "Unknown" });
-}
-
-function formatInteger(value: number | null | undefined): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "N/A";
-  }
-  return value.toLocaleString();
-}
-
-function formatDuration(value: number | null | undefined): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "N/A";
-  }
-  if (value < 1000) {
-    return `${Math.round(value)} ms`;
-  }
-  return `${(value / 1000).toFixed(2)} s`;
-}
-
-function formatRate(value: number | null | undefined): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "Unavailable";
-  }
-  return `${(value * 100).toFixed(1)}%`;
-}
-
-function findLastActiveBucketIndex(buckets: StatsBucket[]): number {
-  for (let index = buckets.length - 1; index >= 0; index -= 1) {
-    const bucket = buckets[index];
-    if (bucket.requestCount > 0 || bucket.compactCount > 0) {
-      return index;
-    }
-  }
-  return Math.max(buckets.length - 1, 0);
-}
-
-function emptyPayload(range: StatsRange): StatsPayload {
-  return {
-    requested_at: Date.now(),
-    range,
-    tabs: [],
-    nodes: [],
-    requests: [],
-    compacts: [],
-  };
-}
+import {
+  FILTER_ALL,
+  METRIC_OPTIONS,
+  RANGE_OPTIONS,
+  SORT_OPTIONS,
+  findLastActiveBucketIndex,
+  formatDuration,
+  formatInteger,
+  formatRate,
+  formatTimestamp,
+  statsFilterLabelClass,
+  statsSelectTriggerClass,
+} from "@/pages/stats/lib";
+import { useStatsPageState } from "@/pages/stats/useStatsPageState";
 
 function StatsLoadingState() {
   return (
@@ -549,112 +467,32 @@ function EventDetail({ event }: { event: StatsEvent }) {
 }
 
 export function StatsPage() {
-  const [range, setRange] = useState<StatsRange>("24h");
-  const [filters, setFilters] = useState<StatsFilters>({
-    providerId: null,
-    model: null,
-    tabId: null,
-    agentId: null,
-  });
-  const [metric, setMetric] = useState<StatsMetric>("requests");
-  const [sortKey, setSortKey] = useState<StatsSortKey>("requests");
-  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
-
-  const { data, error, isLoading, mutate } = useSWR(
-    ["stats", range],
-    ([, currentRange]) => fetchStats(currentRange),
-    {
-      keepPreviousData: true,
-    },
-  );
-
-  const payload = data ?? emptyPayload(range);
-  const filterOptions = useMemo(() => buildFilterOptions(payload), [payload]);
-  const effectiveFilters = useMemo(
-    () =>
-      ({
-        providerId:
-          filters.providerId &&
-          filterOptions.providers.some(
-            (option) => option.value === filters.providerId,
-          )
-            ? filters.providerId
-            : null,
-        model:
-          filters.model &&
-          filterOptions.models.some((option) => option.value === filters.model)
-            ? filters.model
-            : null,
-        tabId:
-          filters.tabId &&
-          filterOptions.tabs.some((option) => option.value === filters.tabId)
-            ? filters.tabId
-            : null,
-        agentId:
-          filters.agentId &&
-          filterOptions.agents.some(
-            (option) => option.value === filters.agentId,
-          )
-            ? filters.agentId
-            : null,
-      }) satisfies StatsFilters,
-    [filterOptions, filters],
-  );
-
-  const filtered = useMemo(
-    () => filterStatsRecords(payload, effectiveFilters),
-    [effectiveFilters, payload],
-  );
-  const overview = useMemo(
-    () => buildOverview(payload, effectiveFilters, filtered),
-    [effectiveFilters, filtered, payload],
-  );
-  const buckets = useMemo(
-    () =>
-      buildChartBuckets(
-        payload.range,
-        filtered.requests,
-        filtered.compacts,
-        payload.requested_at,
-      ),
-    [filtered.compacts, filtered.requests, payload.range, payload.requested_at],
-  );
-  const providerGroups = useMemo(
-    () => buildProviderGroups(filtered.requests),
-    [filtered.requests],
-  );
-  const tabGroups = useMemo(
-    () =>
-      buildTabGroups(
-        filtered.requests,
-        filtered.compacts,
-        filtered.nodes,
-        filtered.tabs,
-        sortKey,
-      ),
-    [
-      filtered.compacts,
-      filtered.nodes,
-      filtered.requests,
-      filtered.tabs,
-      sortKey,
-    ],
-  );
-  const agentGroups = useMemo(
-    () => buildAgentGroups(filtered.requests, filtered.nodes, sortKey),
-    [filtered.nodes, filtered.requests, sortKey],
-  );
-  const recentEvents = useMemo(
-    () => buildRecentEvents(filtered.requests, filtered.compacts),
-    [filtered.compacts, filtered.requests],
-  );
-
-  const hasVisibleStats =
-    filtered.requests.length > 0 ||
-    filtered.compacts.length > 0 ||
-    filtered.nodes.some((node) =>
-      ["running", "sleeping", "initializing", "error"].includes(node.state),
-    );
+  const {
+    range,
+    metric,
+    sortKey,
+    expandedEventId,
+    filterOptions,
+    effectiveFilters,
+    overview,
+    buckets,
+    providerGroups,
+    tabGroups,
+    agentGroups,
+    recentEvents,
+    hasVisibleStats,
+    isLoading,
+    isInitialLoading,
+    hasBlockingError,
+    hasRecoverableError,
+    errorMessage,
+    refresh,
+    handleRangeChange,
+    handleMetricChange,
+    handleSortKeyChange,
+    handleFilterChange,
+    toggleExpandedEvent,
+  } = useStatsPageState();
 
   const overviewCards = [
     {
@@ -739,10 +577,7 @@ export function StatsPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex flex-col gap-1">
                   <span className={statsFilterLabelClass}>Range</span>
-                  <Select
-                    value={range}
-                    onValueChange={(value: StatsRange) => setRange(value)}
-                  >
+                  <Select value={range} onValueChange={handleRangeChange}>
                     <SelectTrigger
                       className={`w-[120px] ${statsSelectTriggerClass}`}
                     >
@@ -761,7 +596,7 @@ export function StatsPage() {
                   type="button"
                   variant="outline"
                   className="mt-5 border-border bg-accent/20 text-foreground hover:bg-accent/35"
-                  onClick={() => void mutate()}
+                  onClick={() => void refresh()}
                 >
                   <RefreshCw
                     className={cn("size-4", isLoading && "animate-spin")}
@@ -779,10 +614,7 @@ export function StatsPage() {
               <Select
                 value={effectiveFilters.providerId ?? FILTER_ALL}
                 onValueChange={(value) =>
-                  setFilters((current) => ({
-                    ...current,
-                    providerId: value === FILTER_ALL ? null : value,
-                  }))
+                  handleFilterChange("providerId", value)
                 }
               >
                 <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
@@ -802,12 +634,7 @@ export function StatsPage() {
               <span className={statsFilterLabelClass}>Model</span>
               <Select
                 value={effectiveFilters.model ?? FILTER_ALL}
-                onValueChange={(value) =>
-                  setFilters((current) => ({
-                    ...current,
-                    model: value === FILTER_ALL ? null : value,
-                  }))
-                }
+                onValueChange={(value) => handleFilterChange("model", value)}
               >
                 <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
                   <SelectValue placeholder="All Models" />
@@ -826,12 +653,7 @@ export function StatsPage() {
               <span className={statsFilterLabelClass}>Tab</span>
               <Select
                 value={effectiveFilters.tabId ?? FILTER_ALL}
-                onValueChange={(value) =>
-                  setFilters((current) => ({
-                    ...current,
-                    tabId: value === FILTER_ALL ? null : value,
-                  }))
-                }
+                onValueChange={(value) => handleFilterChange("tabId", value)}
               >
                 <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
                   <SelectValue placeholder="All Tabs" />
@@ -850,12 +672,7 @@ export function StatsPage() {
               <span className={statsFilterLabelClass}>Agent</span>
               <Select
                 value={effectiveFilters.agentId ?? FILTER_ALL}
-                onValueChange={(value) =>
-                  setFilters((current) => ({
-                    ...current,
-                    agentId: value === FILTER_ALL ? null : value,
-                  }))
-                }
+                onValueChange={(value) => handleFilterChange("agentId", value)}
               >
                 <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
                   <SelectValue placeholder="All Agents" />
@@ -874,18 +691,18 @@ export function StatsPage() {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          {isLoading && !data ? (
+          {isInitialLoading ? (
             <StatsLoadingState />
-          ) : error && !data ? (
+          ) : hasBlockingError ? (
             <StatsErrorState
-              message={error instanceof Error ? error.message : "Unknown error"}
-              onRetry={() => void mutate()}
+              message={errorMessage}
+              onRetry={() => void refresh()}
             />
           ) : !hasVisibleStats ? (
             <StatsEmptyState />
           ) : (
             <div className="space-y-6">
-              {error ? (
+              {hasRecoverableError ? (
                 <SoftPanel className="border-destructive/12 bg-destructive/6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -906,7 +723,7 @@ export function StatsPage() {
                       type="button"
                       variant="outline"
                       className="border-border bg-accent/20 text-foreground hover:bg-accent/35"
-                      onClick={() => void mutate()}
+                      onClick={() => void refresh()}
                     >
                       Retry
                     </Button>
@@ -932,10 +749,7 @@ export function StatsPage() {
                   title="Trend"
                   description="Switch between request, token, error, latency, compact, and cache metrics over time."
                   action={
-                    <Select
-                      value={metric}
-                      onValueChange={(value: StatsMetric) => setMetric(value)}
-                    >
+                    <Select value={metric} onValueChange={handleMetricChange}>
                       <SelectTrigger
                         className={`w-[180px] ${statsSelectTriggerClass}`}
                       >
@@ -1040,9 +854,7 @@ export function StatsPage() {
                       action={
                         <Select
                           value={sortKey}
-                          onValueChange={(value: StatsSortKey) =>
-                            setSortKey(value)
-                          }
+                          onValueChange={handleSortKeyChange}
                         >
                           <SelectTrigger
                             className={`w-[170px] ${statsSelectTriggerClass}`}
@@ -1176,11 +988,7 @@ export function StatsPage() {
                             type="button"
                             variant="ghost"
                             className="grid h-auto w-full gap-3 rounded-xl border border-border bg-card/30 px-4 py-3 text-left text-[12px] text-muted-foreground hover:bg-accent/20 hover:text-inherit md:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1.2fr)_minmax(0,1.2fr)_minmax(0,1.25fr)]"
-                            onClick={() =>
-                              setExpandedEventId((current) =>
-                                current === event.key ? null : event.key,
-                              )
-                            }
+                            onClick={() => toggleExpandedEvent(event.key)}
                           >
                             <span className="text-foreground/85">
                               {formatTimestamp(event.endedAt)}

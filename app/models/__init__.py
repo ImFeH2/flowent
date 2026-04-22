@@ -24,7 +24,18 @@ from app.models.delta import (
     ToolResultDelta,
 )
 from app.models.event import DISPLAY_EVENTS, Event, EventType
-from app.models.graph import GraphEdge, GraphNodeRecord, NodePosition
+from app.models.graph import (
+    EdgeKind,
+    GraphEdge,
+    GraphNodeRecord,
+    NodePosition,
+    PortDirection,
+    WorkflowDefinition,
+    WorkflowNodeDefinition,
+    WorkflowNodeKind,
+    WorkflowPort,
+    WorkflowViewDefinition,
+)
 from app.models.history import (
     AssistantText,
     AssistantThinking,
@@ -63,6 +74,7 @@ __all__ = [
     "CommandResultEntry",
     "ContentDelta",
     "ContentPart",
+    "EdgeKind",
     "ErrorEntry",
     "Event",
     "EventType",
@@ -81,6 +93,7 @@ __all__ = [
     "NodeConfig",
     "NodePosition",
     "NodeType",
+    "PortDirection",
     "ReceivedMessage",
     "ReceivedMessageDelta",
     "SentMessage",
@@ -96,6 +109,11 @@ __all__ = [
     "ToolCall",
     "ToolCallResult",
     "ToolResultDelta",
+    "WorkflowDefinition",
+    "WorkflowNodeDefinition",
+    "WorkflowNodeKind",
+    "WorkflowPort",
+    "WorkflowViewDefinition",
     "content_parts_to_text",
     "deserialize_content_parts",
     "has_image_parts",

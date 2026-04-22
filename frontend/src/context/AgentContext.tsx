@@ -41,7 +41,6 @@ export interface ActiveMessage {
 export type PageId =
   | "assistant"
   | "workspace"
-  | "blueprints"
   | "providers"
   | "mcp"
   | "roles"

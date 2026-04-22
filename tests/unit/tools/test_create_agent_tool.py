@@ -73,7 +73,7 @@ def test_leader_create_agent_defaults_to_current_tab_without_network_edge(
     assert workspace_store.list_edges(tab.id) == []
 
 
-def test_create_agent_can_disable_automatic_edge_to_creator(monkeypatch):
+def test_create_agent_places_new_agent_after_anchor(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
@@ -101,20 +101,33 @@ def test_create_agent_can_disable_automatic_edge_to_creator(monkeypatch):
     )
     registry.register(owner)
 
+    anchor = json.loads(
+        CreateAgentTool().execute(
+            owner,
+            {
+                "role_name": "Worker",
+                "name": "Anchor Worker",
+            },
+        )
+    )
     result = json.loads(
         CreateAgentTool().execute(
             owner,
             {
                 "role_name": "Worker",
-                "name": "Detached Worker",
-                "connect_to_creator": False,
+                "name": "Placed Worker",
+                "placement": "after",
+                "after_node_id": anchor["id"],
             },
         )
     )
 
     assert result["config"]["tab_id"] == tab.id
     assert owner.get_connections_snapshot() == []
-    assert workspace_store.list_edges(tab.id) == []
+    assert [
+        (edge.from_node_id, edge.to_node_id)
+        for edge in workspace_store.list_edges(tab.id)
+    ] == [(anchor["id"], result["id"])]
 
 
 def test_create_agent_rejects_assistant_for_ordinary_nodes(monkeypatch):
@@ -151,7 +164,13 @@ def test_create_agent_allows_explicitly_granted_task_node(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(
-            roles=[RoleConfig(name="Worker", system_prompt="Do work.")],
+            roles=[
+                RoleConfig(
+                    name="Worker",
+                    system_prompt="Do work.",
+                    included_tools=["create_agent"],
+                )
+            ],
         ),
     )
     tab = create_tab(title="Task", goal="Do work")
@@ -161,36 +180,28 @@ def test_create_agent_allows_explicitly_granted_task_node(monkeypatch):
             node_type=NodeType.AGENT,
             role_name="Conductor",
             tab_id=tab.id,
-            tools=[],
+            tools=["create_agent"],
             write_dirs=["/tmp/workspace"],
             allow_network=True,
         ),
         uuid=tab.leader_id,
     )
-    worker = Agent(
-        NodeConfig(
-            node_type=NodeType.AGENT,
-            role_name="Worker",
-            tab_id=tab.id,
-            tools=["create_agent"],
-            write_dirs=["/tmp/workspace"],
-            allow_network=False,
-        ),
-        uuid="worker",
-    )
     registry.register(leader)
-    registry.register(worker)
-    workspace_store.upsert_node_record(
-        GraphNodeRecord(
-            id=worker.uuid,
-            config=worker.config,
-            state=AgentState.INITIALIZING,
+    creator = json.loads(
+        CreateAgentTool().execute(
+            leader,
+            {
+                "role_name": "Worker",
+                "name": "Creator Worker",
+            },
         )
     )
+    creator_node = registry.get(creator["id"])
+    assert creator_node is not None
 
     result = json.loads(
         CreateAgentTool().execute(
-            worker,
+            creator_node,
             {
                 "role_name": "Worker",
                 "name": "Nested Worker",
@@ -200,7 +211,8 @@ def test_create_agent_allows_explicitly_granted_task_node(monkeypatch):
 
     assert result["config"]["tab_id"] == tab.id
     assert result["config"]["name"] == "Nested Worker"
-    assert worker.get_connections_snapshot() == [result["id"]]
+    assert creator_node.get_connections_snapshot() == []
+    assert workspace_store.list_edges(tab.id) == []
 
 
 def test_create_agent_rejects_task_node_without_tool(monkeypatch):
@@ -428,7 +440,7 @@ def test_create_agent_also_respects_tab_leader_boundaries(monkeypatch, tmp_path)
     }
 
 
-def test_create_agent_rejects_non_boolean_connect_to_creator(monkeypatch):
+def test_create_agent_rejects_removed_connect_to_creator_parameter(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
@@ -455,10 +467,12 @@ def test_create_agent_rejects_non_boolean_connect_to_creator(monkeypatch):
         )
     )
 
-    assert result == {"error": "connect_to_creator must be a boolean"}
+    assert result == {
+        "error": "create_agent no longer supports connect_to_creator; use placement"
+    }
 
 
-def test_create_agent_tool_schema_exposes_connect_to_creator_default():
+def test_create_agent_tool_schema_exposes_workflow_placement_options():
     assert CreateAgentTool.parameters == {
         "type": "object",
         "properties": {
@@ -485,14 +499,25 @@ def test_create_agent_tool_schema_exposes_connect_to_creator_default():
                 "description": "Whether the node can access the network",
                 "default": False,
             },
-            "connect_to_creator": {
-                "type": "boolean",
+            "placement": {
+                "type": "string",
+                "enum": ["standalone", "after", "between"],
                 "description": (
-                    "Whether to automatically create an explicit peer "
-                    "connection between the creator and the new node when "
-                    "the creator is a regular task node"
+                    "How to place the new agent inside the current workflow graph"
                 ),
-                "default": True,
+                "default": "standalone",
+            },
+            "after_node_id": {
+                "type": "string",
+                "description": "Anchor node id when placement is `after`",
+            },
+            "between_from_node_id": {
+                "type": "string",
+                "description": "Upstream node id when placement is `between`",
+            },
+            "between_to_node_id": {
+                "type": "string",
+                "description": "Downstream node id when placement is `between`",
             },
         },
         "required": ["role_name"],

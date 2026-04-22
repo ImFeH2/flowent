@@ -1,7 +1,6 @@
 import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
 import { PanelResizer } from "@/components/PanelResizer";
 import { Button } from "@/components/ui/button";
-import type { WorkspaceAgentOption } from "@/components/workspace/WorkspaceDialogs";
 import {
   AgentDetailPanel,
   BadgeChip,
@@ -13,8 +12,27 @@ import {
 } from "@/components/workspace/WorkspacePanels";
 import { cn } from "@/lib/utils";
 import type { Node, Role, TaskTab } from "@/types";
+import type {
+  WorkspaceEditorMode,
+  WorkspacePendingAction,
+} from "@/pages/home/useHomePageState";
+import type {
+  WorkspaceNodeOption,
+  WorkspacePortOption,
+} from "@/components/workspace/WorkspaceDialogs";
 import { AnimatePresence, motion } from "motion/react";
-import { Link2, Plus, Radio, Redo2, Save, Undo2, X } from "lucide-react";
+import {
+  Copy,
+  FileJson2,
+  GitGraph,
+  Link2,
+  Plus,
+  Radio,
+  Redo2,
+  Save,
+  Undo2,
+  X,
+} from "lucide-react";
 import type { MouseEvent, RefObject } from "react";
 
 interface WorkspaceGraphHistory {
@@ -24,6 +42,8 @@ interface WorkspaceGraphHistory {
     tabId: string,
     sourceNodeId: string,
     targetNodeId: string,
+    sourcePortKey?: string,
+    targetPortKey?: string,
   ) => Promise<void>;
   createLinkedAgent: (input: {
     tabId: string;
@@ -36,6 +56,12 @@ interface WorkspaceGraphHistory {
     roleName: string;
     name?: string;
   }) => Promise<unknown>;
+  createStandaloneNode?: (input: {
+    tabId: string;
+    nodeType?: "agent" | "trigger" | "code" | "if" | "merge";
+    roleName?: string;
+    name?: string;
+  }) => Promise<unknown>;
   deleteAgent: (input: {
     tabId: string;
     node: Node;
@@ -45,6 +71,8 @@ interface WorkspaceGraphHistory {
     tabId: string,
     sourceNodeId: string,
     targetNodeId: string,
+    sourcePortKey?: string,
+    targetPortKey?: string,
   ) => Promise<void>;
   insertAgentBetween: (input: {
     tabId: string;
@@ -60,6 +88,8 @@ interface WorkspaceGraphHistory {
 interface WorkspaceShellProps {
   activeTabId: string | null;
   connected: boolean;
+  definitionDraft: string;
+  editorMode: WorkspaceEditorMode;
   graphConnectMode: boolean;
   graphHistory: WorkspaceGraphHistory;
   graphRef: RefObject<AgentGraphHandle | null>;
@@ -71,13 +101,17 @@ interface WorkspaceShellProps {
   loadingRoles: boolean;
   onCloseLeaderDetails: () => void;
   onConnectModeChange: (active: boolean) => void;
-  onCreateAgent: () => void;
+  onCreateNode: () => void;
   onCreateTab: () => void;
+  onDefinitionDraftChange: (nextValue: string) => void;
   onDeleteTab: (tabId: string, title: string, nodeCount?: number) => void;
+  onDuplicateTab: () => void;
+  onEditorModeChange: (nextValue: WorkspaceEditorMode) => void;
   onOpenLeaderDetails: () => void;
   onOpenConnectDialog: () => void;
-  onSaveBlueprint: () => void;
+  onSaveDefinition: () => void;
   panelVisible: boolean;
+  pendingAction: WorkspacePendingAction;
   regularTabAgents: Node[];
   resolvedPanelWidth: number;
   roles: Role[];
@@ -85,15 +119,19 @@ interface WorkspaceShellProps {
   selectedAgent: Node | null;
   setActiveTabId: (id: string | null) => void;
   startDrag: (event: MouseEvent) => void;
-  tabAgentOptions: WorkspaceAgentOption[];
   tabs: Map<string, TaskTab>;
   togglePanel: () => void;
+  workflowNodeOptions: WorkspaceNodeOption[];
+  sourcePortOptions: WorkspacePortOption[];
+  targetPortOptions: WorkspacePortOption[];
   workspaceRef: RefObject<HTMLDivElement | null>;
 }
 
 export function WorkspaceShell({
   activeTabId,
   connected,
+  definitionDraft,
+  editorMode,
   graphConnectMode,
   graphHistory,
   graphRef,
@@ -105,23 +143,26 @@ export function WorkspaceShell({
   loadingRoles,
   onCloseLeaderDetails,
   onConnectModeChange,
-  onCreateAgent,
+  onCreateNode,
   onCreateTab,
+  onDefinitionDraftChange,
   onDeleteTab,
+  onDuplicateTab,
+  onEditorModeChange,
   onOpenLeaderDetails,
   onOpenConnectDialog,
-  onSaveBlueprint,
+  onSaveDefinition,
   panelVisible,
-  regularTabAgents,
+  pendingAction,
   resolvedPanelWidth,
   roles,
   selectAgent,
   selectedAgent,
   setActiveTabId,
   startDrag,
-  tabAgentOptions,
   tabs,
   togglePanel,
+  workflowNodeOptions,
   workspaceRef,
 }: WorkspaceShellProps) {
   const renderPrimaryPanel = () => {
@@ -137,6 +178,8 @@ export function WorkspaceShell({
 
     return <LeaderChatPanel onOpenDetails={onOpenLeaderDetails} />;
   };
+
+  const activeTab = activeTabId ? (tabs.get(activeTabId) ?? null) : null;
 
   return (
     <div
@@ -157,7 +200,7 @@ export function WorkspaceShell({
             {Array.from(tabs.values()).map((tab) => (
               <div
                 key={tab.id}
-                className="group relative min-w-[120px] max-w-[200px] shrink-0"
+                className="group relative min-w-[120px] max-w-[220px] shrink-0"
               >
                 <Button
                   type="button"
@@ -172,7 +215,7 @@ export function WorkspaceShell({
                     onDeleteTab(tab.id, tab.title, tab.node_count);
                   }}
                   className={cn(
-                    "relative h-8 w-full justify-start rounded-md border-b-2 px-3 pr-8 text-left text-[13px] font-medium transition-[color,border-color,background-color] duration-200",
+                    "relative h-8 w-full justify-start rounded-md border-b-2 px-3 pr-12 text-left text-[13px] font-medium transition-[color,border-color,background-color] duration-200",
                     activeTabId === tab.id
                       ? "border-primary text-foreground"
                       : "border-transparent text-muted-foreground hover:bg-accent/25 hover:text-foreground",
@@ -180,6 +223,22 @@ export function WorkspaceShell({
                 >
                   <div className="truncate leading-tight">{tab.title}</div>
                 </Button>
+                {activeTabId === tab.id ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    title="Duplicate workflow"
+                    aria-label={`Duplicate ${tab.title}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDuplicateTab();
+                    }}
+                    className="absolute right-6 top-1/2 z-20 size-5 -translate-y-1/2 rounded-sm p-1 text-foreground/70 transition-all duration-200 hover:bg-accent/45 hover:text-foreground"
+                  >
+                    <Copy className="size-3" />
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="ghost"
@@ -224,19 +283,51 @@ export function WorkspaceShell({
         <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background/28 to-transparent" />
 
         <div className="relative flex-1">
-          <AgentGraph
-            ref={graphRef}
-            loadingRoles={loadingRoles}
-            onConnectModeChange={onConnectModeChange}
-            onCreateConnection={graphHistory.createConnection}
-            onCreateLinkedAgent={graphHistory.createLinkedAgent}
-            onCreateStandaloneAgent={graphHistory.createStandaloneAgent}
-            onDeleteAgent={graphHistory.deleteAgent}
-            onDeleteConnection={graphHistory.deleteConnection}
-            onInsertAgentBetween={graphHistory.insertAgentBetween}
-            onOpenConnectDialog={onOpenConnectDialog}
-            roles={roles}
-          />
+          {editorMode === "graph" ? (
+            <AgentGraph
+              ref={graphRef}
+              loadingRoles={loadingRoles}
+              onConnectModeChange={onConnectModeChange}
+              onCreateConnection={graphHistory.createConnection}
+              onCreateLinkedAgent={graphHistory.createLinkedAgent}
+              onCreateStandaloneAgent={graphHistory.createStandaloneAgent}
+              onDeleteAgent={graphHistory.deleteAgent}
+              onDeleteConnection={graphHistory.deleteConnection}
+              onInsertAgentBetween={graphHistory.insertAgentBetween}
+              onOpenConnectDialog={onOpenConnectDialog}
+              roles={roles}
+            />
+          ) : (
+            <div className="flex h-full flex-col p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Workflow JSON
+                  </p>
+                  <p className="mt-1 text-[13px] text-muted-foreground">
+                    Edit the formal definition shared by the graph view.
+                  </p>
+                </div>
+                <Button
+                  onClick={onSaveDefinition}
+                  disabled={!activeTabId || pendingAction === "save-definition"}
+                >
+                  <Save className="mr-1 size-4" />
+                  {pendingAction === "save-definition"
+                    ? "Saving..."
+                    : "Save JSON"}
+                </Button>
+              </div>
+              <textarea
+                value={definitionDraft}
+                onChange={(event) =>
+                  onDefinitionDraftChange(event.target.value)
+                }
+                className="h-full min-h-0 w-full resize-none rounded-xl border border-border bg-background/40 p-4 font-mono text-[12px] leading-6 text-foreground outline-none transition-[border-color,box-shadow] focus:border-ring focus:ring-[3px] focus:ring-ring/50"
+                spellCheck={false}
+              />
+            </div>
+          )}
           <div
             className={cn(
               "absolute top-4 z-40 flex max-w-[calc(100%-2.5rem)] flex-wrap items-center gap-1.5",
@@ -256,6 +347,12 @@ export function WorkspaceShell({
                 {connected ? "Live" : "Reconnecting"}
               </span>
             </BadgeChip>
+            {activeTab ? (
+              <BadgeChip>
+                {activeTab.node_count ?? activeTab.definition.nodes.length}{" "}
+                nodes
+              </BadgeChip>
+            ) : null}
           </div>
 
           <div className="pointer-events-none absolute inset-x-3 bottom-4 z-40 flex justify-center">
@@ -284,25 +381,40 @@ export function WorkspaceShell({
               </ToolbarButton>
               <ToolbarDivider />
               <ToolbarButton
-                disabled={!activeTabId || regularTabAgents.length === 0}
-                onClick={onSaveBlueprint}
+                disabled={!activeTabId}
+                active={editorMode === "graph"}
+                onClick={() => onEditorModeChange("graph")}
               >
-                <Save className="size-4 opacity-70" />
-                Save as Blueprint
-              </ToolbarButton>
-              <ToolbarDivider />
-              <ToolbarButton disabled={!activeTabId} onClick={onCreateAgent}>
-                <Plus className="size-4 opacity-70" />
-                Add Agent
+                <GitGraph className="size-4 opacity-70" />
+                Graph
               </ToolbarButton>
               <ToolbarDivider />
               <ToolbarButton
-                disabled={!activeTabId || tabAgentOptions.length < 2}
+                disabled={!activeTabId}
+                active={editorMode === "json"}
+                onClick={() => onEditorModeChange("json")}
+              >
+                <FileJson2 className="size-4 opacity-70" />
+                JSON
+              </ToolbarButton>
+              <ToolbarDivider />
+              <ToolbarButton disabled={!activeTabId} onClick={onCreateNode}>
+                <Plus className="size-4 opacity-70" />
+                Add Node
+              </ToolbarButton>
+              <ToolbarDivider />
+              <ToolbarButton
+                disabled={!activeTabId || workflowNodeOptions.length < 2}
                 active={graphConnectMode}
-                onClick={() => graphRef.current?.enterConnectMode()}
+                onClick={onOpenConnectDialog}
               >
                 <Link2 className="size-4 opacity-70" />
-                Connect
+                Connect Ports
+              </ToolbarButton>
+              <ToolbarDivider />
+              <ToolbarButton disabled={!activeTabId} onClick={onDuplicateTab}>
+                <Copy className="size-4 opacity-70" />
+                Duplicate
               </ToolbarButton>
             </div>
           </div>

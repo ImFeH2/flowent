@@ -1,9 +1,8 @@
 import {
-  ConnectAgentsDialog,
-  CreateAgentDialog,
+  ConnectPortsDialog,
+  CreateNodeDialog,
   CreateTabDialog,
   DeleteTabDialog,
-  SaveBlueprintDialog,
 } from "@/components/workspace/WorkspaceDialogs";
 import { WorkspaceShell } from "@/components/workspace/WorkspaceShell";
 import { useHomePageState } from "@/pages/home/useHomePageState";
@@ -15,69 +14,71 @@ export function HomePage() {
     activeTabId,
     connected,
     connectSourceId,
+    connectSourcePortKey,
     connectTargetId,
-    availableCreateAgentRoles,
-    availableCreateTabBlueprints,
-    createAgentName,
-    createAgentRoleName,
+    connectTargetPortKey,
+    createNodeName,
+    createNodeRoleName,
+    createNodeType,
     createTabAllowNetwork,
-    createTabBlueprintId,
     createTabGoal,
     createTabTitle,
     createTabWriteDirs,
+    definitionDraft,
     deleteTabTarget,
+    editorMode,
     graphConnectMode,
     graphHistory,
     graphRef,
     handleCloseLeaderDetails,
-    handleConnectAgents,
-    handleCreateAgent,
+    handleConnectPorts,
+    handleCreateNode,
     handleCreateTab,
     handleDeleteTab,
+    handleDuplicateTab,
     handleOpenLeaderDetails,
-    handleSaveCurrentNetworkAsBlueprint,
+    handleSaveDefinition,
     isCompactWorkspace,
     isDragging,
     leaderDetailVisible,
     leaderNode,
     leaderPanelRunning,
-    loadingBlueprints,
     loadingRoles,
     openConnectDialog,
-    openCreateAgentDialog,
+    openCreateNodeDialog,
     openCreateTabDialog,
-    openSaveBlueprintDialog,
     panelVisible,
     pendingAction,
     regularTabAgents,
     requestDeleteTab,
     resolvedPanelWidth,
     roles,
-    saveBlueprintDescription,
-    saveBlueprintName,
     selectAgent,
     selectedAgent,
-    selectedCreateAgentRole,
-    selectedCreateTabBlueprint,
+    selectedCreateNodeRole,
     setActiveDialog,
     setActiveTabId,
     setConnectSourceId,
+    setConnectSourcePortKey,
     setConnectTargetId,
-    setCreateAgentName,
-    setCreateAgentRoleName,
+    setConnectTargetPortKey,
+    setCreateNodeName,
+    setCreateNodeRoleName,
+    setCreateNodeType,
     setCreateTabAllowNetwork,
-    setCreateTabBlueprintId,
     setCreateTabGoal,
     setCreateTabTitle,
     setCreateTabWriteDirs,
+    setDefinitionDraft,
     setDeleteTabTarget,
+    setEditorMode,
     setGraphConnectMode,
-    setSaveBlueprintDescription,
-    setSaveBlueprintName,
+    sourcePortOptions,
     startDrag,
-    tabAgentOptions,
     tabs,
+    targetPortOptions,
     togglePanel,
+    workflowNodeOptions,
     workspaceRef,
   } = useHomePageState();
 
@@ -86,6 +87,8 @@ export function HomePage() {
       <WorkspaceShell
         activeTabId={activeTabId}
         connected={connected}
+        definitionDraft={definitionDraft}
+        editorMode={editorMode}
         graphConnectMode={graphConnectMode}
         graphHistory={graphHistory}
         graphRef={graphRef}
@@ -97,13 +100,17 @@ export function HomePage() {
         loadingRoles={loadingRoles}
         onCloseLeaderDetails={handleCloseLeaderDetails}
         onConnectModeChange={setGraphConnectMode}
-        onCreateAgent={openCreateAgentDialog}
+        onCreateNode={openCreateNodeDialog}
         onCreateTab={openCreateTabDialog}
+        onDefinitionDraftChange={setDefinitionDraft}
         onDeleteTab={requestDeleteTab}
+        onDuplicateTab={handleDuplicateTab}
+        onEditorModeChange={setEditorMode}
         onOpenLeaderDetails={handleOpenLeaderDetails}
         onOpenConnectDialog={openConnectDialog}
-        onSaveBlueprint={openSaveBlueprintDialog}
+        onSaveDefinition={handleSaveDefinition}
         panelVisible={panelVisible}
+        pendingAction={pendingAction}
         regularTabAgents={regularTabAgents}
         resolvedPanelWidth={resolvedPanelWidth}
         roles={roles}
@@ -111,9 +118,11 @@ export function HomePage() {
         selectedAgent={selectedAgent}
         setActiveTabId={setActiveTabId}
         startDrag={startDrag}
-        tabAgentOptions={tabAgentOptions}
         tabs={tabs}
         togglePanel={togglePanel}
+        workflowNodeOptions={workflowNodeOptions}
+        sourcePortOptions={sourcePortOptions}
+        targetPortOptions={targetPortOptions}
         workspaceRef={workspaceRef}
       />
 
@@ -129,11 +138,6 @@ export function HomePage() {
         onTitleChange={setCreateTabTitle}
         goal={createTabGoal}
         onGoalChange={setCreateTabGoal}
-        blueprintId={createTabBlueprintId}
-        onBlueprintIdChange={setCreateTabBlueprintId}
-        selectedBlueprint={selectedCreateTabBlueprint}
-        blueprints={availableCreateTabBlueprints}
-        loadingBlueprints={loadingBlueprints}
         allowNetwork={createTabAllowNetwork}
         onAllowNetworkChange={setCreateTabAllowNetwork}
         writeDirs={createTabWriteDirs}
@@ -141,67 +145,53 @@ export function HomePage() {
         onSubmit={() => void handleCreateTab()}
       />
 
-      <SaveBlueprintDialog
-        open={activeDialog === "save-blueprint"}
+      <CreateNodeDialog
+        open={activeDialog === "create-node"}
         onOpenChange={(open) => {
           if (!open) {
             setActiveDialog(null);
           }
         }}
-        pending={pendingAction === "save-blueprint"}
-        name={saveBlueprintName}
-        onNameChange={setSaveBlueprintName}
-        description={saveBlueprintDescription}
-        onDescriptionChange={setSaveBlueprintDescription}
-        onSubmit={() => void handleSaveCurrentNetworkAsBlueprint()}
-      />
-
-      <CreateAgentDialog
-        open={activeDialog === "create-agent"}
-        onOpenChange={(open) => {
-          if (!open) {
-            setActiveDialog(null);
-          }
-        }}
-        pending={pendingAction === "create-agent"}
+        pending={pendingAction === "create-node"}
         activeTabTitle={activeTab?.title ?? null}
-        selectedRole={selectedCreateAgentRole}
-        selectedRoleName={createAgentRoleName}
-        onRoleNameChange={setCreateAgentRoleName}
-        roles={availableCreateAgentRoles}
+        nodeType={createNodeType}
+        onNodeTypeChange={setCreateNodeType}
+        selectedRole={selectedCreateNodeRole}
+        selectedRoleName={createNodeRoleName}
+        onRoleNameChange={setCreateNodeRoleName}
+        roles={roles}
         loadingRoles={loadingRoles}
-        agentName={createAgentName}
-        onAgentNameChange={setCreateAgentName}
-        onSubmit={() => void handleCreateAgent()}
+        nodeName={createNodeName}
+        onNodeNameChange={setCreateNodeName}
+        onSubmit={() => void handleCreateNode()}
         submitDisabled={
           !activeTabId ||
-          !selectedCreateAgentRole ||
-          pendingAction === "create-agent"
+          pendingAction === "create-node" ||
+          (createNodeType === "agent" && !selectedCreateNodeRole)
         }
       />
 
-      <ConnectAgentsDialog
-        open={activeDialog === "connect-agents"}
+      <ConnectPortsDialog
+        open={activeDialog === "connect-ports"}
         onOpenChange={(open) => {
           if (!open) {
             setActiveDialog(null);
           }
         }}
-        pending={pendingAction === "connect-agents"}
+        pending={pendingAction === "connect-ports"}
         activeTabTitle={activeTab?.title ?? null}
-        agentOptions={tabAgentOptions}
-        sourceId={connectSourceId}
-        targetId={connectTargetId}
-        onSourceChange={(value) => {
-          setConnectSourceId(value);
-          if (value === connectTargetId) {
-            const nextTarget =
-              tabAgentOptions.find((agent) => agent.id !== value)?.id ?? "";
-            setConnectTargetId(nextTarget);
-          }
-        }}
-        onTargetChange={setConnectTargetId}
-        onSubmit={() => void handleConnectAgents()}
+        nodeOptions={workflowNodeOptions}
+        fromNodeId={connectSourceId}
+        fromPortKey={connectSourcePortKey}
+        toNodeId={connectTargetId}
+        toPortKey={connectTargetPortKey}
+        fromPortOptions={sourcePortOptions}
+        toPortOptions={targetPortOptions}
+        onFromNodeChange={setConnectSourceId}
+        onFromPortChange={setConnectSourcePortKey}
+        onToNodeChange={setConnectTargetId}
+        onToPortChange={setConnectTargetPortKey}
+        onSubmit={() => void handleConnectPorts()}
       />
 
       <DeleteTabDialog

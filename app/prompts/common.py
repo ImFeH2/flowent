@@ -32,7 +32,7 @@ TODO_TOOL_GUIDANCE = """\
 CREATE_TAB_TOOL_GUIDANCE = """\
 ## Create Tab Tool Rules
 
-- Use `create_tab` to open a persistent task workspace before building an Agent Network for that task.
+- Use `create_tab` to open a persistent workflow before building a Workflow Graph for that task.
 - A tab is the user-visible home for one task. Keep the title concrete and easy to recognize later.
 """
 
@@ -40,7 +40,7 @@ DELETE_TAB_TOOL_GUIDANCE = """\
 ## Delete Tab Tool Rules
 
 - Use `delete_tab` only when the Human explicitly asks to remove a tab or when you are intentionally cleaning up a task workspace that should no longer exist.
-- Deleting a tab permanently removes the tab and its persisted Agent Network after active nodes are terminated.
+- Deleting a tab permanently removes the workflow and its persisted Workflow Graph after active nodes are terminated.
 """
 
 SET_PERMISSIONS_TOOL_GUIDANCE = """\
@@ -55,12 +55,11 @@ SET_PERMISSIONS_TOOL_GUIDANCE = """\
 CREATE_AGENT_TOOL_GUIDANCE = """\
 ## Create Agent Tool Rules
 
-- Use `create_agent` to add a new node to a tab's Agent Network.
-- Prefer creating the right set of peer agents up front. If you also have `connect`, wire them as needed.
+- Use `create_agent` to add a new agent node to the current workflow.
+- Prefer creating the right set of agents up front. If you also have `connect`, wire workflow edges as needed.
 - `create_agent` always creates the new peer in your current tab. It does not take `tab_id` or any other cross-tab target parameter.
 - Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them.
-- For ordinary task nodes, `connect_to_creator` defaults to `true` and creates an explicit peer connection to the new node; set it to `false` only when you intentionally want a disconnected node and will wire explicit connections yourself.
-- When the current node is the tab's Leader, `connect_to_creator` does not create a graph edge from the Leader to the new node. Leader-to-agent direct messaging is already a stable contact relationship outside Agent Network edges.
+- `create_agent` can place the new node as a standalone node, after another node, or between two nodes in the current Workflow Graph.
 - Creating an agent does not start work by itself; explicitly dispatch its first task with `send`.
 - After creating multiple agents, dispatch tasks to all of them before calling `idle`.
 - Do not insert unrelated tool calls or Human-facing text while some planned nodes are still waiting for their first task.
@@ -89,7 +88,7 @@ DELEGATION_GENERAL_GUIDANCE = """\
 CONNECT_TOOL_GUIDANCE = """\
 ## Connect Tool Rules
 
-- Use `connect` to establish additional peer connections inside a task tab when the current network topology needs them.
+- Use `connect` to create a directed workflow edge between node ports when the current Workflow Graph needs it.
 """
 
 CONTACTS_TOOL_GUIDANCE = """\

@@ -5,7 +5,7 @@ import {
   deleteTabEdgeRequest,
   deleteTabNodeRequest,
 } from "@/lib/api";
-import type { Node } from "@/types";
+import type { Node, WorkflowNodeType } from "@/types";
 
 type GraphHistoryCommand = {
   undo: () => Promise<void>;
@@ -17,25 +17,32 @@ type TabGraphStacks = {
   redo: GraphHistoryCommand[];
 };
 
-type CreateAgentInput = {
+type CreateNodeInput = {
   tabId: string;
+  nodeType?: WorkflowNodeType;
+  roleName?: string;
+  name?: string;
+};
+
+type CreateLinkedAgentInput = {
+  tabId: string;
+  anchorNodeId: string;
   roleName: string;
   name?: string;
 };
 
-type CreateLinkedAgentInput = CreateAgentInput & {
-  anchorNodeId: string;
-};
-
-type DeleteAgentInput = {
+type DeleteNodeInput = {
   tabId: string;
   node: Node;
   tabAgents: Node[];
 };
 
-type InsertAgentBetweenInput = CreateAgentInput & {
+type InsertAgentBetweenInput = {
+  tabId: string;
   sourceNodeId: string;
   targetNodeId: string;
+  roleName: string;
+  name?: string;
 };
 
 function cloneStacks(stacks?: TabGraphStacks): TabGraphStacks {
@@ -69,11 +76,12 @@ export function useTabGraphHistory() {
     [touch],
   );
 
-  const createStandaloneAgent = useCallback(
-    async ({ tabId, roleName, name }: CreateAgentInput) => {
+  const createStandaloneNode = useCallback(
+    async ({ tabId, nodeType = "agent", roleName, name }: CreateNodeInput) => {
       const normalizedName = normalizeOptionalName(name);
       let currentNodeId = (
         await createTabNodeRequest(tabId, {
+          node_type: nodeType,
           role_name: roleName,
           name: normalizedName,
         })
@@ -86,6 +94,7 @@ export function useTabGraphHistory() {
         redo: async () => {
           currentNodeId = (
             await createTabNodeRequest(tabId, {
+              node_type: nodeType,
               role_name: roleName,
               name: normalizedName,
             })
@@ -103,13 +112,17 @@ export function useTabGraphHistory() {
       const normalizedName = normalizeOptionalName(name);
       let currentNodeId = (
         await createTabNodeRequest(tabId, {
+          node_type: "agent",
           role_name: roleName,
           name: normalizedName,
         })
       ).id;
 
       try {
-        await createTabEdgeRequest(tabId, anchorNodeId, currentNodeId);
+        await createTabEdgeRequest(tabId, {
+          fromNodeId: anchorNodeId,
+          toNodeId: currentNodeId,
+        });
       } catch (error) {
         await deleteTabNodeRequest(tabId, currentNodeId).catch(() => undefined);
         throw error;
@@ -122,11 +135,15 @@ export function useTabGraphHistory() {
         redo: async () => {
           currentNodeId = (
             await createTabNodeRequest(tabId, {
+              node_type: "agent",
               role_name: roleName,
               name: normalizedName,
             })
           ).id;
-          await createTabEdgeRequest(tabId, anchorNodeId, currentNodeId);
+          await createTabEdgeRequest(tabId, {
+            fromNodeId: anchorNodeId,
+            toNodeId: currentNodeId,
+          });
         },
       });
 
@@ -136,15 +153,31 @@ export function useTabGraphHistory() {
   );
 
   const createConnection = useCallback(
-    async (tabId: string, sourceNodeId: string, targetNodeId: string) => {
-      await createTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+    async (
+      tabId: string,
+      sourceNodeId: string,
+      targetNodeId: string,
+      sourcePortKey = "out",
+      targetPortKey = "in",
+    ) => {
+      const edge = await createTabEdgeRequest(tabId, {
+        fromNodeId: sourceNodeId,
+        fromPortKey: sourcePortKey,
+        toNodeId: targetNodeId,
+        toPortKey: targetPortKey,
+      });
 
       pushHistory(tabId, {
         undo: async () => {
-          await deleteTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+          await deleteTabEdgeRequest(tabId, { edgeId: edge.id });
         },
         redo: async () => {
-          await createTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+          await createTabEdgeRequest(tabId, {
+            fromNodeId: sourceNodeId,
+            fromPortKey: sourcePortKey,
+            toNodeId: targetNodeId,
+            toPortKey: targetPortKey,
+          });
         },
       });
     },
@@ -152,40 +185,53 @@ export function useTabGraphHistory() {
   );
 
   const deleteConnection = useCallback(
-    async (tabId: string, sourceNodeId: string, targetNodeId: string) => {
-      await deleteTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+    async (
+      tabId: string,
+      sourceNodeId: string,
+      targetNodeId: string,
+      sourcePortKey = "out",
+      targetPortKey = "in",
+    ) => {
+      await deleteTabEdgeRequest(tabId, {
+        fromNodeId: sourceNodeId,
+        fromPortKey: sourcePortKey,
+        toNodeId: targetNodeId,
+        toPortKey: targetPortKey,
+      });
 
       pushHistory(tabId, {
         undo: async () => {
-          await createTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+          await createTabEdgeRequest(tabId, {
+            fromNodeId: sourceNodeId,
+            fromPortKey: sourcePortKey,
+            toNodeId: targetNodeId,
+            toPortKey: targetPortKey,
+          });
         },
         redo: async () => {
-          await deleteTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+          await deleteTabEdgeRequest(tabId, {
+            fromNodeId: sourceNodeId,
+            fromPortKey: sourcePortKey,
+            toNodeId: targetNodeId,
+            toPortKey: targetPortKey,
+          });
         },
       });
     },
     [pushHistory],
   );
 
-  const deleteAgent = useCallback(
-    async ({ tabId, node, tabAgents }: DeleteAgentInput) => {
-      const roleName = node.role_name?.trim() ?? "";
-      if (!roleName) {
-        throw new Error("Missing role for this node");
-      }
-
-      const incomingNodeIds = tabAgents
-        .filter((candidate) => candidate.id !== node.id)
-        .filter((candidate) => candidate.connections.includes(node.id))
-        .map((candidate) => candidate.id);
+  const deleteNode = useCallback(
+    async ({ tabId, node, tabAgents }: DeleteNodeInput) => {
       const connectedNodeIds = Array.from(
         new Set(
-          [...incomingNodeIds, ...node.connections].filter((targetId) =>
+          [...node.connections].filter((targetId) =>
             tabAgents.some((candidate) => candidate.id === targetId),
           ),
         ),
       );
       const normalizedName = normalizeOptionalName(node.name);
+      const roleName = node.role_name?.trim() ?? "";
       let currentNodeId = node.id;
 
       await deleteTabNodeRequest(tabId, currentNodeId);
@@ -194,13 +240,16 @@ export function useTabGraphHistory() {
         undo: async () => {
           currentNodeId = (
             await createTabNodeRequest(tabId, {
-              role_name: roleName,
+              node_type: node.node_type,
+              role_name: roleName || undefined,
               name: normalizedName,
             })
           ).id;
-
           for (const connectedNodeId of connectedNodeIds) {
-            await createTabEdgeRequest(tabId, connectedNodeId, currentNodeId);
+            await createTabEdgeRequest(tabId, {
+              fromNodeId: connectedNodeId,
+              toNodeId: currentNodeId,
+            });
           }
         },
         redo: async () => {
@@ -222,25 +271,36 @@ export function useTabGraphHistory() {
       const normalizedName = normalizeOptionalName(name);
       let currentNodeId: string | null = null;
 
-      await deleteTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+      await deleteTabEdgeRequest(tabId, {
+        fromNodeId: sourceNodeId,
+        toNodeId: targetNodeId,
+      });
       try {
         currentNodeId = (
           await createTabNodeRequest(tabId, {
+            node_type: "agent",
             role_name: roleName,
             name: normalizedName,
           })
         ).id;
-        await createTabEdgeRequest(tabId, sourceNodeId, currentNodeId);
-        await createTabEdgeRequest(tabId, currentNodeId, targetNodeId);
+        await createTabEdgeRequest(tabId, {
+          fromNodeId: sourceNodeId,
+          toNodeId: currentNodeId,
+        });
+        await createTabEdgeRequest(tabId, {
+          fromNodeId: currentNodeId,
+          toNodeId: targetNodeId,
+        });
       } catch (error) {
         if (currentNodeId) {
           await deleteTabNodeRequest(tabId, currentNodeId).catch(
             () => undefined,
           );
         }
-        await createTabEdgeRequest(tabId, sourceNodeId, targetNodeId).catch(
-          () => undefined,
-        );
+        await createTabEdgeRequest(tabId, {
+          fromNodeId: sourceNodeId,
+          toNodeId: targetNodeId,
+        }).catch(() => undefined);
         throw error;
       }
 
@@ -250,18 +310,31 @@ export function useTabGraphHistory() {
             return;
           }
           await deleteTabNodeRequest(tabId, currentNodeId);
-          await createTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+          await createTabEdgeRequest(tabId, {
+            fromNodeId: sourceNodeId,
+            toNodeId: targetNodeId,
+          });
         },
         redo: async () => {
-          await deleteTabEdgeRequest(tabId, sourceNodeId, targetNodeId);
+          await deleteTabEdgeRequest(tabId, {
+            fromNodeId: sourceNodeId,
+            toNodeId: targetNodeId,
+          });
           currentNodeId = (
             await createTabNodeRequest(tabId, {
+              node_type: "agent",
               role_name: roleName,
               name: normalizedName,
             })
           ).id;
-          await createTabEdgeRequest(tabId, sourceNodeId, currentNodeId);
-          await createTabEdgeRequest(tabId, currentNodeId, targetNodeId);
+          await createTabEdgeRequest(tabId, {
+            fromNodeId: sourceNodeId,
+            toNodeId: currentNodeId,
+          });
+          await createTabEdgeRequest(tabId, {
+            fromNodeId: currentNodeId,
+            toNodeId: targetNodeId,
+          });
         },
       });
 
@@ -328,8 +401,19 @@ export function useTabGraphHistory() {
       canUndo,
       createConnection,
       createLinkedAgent,
-      createStandaloneAgent,
-      deleteAgent,
+      createStandaloneAgent: (input: {
+        tabId: string;
+        roleName: string;
+        name?: string;
+      }) =>
+        createStandaloneNode({
+          tabId: input.tabId,
+          nodeType: "agent",
+          roleName: input.roleName,
+          name: input.name,
+        }),
+      createStandaloneNode,
+      deleteAgent: deleteNode,
       deleteConnection,
       insertAgentBetween,
       redo,
@@ -341,9 +425,9 @@ export function useTabGraphHistory() {
       canUndo,
       createConnection,
       createLinkedAgent,
-      createStandaloneAgent,
-      deleteAgent,
+      createStandaloneNode,
       deleteConnection,
+      deleteNode,
       insertAgentBetween,
       redo,
       revision,

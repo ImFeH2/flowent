@@ -7,6 +7,7 @@ from app.graph_service import (
     is_tab_leader,
     list_tab_edges,
     list_tab_nodes,
+    list_workflow_nodes,
     serialize_tab_summary,
 )
 from app.tools import Tool
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 
 class ListTabsTool(Tool):
     name = "list_tabs"
-    description = "List persistent task tabs. Optionally include the full Agent Network for one tab."
+    description = "List persistent workflows. Optionally include the full Workflow Graph for one workflow."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -40,15 +41,33 @@ class ListTabsTool(Tool):
             if tab is None:
                 return json.dumps({"error": f"Tab '{tab_id.strip()}' not found"})
             nodes = [
-                node
-                for node in list_tab_nodes(tab.id)
-                if not is_tab_leader(node_id=node.id, tab_id=tab.id)
+                {
+                    "id": node.id,
+                    "node_type": node.type.value,
+                    "name": (
+                        node.config["name"]
+                        if isinstance(node.config.get("name"), str)
+                        else None
+                    ),
+                    "role_name": (
+                        node.config["role_name"]
+                        if isinstance(node.config.get("role_name"), str)
+                        else None
+                    ),
+                    "is_leader": False,
+                    "position": (
+                        tab.definition.view.positions[node.id].serialize()
+                        if node.id in tab.definition.view.positions
+                        else None
+                    ),
+                }
+                for node in list_workflow_nodes(tab.id)
             ]
-            edges = list_tab_edges(tab.id)
             return json.dumps(
                 {
                     "tab": serialize_tab_summary(tab),
-                    "nodes": [
+                    "nodes": nodes,
+                    "runtime_nodes": [
                         {
                             "id": node.id,
                             "name": node.config.name,
@@ -64,9 +83,9 @@ class ListTabsTool(Tool):
                                 else None
                             ),
                         }
-                        for node in nodes
+                        for node in list_tab_nodes(tab.id)
                     ],
-                    "edges": [edge.serialize() for edge in edges],
+                    "edges": [edge.serialize() for edge in list_tab_edges(tab.id)],
                 }
             )
 

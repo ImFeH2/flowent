@@ -1611,12 +1611,9 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
 
 def test_send_message_delivers_to_single_contact_and_records_histories(monkeypatch):
     registry.reset()
-    _register_tab_leader()
+    leader = _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
-    registry.register(peer)
-    child.add_connection(peer.uuid)
     events = []
 
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
@@ -1624,7 +1621,7 @@ def test_send_message_delivers_to_single_contact_and_records_histories(monkeypat
     try:
         result = json.loads(
             child.send_message(
-                target_ref="peer",
+                target_ref="leader",
                 raw_parts=[{"type": "text", "text": "investigate the error"}],
             )
         )
@@ -1638,13 +1635,13 @@ def test_send_message_delivers_to_single_contact_and_records_histories(monkeypat
     )
     received_entry = next(
         entry
-        for entry in peer.get_history_snapshot()
+        for entry in leader.get_history_snapshot()
         if isinstance(entry, ReceivedMessage)
     )
-    signal = peer._wake_queue.get_nowait()
+    signal = leader._wake_queue.get_nowait()
 
-    assert result == {"status": "sent", "target_id": "peer"}
-    assert sent_entry.to_id == "peer"
+    assert result == {"status": "sent", "target_id": "leader"}
+    assert sent_entry.to_id == "leader"
     assert sent_entry.content == "investigate the error"
     assert received_entry.from_id == "child"
     assert received_entry.content == "investigate the error"
@@ -1660,7 +1657,7 @@ def test_send_message_delivers_to_single_contact_and_records_histories(monkeypat
     }
     assert [event.data for event in events if event.type == EventType.NODE_MESSAGE] == [
         {
-            "to_id": "peer",
+            "to_id": "leader",
             "content": "investigate the error",
             "message_id": sent_entry.message_id,
         }
@@ -1713,18 +1710,15 @@ def test_send_message_reports_error_when_target_lacks_input_image_support():
     registry.reset()
     _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
-    registry.register(peer)
-    child.add_connection(peer.uuid)
 
     try:
         with pytest.raises(
             ValueError,
-            match=r"Send failed: target `peer` does not support `input_image`\.",
+            match=r"Send failed: target `leader` does not support `input_image`\.",
         ):
             child.send_message(
-                target_ref="peer",
+                target_ref="leader",
                 raw_parts=[{"type": "image", "asset_id": "asset-1"}],
             )
     finally:
@@ -1762,16 +1756,13 @@ def test_handle_tool_call_send_success_omits_toolcall_history(monkeypatch):
     registry.reset()
     _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     registry.register(child)
-    registry.register(peer)
-    child.add_connection(peer.uuid)
 
     try:
         result = child._handle_tool_call(
             "send",
             {
-                "target": "peer",
+                "target": "leader",
                 "parts": [{"type": "text", "text": "reply with the findings"}],
             },
             "call-send",
@@ -1779,7 +1770,7 @@ def test_handle_tool_call_send_success_omits_toolcall_history(monkeypatch):
     finally:
         registry.reset()
 
-    assert json.loads(result) == {"status": "sent", "target_id": "peer"}
+    assert json.loads(result) == {"status": "sent", "target_id": "leader"}
     assert not any(
         isinstance(entry, ToolCall) and entry.tool_call_id == "call-send"
         for entry in child.get_history_snapshot()
@@ -1823,14 +1814,11 @@ def test_handle_tool_call_send_failure_records_error_without_toolcall():
 
 def test_multiple_send_tool_calls_stop_after_first_failure(monkeypatch):
     registry.reset()
-    _register_tab_leader()
+    leader = _register_tab_leader()
     child = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="child")
-    peer = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="peer")
     helper = Agent(NodeConfig(node_type=NodeType.AGENT, tab_id="tab-1"), uuid="helper")
     registry.register(child)
-    registry.register(peer)
     registry.register(helper)
-    child.add_connection(peer.uuid)
 
     wait_calls = 0
     chat_calls = 0
@@ -1860,7 +1848,7 @@ def test_multiple_send_tool_calls_stop_after_first_failure(monkeypatch):
                         id="call-send-1",
                         name="send",
                         arguments={
-                            "target": "peer",
+                            "target": "leader",
                             "parts": [{"type": "text", "text": "first"}],
                         },
                     ),
@@ -1876,7 +1864,7 @@ def test_multiple_send_tool_calls_stop_after_first_failure(monkeypatch):
                         id="call-send-3",
                         name="send",
                         arguments={
-                            "target": "peer",
+                            "target": "leader",
                             "parts": [{"type": "text", "text": "third"}],
                         },
                     ),
@@ -1905,7 +1893,7 @@ def test_multiple_send_tool_calls_stop_after_first_failure(monkeypatch):
     assert [entry.content for entry in sent_entries] == ["first"]
     assert [
         entry.content
-        for entry in peer.get_history_snapshot()
+        for entry in leader.get_history_snapshot()
         if isinstance(entry, ReceivedMessage)
     ] == ["first"]
     assert helper._wake_queue.empty()
@@ -2244,7 +2232,7 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Directory Worker (`12345678`).\n- `create_agent` only creates a new peer node in the current Agent Network. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Directory Worker (`12345678`).\n- `create_agent` only adds a new agent node to the current workflow. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
         },
     ]
 
@@ -2309,7 +2297,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
         },
         {
             "role": "user",
-            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Worker (`12345678`).\n- `create_agent` only creates a new peer node in the current Agent Network. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
+            "content": "<system>Runtime post prompt:\n- Plain content is never delivered to other agents.\n- To send a formal message to another node, use `send` with a single `target` and ordered `parts`.\n- Use `contacts` to inspect the node ids and names you can currently message directly.\n- `@target:` or any other `@name:` text inside normal content is just text. It does not send anything.\n- Newly created agents still waiting for their first task: Worker (`12345678`).\n- `create_agent` only adds a new agent node to the current workflow. It does not start work by itself.\n- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`.</system>",
         },
     ]
 

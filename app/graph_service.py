@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 import uuid
+from copy import deepcopy
 
 from app import settings as settings_module
 from app.events import event_bus
-from app.graph_runtime import connect_nodes, disconnect_nodes
 from app.models import (
-    AgentBlueprint,
     AgentState,
-    BlueprintEdge,
-    BlueprintSlot,
+    EdgeKind,
     Event,
     EventType,
     GraphEdge,
     GraphNodeRecord,
     NodeConfig,
     NodeType,
+    PortDirection,
     Tab,
+    WorkflowDefinition,
+    WorkflowNodeDefinition,
+    WorkflowNodeKind,
+    WorkflowPort,
 )
 from app.registry import registry
 from app.runtime import SYSTEM_NODE_TIMEOUT
@@ -35,24 +38,6 @@ from app.tools import MINIMUM_TOOLS
 from app.workspace_store import workspace_store
 
 LEADER_NODE_NAME = "Leader"
-
-
-def _canonical_connection_pair(
-    left_id: str,
-    right_id: str,
-) -> tuple[str, str]:
-    return (left_id, right_id) if left_id <= right_id else (right_id, left_id)
-
-
-def _sorted_tab_network_nodes(tab_id: str) -> list[GraphNodeRecord]:
-    return sorted(
-        [
-            record
-            for record in list_tab_nodes(tab_id)
-            if not is_tab_leader(node_id=record.id, tab_id=tab_id)
-        ],
-        key=lambda record: (record.created_at, record.id),
-    )
 
 
 def build_tools_for_role(
@@ -139,213 +124,166 @@ def is_tab_leader(*, node_id: str, tab_id: str | None = None) -> bool:
     return get_tab_leader_id(resolved_tab_id) == node_id
 
 
-def _sorted_tab_nodes(tab_id: str) -> list[GraphNodeRecord]:
-    return sorted(
-        list_tab_nodes(tab_id),
-        key=lambda record: (record.created_at, record.id),
-    )
-
-
-def _sorted_tab_edges(tab_id: str) -> list[GraphEdge]:
-    return sorted(
-        list_tab_edges(tab_id),
-        key=lambda edge: (edge.created_at, edge.id),
-    )
-
-
-def _validate_blueprint_graph(
-    *,
-    slots: list[BlueprintSlot],
-    edges: list[BlueprintEdge],
-) -> str | None:
-    settings = settings_module.get_settings()
-    if not slots:
-        return "Blueprint must contain at least one slot"
-    slot_ids: set[str] = set()
-    slot_names: set[str] = set()
-    for slot in slots:
-        if slot.id in slot_ids:
-            return f"Blueprint slot '{slot.id}' is duplicated"
-        slot_ids.add(slot.id)
-        if slot.role_name == CONDUCTOR_ROLE_NAME:
-            return f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a tab Leader"
-        if find_role(settings, slot.role_name) is None:
-            return f"Role '{slot.role_name}' not found"
-        if slot.display_name is None:
-            continue
-        if slot.display_name in slot_names:
-            return f"Node name '{slot.display_name}' already exists"
-        slot_names.add(slot.display_name)
-
-    seen_edges: set[tuple[str, str]] = set()
-    valid_targets = set(slot_ids)
-    for edge in edges:
-        if edge.from_slot_id not in valid_targets:
-            return f"Blueprint connection endpoint A '{edge.from_slot_id}' is invalid"
-        if edge.to_slot_id not in valid_targets:
-            return f"Blueprint connection endpoint B '{edge.to_slot_id}' is invalid"
-        if edge.from_slot_id == edge.to_slot_id:
-            return "Blueprint self-loop connections are not allowed"
-        edge_key = _canonical_connection_pair(
-            edge.from_slot_id,
-            edge.to_slot_id,
+def _default_ports(
+    node_kind: WorkflowNodeKind,
+) -> tuple[list[WorkflowPort], list[WorkflowPort]]:
+    if node_kind == WorkflowNodeKind.TRIGGER:
+        return (
+            [],
+            [
+                WorkflowPort(
+                    key="out",
+                    direction=PortDirection.OUTPUT,
+                    kind=EdgeKind.CONTROL,
+                    multiple=True,
+                )
+            ],
         )
-        if edge_key in seen_edges:
-            return f"Blueprint connection '{edge_key[0]} - {edge_key[1]}' is duplicated"
-        seen_edges.add(edge_key)
-
-    return None
-
-
-def serialize_blueprint(blueprint: AgentBlueprint) -> dict[str, object]:
-    return {
-        **blueprint.serialize(),
-        "node_count": len(blueprint.slots),
-        "edge_count": len(blueprint.edges),
-    }
-
-
-def list_blueprints() -> list[AgentBlueprint]:
-    return sorted(
-        workspace_store.list_blueprints(),
-        key=lambda blueprint: (
-            -blueprint.updated_at,
-            blueprint.name.lower(),
-            blueprint.id,
-        ),
+    if node_kind == WorkflowNodeKind.CODE:
+        return (
+            [
+                WorkflowPort(
+                    key="in",
+                    direction=PortDirection.INPUT,
+                    kind=EdgeKind.CONTROL,
+                ),
+                WorkflowPort(
+                    key="input",
+                    direction=PortDirection.INPUT,
+                    kind=EdgeKind.DATA,
+                    multiple=True,
+                ),
+            ],
+            [
+                WorkflowPort(
+                    key="out",
+                    direction=PortDirection.OUTPUT,
+                    kind=EdgeKind.CONTROL,
+                    multiple=True,
+                ),
+                WorkflowPort(
+                    key="output",
+                    direction=PortDirection.OUTPUT,
+                    kind=EdgeKind.DATA,
+                    multiple=True,
+                ),
+            ],
+        )
+    if node_kind == WorkflowNodeKind.IF:
+        return (
+            [
+                WorkflowPort(
+                    key="in",
+                    direction=PortDirection.INPUT,
+                    kind=EdgeKind.CONTROL,
+                ),
+                WorkflowPort(
+                    key="condition",
+                    direction=PortDirection.INPUT,
+                    kind=EdgeKind.DATA,
+                ),
+            ],
+            [
+                WorkflowPort(
+                    key="true",
+                    direction=PortDirection.OUTPUT,
+                    kind=EdgeKind.CONTROL,
+                    multiple=True,
+                ),
+                WorkflowPort(
+                    key="false",
+                    direction=PortDirection.OUTPUT,
+                    kind=EdgeKind.CONTROL,
+                    multiple=True,
+                ),
+            ],
+        )
+    if node_kind == WorkflowNodeKind.MERGE:
+        return (
+            [
+                WorkflowPort(
+                    key="in",
+                    direction=PortDirection.INPUT,
+                    kind=EdgeKind.CONTROL,
+                    multiple=True,
+                )
+            ],
+            [
+                WorkflowPort(
+                    key="out",
+                    direction=PortDirection.OUTPUT,
+                    kind=EdgeKind.CONTROL,
+                    multiple=True,
+                )
+            ],
+        )
+    return (
+        [
+            WorkflowPort(
+                key="in",
+                direction=PortDirection.INPUT,
+                kind=EdgeKind.CONTROL,
+            )
+        ],
+        [
+            WorkflowPort(
+                key="out",
+                direction=PortDirection.OUTPUT,
+                kind=EdgeKind.CONTROL,
+                multiple=True,
+            )
+        ],
     )
 
 
-def create_blueprint(
+def build_workflow_node_definition(
     *,
-    name: str,
-    description: str = "",
-    slots: list[BlueprintSlot],
-    edges: list[BlueprintEdge],
-) -> tuple[AgentBlueprint | None, str | None]:
-    if not name.strip():
-        return None, "name must not be empty"
-    error = _validate_blueprint_graph(slots=slots, edges=edges)
-    if error is not None:
-        return None, error
-    blueprint = AgentBlueprint(
-        id=str(uuid.uuid4()),
-        name=name.strip(),
-        description=description.strip(),
-        version=1,
-        slots=list(slots),
-        edges=list(edges),
+    node_id: str,
+    node_kind: WorkflowNodeKind,
+    config: dict[str, object] | None = None,
+) -> WorkflowNodeDefinition:
+    inputs, outputs = _default_ports(node_kind)
+    return WorkflowNodeDefinition(
+        id=node_id,
+        type=node_kind,
+        config=deepcopy(config or {}),
+        inputs=inputs,
+        outputs=outputs,
     )
-    workspace_store.upsert_blueprint(blueprint)
-    return blueprint, None
 
 
-def update_blueprint(
-    *,
-    blueprint_id: str,
-    name: str,
-    description: str = "",
-    slots: list[BlueprintSlot],
-    edges: list[BlueprintEdge],
-) -> tuple[AgentBlueprint | None, str | None]:
-    blueprint = workspace_store.get_blueprint(blueprint_id)
-    if blueprint is None:
-        return None, f"Blueprint '{blueprint_id}' not found"
-    if not name.strip():
-        return None, "name must not be empty"
-    error = _validate_blueprint_graph(slots=slots, edges=edges)
-    if error is not None:
-        return None, error
-    blueprint.name = name.strip()
-    blueprint.description = description.strip()
-    blueprint.version += 1
-    blueprint.slots = list(slots)
-    blueprint.edges = list(edges)
-    workspace_store.upsert_blueprint(blueprint)
-    return blueprint, None
+def list_workflow_nodes(tab_id: str) -> list[WorkflowNodeDefinition]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return []
+    return list(tab.definition.nodes)
 
 
-def delete_blueprint(blueprint_id: str) -> tuple[dict[str, object] | None, str | None]:
-    blueprint = workspace_store.get_blueprint(blueprint_id)
-    if blueprint is None:
-        return None, f"Blueprint '{blueprint_id}' not found"
-    workspace_store.delete_blueprint(blueprint_id)
-    return {"id": blueprint.id}, None
+def get_workflow_node(tab_id: str, node_id: str) -> WorkflowNodeDefinition | None:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None
+    return tab.definition.get_node(node_id)
 
 
-def _network_matches_blueprint_source(tab: Tab) -> bool:
-    if tab.network_blueprint_id is None or tab.network_blueprint_version is None:
-        return False
-
-    slot_by_id = {slot.id: slot for slot in tab.network_blueprint_slots}
-    if len(slot_by_id) != len(tab.network_blueprint_slots):
-        return False
-
-    current_nodes = _sorted_tab_network_nodes(tab.id)
-    if len(current_nodes) != len(tab.network_blueprint_slots):
-        return False
-
-    node_by_slot_id: dict[str, GraphNodeRecord] = {}
-    for record in current_nodes:
-        slot_id = record.config.blueprint_slot_id
-        if slot_id is None or slot_id not in slot_by_id or slot_id in node_by_slot_id:
-            return False
-        node_by_slot_id[slot_id] = record
-
-    for slot_id, slot in slot_by_id.items():
-        matched_record = node_by_slot_id.get(slot_id)
-        if matched_record is None:
-            return False
-        if matched_record.config.role_name != slot.role_name:
-            return False
-        if matched_record.config.name != slot.display_name:
-            return False
-
-    expected_edges: set[tuple[str, str]] = set()
-    for edge in tab.network_blueprint_edges:
-        from_record = node_by_slot_id.get(edge.from_slot_id)
-        to_record = node_by_slot_id.get(edge.to_slot_id)
-        from_node_id = from_record.id if from_record is not None else None
-        to_node_id = to_record.id if to_record is not None else None
-        if from_node_id is None or to_node_id is None:
-            return False
-        expected_edges.add(_canonical_connection_pair(from_node_id, to_node_id))
-
-    current_edges = {
-        _canonical_connection_pair(edge.from_node_id, edge.to_node_id)
-        for edge in _sorted_tab_edges(tab.id)
-    }
-    return current_edges == expected_edges
-
-
-def serialize_network_source(tab: Tab) -> dict[str, object]:
-    blueprint = (
-        workspace_store.get_blueprint(tab.network_blueprint_id)
-        if tab.network_blueprint_id is not None
-        else None
-    )
-    if tab.network_blueprint_id is None or tab.network_blueprint_version is None:
-        return {
-            "state": "manual",
-            "blueprint_id": None,
-            "blueprint_name": None,
-            "blueprint_version": None,
-            "blueprint_available": False,
-        }
-    return {
-        "state": (
-            "blueprint-derived" if _network_matches_blueprint_source(tab) else "drifted"
-        ),
-        "blueprint_id": tab.network_blueprint_id,
-        "blueprint_name": (
-            blueprint.name if blueprint is not None else tab.network_blueprint_name
-        ),
-        "blueprint_version": tab.network_blueprint_version,
-        "blueprint_available": blueprint is not None,
-    }
+def _sync_runtime_positions_into_definition(tab: Tab) -> bool:
+    changed = False
+    for record in workspace_store.list_node_records(tab.id):
+        if is_tab_leader(node_id=record.id, tab_id=tab.id):
+            continue
+        if record.position is None:
+            continue
+        current = tab.definition.view.positions.get(record.id)
+        if current == record.position:
+            continue
+        tab.definition.view.positions[record.id] = record.position
+        changed = True
+    return changed
 
 
 def serialize_tab_summary(tab: Tab) -> dict[str, object]:
+    if _sync_runtime_positions_into_definition(tab):
+        workspace_store.upsert_tab(tab)
     return {
         "id": tab.id,
         "title": tab.title,
@@ -353,9 +291,9 @@ def serialize_tab_summary(tab: Tab) -> dict[str, object]:
         "leader_id": tab.leader_id,
         "created_at": tab.created_at,
         "updated_at": tab.updated_at,
-        "network_source": serialize_network_source(tab),
-        "node_count": len(_sorted_tab_network_nodes(tab.id)),
-        "edge_count": len(list_tab_edges(tab.id)),
+        "definition": tab.definition.serialize(),
+        "node_count": len(tab.definition.nodes),
+        "edge_count": len(tab.definition.edges),
     }
 
 
@@ -560,98 +498,6 @@ def _start_tab_runtime(tab_id: str) -> None:
         if registry.get(record.id) is not None:
             continue
         _start_persisted_agent(record=record)
-    for edge in _sorted_tab_edges(tab_id):
-        if (
-            registry.get(edge.from_node_id) is None
-            or registry.get(edge.to_node_id) is None
-        ):
-            continue
-        try:
-            connect_nodes(edge.from_node_id, edge.to_node_id)
-        except ValueError:
-            continue
-
-
-def _validate_blueprint_for_tab(blueprint: AgentBlueprint) -> str | None:
-    return _validate_blueprint_graph(slots=blueprint.slots, edges=blueprint.edges)
-
-
-def _materialize_blueprint_network(*, tab: Tab, blueprint: AgentBlueprint) -> None:
-    slot_node_ids: dict[str, str] = {}
-    for slot in blueprint.slots:
-        config, error = build_node_config(
-            role_name=slot.role_name,
-            tab_id=tab.id,
-            name=slot.display_name,
-        )
-        if error is not None or config is None:
-            raise ValueError(error or "Failed to build blueprint node config")
-        config.blueprint_slot_id = slot.id
-        record = GraphNodeRecord(
-            id=str(uuid.uuid4()),
-            config=config,
-            state=AgentState.INITIALIZING,
-        )
-        workspace_store.upsert_node_record(record)
-        slot_node_ids[slot.id] = record.id
-
-    for blueprint_edge in blueprint.edges:
-        from_node_id = slot_node_ids.get(blueprint_edge.from_slot_id)
-        to_node_id = slot_node_ids.get(blueprint_edge.to_slot_id)
-        if from_node_id is None or to_node_id is None:
-            raise ValueError("Blueprint edge references an unknown slot")
-        _, error = create_edge(
-            from_node_id=from_node_id,
-            to_node_id=to_node_id,
-        )
-        if error is not None:
-            raise ValueError(error)
-
-
-def save_tab_as_blueprint(
-    *,
-    tab_id: str,
-    name: str,
-    description: str = "",
-) -> tuple[AgentBlueprint | None, str | None]:
-    tab = workspace_store.get_tab(tab_id)
-    if tab is None:
-        return None, f"Tab '{tab_id}' not found"
-
-    slot_id_by_node_id: dict[str, str] = {}
-    slots: list[BlueprintSlot] = []
-    for index, record in enumerate(_sorted_tab_network_nodes(tab.id)):
-        if record.config.role_name is None or not record.config.role_name.strip():
-            return None, f"Node '{record.id}' does not have a role_name"
-        slot_id = f"slot-{index + 1}"
-        slot_id_by_node_id[record.id] = slot_id
-        slots.append(
-            BlueprintSlot(
-                id=slot_id,
-                role_name=record.config.role_name,
-                display_name=record.config.name,
-            )
-        )
-
-    edges: list[BlueprintEdge] = []
-    for edge in _sorted_tab_edges(tab.id):
-        from_slot_id = slot_id_by_node_id.get(edge.from_node_id)
-        to_slot_id = slot_id_by_node_id.get(edge.to_node_id)
-        if from_slot_id is None or to_slot_id is None:
-            return None, "Network contains an edge that points outside the current tab"
-        edges.append(
-            BlueprintEdge(
-                from_slot_id=from_slot_id,
-                to_slot_id=to_slot_id,
-            )
-        )
-
-    return create_blueprint(
-        name=name,
-        description=description,
-        slots=slots,
-        edges=edges,
-    )
 
 
 def create_tab(
@@ -660,28 +506,15 @@ def create_tab(
     goal: str = "",
     allow_network: bool = False,
     write_dirs: list[str] | None = None,
-    blueprint_id: str | None = None,
 ) -> Tab:
     settings = settings_module.get_settings()
-    blueprint = None
-    if isinstance(blueprint_id, str) and blueprint_id.strip():
-        blueprint = workspace_store.get_blueprint(blueprint_id.strip())
-        if blueprint is None:
-            raise ValueError(f"Blueprint '{blueprint_id.strip()}' not found")
-        blueprint_error = _validate_blueprint_for_tab(blueprint)
-        if blueprint_error is not None:
-            raise ValueError(blueprint_error)
     leader_id = str(uuid.uuid4())
     tab = Tab(
         id=str(uuid.uuid4()),
         title=title.strip(),
         goal=goal.strip(),
         leader_id=leader_id,
-        network_blueprint_id=blueprint.id if blueprint is not None else None,
-        network_blueprint_name=blueprint.name if blueprint is not None else None,
-        network_blueprint_version=blueprint.version if blueprint is not None else None,
-        network_blueprint_slots=list(blueprint.slots) if blueprint is not None else [],
-        network_blueprint_edges=list(blueprint.edges) if blueprint is not None else [],
+        definition=WorkflowDefinition(),
     )
     workspace_store.upsert_tab(tab)
     leader_record = _build_leader_record(
@@ -692,12 +525,6 @@ def create_tab(
         write_dirs=write_dirs,
     )
     workspace_store.upsert_node_record(leader_record)
-    try:
-        if blueprint is not None:
-            _materialize_blueprint_network(tab=tab, blueprint=blueprint)
-    except Exception:
-        workspace_store.delete_tab(tab.id)
-        raise
     if registry.get_all():
         _start_tab_runtime(tab.id)
     event_bus.emit(
@@ -708,6 +535,117 @@ def create_tab(
         )
     )
     return tab
+
+
+def duplicate_tab(
+    *,
+    tab_id: str,
+) -> tuple[Tab | None, str | None]:
+    source_tab = workspace_store.get_tab(tab_id)
+    if source_tab is None:
+        return None, f"Tab '{tab_id}' not found"
+
+    leader_record = (
+        workspace_store.get_node_record(source_tab.leader_id)
+        if source_tab.leader_id
+        else None
+    )
+    allow_network = leader_record.config.allow_network if leader_record else False
+    write_dirs = list(leader_record.config.write_dirs) if leader_record else []
+    duplicated_definition = WorkflowDefinition.from_mapping(
+        source_tab.definition.serialize()
+    )
+    id_map: dict[str, str] = {}
+    duplicated_nodes: list[WorkflowNodeDefinition] = []
+
+    for node in duplicated_definition.nodes:
+        new_node_id = str(uuid.uuid4())
+        id_map[node.id] = new_node_id
+        duplicated_node = build_workflow_node_definition(
+            node_id=new_node_id,
+            node_kind=node.type,
+            config=node.config,
+        )
+        duplicated_nodes.append(duplicated_node)
+
+    duplicated_edges = [
+        GraphEdge(
+            id=str(uuid.uuid4()),
+            from_node_id=id_map.get(edge.from_node_id, edge.from_node_id),
+            from_port_key=edge.from_port_key,
+            to_node_id=id_map.get(edge.to_node_id, edge.to_node_id),
+            to_port_key=edge.to_port_key,
+            kind=edge.kind,
+        )
+        for edge in duplicated_definition.edges
+    ]
+    duplicated_view_positions = {
+        id_map.get(node_id, node_id): position
+        for node_id, position in duplicated_definition.view.positions.items()
+        if id_map.get(node_id, node_id) in id_map.values()
+    }
+
+    settings = settings_module.get_settings()
+    new_tab = Tab(
+        id=str(uuid.uuid4()),
+        title=f"{source_tab.title} Copy",
+        goal=source_tab.goal,
+        leader_id=str(uuid.uuid4()),
+        definition=WorkflowDefinition(
+            version=duplicated_definition.version,
+            nodes=duplicated_nodes,
+            edges=duplicated_edges,
+            view=duplicated_definition.view.__class__(
+                positions=duplicated_view_positions
+            ),
+        ),
+    )
+    assert new_tab.leader_id is not None
+    workspace_store.upsert_tab(new_tab)
+    workspace_store.upsert_node_record(
+        _build_leader_record(
+            tab_id=new_tab.id,
+            leader_id=new_tab.leader_id,
+            settings=settings,
+            allow_network=allow_network,
+            write_dirs=write_dirs,
+        )
+    )
+
+    for node in source_tab.definition.nodes:
+        if node.type != WorkflowNodeKind.AGENT:
+            continue
+        duplicated_node_id = id_map.get(node.id)
+        if duplicated_node_id is None:
+            continue
+        config, error = build_node_config(
+            role_name=str(node.config.get("role_name", "")),
+            tab_id=new_tab.id,
+            name=str(node.config["name"])
+            if isinstance(node.config.get("name"), str)
+            else None,
+        )
+        if error is not None or config is None:
+            return None, error or "Failed to duplicate workflow"
+        workspace_store.upsert_node_record(
+            GraphNodeRecord(
+                id=duplicated_node_id,
+                config=config,
+                state=AgentState.INITIALIZING,
+                position=duplicated_view_positions.get(duplicated_node_id),
+            )
+        )
+
+    if registry.get_all():
+        _start_tab_runtime(new_tab.id)
+    event_bus.emit(
+        Event(
+            type=EventType.TAB_CREATED,
+            agent_id="assistant",
+            data=serialize_tab_summary(new_tab),
+        )
+    )
+    return new_tab, None
 
 
 def _is_path_within_boundary(path: str, boundary_dirs: list[str]) -> bool:
@@ -857,15 +795,18 @@ def delete_tab(
         return None, f"Tab '{tab_id}' not found"
 
     stored_nodes = list_tab_nodes(tab_id)
-    stored_edges = list_tab_edges(tab_id)
     live_nodes = [node for node in registry.get_all() if node.config.tab_id == tab_id]
 
     removed_node_ids = list(
         dict.fromkeys(
-            [*(node.id for node in stored_nodes), *(node.uuid for node in live_nodes)]
+            [
+                *(node.id for node in stored_nodes),
+                *(node.uuid for node in live_nodes),
+                *(node.id for node in tab.definition.nodes),
+            ]
         )
     )
-    removed_edge_ids = [edge.id for edge in stored_edges]
+    removed_edge_ids = [edge.id for edge in tab.definition.edges]
 
     for node in live_nodes:
         node.request_termination("tab_deleted")
@@ -944,6 +885,33 @@ def build_node_config(
     )
 
 
+def _persist_tab(tab: Tab, *, actor_id: str) -> Tab:
+    workspace_store.upsert_tab(tab)
+    _emit_tab_updated(tab_id=tab.id, agent_id=actor_id)
+    return tab
+
+
+def create_graph_node(
+    *,
+    tab_id: str,
+    node_type: WorkflowNodeKind,
+    config: dict[str, object] | None = None,
+    actor_id: str,
+) -> tuple[WorkflowNodeDefinition | None, str | None]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None, f"Tab '{tab_id}' not found"
+    node_id = str(uuid.uuid4())
+    node = build_workflow_node_definition(
+        node_id=node_id,
+        node_kind=node_type,
+        config=config,
+    )
+    tab.definition.nodes.append(node)
+    _persist_tab(tab, actor_id=actor_id)
+    return node, None
+
+
 def create_agent_node(
     *,
     role_name: str,
@@ -953,8 +921,9 @@ def create_agent_node(
     write_dirs: list[str] | None = None,
     allow_network: bool = False,
     creator_node_id: str | None = None,
-    connect_to_creator: bool = True,
+    connect_to_creator: bool | None = None,
 ) -> tuple[GraphNodeRecord | None, str | None]:
+    del creator_node_id, connect_to_creator
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
         return None, f"Tab '{tab_id}' not found"
@@ -978,135 +947,262 @@ def create_agent_node(
         config=config,
         state=AgentState.INITIALIZING,
     )
-    return _finalize_agent_creation(
-        record=record,
-        creator_node_id=creator_node_id,
-        connect_to_creator=connect_to_creator,
-    )
-
-
-def _finalize_agent_creation(
-    *,
-    record: GraphNodeRecord,
-    creator_node_id: str | None = None,
-    connect_to_creator: bool = True,
-) -> tuple[GraphNodeRecord | None, str | None]:
     workspace_store.upsert_node_record(record)
-    started_record, error = _start_persisted_agent(record=record)
-    if error is not None or started_record is None:
-        return None, error or "Failed to create agent"
-    should_create_network_edge = (
-        connect_to_creator
-        and creator_node_id is not None
-        and record.config.tab_id is not None
-        and not is_tab_leader(node_id=creator_node_id, tab_id=record.config.tab_id)
+    tab.definition.nodes.append(
+        build_workflow_node_definition(
+            node_id=node_id,
+            node_kind=WorkflowNodeKind.AGENT,
+            config={
+                "role_name": config.role_name or "",
+                **({"name": config.name} if config.name else {}),
+            },
+        )
     )
-    if should_create_network_edge:
-        assert creator_node_id is not None
-        _, edge_error = create_edge(
-            from_node_id=creator_node_id,
-            to_node_id=record.id,
-        )
-        if edge_error is not None:
-            return None, edge_error
-    if record.config.tab_id is not None and not should_create_network_edge:
-        _emit_tab_updated(
-            tab_id=record.config.tab_id,
-            agent_id=creator_node_id or record.id,
-        )
+    workspace_store.upsert_tab(tab)
+    started_record, start_error = _start_persisted_agent(record=record)
+    if start_error is not None or started_record is None:
+        return None, start_error or "Failed to create agent"
+    _emit_tab_updated(tab_id=tab_id, agent_id=node_id)
     return started_record, None
+
+
+def update_tab_definition(
+    *,
+    tab_id: str,
+    definition_payload: dict[str, object],
+    actor_id: str,
+) -> tuple[Tab | None, str | None]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        return None, f"Tab '{tab_id}' not found"
+    next_definition = WorkflowDefinition.from_mapping(definition_payload)
+    node_ids = [node.id for node in next_definition.nodes]
+    if len(node_ids) != len(set(node_ids)):
+        return None, "Workflow definition contains duplicate node ids"
+    edge_ids = [edge.id for edge in next_definition.edges]
+    if len(edge_ids) != len(set(edge_ids)):
+        return None, "Workflow definition contains duplicate edge ids"
+
+    current_agent_ids = {
+        node.id for node in tab.definition.nodes if node.type == WorkflowNodeKind.AGENT
+    }
+    next_agent_ids = {
+        node.id for node in next_definition.nodes if node.type == WorkflowNodeKind.AGENT
+    }
+    if current_agent_ids != next_agent_ids:
+        return None, "Agent nodes must be created or deleted through workflow node APIs"
+
+    current_records = {
+        record.id: record
+        for record in list_tab_nodes(tab_id)
+        if not is_tab_leader(node_id=record.id, tab_id=tab_id)
+    }
+    for node in next_definition.nodes:
+        if node.type != WorkflowNodeKind.AGENT:
+            continue
+        role_name = node.config.get("role_name")
+        if not isinstance(role_name, str) or not role_name.strip():
+            return None, f"Agent node '{node.id}' requires role_name"
+        record = current_records.get(node.id)
+        if record is None:
+            return None, f"Runtime agent '{node.id}' was not found"
+        config, error = build_node_config(
+            role_name=role_name,
+            tab_id=tab_id,
+            name=str(node.config["name"])
+            if isinstance(node.config.get("name"), str)
+            else None,
+            write_dirs=list(record.config.write_dirs),
+            allow_network=record.config.allow_network,
+        )
+        if error is not None or config is None:
+            return None, error or f"Failed to validate agent node '{node.id}'"
+        record.config.role_name = config.role_name
+        record.config.name = config.name
+        record.config.tools = config.tools
+        workspace_store.upsert_node_record(record)
+        live_node = registry.get(node.id)
+        if live_node is not None:
+            live_node.config.role_name = record.config.role_name
+            live_node.config.name = record.config.name
+            live_node.config.tools = list(record.config.tools)
+            live_node._sync_system_prompt_entry()
+            live_node.set_state(
+                live_node.state,
+                "workflow_definition_updated",
+                force_emit=True,
+            )
+
+    seen_target_ports: set[tuple[str, str]] = set()
+    for edge in next_definition.edges:
+        source_node = next_definition.get_node(edge.from_node_id)
+        target_node = next_definition.get_node(edge.to_node_id)
+        if source_node is None:
+            return None, f"Edge source node '{edge.from_node_id}' does not exist"
+        if target_node is None:
+            return None, f"Edge target node '{edge.to_node_id}' does not exist"
+        source_port = _port_matches(
+            source_node.outputs,
+            port_key=edge.from_port_key,
+            direction=PortDirection.OUTPUT,
+            kind=edge.kind,
+        )
+        if source_port is None:
+            return None, f"Output port '{edge.from_port_key}' is invalid"
+        target_port = _port_matches(
+            target_node.inputs,
+            port_key=edge.to_port_key,
+            direction=PortDirection.INPUT,
+            kind=edge.kind,
+        )
+        if target_port is None:
+            return None, f"Input port '{edge.to_port_key}' is invalid"
+        target_key = (edge.to_node_id, edge.to_port_key)
+        if target_key in seen_target_ports and not target_port.multiple:
+            return None, f"Input port '{edge.to_port_key}' already has an incoming edge"
+        seen_target_ports.add(target_key)
+
+    tab.definition = next_definition
+    _persist_tab(tab, actor_id=actor_id)
+    return tab, None
+
+
+def _port_matches(
+    ports: list[WorkflowPort],
+    *,
+    port_key: str,
+    direction: PortDirection,
+    kind: EdgeKind,
+) -> WorkflowPort | None:
+    return next(
+        (
+            port
+            for port in ports
+            if port.key == port_key
+            and port.direction == direction
+            and port.kind == kind
+        ),
+        None,
+    )
 
 
 def create_edge(
     *,
+    tab_id: str | None = None,
     from_node_id: str,
     to_node_id: str,
+    from_port_key: str = "out",
+    to_port_key: str = "in",
+    kind: EdgeKind | str = EdgeKind.CONTROL,
 ) -> tuple[GraphEdge | None, str | None]:
-    source_record = workspace_store.get_node_record(from_node_id)
-    target_record = workspace_store.get_node_record(to_node_id)
-    if source_record is None:
-        return None, f"Node '{from_node_id}' not found"
-    if target_record is None:
-        return None, f"Node '{to_node_id}' not found"
-    if (
-        not source_record.config.tab_id
-        or source_record.config.tab_id != target_record.config.tab_id
+    resolved_kind = kind if isinstance(kind, EdgeKind) else EdgeKind(str(kind))
+    resolved_tab_id = tab_id
+    if resolved_tab_id is None:
+        source_record = workspace_store.get_node_record(from_node_id)
+        target_record = workspace_store.get_node_record(to_node_id)
+        if source_record is not None and source_record.config.tab_id:
+            resolved_tab_id = source_record.config.tab_id
+        elif target_record is not None and target_record.config.tab_id:
+            resolved_tab_id = target_record.config.tab_id
+    if resolved_tab_id is None:
+        return None, "tab_id is required"
+    tab = workspace_store.get_tab(resolved_tab_id)
+    if tab is None:
+        return None, f"Tab '{resolved_tab_id}' not found"
+    if is_tab_leader(node_id=from_node_id, tab_id=resolved_tab_id) or is_tab_leader(
+        node_id=to_node_id,
+        tab_id=resolved_tab_id,
     ):
-        return None, "Both nodes must belong to the same tab"
-    tab_id = source_record.config.tab_id
+        return None, "Tab Leader does not participate in Workflow Graph edges"
     if from_node_id == to_node_id:
         return None, "Self-loop edges are not allowed"
-    if is_tab_leader(node_id=from_node_id, tab_id=tab_id) or is_tab_leader(
-        node_id=to_node_id,
-        tab_id=tab_id,
-    ):
-        return None, "Leader does not participate in Agent Network edges"
-
-    canonical_from_node_id, canonical_to_node_id = _canonical_connection_pair(
-        from_node_id,
-        to_node_id,
+    source_node = tab.definition.get_node(from_node_id)
+    target_node = tab.definition.get_node(to_node_id)
+    if source_node is None:
+        return None, f"Node '{from_node_id}' not found"
+    if target_node is None:
+        return None, f"Node '{to_node_id}' not found"
+    source_port = _port_matches(
+        source_node.outputs,
+        port_key=from_port_key,
+        direction=PortDirection.OUTPUT,
+        kind=resolved_kind,
     )
-
-    for edge in list_tab_edges(tab_id):
-        if _canonical_connection_pair(edge.from_node_id, edge.to_node_id) == (
-            canonical_from_node_id,
-            canonical_to_node_id,
-        ):
-            return None, "Duplicate connections are not allowed"
+    if source_port is None:
+        return None, f"Output port '{from_port_key}' is invalid"
+    target_port = _port_matches(
+        target_node.inputs,
+        port_key=to_port_key,
+        direction=PortDirection.INPUT,
+        kind=resolved_kind,
+    )
+    if target_port is None:
+        return None, f"Input port '{to_port_key}' is invalid"
+    if any(
+        edge.from_node_id == from_node_id
+        and edge.from_port_key == from_port_key
+        and edge.to_node_id == to_node_id
+        and edge.to_port_key == to_port_key
+        and edge.kind == resolved_kind
+        for edge in tab.definition.edges
+    ):
+        return None, "Duplicate edges are not allowed"
+    if not target_port.multiple and any(
+        edge.to_node_id == to_node_id and edge.to_port_key == to_port_key
+        for edge in tab.definition.edges
+    ):
+        return None, f"Input port '{to_port_key}' already has an incoming edge"
 
     edge = GraphEdge(
         id=str(uuid.uuid4()),
-        tab_id=tab_id,
-        from_node_id=canonical_from_node_id,
-        to_node_id=canonical_to_node_id,
+        tab_id=resolved_tab_id,
+        from_node_id=from_node_id,
+        from_port_key=from_port_key,
+        to_node_id=to_node_id,
+        to_port_key=to_port_key,
+        kind=resolved_kind,
     )
-    workspace_store.upsert_edge(edge)
-
-    source = registry.get(canonical_from_node_id)
-    target = registry.get(canonical_to_node_id)
-    if source is not None and target is not None:
-        connect_nodes(canonical_from_node_id, canonical_to_node_id)
-    _emit_tab_updated(
-        tab_id=edge.tab_id,
-        agent_id=canonical_from_node_id,
-    )
+    tab.definition.edges.append(edge)
+    _persist_tab(tab, actor_id=from_node_id)
     return edge, None
 
 
 def delete_edge(
     *,
     tab_id: str,
-    from_node_id: str,
-    to_node_id: str,
+    edge_id: str | None = None,
+    from_node_id: str | None = None,
+    to_node_id: str | None = None,
+    from_port_key: str | None = None,
+    to_port_key: str | None = None,
 ) -> tuple[dict[str, object] | None, str | None]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
         return None, f"Tab '{tab_id}' not found"
 
-    edge_key = _canonical_connection_pair(from_node_id, to_node_id)
-    edge = next(
-        (
-            item
-            for item in list_tab_edges(tab_id)
-            if _canonical_connection_pair(item.from_node_id, item.to_node_id)
-            == edge_key
-        ),
-        None,
-    )
-    if edge is None:
+    matched_edge: GraphEdge | None = None
+    for edge in tab.definition.edges:
+        if edge_id is not None and edge.id == edge_id:
+            matched_edge = edge
+            break
+        if (
+            from_node_id is not None
+            and to_node_id is not None
+            and edge.from_node_id == from_node_id
+            and edge.to_node_id == to_node_id
+            and (from_port_key is None or edge.from_port_key == from_port_key)
+            and (to_port_key is None or edge.to_port_key == to_port_key)
+        ):
+            matched_edge = edge
+            break
+    if matched_edge is None:
         return None, "Edge not found"
 
-    live_source = registry.get(edge.from_node_id)
-    live_target = registry.get(edge.to_node_id)
-    if live_source is not None and live_target is not None:
-        disconnect_nodes(edge.from_node_id, edge.to_node_id)
-
-    workspace_store.delete_edge(edge.id)
-    _emit_tab_updated(
-        tab_id=tab_id,
-        agent_id=edge.from_node_id,
-    )
-    return edge.serialize(), None
+    tab.definition.edges = [
+        edge for edge in tab.definition.edges if edge.id != matched_edge.id
+    ]
+    _persist_tab(tab, actor_id=matched_edge.from_node_id)
+    return matched_edge.serialize(), None
 
 
 def delete_agent_node(
@@ -1119,25 +1215,19 @@ def delete_agent_node(
     if tab is None:
         return None, f"Tab '{tab_id}' not found"
 
-    record = workspace_store.get_node_record(node_id)
-    if record is None or record.config.tab_id != tab_id:
+    node_definition = tab.definition.get_node(node_id)
+    if node_definition is None:
         return None, f"Node '{node_id}' not found"
-    if record.config.node_type == NodeType.ASSISTANT:
-        return None, "Assistant does not belong to task tabs"
     if is_tab_leader(node_id=node_id, tab_id=tab_id):
         return None, "Tab Leader cannot be deleted from the graph"
 
     related_edges = [
         edge
-        for edge in workspace_store.list_edges(tab_id)
+        for edge in tab.definition.edges
         if edge.from_node_id == node_id or edge.to_node_id == node_id
     ]
     live_node = registry.get(node_id)
-
-    for edge in related_edges:
-        if registry.get(edge.from_node_id) is None:
-            continue
-        disconnect_nodes(edge.from_node_id, edge.to_node_id)
+    record = workspace_store.get_node_record(node_id)
 
     if live_node is not None:
         live_node.request_termination("graph_deleted")
@@ -1147,7 +1237,17 @@ def delete_agent_node(
                 f"Failed to delete node '{node_id}' because it did not terminate",
             )
 
-    workspace_store.delete_node_record(node_id)
+    if record is not None:
+        workspace_store.delete_node_record(node_id)
+
+    tab.definition.nodes = [node for node in tab.definition.nodes if node.id != node_id]
+    tab.definition.edges = [
+        edge
+        for edge in tab.definition.edges
+        if edge.id not in {item.id for item in related_edges}
+    ]
+    tab.definition.view.positions.pop(node_id, None)
+    workspace_store.upsert_tab(tab)
     payload: dict[str, object] = {
         "id": node_id,
         "tab_id": tab_id,
@@ -1193,55 +1293,40 @@ def dispatch_node_message(
 
 
 def list_tab_nodes(tab_id: str) -> list[GraphNodeRecord]:
-    return workspace_store.list_node_records(tab_id)
+    return sorted(
+        workspace_store.list_node_records(tab_id),
+        key=lambda record: (record.created_at, record.id),
+    )
 
 
 def list_tab_edges(tab_id: str) -> list[GraphEdge]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
         return []
-
-    edges = sorted(
-        workspace_store.list_edges(tab_id),
-        key=lambda edge: (edge.created_at, edge.id),
-    )
-    seen_pairs: set[tuple[str, str]] = set()
-    normalized_edges: list[GraphEdge] = []
-
-    for edge in edges:
-        if tab.leader_id and (
-            edge.from_node_id == tab.leader_id or edge.to_node_id == tab.leader_id
-        ):
-            continue
-        if edge.from_node_id == edge.to_node_id:
-            continue
-        canonical_from_node_id, canonical_to_node_id = _canonical_connection_pair(
-            edge.from_node_id,
-            edge.to_node_id,
-        )
-        edge_key = (canonical_from_node_id, canonical_to_node_id)
-        if edge_key in seen_pairs:
-            continue
-        seen_pairs.add(edge_key)
-        normalized_edges.append(
+    return sorted(
+        [
             GraphEdge(
                 id=edge.id,
-                tab_id=edge.tab_id,
-                from_node_id=canonical_from_node_id,
-                to_node_id=canonical_to_node_id,
+                tab_id=tab_id,
+                from_node_id=edge.from_node_id,
+                from_port_key=edge.from_port_key,
+                to_node_id=edge.to_node_id,
+                to_port_key=edge.to_port_key,
+                kind=edge.kind,
                 created_at=edge.created_at,
             )
-        )
-
-    return normalized_edges
+            for edge in tab.definition.edges
+        ],
+        key=lambda edge: (edge.created_at, edge.id),
+    )
 
 
 def list_node_connection_ids(*, tab_id: str, node_id: str) -> list[str]:
     if is_tab_leader(node_id=node_id, tab_id=tab_id):
         return []
 
-    seen_node_ids: set[str] = set()
     connection_ids: list[str] = []
+    seen_node_ids: set[str] = set()
     for edge in list_tab_edges(tab_id):
         other_node_id: str | None = None
         if edge.from_node_id == node_id:

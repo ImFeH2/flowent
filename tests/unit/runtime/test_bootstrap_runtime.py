@@ -599,7 +599,7 @@ def test_bootstrap_runtime_restores_active_nodes_as_idle(
         _stop_all_agents()
 
 
-def test_bootstrap_runtime_restores_only_normalized_tab_connections(
+def test_bootstrap_runtime_restores_workflow_definition_without_runtime_connections(
     monkeypatch,
     tmp_path,
 ):
@@ -720,13 +720,26 @@ def test_bootstrap_runtime_restores_only_normalized_tab_connections(
         leader = registry.get("leader-1")
         left = registry.get("node-a")
         right = registry.get("node-b")
+        restored_tab = workspace_store.get_tab("tab-1")
 
         assert leader is not None
         assert left is not None
         assert right is not None
+        assert restored_tab is not None
         assert leader.get_connections_snapshot() == []
-        assert left.get_connections_snapshot() == ["node-b"]
-        assert right.get_connections_snapshot() == ["node-a"]
+        assert left.get_connections_snapshot() == []
+        assert right.get_connections_snapshot() == []
+        assert {node.id for node in restored_tab.definition.nodes} == {
+            "node-a",
+            "node-b",
+        }
+        assert {
+            (edge.from_node_id, edge.to_node_id)
+            for edge in restored_tab.definition.edges
+        } == {
+            ("node-a", "node-b"),
+            ("node-b", "node-a"),
+        }
     finally:
         registry.reset()
 

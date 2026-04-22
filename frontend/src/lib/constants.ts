@@ -1,9 +1,13 @@
-import { Bot, Shield } from "lucide-react";
+import { Bot, Code2, GitBranch, Play, Shield } from "lucide-react";
 import { type AgentState, type NodeType } from "@/types";
 
 export const nodeTypeIcon = {
   assistant: Shield,
   agent: Bot,
+  trigger: Play,
+  code: Code2,
+  if: GitBranch,
+  merge: Bot,
 } as const;
 
 export function getNodeLabel({
@@ -20,7 +24,19 @@ export function getNodeLabel({
   return (
     name ??
     roleName ??
-    (nodeType === "assistant" ? "Assistant" : isLeader ? "Leader" : "Agent")
+    (nodeType === "assistant"
+      ? "Assistant"
+      : nodeType === "trigger"
+        ? "Trigger"
+        : nodeType === "code"
+          ? "Code"
+          : nodeType === "if"
+            ? "If"
+            : nodeType === "merge"
+              ? "Merge"
+              : isLeader
+                ? "Leader"
+                : "Agent")
   );
 }
 

@@ -80,13 +80,7 @@ function buildActiveTab(): TaskTab {
     leader_id: "leader",
     created_at: 1,
     updated_at: 1,
-    network_source: {
-      state: "manual",
-      blueprint_id: null,
-      blueprint_name: null,
-      blueprint_version: null,
-      blueprint_available: false,
-    },
+    definition: { version: 1, nodes: [], edges: [] },
     node_count: 1,
     edge_count: 0,
   };

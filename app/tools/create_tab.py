@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 
 class CreateTabTool(Tool):
     name = "create_tab"
-    description = "Create a new task tab with its bound Leader and Agent Network."
+    description = (
+        "Create a new workflow with its bound Leader and empty Workflow Graph."
+    )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -33,10 +35,6 @@ class CreateTabTool(Tool):
                 "items": {"type": "string"},
                 "description": "List of directory paths the tab's leader is allowed to write to",
             },
-            "blueprint_id": {
-                "type": "string",
-                "description": "Optional global Agent Blueprint ID to materialize as the tab's initial Agent Network",
-            },
         },
         "required": ["title"],
     }
@@ -46,7 +44,6 @@ class CreateTabTool(Tool):
         goal = args.get("goal", "")
         allow_network = args.get("allow_network", False)
         write_dirs = args.get("write_dirs", [])
-        blueprint_id = args.get("blueprint_id")
         if not isinstance(title, str) or not title.strip():
             return json.dumps({"error": "title must be a non-empty string"})
         if not isinstance(goal, str):
@@ -57,8 +54,6 @@ class CreateTabTool(Tool):
             isinstance(x, str) for x in write_dirs
         ):
             return json.dumps({"error": "write_dirs must be a list of strings"})
-        if blueprint_id is not None and not isinstance(blueprint_id, str):
-            return json.dumps({"error": "blueprint_id must be a string"})
 
         try:
             tab = create_tab(
@@ -66,7 +61,6 @@ class CreateTabTool(Tool):
                 goal=goal,
                 allow_network=allow_network,
                 write_dirs=write_dirs,
-                blueprint_id=blueprint_id,
             )
         except ValueError as exc:
             return json.dumps({"error": str(exc)})

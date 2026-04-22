@@ -223,7 +223,7 @@ def test_contacts_tool_uses_agent_public_api(monkeypatch):
     assert result == {"contacts": expected}
 
 
-def test_agent_get_contacts_info_includes_leader_without_explicit_edge():
+def test_agent_get_contacts_info_keeps_only_leader_for_regular_agents():
     registry.reset()
     workspace_store.reset_cache()
     workspace_store.upsert_tab(
@@ -270,14 +270,6 @@ def test_agent_get_contacts_info_includes_leader_without_explicit_edge():
                 "name": "Leader",
                 "state": "initializing",
                 "is_leader": True,
-            },
-            {
-                "id": "agent-b",
-                "node_type": "agent",
-                "role_name": "Worker",
-                "name": "Worker",
-                "state": "initializing",
-                "is_leader": False,
             },
         ]
     finally:
@@ -329,7 +321,7 @@ def test_agent_get_contacts_info_keeps_leader_stable_when_explicitly_connected()
         workspace_store.reset_cache()
 
 
-def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
+def test_agent_get_contacts_info_ignores_peer_only_connections():
     registry.reset()
     workspace_store.reset_cache()
     workspace_store.upsert_tab(
@@ -376,14 +368,6 @@ def test_agent_get_contacts_info_includes_peer_with_only_incoming_edge():
                 "name": "Leader",
                 "state": "initializing",
                 "is_leader": True,
-            },
-            {
-                "id": "agent-b",
-                "node_type": "agent",
-                "role_name": "Reviewer",
-                "name": "Reviewer",
-                "state": "initializing",
-                "is_leader": False,
             },
         ]
     finally:

@@ -60,7 +60,6 @@ describe("Sidebar", () => {
     ).toEqual([
       "Assistant",
       "Workspace",
-      "Blueprints",
       "Providers",
       "Roles",
       "Prompts",

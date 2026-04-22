@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Shield,
-  BookCopy,
   ChartNoAxesCombined,
   LayoutDashboard,
   MessageSquareQuote,
@@ -23,7 +22,6 @@ export interface PageNavigationItem {
 export const PAGE_NAVIGATION_ITEMS: PageNavigationItem[] = [
   { id: "assistant", label: "Assistant", icon: Shield },
   { id: "workspace", label: "Workspace", icon: LayoutDashboard },
-  { id: "blueprints", label: "Blueprints", icon: BookCopy },
   { id: "providers", label: "Providers", icon: Server },
   { id: "roles", label: "Roles", icon: Users },
   { id: "prompts", label: "Prompts", icon: MessageSquareQuote },

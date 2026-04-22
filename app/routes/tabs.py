@@ -6,16 +6,20 @@ from pydantic import BaseModel, ConfigDict
 from app.graph_service import (
     create_agent_node,
     create_edge,
+    create_graph_node,
     create_tab,
     delete_agent_node,
     delete_edge,
     delete_tab,
-    is_tab_leader,
+    duplicate_tab,
     list_node_connection_ids,
     list_tab_edges,
-    list_tab_nodes,
+    list_workflow_nodes,
     serialize_tab_summary,
+    update_tab_definition,
 )
+from app.models import AgentState, EdgeKind, WorkflowNodeKind
+from app.registry import registry
 from app.workspace_store import workspace_store
 
 router = APIRouter()
@@ -27,20 +31,77 @@ class CreateTabRequest(BaseModel):
     goal: str = ""
     allow_network: bool = False
     write_dirs: list[str] = []
-    blueprint_id: str | None = None
 
 
 class CreateTabNodeRequest(BaseModel):
-    role_name: str
+    model_config = ConfigDict(extra="forbid")
+    node_type: str = WorkflowNodeKind.AGENT.value
+    role_name: str | None = None
     name: str | None = None
+    config: dict[str, object] = {}
     tools: list[str] = []
     write_dirs: list[str] = []
     allow_network: bool = False
 
 
 class CreateTabEdgeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     from_node_id: str
+    from_port_key: str = "out"
     to_node_id: str
+    to_port_key: str = "in"
+    kind: str = EdgeKind.CONTROL.value
+
+
+class UpdateTabDefinitionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    definition: dict[str, object]
+
+
+def _serialize_workflow_node(
+    *,
+    tab_id: str,
+    node_id: str,
+) -> dict[str, object]:
+    tab = workspace_store.get_tab(tab_id)
+    if tab is None:
+        raise HTTPException(status_code=404, detail="Tab not found")
+    definition = tab.definition.get_node(node_id)
+    if definition is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+    record = workspace_store.get_node_record(node_id)
+    live_node = registry.get(node_id)
+    config = dict(definition.config)
+    role_name = config.get("role_name")
+    name = config.get("name")
+    position = tab.definition.view.positions.get(node_id)
+    todos = (
+        [todo.serialize() for todo in live_node.get_todos_snapshot()]
+        if live_node is not None
+        else [todo.serialize() for todo in (record.todos if record is not None else [])]
+    )
+    state = (
+        live_node.state.value
+        if live_node is not None
+        else (record.state.value if record is not None else AgentState.IDLE.value)
+    )
+    return {
+        "id": definition.id,
+        "node_type": definition.type.value,
+        "tab_id": tab_id,
+        "role_name": role_name if isinstance(role_name, str) else None,
+        "is_leader": False,
+        "state": state,
+        "connections": list_node_connection_ids(tab_id=tab_id, node_id=definition.id)
+        if definition.type == WorkflowNodeKind.AGENT
+        else [],
+        "name": name if isinstance(name, str) else None,
+        "todos": todos if definition.type == WorkflowNodeKind.AGENT else [],
+        "position": position.serialize() if position is not None else None,
+        "config": config,
+        "inputs": [port.serialize() for port in definition.inputs],
+        "outputs": [port.serialize() for port in definition.outputs],
+    }
 
 
 @router.get("/api/tabs")
@@ -60,11 +121,21 @@ async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
             goal=req.goal,
             allow_network=req.allow_network,
             write_dirs=req.write_dirs,
-            blueprint_id=req.blueprint_id,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_tab_summary(tab)
+
+
+@router.post("/api/tabs/{tab_id}/duplicate")
+async def duplicate_tab_route(tab_id: str) -> dict[str, object]:
+    duplicated, error = duplicate_tab(tab_id=tab_id)
+    if error is not None or duplicated is None:
+        raise HTTPException(
+            status_code=404 if error and error.endswith("not found") else 400,
+            detail=error or "Failed to duplicate workflow",
+        )
+    return serialize_tab_summary(duplicated)
 
 
 @router.get("/api/tabs/{tab_id}")
@@ -73,32 +144,33 @@ async def get_tab(tab_id: str) -> dict[str, object]:
     if tab is None:
         raise HTTPException(status_code=404, detail="Tab not found")
     nodes = [
-        node
-        for node in list_tab_nodes(tab_id)
-        if not is_tab_leader(node_id=node.id, tab_id=tab_id)
+        _serialize_workflow_node(tab_id=tab_id, node_id=node.id)
+        for node in list_workflow_nodes(tab_id)
     ]
-    edges = list_tab_edges(tab_id)
+    edges = [edge.serialize() for edge in list_tab_edges(tab_id)]
     return {
         "tab": serialize_tab_summary(tab),
-        "nodes": [
-            {
-                "id": node.id,
-                "node_type": node.config.node_type.value,
-                "tab_id": node.config.tab_id,
-                "role_name": node.config.role_name,
-                "is_leader": False,
-                "state": node.state.value,
-                "connections": list_node_connection_ids(tab_id=tab_id, node_id=node.id),
-                "name": node.config.name,
-                "todos": [todo.serialize() for todo in node.todos],
-                "position": node.position.serialize()
-                if node.position is not None
-                else None,
-            }
-            for node in nodes
-        ],
-        "edges": [edge.serialize() for edge in edges],
+        "nodes": nodes,
+        "edges": edges,
     }
+
+
+@router.put("/api/tabs/{tab_id}/definition")
+async def update_tab_definition_route(
+    tab_id: str,
+    req: UpdateTabDefinitionRequest,
+) -> dict[str, object]:
+    updated, error = update_tab_definition(
+        tab_id=tab_id,
+        definition_payload=req.definition,
+        actor_id=tab_id,
+    )
+    if error is not None or updated is None:
+        raise HTTPException(
+            status_code=400 if error and not error.endswith("not found") else 404,
+            detail=error or "Failed to update workflow definition",
+        )
+    return serialize_tab_summary(updated)
 
 
 @router.delete("/api/tabs/{tab_id}")
@@ -114,17 +186,44 @@ async def delete_tab_route(tab_id: str) -> dict[str, object]:
 
 @router.post("/api/tabs/{tab_id}/nodes")
 async def create_tab_node(tab_id: str, req: CreateTabNodeRequest) -> dict[str, object]:
-    record, error = create_agent_node(
-        role_name=req.role_name,
+    try:
+        node_type = WorkflowNodeKind(req.node_type.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid node_type") from exc
+
+    if node_type == WorkflowNodeKind.AGENT:
+        if not isinstance(req.role_name, str) or not req.role_name.strip():
+            raise HTTPException(status_code=400, detail="role_name is required")
+        record, error = create_agent_node(
+            role_name=req.role_name,
+            tab_id=tab_id,
+            name=req.name,
+            tools=req.tools,
+            write_dirs=req.write_dirs,
+            allow_network=req.allow_network,
+        )
+        if error is not None or record is None:
+            raise HTTPException(
+                status_code=400, detail=error or "Failed to create node"
+            )
+        return _serialize_workflow_node(tab_id=tab_id, node_id=record.id)
+
+    node, error = create_graph_node(
         tab_id=tab_id,
-        name=req.name,
-        tools=req.tools,
-        write_dirs=req.write_dirs,
-        allow_network=req.allow_network,
+        node_type=node_type,
+        config={
+            **req.config,
+            **(
+                {"name": req.name}
+                if isinstance(req.name, str) and req.name.strip()
+                else {}
+            ),
+        },
+        actor_id=tab_id,
     )
-    if error is not None or record is None:
+    if error is not None or node is None:
         raise HTTPException(status_code=400, detail=error or "Failed to create node")
-    return record.serialize()
+    return _serialize_workflow_node(tab_id=tab_id, node_id=node.id)
 
 
 @router.post("/api/tabs/{tab_id}/edges")
@@ -132,9 +231,17 @@ async def create_tab_edge(tab_id: str, req: CreateTabEdgeRequest) -> dict[str, o
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
         raise HTTPException(status_code=404, detail="Tab not found")
+    try:
+        edge_kind = EdgeKind(req.kind.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid edge kind") from exc
     edge, error = create_edge(
+        tab_id=tab_id,
         from_node_id=req.from_node_id,
+        from_port_key=req.from_port_key,
         to_node_id=req.to_node_id,
+        to_port_key=req.to_port_key,
+        kind=edge_kind,
     )
     if error is not None or edge is None:
         raise HTTPException(status_code=400, detail=error or "Failed to create edge")
@@ -158,13 +265,19 @@ async def delete_tab_node(tab_id: str, node_id: str) -> dict[str, object]:
 @router.delete("/api/tabs/{tab_id}/edges")
 async def delete_tab_edge(
     tab_id: str,
-    from_node_id: str,
-    to_node_id: str,
+    edge_id: str | None = None,
+    from_node_id: str | None = None,
+    to_node_id: str | None = None,
+    from_port_key: str | None = None,
+    to_port_key: str | None = None,
 ) -> dict[str, object]:
     deleted, error = delete_edge(
         tab_id=tab_id,
+        edge_id=edge_id,
         from_node_id=from_node_id,
         to_node_id=to_node_id,
+        from_port_key=from_port_key,
+        to_port_key=to_port_key,
     )
     if error is not None or deleted is None:
         status_code = 404 if error and error.endswith("not found") else 400

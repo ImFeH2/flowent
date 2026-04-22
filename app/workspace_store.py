@@ -10,7 +10,10 @@ from app.models import (
     BlueprintVersionSummary,
     GraphEdge,
     GraphNodeRecord,
+    NodeType,
     Tab,
+    WorkflowDefinition,
+    WorkflowNodeKind,
 )
 from app.state_db import get_legacy_workspace_file_path, open_state_db
 
@@ -34,6 +37,8 @@ class WorkspaceSnapshot:
 
     @classmethod
     def from_mapping(cls, data: dict[str, object]) -> WorkspaceSnapshot:
+        from app.graph_service import build_workflow_node_definition
+
         raw_tabs = data.get("tabs")
         raw_nodes = data.get("nodes")
         raw_edges = data.get("edges")
@@ -71,6 +76,59 @@ class WorkspaceSnapshot:
             )
             if blueprint.id
         }
+        for tab in tabs.values():
+            if not isinstance(tab.definition, WorkflowDefinition):
+                tab.definition = WorkflowDefinition()
+            tab_node_records = sorted(
+                [
+                    node
+                    for node in nodes.values()
+                    if node.config.tab_id == tab.id and tab.leader_id != node.id
+                ],
+                key=lambda node: (node.created_at, node.id),
+            )
+            if not tab.definition.nodes:
+                migrated_nodes = []
+                for node in tab_node_records:
+                    if node.config.node_type != NodeType.AGENT:
+                        continue
+                    migrated_nodes.append(
+                        build_workflow_node_definition(
+                            node_id=node.id,
+                            node_kind=WorkflowNodeKind.AGENT,
+                            config={
+                                "role_name": node.config.role_name or "",
+                                **(
+                                    {"name": node.config.name}
+                                    if node.config.name is not None
+                                    else {}
+                                ),
+                            },
+                        )
+                    )
+                tab.definition.nodes = migrated_nodes
+            known_node_ids = {node.id for node in tab.definition.nodes}
+            if not tab.definition.edges:
+                tab.definition.edges = [
+                    GraphEdge(
+                        id=edge.id,
+                        tab_id=tab.id,
+                        from_node_id=edge.from_node_id,
+                        from_port_key=edge.from_port_key,
+                        to_node_id=edge.to_node_id,
+                        to_port_key=edge.to_port_key,
+                        kind=edge.kind,
+                        created_at=edge.created_at,
+                    )
+                    for edge in edges.values()
+                    if edge.tab_id == tab.id
+                    and edge.from_node_id in known_node_ids
+                    and edge.to_node_id in known_node_ids
+                ]
+            for node in tab_node_records:
+                if node.position is None:
+                    continue
+                tab.definition.view.positions[node.id] = node.position
         return cls(tabs=tabs, nodes=nodes, edges=edges, blueprints=blueprints)
 
 
@@ -199,7 +257,20 @@ class WorkspaceStore:
                             json.dumps(edge.serialize(), ensure_ascii=False),
                             edge.tab_id,
                         )
-                        for edge in snapshot.edges.values()
+                        for tab in snapshot.tabs.values()
+                        for edge in (
+                            GraphEdge(
+                                id=item.id,
+                                tab_id=tab.id,
+                                from_node_id=item.from_node_id,
+                                from_port_key=item.from_port_key,
+                                to_node_id=item.to_node_id,
+                                to_port_key=item.to_port_key,
+                                kind=item.kind,
+                                created_at=item.created_at,
+                            )
+                            for item in tab.definition.edges
+                        )
                     ],
                 )
                 connection.executemany(
@@ -296,31 +367,73 @@ class WorkspaceStore:
 
     def list_edges(self, tab_id: str | None = None) -> list[GraphEdge]:
         with self._lock:
-            edges = list(self._load_snapshot().edges.values())
-            if tab_id is None:
-                return edges
-            return [edge for edge in edges if edge.tab_id == tab_id]
+            snapshot = self._load_snapshot()
+            result: list[GraphEdge] = []
+            for tab in snapshot.tabs.values():
+                if tab_id is not None and tab.id != tab_id:
+                    continue
+                result.extend(
+                    GraphEdge(
+                        id=edge.id,
+                        tab_id=tab.id,
+                        from_node_id=edge.from_node_id,
+                        from_port_key=edge.from_port_key,
+                        to_node_id=edge.to_node_id,
+                        to_port_key=edge.to_port_key,
+                        kind=edge.kind,
+                        created_at=edge.created_at,
+                    )
+                    for edge in tab.definition.edges
+                )
+            return result
 
     def get_edge(self, edge_id: str) -> GraphEdge | None:
         with self._lock:
-            return self._load_snapshot().edges.get(edge_id)
+            snapshot = self._load_snapshot()
+            for tab in snapshot.tabs.values():
+                edge = next(
+                    (item for item in tab.definition.edges if item.id == edge_id),
+                    None,
+                )
+                if edge is None:
+                    continue
+                return GraphEdge(
+                    id=edge.id,
+                    tab_id=tab.id,
+                    from_node_id=edge.from_node_id,
+                    from_port_key=edge.from_port_key,
+                    to_node_id=edge.to_node_id,
+                    to_port_key=edge.to_port_key,
+                    kind=edge.kind,
+                    created_at=edge.created_at,
+                )
+            return None
 
     def upsert_edge(self, edge: GraphEdge) -> None:
         with self._lock:
             snapshot = self._load_snapshot()
-            snapshot.edges[edge.id] = edge
-            if edge.tab_id in snapshot.tabs:
-                snapshot.tabs[edge.tab_id].updated_at = time.time()
+            if edge.tab_id is None or edge.tab_id not in snapshot.tabs:
+                return
+            tab = snapshot.tabs[edge.tab_id]
+            tab.definition.edges = [
+                item for item in tab.definition.edges if item.id != edge.id
+            ]
+            tab.definition.edges.append(edge)
+            tab.updated_at = time.time()
             self._persist_snapshot(snapshot)
 
     def delete_edge(self, edge_id: str) -> None:
         with self._lock:
             snapshot = self._load_snapshot()
-            edge = snapshot.edges.pop(edge_id, None)
-            if edge is None:
-                return
-            if edge.tab_id in snapshot.tabs:
-                snapshot.tabs[edge.tab_id].updated_at = time.time()
+            for tab in snapshot.tabs.values():
+                original_size = len(tab.definition.edges)
+                tab.definition.edges = [
+                    edge for edge in tab.definition.edges if edge.id != edge_id
+                ]
+                if len(tab.definition.edges) == original_size:
+                    continue
+                tab.updated_at = time.time()
+                break
             self._persist_snapshot(snapshot)
 
     def list_blueprints(self) -> list[AgentBlueprint]:

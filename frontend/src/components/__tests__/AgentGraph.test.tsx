@@ -7,17 +7,15 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Edge as FlowEdge, Node as FlowNode } from "@xyflow/react";
 import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
 import { getAgentGraphLayoutedElements } from "@/lib/agentGraphLayout";
-import type { Node, TaskTab } from "@/types";
+import type { Node, TaskTab, WorkflowDefinition } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 const getZoomMock = vi.fn(() => 1);
-const terminateNodeMock = vi.fn().mockResolvedValue(undefined);
 const useAgentNodesRuntimeMock = vi.fn();
 const useAgentTabsRuntimeMock = vi.fn();
 const useAgentActivityRuntimeMock = vi.fn();
@@ -85,10 +83,6 @@ vi.mock("@/context/AgentContext", () => ({
   useAgentUI: () => useAgentUIMock(),
 }));
 
-vi.mock("@/lib/api", () => ({
-  terminateNode: (...args: unknown[]) => terminateNodeMock(...args),
-}));
-
 vi.mock("@xyflow/react", async () => {
   const react = await import("react");
   type MockNodeComponentProps = {
@@ -116,8 +110,6 @@ vi.mock("@xyflow/react", async () => {
     onConnectStart,
     onConnectEnd,
     onMove,
-    onNodeContextMenu,
-    onPaneContextMenu,
     isValidConnection,
     nodesDraggable,
     nodesConnectable,
@@ -151,18 +143,23 @@ vi.mock("@xyflow/react", async () => {
     onNodeMouseEnter?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseMove?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseLeave?: (event: React.MouseEvent, node: { id: string }) => void;
-    onConnect?: (connection: { source: string; target: string }) => void;
+    onConnect?: (connection: {
+      source: string;
+      target: string;
+      sourceHandle: string;
+      targetHandle: string;
+    }) => void;
     onConnectStart?: () => void;
     onConnectEnd?: (...args: unknown[]) => void;
     onMove?: (
       event: MouseEvent | TouchEvent | null,
       viewport: { x: number; y: number; zoom: number },
     ) => void;
-    onNodeContextMenu?: (event: React.MouseEvent, node: { id: string }) => void;
-    onPaneContextMenu?: (event: React.MouseEvent) => void;
     isValidConnection?: (connection: {
       source?: string;
       target?: string;
+      sourceHandle?: string;
+      targetHandle?: string;
     }) => boolean;
     nodesDraggable?: boolean;
     nodesConnectable?: boolean;
@@ -198,7 +195,12 @@ vi.mock("@xyflow/react", async () => {
       if (!sourceId || !targetId) {
         return;
       }
-      const connection = { source: sourceId, target: targetId };
+      const connection = {
+        source: sourceId,
+        target: targetId,
+        sourceHandle: "out",
+        targetHandle: "in",
+      };
       if (isValidConnection && !isValidConnection(connection)) {
         return;
       }
@@ -206,10 +208,7 @@ vi.mock("@xyflow/react", async () => {
     };
 
     return (
-      <div
-        data-testid="react-flow"
-        onContextMenu={(event) => onPaneContextMenu?.(event)}
-      >
+      <div data-testid="react-flow">
         <button
           data-testid="connect-start"
           onClick={() => onConnectStart?.()}
@@ -224,24 +223,8 @@ vi.mock("@xyflow/react", async () => {
           onClick={() => emitConnection(0, 1)}
         />
         <button
-          data-testid="connect-second-to-first"
-          onClick={() => emitConnection(1, 0)}
-        />
-        <button
           data-testid="connect-first-to-last"
           onClick={() => emitConnection(0, nodes.length - 1)}
-        />
-        <button
-          data-testid="connect-end-empty-first"
-          onClick={() =>
-            onConnectEnd?.(
-              { clientX: 320, clientY: 240 } as unknown as React.MouseEvent,
-              {
-                fromNode: nodes[0] ? { id: nodes[0].id } : null,
-                toNode: null,
-              },
-            )
-          }
         />
         <button
           data-testid="move-zoom-142"
@@ -258,11 +241,6 @@ vi.mock("@xyflow/react", async () => {
               onMouseEnter={(event) => onNodeMouseEnter?.(event, node)}
               onMouseMove={(event) => onNodeMouseMove?.(event, node)}
               onMouseLeave={(event) => onNodeMouseLeave?.(event, node)}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onNodeContextMenu?.(event, node);
-              }}
             >
               <Component
                 data={node.data}
@@ -327,7 +305,74 @@ function buildNode(overrides: Partial<Node>): Node {
   };
 }
 
-function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
+function buildDefinition(nodes: Node[]): WorkflowDefinition {
+  return {
+    version: 1,
+    nodes: nodes
+      .filter(
+        (node) =>
+          node.tab_id === "tab-1" &&
+          node.node_type !== "assistant" &&
+          !node.is_leader,
+      )
+      .map((node) => ({
+        id: node.id,
+        type: (node.node_type === "agent"
+          ? "agent"
+          : node.node_type) as Exclude<Node["node_type"], "assistant">,
+        config: {
+          ...(node.name ? { name: node.name } : {}),
+          ...(node.role_name ? { role_name: node.role_name } : {}),
+        },
+        inputs: [
+          {
+            key: "in",
+            direction: "input" as const,
+            kind: "control" as const,
+            required: false,
+            multiple: false,
+          },
+        ],
+        outputs: [
+          {
+            key: "out",
+            direction: "output" as const,
+            kind: "control" as const,
+            required: false,
+            multiple: true,
+          },
+        ],
+      })),
+    edges: Array.from(
+      new Map(
+        nodes
+          .filter(
+            (node) =>
+              node.tab_id === "tab-1" &&
+              node.node_type !== "assistant" &&
+              !node.is_leader,
+          )
+          .flatMap((node) =>
+            node.connections
+              .filter((targetId) => targetId !== node.id)
+              .map((targetId) => [
+                `${node.id}->${targetId}`,
+                {
+                  id: `${node.id}->${targetId}`,
+                  from_node_id: node.id,
+                  from_port_key: "out",
+                  to_node_id: targetId,
+                  to_port_key: "in",
+                  kind: "control" as const,
+                },
+              ]),
+          ),
+      ).values(),
+    ),
+  };
+}
+
+function buildTab(nodes: Node[], overrides: Partial<TaskTab> = {}): TaskTab {
   return {
     id: "tab-1",
     title: "Research Task",
@@ -335,13 +380,7 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     leader_id: "leader-1",
     created_at: 1,
     updated_at: 1,
-    network_source: {
-      state: "manual",
-      blueprint_id: null,
-      blueprint_name: null,
-      blueprint_version: null,
-      blueprint_available: false,
-    },
+    definition: overrides.definition ?? buildDefinition(nodes),
     ...overrides,
   };
 }
@@ -357,15 +396,17 @@ function renderGraph(
       tabId: string,
       sourceNodeId: string,
       targetNodeId: string,
+      sourcePortKey?: string,
+      targetPortKey?: string,
     ) => Promise<void>;
   },
 ) {
   useAgentNodesRuntimeMock.mockReturnValue({
-    agents: new Map(nodes.map((node) => [node.id, node])),
+    agents: new Map(nodes.map((node) => [node.id, node] as const)),
   });
   useAgentTabsRuntimeMock.mockReturnValue({
     tabs: new Map(
-      (options?.tabs ?? [buildTab()]).map((tab) => [tab.id, tab] as const),
+      (options?.tabs ?? [buildTab(nodes)]).map((tab) => [tab.id, tab] as const),
     ),
   });
   useAgentActivityRuntimeMock.mockReturnValue({
@@ -387,7 +428,7 @@ function renderGraph(
 }
 
 function expectConnectionHandlesHidden(node: HTMLElement) {
-  for (const handleId of ["handle-source-left", "handle-source-right"]) {
+  for (const handleId of ["handle-target-left", "handle-source-right"]) {
     expect(within(node).getByTestId(handleId)).toHaveClass("!opacity-0");
   }
 }
@@ -412,7 +453,6 @@ beforeEach(() => {
   fitViewMock.mockClear();
   getZoomMock.mockClear();
   getZoomMock.mockReturnValue(1);
-  terminateNodeMock.mockClear();
   reactFlowPropsMock.mockClear();
   resizeObservers.splice(0, resizeObservers.length);
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
@@ -426,105 +466,28 @@ afterEach(() => {
 });
 
 describe("AgentGraph", () => {
-  it("renders active tab agent nodes using role_name", async () => {
+  it("renders workflow nodes from the active tab definition and hides assistants", async () => {
     renderGraph([
       buildNode({
         id: "assistant",
         node_type: "assistant",
         tab_id: null,
-        connections: ["worker-1"],
       }),
       buildNode({
         id: "worker-1",
         role_name: "Worker",
-        connections: [],
       }),
     ]);
 
     expect(await screen.findByText("Worker")).toBeInTheDocument();
     expect(screen.queryByText("Assistant")).not.toBeInTheDocument();
 
-    const workerNode = screen.getByTestId("node-worker-1").firstElementChild;
-    expect(workerNode).toHaveClass("w-max");
-    expect(workerNode).toHaveClass("h-14");
+    const workerNode = screen.getByTestId("node-worker-1");
+    expectConnectionHandlesHidden(workerNode);
+    expectConnectionEntriesHidden(workerNode);
   });
 
-  it("keeps connected nodes visually clean until connection interaction begins", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Planner",
-        connections: ["worker-2"],
-      }),
-      buildNode({
-        id: "worker-2",
-        role_name: "Reviewer",
-        connections: ["worker-1"],
-      }),
-    ]);
-
-    await screen.findByText("Planner");
-
-    const plannerNode = screen.getByTestId("node-worker-1");
-    const reviewerNode = screen.getByTestId("node-worker-2");
-
-    expectConnectionHandlesHidden(plannerNode);
-    expectConnectionHandlesHidden(reviewerNode);
-    expectConnectionEntriesHidden(plannerNode);
-    expectConnectionEntriesHidden(reviewerNode);
-  });
-
-  it("temporarily shows connection entries for isolated nodes during explicit connect interaction", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Planner",
-        connections: [],
-      }),
-      buildNode({
-        id: "worker-2",
-        role_name: "Reviewer",
-        connections: [],
-      }),
-    ]);
-
-    await screen.findByText("Planner");
-
-    const plannerNode = screen.getByTestId("node-worker-1");
-    expectConnectionHandlesHidden(plannerNode);
-    expectConnectionEntriesHidden(plannerNode);
-
-    fireEvent.click(screen.getByTestId("connect-start"));
-
-    expectConnectionHandlesHidden(plannerNode);
-    expectConnectionEntriesVisible(plannerNode);
-
-    fireEvent.click(screen.getByTestId("connect-end"));
-
-    expectConnectionHandlesHidden(plannerNode);
-    expectConnectionEntriesHidden(plannerNode);
-  });
-
-  it("keeps isolated connection entries hidden when selection is the only state", async () => {
-    renderGraph(
-      [
-        buildNode({
-          id: "worker-1",
-          role_name: "Planner",
-          connections: [],
-        }),
-      ],
-      { selectedAgentId: "worker-1" },
-    );
-
-    await screen.findByText("Planner");
-
-    const plannerNode = screen.getByTestId("node-worker-1");
-    expectConnectionHandlesHidden(plannerNode);
-    expectConnectionEntriesHidden(plannerNode);
-  });
-
-  it("keeps explicit connect mode active after an unfinished drag", async () => {
+  it("shows connection entries and a connect hint in connect mode", async () => {
     const graphRef = React.createRef<AgentGraphHandle>();
 
     renderGraph(
@@ -532,12 +495,10 @@ describe("AgentGraph", () => {
         buildNode({
           id: "worker-1",
           role_name: "Planner",
-          connections: [],
         }),
         buildNode({
           id: "worker-2",
           role_name: "Reviewer",
-          connections: [],
         }),
       ],
       { ref: graphRef },
@@ -551,72 +512,10 @@ describe("AgentGraph", () => {
 
     const plannerNode = screen.getByTestId("node-worker-1");
     expectConnectionEntriesVisible(plannerNode);
-    expect(screen.getByText("Connect Mode")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("connect-start"));
-    fireEvent.click(screen.getByTestId("connect-end"));
-
-    expectConnectionEntriesVisible(plannerNode);
-    expect(screen.getByText("Connect Mode")).toBeInTheDocument();
+    expect(screen.getByText("Connect Ports")).toBeInTheDocument();
   });
 
-  it("highlights valid and invalid targets during explicit source picking", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Planner",
-        connections: ["worker-2"],
-      }),
-      buildNode({
-        id: "worker-2",
-        role_name: "Reviewer",
-        connections: ["worker-1"],
-      }),
-      buildNode({
-        id: "worker-3",
-        role_name: "Researcher",
-        connections: [],
-      }),
-    ]);
-
-    await screen.findByText("Planner");
-
-    fireEvent.contextMenu(screen.getByTestId("node-worker-1"));
-    await userEvent.setup().click(
-      await screen.findByRole("button", {
-        name: "Connect To...",
-      }),
-    );
-
-    const plannerNode = screen.getByTestId("node-worker-1");
-    const reviewerNode = screen.getByTestId("node-worker-2");
-    const researcherNode = screen.getByTestId("node-worker-3");
-
-    expectConnectionEntriesVisible(plannerNode);
-    expectConnectionEntriesVisible(reviewerNode);
-    expectConnectionEntriesVisible(researcherNode);
-    expect(plannerNode.firstElementChild).toHaveClass("ring-2");
-    expect(reviewerNode.firstElementChild).toHaveClass("opacity-45");
-    expect(researcherNode.firstElementChild).not.toHaveClass("opacity-45");
-  });
-
-  it("opens linked quick create when a dragged connection lands on empty space", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Planner",
-        connections: [],
-      }),
-    ]);
-
-    await screen.findByText("Planner");
-
-    fireEvent.click(screen.getByTestId("connect-end-empty-first"));
-
-    expect(await screen.findByText("No roles available.")).toBeInTheDocument();
-  });
-
-  it("blocks self and duplicate connections before calling onCreateConnection", async () => {
+  it("blocks invalid connections and forwards valid ones with explicit port keys", async () => {
     const onCreateConnection = vi.fn().mockResolvedValue(undefined);
 
     renderGraph(
@@ -629,12 +528,10 @@ describe("AgentGraph", () => {
         buildNode({
           id: "worker-2",
           role_name: "Reviewer",
-          connections: ["worker-1"],
         }),
         buildNode({
           id: "worker-3",
           role_name: "Researcher",
-          connections: [],
         }),
       ],
       { onCreateConnection },
@@ -644,7 +541,6 @@ describe("AgentGraph", () => {
 
     fireEvent.click(screen.getByTestId("connect-first-to-first"));
     fireEvent.click(screen.getByTestId("connect-first-to-second"));
-    fireEvent.click(screen.getByTestId("connect-second-to-first"));
 
     expect(onCreateConnection).not.toHaveBeenCalled();
 
@@ -655,11 +551,13 @@ describe("AgentGraph", () => {
         "tab-1",
         "worker-1",
         "worker-3",
+        "out",
+        "in",
       );
     });
   });
 
-  it("maps rendered edges onto the new undirected entry handles", async () => {
+  it("renders workflow edges with strict connection mode and port handles", async () => {
     renderGraph([
       buildNode({
         id: "worker-1",
@@ -669,37 +567,42 @@ describe("AgentGraph", () => {
       buildNode({
         id: "worker-2",
         role_name: "Reviewer",
-        connections: ["worker-1"],
       }),
     ]);
 
     await screen.findByText("Planner");
 
     await waitFor(() => {
-      const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
-        | {
-            edges: Array<{
-              id: string;
-              sourceHandle?: string;
-              targetHandle?: string;
-            }>;
-          }
-        | undefined;
-
-      expect(latestProps?.edges).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: "worker-1<->worker-2",
-            sourceHandle: "right-entry",
-            targetHandle: "left-entry",
-          }),
-        ]),
+      expect(reactFlowPropsMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          edges: expect.arrayContaining([
+            expect.objectContaining({
+              id: "worker-1->worker-2",
+              sourceHandle: "out",
+              targetHandle: "in",
+            }),
+          ]),
+          connectionMode: "strict",
+          nodesDraggable: false,
+          nodesConnectable: true,
+          connectOnClick: false,
+          minZoom: 0.05,
+          maxZoom: 6,
+          zoomOnScroll: true,
+          zoomOnPinch: true,
+        }),
       );
     });
   });
 
-  it("renders only nodes from the active task tab", async () => {
+  it("renders only nodes from the active task tab and keeps leaders out of the graph", async () => {
     renderGraph([
+      buildNode({
+        id: "leader-1",
+        role_name: "Conductor",
+        is_leader: true,
+        name: "Leader",
+      }),
       buildNode({
         id: "worker-1",
         role_name: "Planner",
@@ -713,94 +616,11 @@ describe("AgentGraph", () => {
     ]);
 
     expect(await screen.findByText("Planner")).toBeInTheDocument();
+    expect(screen.queryByText("Leader")).not.toBeInTheDocument();
     expect(screen.queryByText("Reviewer")).not.toBeInTheDocument();
   });
 
-  it("allows stopping regular agents from the graph context menu", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-      }),
-    ]);
-
-    fireEvent.contextMenu(screen.getByTestId("node-worker-1"));
-    const stopWorker = await screen.findByRole("button", {
-      name: "Stop Agent",
-    });
-    expect(stopWorker).toBeEnabled();
-    expect(stopWorker.className).toContain("text-graph-status-error/90");
-
-    await userEvent.setup().click(stopWorker);
-    await waitFor(() => {
-      expect(terminateNodeMock).toHaveBeenCalledWith("worker-1");
-    });
-  });
-
-  it("renders graph context menus in a viewport portal instead of inside the workspace canvas", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-      }),
-    ]);
-
-    fireEvent.contextMenu(screen.getByTestId("node-worker-1"));
-
-    const stopWorker = await screen.findByRole("button", {
-      name: "Stop Agent",
-    });
-    expect(stopWorker).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("react-flow")).queryByRole("button", {
-        name: "Stop Agent",
-      }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("renders canvas context menus in a viewport portal instead of inside the workspace canvas", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-      }),
-    ]);
-
-    fireEvent.contextMenu(screen.getByTestId("react-flow"));
-
-    const fitView = await screen.findByRole("button", {
-      name: "Fit View",
-    });
-    expect(fitView).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("react-flow")).queryByRole("button", {
-        name: "Fit View",
-      }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("renders pane context menus in a viewport portal instead of inside the workspace canvas", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-      }),
-    ]);
-
-    fireEvent.contextMenu(screen.getByTestId("react-flow"));
-
-    const fitView = await screen.findByRole("button", {
-      name: "Fit View",
-    });
-    expect(fitView).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("react-flow")).queryByRole("button", {
-        name: "Fit View",
-      }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("renders node tooltips in a viewport portal instead of inside the workspace canvas", async () => {
+  it("renders node tooltips in a viewport portal instead of inside the canvas", async () => {
     renderGraph([
       buildNode({
         id: "worker-1",
@@ -850,32 +670,7 @@ describe("AgentGraph", () => {
     });
   });
 
-  it("configures the workspace canvas for freeform zooming", async () => {
-    renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-      }),
-    ]);
-
-    await waitFor(() => {
-      expect(reactFlowPropsMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          nodes: expect.any(Array),
-          nodesDraggable: false,
-          nodesConnectable: true,
-          connectionMode: "loose",
-          connectOnClick: false,
-          minZoom: 0.05,
-          maxZoom: 6,
-          zoomOnScroll: true,
-          zoomOnPinch: true,
-        }),
-      );
-    });
-  });
-
-  it("shows the current viewport zoom when a graph is visible and updates it live", async () => {
+  it("shows the viewport zoom while a graph is visible and updates it live", async () => {
     renderGraph([
       buildNode({
         id: "worker-1",
@@ -894,15 +689,7 @@ describe("AgentGraph", () => {
     );
   });
 
-  it("hides the graph zoom indicator in the stable empty state", () => {
-    renderGraph([]);
-
-    expect(
-      screen.queryByTestId("agent-graph-zoom-indicator"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("lays out active tab nodes from graph structure instead of stored positions", async () => {
+  it("lays out nodes from graph structure instead of stored runtime positions", async () => {
     vi.stubGlobal("Worker", DeferredWorkerMock as unknown as typeof Worker);
 
     renderGraph([
@@ -916,7 +703,6 @@ describe("AgentGraph", () => {
         id: "worker-2",
         role_name: "Reviewer",
         position: { x: 40, y: 20 },
-        connections: [],
       }),
     ]);
 
@@ -943,152 +729,6 @@ describe("AgentGraph", () => {
 
       expect(plannerNode?.position).not.toEqual({ x: 900, y: 700 });
       expect(reviewerNode?.position).not.toEqual({ x: 40, y: 20 });
-      expect(
-        Math.hypot(
-          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
-          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
-        ),
-      ).toBeGreaterThan(80);
-    });
-  });
-
-  it("keeps leader nodes out of the visible graph", async () => {
-    renderGraph([
-      buildNode({
-        id: "leader-1",
-        role_name: "Conductor",
-        is_leader: true,
-        name: "Leader",
-      }),
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-        name: "Worker",
-      }),
-    ]);
-
-    await screen.findByText("Worker");
-
-    const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
-      | {
-          nodes: Array<{ id: string; position: { x: number; y: number } }>;
-        }
-      | undefined;
-    const workerNode = latestProps?.nodes.find(
-      (node) => node.id === "worker-1",
-    );
-
-    expect(workerNode).toBeDefined();
-    expect(latestProps?.nodes).toHaveLength(1);
-    expect(screen.queryByText("Leader")).not.toBeInTheDocument();
-  });
-
-  it("ignores stale worker layout results after structure changes", async () => {
-    vi.stubGlobal("Worker", DeferredWorkerMock as unknown as typeof Worker);
-
-    const view = renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Planner",
-        connections: [],
-      }),
-    ]);
-
-    const worker = DeferredWorkerMock.instances[0];
-    expect(worker).toBeDefined();
-    expect(worker?.messages).toHaveLength(1);
-
-    useAgentNodesRuntimeMock.mockReturnValue({
-      agents: new Map(
-        [
-          buildNode({
-            id: "worker-1",
-            role_name: "Planner",
-            connections: ["worker-2"],
-          }),
-          buildNode({
-            id: "worker-2",
-            role_name: "Reviewer",
-            connections: [],
-          }),
-        ].map((node) => [node.id, node] as const),
-      ),
-    });
-
-    view.rerender(<AgentGraph />);
-
-    await waitFor(() => {
-      expect(worker?.messages).toHaveLength(2);
-    });
-
-    await act(async () => {
-      await worker?.flush(1);
-    });
-
-    await waitFor(() => {
-      const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
-        | {
-            nodes: Array<{ id: string; position: { x: number; y: number } }>;
-          }
-        | undefined;
-      const plannerNode = latestProps?.nodes.find(
-        (node) => node.id === "worker-1",
-      );
-      const reviewerNode = latestProps?.nodes.find(
-        (node) => node.id === "worker-2",
-      );
-      expect(
-        Math.hypot(
-          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
-          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
-        ),
-      ).toBeGreaterThan(80);
-    });
-
-    const renderCountAfterFreshLayout = reactFlowPropsMock.mock.calls.length;
-
-    await act(async () => {
-      await worker?.flush(0);
-    });
-
-    await waitFor(() => {
-      expect(reactFlowPropsMock.mock.calls).toHaveLength(
-        renderCountAfterFreshLayout,
-      );
-    });
-  });
-
-  it("does not repost layout work for state-only rerenders while a layout is pending", async () => {
-    vi.stubGlobal("Worker", DeferredWorkerMock as unknown as typeof Worker);
-
-    const view = renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-        state: "idle",
-      }),
-    ]);
-
-    const worker = DeferredWorkerMock.instances[0];
-    expect(worker).toBeDefined();
-    expect(worker?.messages).toHaveLength(1);
-
-    useAgentNodesRuntimeMock.mockReturnValue({
-      agents: new Map(
-        [
-          buildNode({
-            id: "worker-1",
-            role_name: "Worker",
-            state: "running",
-          }),
-        ].map((node) => [node.id, node] as const),
-      ),
-    });
-
-    view.rerender(<AgentGraph />);
-
-    await waitFor(() => {
-      expect(worker?.messages).toHaveLength(1);
     });
   });
 
@@ -1107,7 +747,6 @@ describe("AgentGraph", () => {
       buildNode({
         id: "worker-2",
         role_name: "Reviewer",
-        connections: [],
       }),
     ]);
 
@@ -1124,128 +763,6 @@ describe("AgentGraph", () => {
       expect(worker?.messages).toHaveLength(2);
     });
 
-    await act(async () => {
-      await worker?.flush(1);
-    });
-
-    await waitFor(() => {
-      const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
-        | {
-            nodes: Array<{ id: string; position: { x: number; y: number } }>;
-          }
-        | undefined;
-      const plannerNode = latestProps?.nodes.find(
-        (node) => node.id === "worker-1",
-      );
-      const reviewerNode = latestProps?.nodes.find(
-        (node) => node.id === "worker-2",
-      );
-
-      expect(
-        Math.hypot(
-          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
-          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
-        ),
-      ).toBeGreaterThan(80);
-    });
-
     consoleErrorSpy.mockRestore();
-  });
-
-  it("reposts layout after StrictMode remount when the first worker is terminated", async () => {
-    vi.stubGlobal("Worker", DeferredWorkerMock as unknown as typeof Worker);
-
-    useAgentNodesRuntimeMock.mockReturnValue({
-      agents: new Map(
-        [
-          buildNode({
-            id: "worker-1",
-            role_name: "Planner",
-            connections: ["worker-2"],
-          }),
-          buildNode({
-            id: "worker-2",
-            role_name: "Reviewer",
-            connections: [],
-          }),
-        ].map((node) => [node.id, node] as const),
-      ),
-    });
-    useAgentTabsRuntimeMock.mockReturnValue({
-      tabs: new Map([["tab-1", buildTab()]]),
-    });
-    useAgentActivityRuntimeMock.mockReturnValue({
-      activeMessages: [],
-      activeToolCalls: new Map(),
-    });
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-1",
-      selectedAgentId: null,
-      selectAgent: vi.fn(),
-    });
-
-    render(
-      <React.StrictMode>
-        <AgentGraph />
-      </React.StrictMode>,
-    );
-
-    await waitFor(() => {
-      expect(DeferredWorkerMock.instances.length).toBeGreaterThanOrEqual(2);
-    });
-
-    const latestWorker = DeferredWorkerMock.instances.at(-1);
-    expect(latestWorker?.messages).toHaveLength(1);
-
-    await act(async () => {
-      await latestWorker?.flush(0);
-    });
-
-    await waitFor(() => {
-      const latestProps = reactFlowPropsMock.mock.calls.at(-1)?.[0] as
-        | {
-            nodes: Array<{ id: string; position: { x: number; y: number } }>;
-          }
-        | undefined;
-      const plannerNode = latestProps?.nodes.find(
-        (node) => node.id === "worker-1",
-      );
-      const reviewerNode = latestProps?.nodes.find(
-        (node) => node.id === "worker-2",
-      );
-      expect(
-        Math.hypot(
-          (reviewerNode?.position.x ?? 0) - (plannerNode?.position.x ?? 0),
-          (reviewerNode?.position.y ?? 0) - (plannerNode?.position.y ?? 0),
-        ),
-      ).toBeGreaterThan(80);
-    });
-  });
-
-  it("keeps removed nodes briefly for exit transitions before unmounting them", () => {
-    vi.useFakeTimers();
-
-    const view = renderGraph([
-      buildNode({
-        id: "worker-1",
-        role_name: "Worker",
-      }),
-    ]);
-
-    expect(screen.getByTestId("node-worker-1")).toBeInTheDocument();
-
-    useAgentNodesRuntimeMock.mockReturnValue({
-      agents: new Map(),
-    });
-
-    view.rerender(<AgentGraph />);
-
-    expect(screen.getByTestId("node-worker-1")).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(330);
-    });
-
-    expect(screen.queryByTestId("node-worker-1")).not.toBeInTheDocument();
   });
 });

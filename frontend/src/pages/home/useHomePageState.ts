@@ -1,5 +1,8 @@
 import type { AgentGraphHandle } from "@/components/AgentGraph";
-import type { WorkspaceAgentOption } from "@/components/workspace/WorkspaceDialogs";
+import type {
+  WorkspaceNodeOption,
+  WorkspacePortOption,
+} from "@/components/workspace/WorkspaceDialogs";
 import {
   useAgentActivityRuntime,
   useAgentConnectionRuntime,
@@ -11,11 +14,12 @@ import {
 import {
   createTabRequest,
   deleteTabRequest,
-  fetchBlueprints,
+  duplicateTabRequest,
   fetchRoles,
-  saveTabAsBlueprintRequest,
+  updateTabDefinitionRequest,
 } from "@/lib/api";
 import { getNodeLabel } from "@/lib/constants";
+import { EMPTY_WORKFLOW_DEFINITION } from "@/lib/tabEvents";
 import { getWorkflowLeaderNode } from "@/lib/workflow";
 import {
   hasCachedPanelWidth,
@@ -24,7 +28,7 @@ import {
 } from "@/hooks/usePanelDrag";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useTabGraphHistory } from "@/hooks/useTabGraphHistory";
-import type { AgentBlueprint, Role } from "@/types";
+import type { Role, WorkflowNodeType, WorkflowPort } from "@/types";
 import { toast } from "sonner";
 import {
   useCallback,
@@ -45,18 +49,31 @@ const COMPACT_PANEL_MIN_WIDTH = 300;
 
 export type WorkspaceDialogKind =
   | "create-tab"
-  | "create-agent"
-  | "connect-agents"
-  | "save-blueprint"
+  | "create-node"
+  | "connect-ports"
   | "delete-tab"
   | null;
 
+export type WorkspacePendingAction =
+  | "create-tab"
+  | "create-node"
+  | "connect-ports"
+  | "delete-tab"
+  | "duplicate-tab"
+  | "save-definition"
+  | null;
+
 export type WorkspacePanelView = "chat" | "detail";
+export type WorkspaceEditorMode = "graph" | "json";
 
 export interface DeleteTabTarget {
   id: string;
   title: string;
   nodeCount?: number;
+}
+
+function formatPortLabel(port: WorkflowPort): string {
+  return `${port.key} · ${port.kind}`;
 }
 
 export function useHomePageState() {
@@ -70,26 +87,30 @@ export function useHomePageState() {
 
   const [panelOpen, setPanelOpen] = useState(true);
   const [panelView, setPanelView] = useState<WorkspacePanelView>("chat");
+  const [editorMode, setEditorMode] = useState<WorkspaceEditorMode>("graph");
   const isCompactWorkspace = useMediaQuery("(max-width: 1180px)");
   const [activeDialog, setActiveDialog] = useState<WorkspaceDialogKind>(null);
-  const [pendingAction, setPendingAction] = useState<WorkspaceDialogKind>(null);
+  const [pendingAction, setPendingAction] =
+    useState<WorkspacePendingAction>(null);
   const [createTabTitle, setCreateTabTitle] = useState("");
   const [createTabGoal, setCreateTabGoal] = useState("");
   const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
   const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
-  const [createTabBlueprintId, setCreateTabBlueprintId] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
-  const [blueprints, setBlueprints] = useState<AgentBlueprint[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(false);
-  const [loadingBlueprints, setLoadingBlueprints] = useState(false);
-  const [createAgentRoleName, setCreateAgentRoleName] = useState("Worker");
-  const [createAgentName, setCreateAgentName] = useState("");
-  const [saveBlueprintName, setSaveBlueprintName] = useState("");
-  const [saveBlueprintDescription, setSaveBlueprintDescription] = useState("");
+  const [createNodeType, setCreateNodeType] =
+    useState<WorkflowNodeType>("agent");
+  const [createNodeRoleName, setCreateNodeRoleName] = useState("Worker");
+  const [createNodeName, setCreateNodeName] = useState("");
   const [connectSourceId, setConnectSourceId] = useState("");
+  const [connectSourcePortKey, setConnectSourcePortKey] = useState("");
   const [connectTargetId, setConnectTargetId] = useState("");
+  const [connectTargetPortKey, setConnectTargetPortKey] = useState("");
   const [deleteTabTarget, setDeleteTabTarget] =
     useState<DeleteTabTarget | null>(null);
+  const [definitionDraft, setDefinitionDraft] = useState(
+    JSON.stringify(EMPTY_WORKFLOW_DEFINITION, null, 2),
+  );
   const previousCompactWorkspaceRef = useRef<boolean | null>(null);
   const graphRef = useRef<AgentGraphHandle | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -160,18 +181,6 @@ export function useHomePageState() {
     }
   }, [isCompactWorkspace]);
 
-  const refreshBlueprints = useCallback(async () => {
-    setLoadingBlueprints(true);
-    try {
-      const items = await fetchBlueprints();
-      setBlueprints(items);
-    } catch {
-      toast.error("Failed to load blueprints");
-    } finally {
-      setLoadingBlueprints(false);
-    }
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     setLoadingRoles(true);
@@ -197,20 +206,10 @@ export function useHomePageState() {
     };
   }, []);
 
-  useEffect(() => {
-    void refreshBlueprints();
-  }, [refreshBlueprints]);
-
   const selectedAgent = selectedAgentId
     ? (agents.get(selectedAgentId) ?? null)
     : null;
   const activeTab = activeTabId ? (tabs.get(activeTabId) ?? null) : null;
-  const selectedCreateTabBlueprint = useMemo(
-    () =>
-      blueprints.find((blueprint) => blueprint.id === createTabBlueprintId) ??
-      null,
-    [blueprints, createTabBlueprintId],
-  );
   const tabAgents = useMemo(
     () =>
       Array.from(agents.values()).filter(
@@ -223,25 +222,54 @@ export function useHomePageState() {
     () => tabAgents.filter((agent) => !agent.is_leader),
     [tabAgents],
   );
-  const tabAgentOptions = useMemo<WorkspaceAgentOption[]>(
+  const workflowNodes = useMemo(
+    () => activeTab?.definition.nodes ?? [],
+    [activeTab?.definition.nodes],
+  );
+  const workflowNodeOptions = useMemo<WorkspaceNodeOption[]>(
     () =>
-      regularTabAgents.map((agent) => ({
-        id: agent.id,
+      workflowNodes.map((node) => ({
+        id: node.id,
         label: getNodeLabel({
-          name: agent.name,
-          roleName: agent.role_name,
-          nodeType: agent.node_type,
-          isLeader: agent.is_leader,
+          name: typeof node.config.name === "string" ? node.config.name : null,
+          roleName:
+            typeof node.config.role_name === "string"
+              ? node.config.role_name
+              : null,
+          nodeType: node.type,
+          isLeader: false,
         }),
       })),
-    [regularTabAgents],
+    [workflowNodes],
   );
-  const selectedCreateAgentRole = useMemo(
-    () => roles.find((role) => role.name === createAgentRoleName) ?? null,
-    [createAgentRoleName, roles],
+  const sourceNodeDefinition = useMemo(
+    () => workflowNodes.find((node) => node.id === connectSourceId) ?? null,
+    [connectSourceId, workflowNodes],
   );
-  const availableCreateAgentRoles = roles;
-  const availableCreateTabBlueprints = blueprints;
+  const targetNodeDefinition = useMemo(
+    () => workflowNodes.find((node) => node.id === connectTargetId) ?? null,
+    [connectTargetId, workflowNodes],
+  );
+  const sourcePortOptions = useMemo<WorkspacePortOption[]>(
+    () =>
+      (sourceNodeDefinition?.outputs ?? []).map((port) => ({
+        key: port.key,
+        label: formatPortLabel(port),
+      })),
+    [sourceNodeDefinition],
+  );
+  const targetPortOptions = useMemo<WorkspacePortOption[]>(
+    () =>
+      (targetNodeDefinition?.inputs ?? []).map((port) => ({
+        key: port.key,
+        label: formatPortLabel(port),
+      })),
+    [targetNodeDefinition],
+  );
+  const selectedCreateNodeRole = useMemo(
+    () => roles.find((role) => role.name === createNodeRoleName) ?? null,
+    [createNodeRoleName, roles],
+  );
 
   const panelVisible = panelOpen || !!selectedAgent;
   const resolvedPanelWidth = useMemo(() => {
@@ -287,6 +315,28 @@ export function useHomePageState() {
       selectAgent(null);
     }
   }, [activeTabId, selectAgent, selectedAgent]);
+
+  useEffect(() => {
+    setDefinitionDraft(
+      JSON.stringify(
+        activeTab?.definition ?? EMPTY_WORKFLOW_DEFINITION,
+        null,
+        2,
+      ),
+    );
+  }, [activeTab?.definition]);
+
+  useEffect(() => {
+    if (!sourcePortOptions.some((port) => port.key === connectSourcePortKey)) {
+      setConnectSourcePortKey(sourcePortOptions[0]?.key ?? "");
+    }
+  }, [connectSourcePortKey, sourcePortOptions]);
+
+  useEffect(() => {
+    if (!targetPortOptions.some((port) => port.key === connectTargetPortKey)) {
+      setConnectTargetPortKey(targetPortOptions[0]?.key ?? "");
+    }
+  }, [connectTargetPortKey, targetPortOptions]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -343,7 +393,6 @@ export function useHomePageState() {
     setCreateTabGoal("");
     setCreateTabAllowNetwork(false);
     setCreateTabWriteDirs("");
-    setCreateTabBlueprintId("");
     setActiveDialog("create-tab");
   }, []);
 
@@ -363,7 +412,6 @@ export function useHomePageState() {
         createTabGoal.trim(),
         createTabAllowNetwork,
         writeDirsArray,
-        createTabBlueprintId || undefined,
       );
       setActiveTabId(tab.id);
       setActiveDialog(null);
@@ -371,108 +419,92 @@ export function useHomePageState() {
       setCreateTabGoal("");
       setCreateTabAllowNetwork(false);
       setCreateTabWriteDirs("");
-      setCreateTabBlueprintId("");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to create tab",
+        error instanceof Error ? error.message : "Failed to create workflow",
       );
     } finally {
       setPendingAction(null);
     }
   }, [
     createTabAllowNetwork,
-    createTabBlueprintId,
     createTabGoal,
     createTabTitle,
     createTabWriteDirs,
     setActiveTabId,
   ]);
 
-  const openSaveBlueprintDialog = useCallback(() => {
-    if (!activeTabId || !activeTab) {
-      toast.error("Create or select a tab first");
-      return;
-    }
-    if (regularTabAgents.length === 0) {
-      toast.error("Add at least one task node before saving a blueprint");
-      return;
-    }
-    setSaveBlueprintName(activeTab.title);
-    setSaveBlueprintDescription("");
-    setActiveDialog("save-blueprint");
-  }, [activeTab, activeTabId, regularTabAgents.length]);
-
-  const handleSaveCurrentNetworkAsBlueprint = useCallback(async () => {
+  const handleDuplicateTab = useCallback(async () => {
     if (!activeTabId) {
+      toast.error("Create or select a workflow first");
       return;
     }
-    const name = saveBlueprintName.trim();
-    if (!name) {
-      return;
-    }
-    setPendingAction("save-blueprint");
+    setPendingAction("duplicate-tab");
     try {
-      await saveTabAsBlueprintRequest(
-        activeTabId,
-        name,
-        saveBlueprintDescription.trim(),
-      );
-      await refreshBlueprints();
-      setActiveDialog(null);
-      setSaveBlueprintName("");
-      setSaveBlueprintDescription("");
-      toast.success("Blueprint saved to library");
+      const duplicated = await duplicateTabRequest(activeTabId);
+      setActiveTabId(duplicated.id);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to save blueprint",
+        error instanceof Error ? error.message : "Failed to duplicate workflow",
       );
     } finally {
       setPendingAction(null);
     }
-  }, [
-    activeTabId,
-    refreshBlueprints,
-    saveBlueprintDescription,
-    saveBlueprintName,
-  ]);
+  }, [activeTabId, setActiveTabId]);
 
-  const openCreateAgentDialog = useCallback(() => {
+  const openCreateNodeDialog = useCallback(() => {
     if (!activeTabId) {
-      toast.error("Create or select a tab first");
+      toast.error("Create or select a workflow first");
       return;
     }
-    setCreateAgentRoleName("Worker");
-    setCreateAgentName("");
-    setActiveDialog("create-agent");
+    setCreateNodeType("agent");
+    setCreateNodeRoleName("Worker");
+    setCreateNodeName("");
+    setActiveDialog("create-node");
   }, [activeTabId]);
 
-  const handleCreateAgent = useCallback(async () => {
-    const roleName = selectedCreateAgentRole?.name ?? "";
-    if (!activeTabId || !roleName) {
+  const handleCreateNode = useCallback(async () => {
+    if (!activeTabId) {
       return;
     }
-    setPendingAction("create-agent");
+    const trimmedName = createNodeName.trim() || undefined;
+    setPendingAction("create-node");
     try {
-      await graphHistory.createStandaloneAgent({
-        tabId: activeTabId,
-        roleName,
-        name: createAgentName.trim() || undefined,
-      });
+      if (createNodeType === "agent") {
+        const roleName = selectedCreateNodeRole?.name ?? "";
+        if (!roleName) {
+          return;
+        }
+        await graphHistory.createStandaloneNode({
+          tabId: activeTabId,
+          nodeType: "agent",
+          roleName,
+          name: trimmedName,
+        });
+      } else {
+        await graphHistory.createStandaloneNode({
+          tabId: activeTabId,
+          nodeType: createNodeType,
+          name: trimmedName,
+        });
+      }
       setActiveDialog(null);
-      setCreateAgentRoleName("Worker");
-      setCreateAgentName("");
+      setCreateNodeType("agent");
+      setCreateNodeRoleName("Worker");
+      setCreateNodeName("");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to create agent",
+        error instanceof Error ? error.message : "Failed to create node",
       );
     } finally {
       setPendingAction(null);
     }
   }, [
     activeTabId,
-    createAgentName,
+    createNodeName,
+    createNodeType,
     graphHistory,
-    selectedCreateAgentRole?.name,
+    selectedCreateNodeRole?.name,
   ]);
 
   const requestDeleteTab = useCallback(
@@ -492,7 +524,7 @@ export function useHomePageState() {
       setDeleteTabTarget(null);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete tab",
+        error instanceof Error ? error.message : "Failed to delete workflow",
       );
     } finally {
       setPendingAction(null);
@@ -501,51 +533,92 @@ export function useHomePageState() {
 
   const openConnectDialog = useCallback(() => {
     if (!activeTabId) {
-      toast.error("Create or select a tab first");
+      toast.error("Create or select a workflow first");
       return;
     }
-    if (tabAgentOptions.length < 2) {
-      toast.error("Add at least two agents before creating a connection");
+    if (workflowNodeOptions.length < 2) {
+      toast.error("Add at least two nodes before creating an edge");
       return;
     }
-    const selectedSourceId =
-      selectedAgent && selectedAgent.tab_id === activeTabId
-        ? selectedAgent.id
-        : tabAgentOptions[0]?.id;
+    const initialSourceId = workflowNodeOptions[0]?.id ?? "";
     const initialTargetId =
-      tabAgentOptions.find((agent) => agent.id !== selectedSourceId)?.id ?? "";
-    if (!selectedSourceId || !initialTargetId) {
+      workflowNodeOptions.find((node) => node.id !== initialSourceId)?.id ?? "";
+    if (!initialSourceId || !initialTargetId) {
       return;
     }
-    setConnectSourceId(selectedSourceId);
+    setConnectSourceId(initialSourceId);
     setConnectTargetId(initialTargetId);
-    setActiveDialog("connect-agents");
-  }, [activeTabId, selectedAgent, tabAgentOptions]);
+    setActiveDialog("connect-ports");
+  }, [activeTabId, workflowNodeOptions]);
 
-  const handleConnectAgents = useCallback(async () => {
-    if (!activeTabId || !connectSourceId || !connectTargetId) {
+  const handleConnectPorts = useCallback(async () => {
+    if (
+      !activeTabId ||
+      !connectSourceId ||
+      !connectSourcePortKey ||
+      !connectTargetId ||
+      !connectTargetPortKey
+    ) {
       return;
     }
-    if (connectSourceId === connectTargetId) {
-      toast.error("Choose two different agents");
-      return;
-    }
-    setPendingAction("connect-agents");
+    setPendingAction("connect-ports");
     try {
       await graphHistory.createConnection(
         activeTabId,
         connectSourceId,
         connectTargetId,
+        connectSourcePortKey,
+        connectTargetPortKey,
       );
       setActiveDialog(null);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to connect agents",
+        error instanceof Error ? error.message : "Failed to connect ports",
       );
     } finally {
       setPendingAction(null);
     }
-  }, [activeTabId, connectSourceId, connectTargetId, graphHistory]);
+  }, [
+    activeTabId,
+    connectSourceId,
+    connectSourcePortKey,
+    connectTargetId,
+    connectTargetPortKey,
+    graphHistory,
+  ]);
+
+  const handleSaveDefinition = useCallback(async () => {
+    if (!activeTabId) {
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(definitionDraft);
+    } catch {
+      toast.error("Workflow JSON is invalid");
+      return;
+    }
+    if (!parsed || typeof parsed !== "object") {
+      toast.error("Workflow JSON must be an object");
+      return;
+    }
+    setPendingAction("save-definition");
+    try {
+      await updateTabDefinitionRequest(
+        activeTabId,
+        parsed as typeof EMPTY_WORKFLOW_DEFINITION,
+      );
+      toast.success("Workflow JSON saved");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save workflow definition",
+      );
+    } finally {
+      setPendingAction(null);
+    }
+  }, [activeTabId, definitionDraft]);
 
   return {
     activeDialog,
@@ -553,69 +626,71 @@ export function useHomePageState() {
     activeTabId,
     connected,
     connectSourceId,
+    connectSourcePortKey,
     connectTargetId,
-    createAgentName,
-    createAgentRoleName,
+    connectTargetPortKey,
+    createNodeName,
+    createNodeRoleName,
+    createNodeType,
     createTabAllowNetwork,
-    createTabBlueprintId,
     createTabGoal,
     createTabTitle,
     createTabWriteDirs,
+    definitionDraft,
     deleteTabTarget,
-    availableCreateAgentRoles,
-    availableCreateTabBlueprints,
+    editorMode,
     graphConnectMode,
     graphHistory,
     graphRef,
     handleCloseLeaderDetails,
-    handleConnectAgents,
-    handleCreateAgent,
+    handleConnectPorts,
+    handleCreateNode,
     handleCreateTab,
     handleDeleteTab,
+    handleDuplicateTab,
     handleOpenLeaderDetails,
-    handleSaveCurrentNetworkAsBlueprint,
+    handleSaveDefinition,
     isCompactWorkspace,
     isDragging,
     leaderDetailVisible,
     leaderNode,
     leaderPanelRunning,
-    loadingBlueprints,
     loadingRoles,
     openConnectDialog,
-    openCreateAgentDialog,
+    openCreateNodeDialog,
     openCreateTabDialog,
-    openSaveBlueprintDialog,
     panelVisible,
     pendingAction,
     regularTabAgents,
     requestDeleteTab,
     resolvedPanelWidth,
     roles,
-    saveBlueprintDescription,
-    saveBlueprintName,
     selectAgent,
     selectedAgent,
-    selectedCreateAgentRole,
-    selectedCreateTabBlueprint,
+    selectedCreateNodeRole,
     setActiveDialog,
     setActiveTabId,
     setConnectSourceId,
+    setConnectSourcePortKey,
     setConnectTargetId,
-    setCreateAgentName,
-    setCreateAgentRoleName,
+    setConnectTargetPortKey,
+    setCreateNodeName,
+    setCreateNodeRoleName,
+    setCreateNodeType,
     setCreateTabAllowNetwork,
-    setCreateTabBlueprintId,
     setCreateTabGoal,
     setCreateTabTitle,
     setCreateTabWriteDirs,
+    setDefinitionDraft,
     setDeleteTabTarget,
+    setEditorMode,
     setGraphConnectMode,
-    setSaveBlueprintDescription,
-    setSaveBlueprintName,
+    sourcePortOptions,
     startDrag,
-    tabAgentOptions,
     tabs,
+    targetPortOptions,
     togglePanel,
+    workflowNodeOptions,
     workspaceRef,
   };
 }

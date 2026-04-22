@@ -11,6 +11,7 @@ import type {
   Node as AgentGraphNode,
   NodeType,
   Role,
+  WorkflowPort,
 } from "@/types";
 
 export const NODE_EXIT_MS = 320;
@@ -95,6 +96,8 @@ export interface AgentNodeData extends Record<string, unknown> {
   canConnect: boolean;
   showConnectionEntryHint: boolean;
   connectionState?: "source" | "valid-target" | "invalid-target" | null;
+  inputPorts: WorkflowPort[];
+  outputPorts: WorkflowPort[];
 }
 
 export interface AgentGraphHandle {
@@ -109,6 +112,8 @@ export interface AgentGraphProps {
     tabId: string,
     sourceNodeId: string,
     targetNodeId: string,
+    sourcePortKey?: string,
+    targetPortKey?: string,
   ) => Promise<void>;
   onDeleteConnection?: (
     tabId: string,

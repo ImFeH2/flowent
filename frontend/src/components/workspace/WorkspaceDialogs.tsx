@@ -1,4 +1,4 @@
-import type { AgentBlueprint, Role } from "@/types";
+import type { Role, WorkflowNodeType } from "@/types";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -37,19 +37,20 @@ const workspaceChoiceListClass =
 const workspaceChoiceButtonBaseClass =
   "w-full rounded-md border px-3 py-2.5 text-left transition-colors";
 
-export interface WorkspaceAgentOption {
+export interface WorkspaceNodeOption {
   id: string;
+  label: string;
+}
+
+export interface WorkspacePortOption {
+  key: string;
   label: string;
 }
 
 interface CreateTabDialogProps {
   allowNetwork: boolean;
-  blueprintId: string;
-  blueprints: AgentBlueprint[];
   goal: string;
-  loadingBlueprints: boolean;
   onAllowNetworkChange: (nextValue: boolean) => void;
-  onBlueprintIdChange: (nextValue: string) => void;
   onGoalChange: (nextValue: string) => void;
   onOpenChange: (open: boolean) => void;
   onSubmit: () => void;
@@ -57,19 +58,14 @@ interface CreateTabDialogProps {
   onWriteDirsChange: (nextValue: string) => void;
   open: boolean;
   pending: boolean;
-  selectedBlueprint: AgentBlueprint | null;
   title: string;
   writeDirs: string;
 }
 
 export function CreateTabDialog({
   allowNetwork,
-  blueprintId,
-  blueprints,
   goal,
-  loadingBlueprints,
   onAllowNetworkChange,
-  onBlueprintIdChange,
   onGoalChange,
   onOpenChange,
   onSubmit,
@@ -77,7 +73,6 @@ export function CreateTabDialog({
   onWriteDirsChange,
   open,
   pending,
-  selectedBlueprint,
   title,
   writeDirs,
 }: CreateTabDialogProps) {
@@ -120,88 +115,9 @@ export function CreateTabDialog({
           className={cn("min-h-[116px] rounded-md", workspaceDialogInputClass)}
         />
       </WorkspaceDialogField>
-      <WorkspaceDialogField label="Blueprint" hint="Optional">
-        <div className="space-y-3">
-          {selectedBlueprint ? (
-            <div className={workspaceChoiceCardClass}>
-              <div className="text-[13px] font-medium text-foreground">
-                {selectedBlueprint.name}
-              </div>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                {selectedBlueprint.description || "No description"}
-              </p>
-              <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
-                {selectedBlueprint.node_count} nodes ·{" "}
-                {selectedBlueprint.edge_count} edges
-              </p>
-            </div>
-          ) : null}
-          <div className={workspaceChoiceListClass}>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onBlueprintIdChange("")}
-              className={cn(
-                workspaceChoiceButtonBaseClass,
-                !blueprintId
-                  ? "border-border bg-accent/70"
-                  : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
-              )}
-            >
-              <div className="text-[13px] font-medium text-foreground">
-                Start blank
-              </div>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                Create a workflow with only its bound Leader. Permissions do not
-                inherit from a blueprint.
-              </p>
-            </Button>
-            {loadingBlueprints ? (
-              <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                Loading blueprints...
-              </p>
-            ) : blueprints.length === 0 ? (
-              <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                No blueprints available.
-              </p>
-            ) : (
-              blueprints.map((blueprint) => (
-                <Button
-                  key={blueprint.id}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onBlueprintIdChange(blueprint.id)}
-                  className={cn(
-                    workspaceChoiceButtonBaseClass,
-                    blueprintId === blueprint.id
-                      ? "border-border bg-accent/70"
-                      : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[13px] font-medium text-foreground">
-                      {blueprint.name}
-                    </div>
-                    <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">
-                      v{blueprint.version}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                    {blueprint.description || "No description"}
-                  </p>
-                  <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/80">
-                    {blueprint.node_count} nodes · {blueprint.edge_count} edges
-                  </p>
-                </Button>
-              ))
-            )}
-          </div>
-        </div>
-      </WorkspaceDialogField>
       <WorkspaceDialogMeta>
-        The selected Network Access and Write Dirs initialize the bound Leader
-        for this workflow. MCP servers are provided globally after they connect,
-        and they do not inherit from a blueprint.
+        New workflows always start with an empty definition and a bound Leader.
+        MCP servers are provided globally after they connect.
       </WorkspaceDialogMeta>
       <WorkspaceDialogField
         label="Network Access"
@@ -232,80 +148,14 @@ export function CreateTabDialog({
   );
 }
 
-interface SaveBlueprintDialogProps {
-  description: string;
-  name: string;
-  onDescriptionChange: (nextValue: string) => void;
-  onNameChange: (nextValue: string) => void;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: () => void;
-  open: boolean;
-  pending: boolean;
-}
-
-export function SaveBlueprintDialog({
-  description,
-  name,
-  onDescriptionChange,
-  onNameChange,
-  onOpenChange,
-  onSubmit,
-  open,
-  pending,
-}: SaveBlueprintDialogProps) {
-  return (
-    <WorkspaceCommandDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Save as Blueprint"
-      footer={
-        <>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={pending}
-          >
-            Cancel
-          </Button>
-          <Button onClick={onSubmit} disabled={!name.trim() || pending}>
-            {pending ? "Saving..." : "Save as Blueprint"}
-          </Button>
-        </>
-      }
-    >
-      <WorkspaceDialogMeta>
-        This only saves the current Agent Network structure. History, runtime
-        state, todos, and permissions are not copied into the Agent Blueprint.
-      </WorkspaceDialogMeta>
-      <WorkspaceDialogField label="Name" hint="Required">
-        <Input
-          autoFocus
-          aria-label="Blueprint name"
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          placeholder="Review Pipeline"
-          className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-        />
-      </WorkspaceDialogField>
-      <WorkspaceDialogField label="Description" hint="Optional">
-        <Textarea
-          aria-label="Blueprint description"
-          value={description}
-          onChange={(event) => onDescriptionChange(event.target.value)}
-          placeholder="Describe the reusable collaboration architecture."
-          className={cn("min-h-[116px] rounded-md", workspaceDialogInputClass)}
-        />
-      </WorkspaceDialogField>
-    </WorkspaceCommandDialog>
-  );
-}
-
-interface CreateAgentDialogProps {
+interface CreateNodeDialogProps {
   activeTabTitle: string | null;
-  agentName: string;
+  nodeName: string;
+  nodeType: WorkflowNodeType;
   roles: Role[];
   loadingRoles: boolean;
-  onAgentNameChange: (nextValue: string) => void;
+  onNodeNameChange: (nextValue: string) => void;
+  onNodeTypeChange: (nextValue: WorkflowNodeType) => void;
   onOpenChange: (open: boolean) => void;
   onRoleNameChange: (nextValue: string) => void;
   onSubmit: () => void;
@@ -316,12 +166,22 @@ interface CreateAgentDialogProps {
   submitDisabled: boolean;
 }
 
-export function CreateAgentDialog({
+const workflowNodeTypeLabels: Record<WorkflowNodeType, string> = {
+  agent: "Agent",
+  trigger: "Trigger",
+  code: "Code",
+  if: "If",
+  merge: "Merge",
+};
+
+export function CreateNodeDialog({
   activeTabTitle,
-  agentName,
+  nodeName,
+  nodeType,
   roles,
   loadingRoles,
-  onAgentNameChange,
+  onNodeNameChange,
+  onNodeTypeChange,
   onOpenChange,
   onRoleNameChange,
   onSubmit,
@@ -330,12 +190,12 @@ export function CreateAgentDialog({
   selectedRole,
   selectedRoleName,
   submitDisabled,
-}: CreateAgentDialogProps) {
+}: CreateNodeDialogProps) {
   return (
     <WorkspaceCommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Add Agent"
+      title="Add Node"
       footer={
         <>
           <Button
@@ -346,73 +206,106 @@ export function CreateAgentDialog({
             Cancel
           </Button>
           <Button onClick={onSubmit} disabled={submitDisabled}>
-            {pending ? "Adding..." : "Add Agent"}
+            {pending ? "Adding..." : "Add Node"}
           </Button>
         </>
       }
     >
       <WorkspaceDialogMeta>
-        Adding a regular node to{" "}
+        Adding a node to{" "}
         <span className="font-semibold text-foreground">
-          {activeTabTitle ?? "No active tab"}
+          {activeTabTitle ?? "No active workflow"}
         </span>
       </WorkspaceDialogMeta>
-      <WorkspaceDialogField
-        label="Role"
-        hint="Required · Leader is managed by the tab"
-      >
-        <div className="space-y-3">
-          {selectedRole ? (
-            <div className={workspaceChoiceCardClass}>
-              <div className="text-[13px] font-medium text-foreground">
-                {selectedRole.name}
-              </div>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                {selectedRole.description}
-              </p>
-            </div>
-          ) : null}
-          <div className={workspaceChoiceListClass}>
-            {loadingRoles ? (
-              <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                Loading roles...
-              </p>
-            ) : roles.length === 0 ? (
-              <p className="px-2 py-3 text-[12px] text-muted-foreground">
-                No roles available.
-              </p>
-            ) : (
-              roles.map((role) => (
-                <Button
-                  key={role.name}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onRoleNameChange(role.name)}
-                  className={cn(
-                    workspaceChoiceButtonBaseClass,
-                    selectedRoleName === role.name
-                      ? "border-border bg-accent/70"
-                      : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
-                  )}
-                >
-                  <div className="text-[13px] font-medium text-foreground">
-                    {role.name}
-                  </div>
-                  <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                    {role.description}
-                  </p>
-                </Button>
-              ))
+      <WorkspaceDialogField label="Node Type" hint="Required">
+        <Select
+          value={nodeType}
+          onValueChange={(value) => onNodeTypeChange(value as WorkflowNodeType)}
+        >
+          <SelectTrigger
+            aria-label="Node Type"
+            className={cn(
+              "h-10 rounded-md data-[placeholder]:text-muted-foreground",
+              workspaceDialogInputClass,
             )}
-          </div>
-        </div>
+          >
+            <SelectValue placeholder="Choose node type" />
+          </SelectTrigger>
+          <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
+            {(
+              Object.entries(workflowNodeTypeLabels) as Array<
+                [WorkflowNodeType, string]
+              >
+            ).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </WorkspaceDialogField>
+      {nodeType === "agent" ? (
+        <WorkspaceDialogField
+          label="Role"
+          hint="Required · Leader is managed by the workflow"
+        >
+          <div className="space-y-3">
+            {selectedRole ? (
+              <div className={workspaceChoiceCardClass}>
+                <div className="text-[13px] font-medium text-foreground">
+                  {selectedRole.name}
+                </div>
+                <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                  {selectedRole.description}
+                </p>
+              </div>
+            ) : null}
+            <div className={workspaceChoiceListClass}>
+              {loadingRoles ? (
+                <p className="px-2 py-3 text-[12px] text-muted-foreground">
+                  Loading roles...
+                </p>
+              ) : roles.length === 0 ? (
+                <p className="px-2 py-3 text-[12px] text-muted-foreground">
+                  No roles available.
+                </p>
+              ) : (
+                roles.map((role) => (
+                  <Button
+                    key={role.name}
+                    type="button"
+                    variant="ghost"
+                    onClick={() => onRoleNameChange(role.name)}
+                    className={cn(
+                      workspaceChoiceButtonBaseClass,
+                      selectedRoleName === role.name
+                        ? "border-border bg-accent/70"
+                        : "border-transparent bg-transparent hover:border-border hover:bg-accent/45",
+                    )}
+                  >
+                    <div className="text-[13px] font-medium text-foreground">
+                      {role.name}
+                    </div>
+                    <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+                      {role.description}
+                    </p>
+                  </Button>
+                ))
+              )}
+            </div>
+          </div>
+        </WorkspaceDialogField>
+      ) : null}
       <WorkspaceDialogField label="Display Name" hint="Optional">
         <Input
-          value={agentName}
-          aria-label="Agent display name"
-          onChange={(event) => onAgentNameChange(event.target.value)}
-          placeholder="Docs Worker"
+          value={nodeName}
+          aria-label="Node display name"
+          onChange={(event) => onNodeNameChange(event.target.value)}
+          placeholder={
+            nodeType === "agent"
+              ? "Docs Worker"
+              : `${workflowNodeTypeLabels[nodeType]} Node`
+          }
           className={cn("h-10 rounded-md", workspaceDialogInputClass)}
         />
       </WorkspaceDialogField>
@@ -420,36 +313,48 @@ export function CreateAgentDialog({
   );
 }
 
-interface ConnectAgentsDialogProps {
+interface ConnectPortsDialogProps {
   activeTabTitle: string | null;
-  agentOptions: WorkspaceAgentOption[];
+  nodeOptions: WorkspaceNodeOption[];
+  onFromNodeChange: (nextValue: string) => void;
+  onFromPortChange: (nextValue: string) => void;
   onOpenChange: (open: boolean) => void;
-  onSourceChange: (nextValue: string) => void;
   onSubmit: () => void;
-  onTargetChange: (nextValue: string) => void;
+  onToNodeChange: (nextValue: string) => void;
+  onToPortChange: (nextValue: string) => void;
   open: boolean;
   pending: boolean;
-  sourceId: string;
-  targetId: string;
+  fromNodeId: string;
+  fromPortKey: string;
+  toNodeId: string;
+  toPortKey: string;
+  fromPortOptions: WorkspacePortOption[];
+  toPortOptions: WorkspacePortOption[];
 }
 
-export function ConnectAgentsDialog({
+export function ConnectPortsDialog({
   activeTabTitle,
-  agentOptions,
+  nodeOptions,
+  onFromNodeChange,
+  onFromPortChange,
   onOpenChange,
-  onSourceChange,
   onSubmit,
-  onTargetChange,
+  onToNodeChange,
+  onToPortChange,
   open,
   pending,
-  sourceId,
-  targetId,
-}: ConnectAgentsDialogProps) {
+  fromNodeId,
+  fromPortKey,
+  toNodeId,
+  toPortKey,
+  fromPortOptions,
+  toPortOptions,
+}: ConnectPortsDialogProps) {
   return (
     <WorkspaceCommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="Connect Agents"
+      title="Connect Ports"
       footer={
         <>
           <Button
@@ -462,10 +367,10 @@ export function ConnectAgentsDialog({
           <Button
             onClick={onSubmit}
             disabled={
-              !sourceId || !targetId || sourceId === targetId || pending
+              !fromNodeId || !fromPortKey || !toNodeId || !toPortKey || pending
             }
           >
-            {pending ? "Connecting..." : "Create Connection"}
+            {pending ? "Connecting..." : "Create Edge"}
           </Button>
         </>
       }
@@ -473,55 +378,95 @@ export function ConnectAgentsDialog({
       <WorkspaceDialogMeta>
         {activeTabTitle ? (
           <>
-            Tab{" "}
+            Workflow{" "}
             <span className="font-semibold text-foreground">
               {activeTabTitle}
             </span>{" "}
-            · {agentOptions.length} agents available
+            · {nodeOptions.length} nodes available
           </>
         ) : (
-          "No active tab"
+          "No active workflow"
         )}
       </WorkspaceDialogMeta>
-      <WorkspaceDialogField label="Agent A" hint="First endpoint">
-        <Select value={sourceId} onValueChange={onSourceChange}>
+      <WorkspaceDialogField label="From Node" hint="Source node">
+        <Select value={fromNodeId} onValueChange={onFromNodeChange}>
           <SelectTrigger
-            aria-label="Agent A"
+            aria-label="From Node"
             className={cn(
               "h-10 rounded-md data-[placeholder]:text-muted-foreground",
               workspaceDialogInputClass,
             )}
           >
-            <SelectValue placeholder="Choose first agent" />
+            <SelectValue placeholder="Choose source node" />
           </SelectTrigger>
           <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
-            {agentOptions.map((agent) => (
-              <SelectItem key={agent.id} value={agent.id}>
-                {agent.label}
+            {nodeOptions.map((node) => (
+              <SelectItem key={node.id} value={node.id}>
+                {node.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </WorkspaceDialogField>
-      <WorkspaceDialogField label="Agent B" hint="Second endpoint">
-        <Select value={targetId} onValueChange={onTargetChange}>
+      <WorkspaceDialogField label="From Port" hint="Output port">
+        <Select value={fromPortKey} onValueChange={onFromPortChange}>
           <SelectTrigger
-            aria-label="Agent B"
+            aria-label="From Port"
             className={cn(
               "h-10 rounded-md data-[placeholder]:text-muted-foreground",
               workspaceDialogInputClass,
             )}
           >
-            <SelectValue placeholder="Choose second agent" />
+            <SelectValue placeholder="Choose output port" />
           </SelectTrigger>
           <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
-            {agentOptions
-              .filter((agent) => agent.id !== sourceId)
-              .map((agent) => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  {agent.label}
+            {fromPortOptions.map((port) => (
+              <SelectItem key={port.key} value={port.key}>
+                {port.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </WorkspaceDialogField>
+      <WorkspaceDialogField label="To Node" hint="Target node">
+        <Select value={toNodeId} onValueChange={onToNodeChange}>
+          <SelectTrigger
+            aria-label="To Node"
+            className={cn(
+              "h-10 rounded-md data-[placeholder]:text-muted-foreground",
+              workspaceDialogInputClass,
+            )}
+          >
+            <SelectValue placeholder="Choose target node" />
+          </SelectTrigger>
+          <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
+            {nodeOptions
+              .filter((node) => node.id !== fromNodeId)
+              .map((node) => (
+                <SelectItem key={node.id} value={node.id}>
+                  {node.label}
                 </SelectItem>
               ))}
+          </SelectContent>
+        </Select>
+      </WorkspaceDialogField>
+      <WorkspaceDialogField label="To Port" hint="Input port">
+        <Select value={toPortKey} onValueChange={onToPortChange}>
+          <SelectTrigger
+            aria-label="To Port"
+            className={cn(
+              "h-10 rounded-md data-[placeholder]:text-muted-foreground",
+              workspaceDialogInputClass,
+            )}
+          >
+            <SelectValue placeholder="Choose input port" />
+          </SelectTrigger>
+          <SelectContent className="rounded-md border-border bg-popover text-popover-foreground">
+            {toPortOptions.map((port) => (
+              <SelectItem key={port.key} value={port.key}>
+                {port.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </WorkspaceDialogField>
@@ -561,7 +506,7 @@ export function DeleteTabDialog({
                 Destructive Action
               </p>
               <AlertDialogTitle className="mt-1 text-foreground">
-                Delete tab?
+                Delete workflow?
               </AlertDialogTitle>
             </div>
           </div>
@@ -572,7 +517,7 @@ export function DeleteTabDialog({
                 <span className="font-semibold text-foreground">
                   {target.title}
                 </span>{" "}
-                and clean up its persisted agent network.
+                and clean up its persisted workflow graph.
                 {typeof target.nodeCount === "number"
                   ? ` ${target.nodeCount} node${target.nodeCount === 1 ? "" : "s"} will be removed with it.`
                   : ""}
@@ -588,7 +533,7 @@ export function DeleteTabDialog({
           </AlertDialogCancel>
           <AlertDialogAction asChild>
             <Button variant="destructive" onClick={onDelete} disabled={pending}>
-              {pending ? "Deleting..." : "Delete Tab"}
+              {pending ? "Deleting..." : "Delete Workflow"}
             </Button>
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -106,17 +106,17 @@ def test_compose_system_prompt_injects_create_agent_guidance_when_tool_present()
     assert DELEGATION_GENERAL_GUIDANCE in result
     assert CREATE_AGENT_TOOL_GUIDANCE in result
     assert (
-        "If you also have `connect`, wire them as needed." in CREATE_AGENT_TOOL_GUIDANCE
-    )
-    assert (
-        "For ordinary task nodes, `connect_to_creator` defaults to `true`"
+        "If you also have `connect`, wire workflow edges as needed."
         in CREATE_AGENT_TOOL_GUIDANCE
     )
     assert (
-        "When the current node is the tab's Leader, `connect_to_creator` does not create a graph edge"
+        "place the new node as a standalone node, after another node, or between two nodes"
         in CREATE_AGENT_TOOL_GUIDANCE
     )
-    assert "does not take `tab_id`" in CREATE_AGENT_TOOL_GUIDANCE
+    assert (
+        "It does not take `tab_id` or any other cross-tab target parameter."
+        in CREATE_AGENT_TOOL_GUIDANCE
+    )
     assert (
         "Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them."
         in CREATE_AGENT_TOOL_GUIDANCE
@@ -141,7 +141,7 @@ def test_compose_system_prompt_injects_connect_guidance_when_tool_present():
     )
 
     assert CONNECT_TOOL_GUIDANCE in result
-    assert "task tab" in CONNECT_TOOL_GUIDANCE
+    assert "directed workflow edge between node ports" in CONNECT_TOOL_GUIDANCE
 
 
 def test_compose_system_prompt_injects_management_guidance_when_manage_tool_present():

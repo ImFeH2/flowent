@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class CreateAgentTool(Tool):
     name = "create_agent"
-    description = "Create a new agent node inside your current task tab."
+    description = "Create a new agent node inside your current workflow."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
@@ -41,14 +41,25 @@ class CreateAgentTool(Tool):
                 "description": "Whether the node can access the network",
                 "default": False,
             },
-            "connect_to_creator": {
-                "type": "boolean",
+            "placement": {
+                "type": "string",
+                "enum": ["standalone", "after", "between"],
                 "description": (
-                    "Whether to automatically create an explicit peer "
-                    "connection between the creator and the new node when "
-                    "the creator is a regular task node"
+                    "How to place the new agent inside the current workflow graph"
                 ),
-                "default": True,
+                "default": "standalone",
+            },
+            "after_node_id": {
+                "type": "string",
+                "description": "Anchor node id when placement is `after`",
+            },
+            "between_from_node_id": {
+                "type": "string",
+                "description": "Upstream node id when placement is `between`",
+            },
+            "between_to_node_id": {
+                "type": "string",
+                "description": "Downstream node id when placement is `between`",
             },
         },
         "required": ["role_name"],
@@ -57,12 +68,21 @@ class CreateAgentTool(Tool):
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         if "tab_id" in args:
             return json.dumps({"error": "create_agent does not accept tab_id"})
+        if "connect_to_creator" in args:
+            return json.dumps(
+                {
+                    "error": "create_agent no longer supports connect_to_creator; use placement"
+                }
+            )
         role_name = args.get("role_name")
         name = args.get("name")
         tools = args.get("tools", [])
         write_dirs = args.get("write_dirs", [])
         allow_network = args.get("allow_network", False)
-        connect_to_creator = args.get("connect_to_creator", True)
+        placement = args.get("placement", "standalone")
+        after_node_id = args.get("after_node_id")
+        between_from_node_id = args.get("between_from_node_id")
+        between_to_node_id = args.get("between_to_node_id")
 
         if not isinstance(role_name, str) or not role_name.strip():
             return json.dumps({"error": "role_name must be a non-empty string"})
@@ -78,8 +98,18 @@ class CreateAgentTool(Tool):
             return json.dumps({"error": "write_dirs must be an array of strings"})
         if not isinstance(allow_network, bool):
             return json.dumps({"error": "allow_network must be a boolean"})
-        if not isinstance(connect_to_creator, bool):
-            return json.dumps({"error": "connect_to_creator must be a boolean"})
+        if placement not in {"standalone", "after", "between"}:
+            return json.dumps(
+                {"error": "placement must be standalone, after, or between"}
+            )
+        if after_node_id is not None and not isinstance(after_node_id, str):
+            return json.dumps({"error": "after_node_id must be a string"})
+        if between_from_node_id is not None and not isinstance(
+            between_from_node_id, str
+        ):
+            return json.dumps({"error": "between_from_node_id must be a string"})
+        if between_to_node_id is not None and not isinstance(between_to_node_id, str):
+            return json.dumps({"error": "between_to_node_id must be a string"})
         try:
             write_dirs = build_assistant_write_dirs(
                 write_dirs,
@@ -178,9 +208,59 @@ class CreateAgentTool(Tool):
             tools=tools,
             write_dirs=write_dirs,
             allow_network=allow_network,
-            creator_node_id=agent.uuid,
-            connect_to_creator=connect_to_creator,
         )
         if error is not None or record is None:
             return json.dumps({"error": error or "Failed to create agent"})
+        if placement == "after":
+            if not isinstance(after_node_id, str) or not after_node_id.strip():
+                return json.dumps(
+                    {"error": "after_node_id is required when placement=after"}
+                )
+            from app.graph_service import create_edge
+
+            edge, edge_error = create_edge(
+                tab_id=agent.config.tab_id,
+                from_node_id=after_node_id,
+                to_node_id=record.id,
+            )
+            if edge_error is not None or edge is None:
+                return json.dumps({"error": edge_error or "Failed to place agent"})
+        elif placement == "between":
+            if (
+                not isinstance(between_from_node_id, str)
+                or not between_from_node_id.strip()
+            ):
+                return json.dumps(
+                    {"error": "between_from_node_id is required when placement=between"}
+                )
+            if (
+                not isinstance(between_to_node_id, str)
+                or not between_to_node_id.strip()
+            ):
+                return json.dumps(
+                    {"error": "between_to_node_id is required when placement=between"}
+                )
+            from app.graph_service import create_edge, delete_edge
+
+            deleted, delete_error = delete_edge(
+                tab_id=agent.config.tab_id,
+                from_node_id=between_from_node_id,
+                to_node_id=between_to_node_id,
+            )
+            if delete_error is not None or deleted is None:
+                return json.dumps({"error": delete_error or "Failed to place agent"})
+            first_edge, first_error = create_edge(
+                tab_id=agent.config.tab_id,
+                from_node_id=between_from_node_id,
+                to_node_id=record.id,
+            )
+            if first_error is not None or first_edge is None:
+                return json.dumps({"error": first_error or "Failed to place agent"})
+            second_edge, second_error = create_edge(
+                tab_id=agent.config.tab_id,
+                from_node_id=record.id,
+                to_node_id=between_to_node_id,
+            )
+            if second_error is not None or second_edge is None:
+                return json.dumps({"error": second_error or "Failed to place agent"})
         return json.dumps(record.serialize())

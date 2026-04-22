@@ -7,6 +7,10 @@ from enum import StrEnum
 class NodeType(StrEnum):
     ASSISTANT = "assistant"
     AGENT = "agent"
+    TRIGGER = "trigger"
+    CODE = "code"
+    IF = "if"
+    MERGE = "merge"
 
 
 class AgentState(StrEnum):
@@ -27,4 +31,3 @@ class NodeConfig:
     tools: list[str] = field(default_factory=list)
     write_dirs: list[str] = field(default_factory=list)
     allow_network: bool = False
-    blueprint_slot_id: str | None = None

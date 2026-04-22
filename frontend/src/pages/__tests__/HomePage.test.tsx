@@ -196,13 +196,7 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     leader_id: overrides.leader_id ?? "leader-1",
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 1,
-    network_source: overrides.network_source ?? {
-      state: "manual",
-      blueprint_id: null,
-      blueprint_name: null,
-      blueprint_version: null,
-      blueprint_available: false,
-    },
+    definition: overrides.definition ?? { version: 1, nodes: [], edges: [] },
     node_count: overrides.node_count ?? 2,
     edge_count: overrides.edge_count ?? 1,
   };
@@ -318,13 +312,7 @@ describe("HomePage", () => {
       id: "tab-2",
       title: "Release Prep",
       goal: "Coordinate the launch work",
-      network_source: {
-        state: "manual",
-        blueprint_id: null,
-        blueprint_name: null,
-        blueprint_version: null,
-        blueprint_available: false,
-      },
+      definition: { version: 1, nodes: [], edges: [] },
     });
 
     render(<HomePage />);
@@ -344,75 +332,19 @@ describe("HomePage", () => {
         "Coordinate the launch work",
         false,
         [],
-        undefined,
       ),
     );
     expect(setActiveTabId).toHaveBeenCalledWith("tab-2");
   }, 10000);
 
-  it("saves the current network as a blueprint from the workspace toolbar", async () => {
-    fetchBlueprintsMock.mockResolvedValue([
-      {
-        id: "blueprint-1",
-        name: "Review Pipeline",
-        description: "Reviewer collaboration pattern",
-        version: 1,
-        slots: [
-          {
-            id: "slot-1",
-            role_name: "Reviewer",
-            display_name: "Primary Reviewer",
-          },
-        ],
-        edges: [],
-        created_at: 1,
-        updated_at: 1,
-        node_count: 1,
-        edge_count: 0,
-      },
-    ]);
-    saveTabAsBlueprintRequestMock.mockResolvedValue({
-      id: "blueprint-2",
-      name: "Saved Network",
-      description: "Saved from current network",
-      version: 1,
-      slots: [],
-      edges: [],
-      created_at: 1,
-      updated_at: 1,
-      node_count: 0,
-      edge_count: 0,
-    });
-    useAgentUIMock.mockReturnValue({
-      activeTabId: "tab-1",
-      pendingAssistantMessages: [],
-      selectedAgentId: null,
-      selectAgent: vi.fn(),
-      setActiveTabId: vi.fn(),
-    });
-
+  it("does not expose removed blueprint actions in the workspace toolbar", async () => {
     render(<HomePage />);
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Save as Blueprint" })[0],
-    );
-    fireEvent.change(screen.getByLabelText("Blueprint name"), {
-      target: { value: "Saved Network" },
-    });
-    fireEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Save as Blueprint",
-      }),
-    );
-
     await waitFor(() =>
-      expect(saveTabAsBlueprintRequestMock).toHaveBeenCalledWith(
-        "tab-1",
-        "Saved Network",
-        "",
-      ),
+      expect(
+        screen.queryByRole("button", { name: /Blueprint/i }),
+      ).not.toBeInTheDocument(),
     );
-    expect(toastSuccessMock).toHaveBeenCalledWith("Blueprint saved to library");
   });
 
   it("keeps the workspace toolbar centered while constraining overflow inside the background", () => {
@@ -430,12 +362,12 @@ describe("HomePage", () => {
     }
   });
 
-  it("adds an agent through the custom dialog", async () => {
+  it("adds an agent node through the custom dialog", async () => {
     createTabNodeRequestMock.mockResolvedValue(undefined);
 
     render(<HomePage />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Add Agent" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "Add Node" })[0]);
     const dialog = await screen.findByRole("dialog");
     const reviewerButton = within(dialog)
       .getByText("Reviewer")
@@ -444,17 +376,18 @@ describe("HomePage", () => {
       throw new Error("Reviewer role button not found");
     }
     fireEvent.click(reviewerButton);
-    fireEvent.change(screen.getByLabelText("Agent display name"), {
+    fireEvent.change(screen.getByLabelText("Node display name"), {
       target: { value: "Release Reviewer" },
     });
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Add Agent",
+        name: "Add Node",
       }),
     );
 
     await waitFor(() =>
       expect(createTabNodeRequestMock).toHaveBeenCalledWith("tab-1", {
+        node_type: "agent",
         role_name: "Reviewer",
         name: "Release Reviewer",
       }),
@@ -676,7 +609,7 @@ describe("HomePage", () => {
     render(<HomePage />);
 
     fireEvent.click(screen.getAllByLabelText("Delete Example Tab")[0]);
-    fireEvent.click(screen.getByRole("button", { name: "Delete Tab" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Workflow" }));
 
     await waitFor(() =>
       expect(deleteTabRequestMock).toHaveBeenCalledWith("tab-1"),
@@ -718,7 +651,7 @@ describe("HomePage", () => {
     );
 
     expect(setActiveTabId).not.toHaveBeenCalledWith("tab-1");
-    fireEvent.click(screen.getByRole("button", { name: "Delete Tab" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Workflow" }));
 
     await waitFor(() =>
       expect(deleteTabRequestMock).toHaveBeenCalledWith("tab-1"),

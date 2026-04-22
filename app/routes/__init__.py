@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.routes.access import router as access_router
 from app.routes.assistant import router as assistant_router
-from app.routes.blueprints import router as blueprints_router
 from app.routes.image_assets import router as image_assets_router
 from app.routes.mcp import router as mcp_router
 from app.routes.meta import router as meta_router
@@ -19,7 +18,6 @@ router = APIRouter()
 router.include_router(access_router)
 router.include_router(nodes_router)
 router.include_router(assistant_router)
-router.include_router(blueprints_router)
 router.include_router(image_assets_router)
 router.include_router(mcp_router)
 router.include_router(roles_router)

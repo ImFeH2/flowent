@@ -22,7 +22,6 @@ import {
   useAgentTabsRuntime,
   useAgentUI,
 } from "@/context/AgentContext";
-import { terminateNode } from "@/lib/api";
 import { AGENT_NODE_HEIGHT, getAgentNodeWidth } from "@/lib/layout";
 import { getNodeLabel } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -37,9 +36,6 @@ import {
   NODE_EXIT_MS,
   VIEWPORT_FIT_MAX_ZOOM,
   VIEWPORT_FIT_PADDING,
-  getCanonicalEdgeId,
-  getHorizontalHandleIds,
-  getPointerPosition,
 } from "@/components/agent-graph/lib";
 
 function useTransientGraphElements(
@@ -177,37 +173,20 @@ export function useAgentGraphController({
   onConnectModeChange,
   onCreateConnection = async () => undefined,
   onDeleteConnection = async () => undefined,
-  onCreateStandaloneAgent = async () => undefined,
-  onCreateLinkedAgent = async () => undefined,
-  onDeleteAgent = async () => undefined,
-  onInsertAgentBetween = async () => undefined,
-  onOpenConnectDialog = () => undefined,
 }: AgentGraphProps): AgentGraphController {
   const { agents } = useAgentNodesRuntime();
   const { tabs } = useAgentTabsRuntime();
-  const { activeMessages, activeToolCalls } = useAgentActivityRuntime();
+  const { activeToolCalls } = useAgentActivityRuntime();
   const { activeTabId, selectedAgentId, selectAgent } = useAgentUI();
   const [tooltip, setTooltip] = useState<AgentGraphController["tooltip"]>(null);
   const [contextMenu, setContextMenu] =
     useState<AgentGraphController["contextMenu"]>(null);
-  const [quickCreate, setQuickCreate] =
-    useState<AgentGraphController["quickCreate"]>(null);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(
     null,
   );
   const [viewportZoom, setViewportZoom] = useState(1);
-  const [connecting, setConnecting] = useState(false);
-  const [connectMode, setConnectMode] = useState(false);
-  const [targetPickSourceId, setTargetPickSourceId] = useState<string | null>(
-    null,
-  );
-  const [dragConnectionSourceId, setDragConnectionSourceId] = useState<
-    string | null
-  >(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [quickCreateRoleName, setQuickCreateRoleName] = useState("");
-  const [quickCreateName, setQuickCreateName] = useState("");
-  const [submittingQuickCreate, setSubmittingQuickCreate] = useState(false);
+  const [connectMode, setConnectMode] = useState(false);
   const layoutWorker = useRef<Worker | null>(null);
   const requestedLayoutKey = useRef("");
   const layoutRetryCounts = useRef(new Map<string, number>());
@@ -223,6 +202,16 @@ export function useAgentGraphController({
     width: number;
     height: number;
   } | null>(null);
+
+  const activeTab = activeTabId ? (tabs.get(activeTabId) ?? null) : null;
+  const workflowNodes = useMemo(
+    () => activeTab?.definition.nodes ?? [],
+    [activeTab?.definition.nodes],
+  );
+  const workflowEdges = useMemo(
+    () => activeTab?.definition.edges ?? [],
+    [activeTab?.definition.edges],
+  );
 
   const scheduleLayoutRetry = useCallback(
     (key: string, message: string, detail?: unknown) => {
@@ -297,6 +286,10 @@ export function useAgentGraphController({
     };
   }, [scheduleLayoutRetry]);
 
+  useEffect(() => {
+    onConnectModeChange?.(connectMode);
+  }, [connectMode, onConnectModeChange]);
+
   const syncViewportZoom = useCallback((zoom: number) => {
     if (!Number.isFinite(zoom) || zoom <= 0) {
       return;
@@ -345,140 +338,51 @@ export function useAgentGraphController({
     [syncViewportZoom],
   );
 
-  const closeQuickCreate = useCallback(() => {
-    setQuickCreate(null);
-    setQuickCreateRoleName("");
-    setQuickCreateName("");
-  }, []);
-
-  const resetConnectionModes = useCallback(() => {
-    setConnectMode(false);
-    setTargetPickSourceId(null);
-    setDragConnectionSourceId(null);
-  }, []);
-
-  const clearGraphSelection = useCallback(() => {
-    selectAgent(null);
-    setSelectedEdgeId(null);
-    setTooltip(null);
-    setContextMenu(null);
-    closeQuickCreate();
-    resetConnectionModes();
-  }, [closeQuickCreate, resetConnectionModes, selectAgent]);
-
-  const openQuickCreate = useCallback(
-    (state: NonNullable<typeof quickCreate>) => {
-      setContextMenu(null);
-      setQuickCreateRoleName("");
-      setQuickCreateName("");
-      setQuickCreate(state);
-      setConnectMode(false);
-      setTargetPickSourceId(null);
-    },
-    [],
-  );
-
   const enterConnectMode = useCallback(() => {
-    setContextMenu(null);
-    closeQuickCreate();
-    setSelectedEdgeId(null);
-    setTargetPickSourceId(null);
-    setConnectMode(true);
-  }, [closeQuickCreate]);
+    setConnectMode((current) => !current);
+  }, []);
 
-  useEffect(() => {
-    onConnectModeChange?.(connectMode);
-  }, [connectMode, onConnectModeChange]);
-
-  const activeEdgeMessages = useMemo(() => {
-    const map = new Map<
-      string,
-      { fromId: string; toId: string; timestamp: number }
-    >();
-    for (const msg of activeMessages) {
-      const edgeId = getCanonicalEdgeId(msg.fromId, msg.toId);
-      const current = map.get(edgeId);
-      if (!current || current.timestamp <= msg.timestamp) {
-        map.set(edgeId, {
-          fromId: msg.fromId,
-          toId: msg.toId,
-          timestamp: msg.timestamp,
-        });
-      }
-    }
-    return map;
-  }, [activeMessages]);
-
-  const visibleAgents = useMemo(
-    () =>
-      Array.from(agents.values()).filter((agent) => {
-        if (agent.node_type === "assistant" || agent.is_leader) {
-          return false;
-        }
-        if (activeTabId) {
-          return agent.tab_id === activeTabId;
-        }
-        return agent.tab_id == null;
-      }),
-    [activeTabId, agents],
-  );
-
-  const visibleAgentMap = useMemo(
-    () => new Map(visibleAgents.map((agent) => [agent.id, agent] as const)),
-    [visibleAgents],
-  );
-  const connectPreviewSourceId = dragConnectionSourceId ?? targetPickSourceId;
-  const showConnectionEntryHint =
-    Boolean(activeTabId) &&
-    (connectMode || connecting || Boolean(connectPreviewSourceId));
-  const isValidDirectConnection = useCallback(
-    (sourceNodeId: string, targetNodeId: string) => {
-      if (sourceNodeId === targetNodeId) {
-        return false;
-      }
-      const sourceNode = visibleAgentMap.get(sourceNodeId);
-      const targetNode = visibleAgentMap.get(targetNodeId);
-      if (!sourceNode || !targetNode) {
-        return false;
-      }
-      return !sourceNode.connections.includes(targetNodeId);
-    },
-    [visibleAgentMap],
+  const runtimeAgentMap = useMemo(
+    () => new Map(Array.from(agents.entries())),
+    [agents],
   );
 
   const transientData = useMemo(() => {
     const data = new Map<string, AgentNodeData>();
 
-    for (const agent of visibleAgents) {
-      const id = agent.id;
+    for (const node of workflowNodes) {
+      const runtimeNode = runtimeAgentMap.get(node.id) ?? null;
       const label = getNodeLabel({
-        name: agent.name,
-        roleName: agent.role_name,
-        nodeType: agent.node_type,
-        isLeader: agent.is_leader,
+        name: typeof node.config.name === "string" ? node.config.name : null,
+        roleName:
+          typeof node.config.role_name === "string"
+            ? node.config.role_name
+            : null,
+        nodeType: node.type,
+        isLeader: false,
       });
-      data.set(id, {
+      data.set(node.id, {
         label,
         width: getAgentNodeWidth(label),
-        node_type: agent.node_type,
-        is_leader: agent.is_leader,
-        state: agent.state,
-        shortId: id.slice(0, 8),
-        name: agent.name,
-        role_name: agent.role_name,
-        latestTodo: agent.todos[agent.todos.length - 1]?.text ?? null,
-        selected: id === selectedAgentId && selectedEdgeId === null,
-        toolCall: activeToolCalls.get(id) ?? null,
+        node_type: node.type,
+        is_leader: false,
+        state: runtimeNode?.state ?? "idle",
+        shortId: node.id.slice(0, 8),
+        name: typeof node.config.name === "string" ? node.config.name : null,
+        role_name:
+          typeof node.config.role_name === "string"
+            ? node.config.role_name
+            : null,
+        latestTodo:
+          runtimeNode?.todos[runtimeNode.todos.length - 1]?.text ?? null,
+        selected: node.id === selectedAgentId && selectedEdgeId === null,
+        toolCall: runtimeNode ? (activeToolCalls.get(node.id) ?? null) : null,
         leaving: false,
         canConnect: Boolean(activeTabId),
-        showConnectionEntryHint,
-        connectionState: connectPreviewSourceId
-          ? id === connectPreviewSourceId
-            ? "source"
-            : isValidDirectConnection(connectPreviewSourceId, id)
-              ? "valid-target"
-              : "invalid-target"
-          : null,
+        showConnectionEntryHint: connectMode,
+        connectionState: null,
+        inputPorts: node.inputs,
+        outputPorts: node.outputs,
       });
     }
 
@@ -486,49 +390,22 @@ export function useAgentGraphController({
   }, [
     activeTabId,
     activeToolCalls,
-    connectPreviewSourceId,
-    isValidDirectConnection,
+    connectMode,
+    runtimeAgentMap,
     selectedAgentId,
     selectedEdgeId,
-    showConnectionEntryHint,
-    visibleAgents,
+    workflowNodes,
   ]);
 
   const { rawNodes, baseEdges, structureKey } = useMemo(() => {
-    const visibleAgentIds = new Set<string>();
-    for (let i = 0; i < visibleAgents.length; i++)
-      visibleAgentIds.add(visibleAgents[i].id);
-    const seenEdgeIds = new Set<string>();
-    const nextBaseEdges: FlowEdge[] = [];
-    for (const agent of visibleAgents) {
-      for (const targetId of agent.connections) {
-        if (!visibleAgentIds.has(targetId)) {
-          continue;
-        }
-        const edgeId = getCanonicalEdgeId(agent.id, targetId);
-        if (seenEdgeIds.has(edgeId)) {
-          continue;
-        }
-        seenEdgeIds.add(edgeId);
-        const [source, target] =
-          agent.id <= targetId ? [agent.id, targetId] : [targetId, agent.id];
-        nextBaseEdges.push({
-          id: edgeId,
-          source,
-          target,
-          type: "animated",
-        });
-      }
-    }
-
-    const nextRawNodes: FlowNode[] = visibleAgents.flatMap((agent) => {
-      const data = transientData.get(agent.id);
+    const nextRawNodes: FlowNode[] = workflowNodes.flatMap((node) => {
+      const data = transientData.get(node.id);
       if (!data) {
         return [];
       }
       return [
         {
-          id: agent.id,
+          id: node.id,
           type: "agent",
           position: { x: 0, y: 0 },
           width: data.width,
@@ -539,17 +416,26 @@ export function useAgentGraphController({
       ];
     });
 
-    const nextStructureKey = `${activeTabId ?? "unassigned"}:${visibleAgents
-      .map((agent) => {
-        const data = transientData.get(agent.id);
-        return `${agent.id}:${data?.label ?? ""}:${agent.connections
-          .filter((targetId) => visibleAgentIds.has(targetId))
-          .sort()
-          .join(",")}`;
-      })
+    const nextBaseEdges: FlowEdge[] = workflowEdges.map((edge) => ({
+      id: edge.id,
+      source: edge.from_node_id,
+      sourceHandle: edge.from_port_key,
+      target: edge.to_node_id,
+      targetHandle: edge.to_port_key,
+      type: "animated",
+      data: {
+        kind: edge.kind,
+      },
+    }));
+
+    const nextStructureKey = `${activeTabId ?? "unassigned"}:${workflowNodes
+      .map((node) => `${node.id}:${node.type}:${JSON.stringify(node.config)}`)
       .sort()
-      .join("|")}:${nextBaseEdges
-      .map((edge) => edge.id)
+      .join("|")}:${workflowEdges
+      .map(
+        (edge) =>
+          `${edge.id}:${edge.from_node_id}:${edge.from_port_key}:${edge.to_node_id}:${edge.to_port_key}:${edge.kind}`,
+      )
       .sort()
       .join("|")}`;
 
@@ -558,7 +444,7 @@ export function useAgentGraphController({
       baseEdges: nextBaseEdges,
       structureKey: nextStructureKey,
     };
-  }, [activeTabId, transientData, visibleAgents]);
+  }, [activeTabId, transientData, workflowEdges, workflowNodes]);
 
   useEffect(() => {
     if (rawNodes.length === 0) {
@@ -590,36 +476,19 @@ export function useAgentGraphController({
       ...node,
       position: positions.get(node.id) ?? { x: 0, y: 0 },
     }));
-    const nodePositions = new Map(
-      nodes.map((node) => [node.id, node.position] as const),
-    );
-    const edges = baseEdges.map((edge) => {
-      const activeMessage = activeEdgeMessages.get(edge.id);
-      const handleIds = getHorizontalHandleIds(
-        nodePositions.get(edge.source),
-        nodePositions.get(edge.target),
-      );
-      return {
-        ...edge,
-        ...handleIds,
-        data: {
-          active: !!activeMessage,
-          flowDirection: activeMessage
-            ? activeMessage.fromId === edge.source &&
-              activeMessage.toId === edge.target
-              ? "forward"
-              : "reverse"
-            : null,
-          leaving: false,
-          selected: edge.id === selectedEdgeId,
-        },
-        animated: false,
-      } satisfies FlowEdge;
-    });
+    const edges = baseEdges.map((edge) => ({
+      ...edge,
+      data: {
+        active: false,
+        flowDirection: null,
+        leaving: false,
+        selected: edge.id === selectedEdgeId,
+      },
+      animated: false,
+    }));
 
     return { nodes, edges, structureKey };
   }, [
-    activeEdgeMessages,
     baseEdges,
     layoutState.positions,
     rawNodes,
@@ -632,98 +501,74 @@ export function useAgentGraphController({
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
-      if (
-        node.type !== "agent" ||
-        (node.data as Record<string, unknown> | undefined)?.leaving
-      ) {
-        return;
-      }
-      if (targetPickSourceId && activeTabId) {
-        if (node.id === targetPickSourceId) {
-          return;
-        }
-        if (!isValidDirectConnection(targetPickSourceId, node.id)) {
-          toast.error("Duplicate connections are not allowed");
-          return;
-        }
-        void onCreateConnection(activeTabId, targetPickSourceId, node.id)
-          .then(() => {
-            setTargetPickSourceId(null);
-            setSelectedEdgeId(null);
-          })
-          .catch((error) => {
-            toast.error(
-              error instanceof Error
-                ? error.message
-                : "Failed to connect agents",
-            );
-          });
-        return;
-      }
       setSelectedEdgeId(null);
-      selectAgent(node.id);
+      if (runtimeAgentMap.has(node.id)) {
+        selectAgent(node.id);
+      } else {
+        selectAgent(null);
+      }
     },
-    [
-      activeTabId,
-      isValidDirectConnection,
-      onCreateConnection,
-      selectAgent,
-      targetPickSourceId,
-    ],
+    [runtimeAgentMap, selectAgent],
   );
 
-  const onNodeMouseEnter: NodeMouseHandler = useCallback((event, node) => {
-    if (node.type !== "agent") {
-      return;
-    }
-    const mouseEvent = event as unknown as ReactMouseEvent;
-    setTooltip({
-      agentId: node.id,
-      x: mouseEvent.clientX,
-      y: mouseEvent.clientY,
-    });
-  }, []);
+  const onNodeMouseEnter: NodeMouseHandler = useCallback(
+    (event, node) => {
+      if (!runtimeAgentMap.has(node.id)) {
+        return;
+      }
+      const mouseEvent = event as unknown as ReactMouseEvent;
+      setTooltip({
+        agentId: node.id,
+        x: mouseEvent.clientX,
+        y: mouseEvent.clientY,
+      });
+    },
+    [runtimeAgentMap],
+  );
 
-  const onNodeMouseMove: NodeMouseHandler = useCallback((event, node) => {
-    if (node.type !== "agent") {
-      return;
-    }
-    const mouseEvent = event as unknown as ReactMouseEvent;
-    setTooltip({
-      agentId: node.id,
-      x: mouseEvent.clientX,
-      y: mouseEvent.clientY,
-    });
-  }, []);
+  const onNodeMouseMove: NodeMouseHandler = useCallback(
+    (event, node) => {
+      if (!runtimeAgentMap.has(node.id)) {
+        return;
+      }
+      const mouseEvent = event as unknown as ReactMouseEvent;
+      setTooltip({
+        agentId: node.id,
+        x: mouseEvent.clientX,
+        y: mouseEvent.clientY,
+      });
+    },
+    [runtimeAgentMap],
+  );
 
   const onNodeMouseLeave: NodeMouseHandler = useCallback(() => {
     setTooltip(null);
   }, []);
 
   const onPaneClick = useCallback(() => {
-    clearGraphSelection();
-  }, [clearGraphSelection]);
+    setSelectedEdgeId(null);
+    setTooltip(null);
+    setContextMenu(null);
+    selectAgent(null);
+  }, [selectAgent]);
 
   const onPaneContextMenu = useCallback(
     (event: ReactMouseEvent | globalThis.MouseEvent) => {
       event.preventDefault();
-      setTooltip(null);
-      setContextMenu({
-        kind: "pane",
-        x: (event as globalThis.MouseEvent).clientX,
-        y: (event as globalThis.MouseEvent).clientY,
-      });
+      setContextMenu(null);
     },
     [],
   );
 
   const onNodeContextMenu: NodeMouseHandler = useCallback(
     (event, node) => {
-      if (node.type !== "agent") {
-        return;
-      }
+      const runtimeNode = runtimeAgentMap.get(node.id);
       const mouseEvent = event as unknown as globalThis.MouseEvent;
       mouseEvent.preventDefault();
+      if (!runtimeNode || !activeTabId) {
+        setContextMenu(null);
+        return;
+      }
       selectAgent(node.id);
       setSelectedEdgeId(null);
       setTooltip(null);
@@ -734,7 +579,7 @@ export function useAgentGraphController({
         agentId: node.id,
       });
     },
-    [selectAgent],
+    [activeTabId, runtimeAgentMap, selectAgent],
   );
 
   const onConnect = useCallback(
@@ -742,79 +587,42 @@ export function useAgentGraphController({
       if (!activeTabId || !connection.source || !connection.target) {
         return;
       }
-      void onCreateConnection(activeTabId, connection.source, connection.target)
+      void onCreateConnection(
+        activeTabId,
+        connection.source,
+        connection.target,
+        connection.sourceHandle ?? "out",
+        connection.targetHandle ?? "in",
+      )
         .then(() => {
           setConnectMode(false);
           setSelectedEdgeId(null);
         })
         .catch((error) => {
           toast.error(
-            error instanceof Error ? error.message : "Failed to connect agents",
+            error instanceof Error ? error.message : "Failed to connect nodes",
           );
         });
     },
     [activeTabId, onCreateConnection],
   );
 
-  const onConnectStart = useCallback(
-    (
-      _event: globalThis.MouseEvent | TouchEvent,
-      params?: {
-        nodeId: string | null;
-        handleType: "source" | "target" | null;
-      },
-    ) => {
-      setSelectedEdgeId(null);
-      setDragConnectionSourceId(params?.nodeId ?? null);
-      if (params?.nodeId) {
-        selectAgent(params.nodeId);
-      }
-      setConnecting(true);
-    },
-    [selectAgent],
-  );
+  const onConnectStart = useCallback(() => {}, []);
 
-  const onConnectEnd = useCallback(
-    (
-      event?: globalThis.MouseEvent | TouchEvent,
-      state?: Record<string, unknown>,
-    ) => {
-      setConnecting(false);
-      setDragConnectionSourceId(null);
-
-      const fromNode = state?.fromNode as { id: string } | null | undefined;
-      const toNode = state?.toNode as { id: string } | null | undefined;
-
-      if (!toNode && activeTabId && fromNode && event) {
-        const pointer = getPointerPosition(event);
-        if (pointer) {
-          openQuickCreate({
-            kind: "linked",
-            x: pointer.x,
-            y: pointer.y,
-            anchorNodeId: fromNode.id,
-          });
-          return;
-        }
-      }
-
-      if (!connectMode) {
-        setConnectMode(false);
-      }
-    },
-    [activeTabId, connectMode, openQuickCreate],
-  );
+  const onConnectEnd = useCallback(() => {
+    if (!connectMode) {
+      setConnectMode(false);
+    }
+  }, [connectMode]);
 
   const onEdgeClick: EdgeMouseHandler = useCallback(
     (_, edge) => {
       setSelectedEdgeId(edge.id);
       setTooltip(null);
       setContextMenu(null);
-      closeQuickCreate();
-      setTargetPickSourceId(null);
       selectAgent(null);
     },
-    [closeQuickCreate, selectAgent],
+    [selectAgent],
   );
 
   const onEdgeContextMenu: EdgeMouseHandler = useCallback(
@@ -841,87 +649,12 @@ export function useAgentGraphController({
   }, []);
 
   const contextMenuItems = useMemo((): ContextMenuEntry[] => {
-    if (!contextMenu) {
+    if (!contextMenu || contextMenu.kind !== "edge" || !activeTabId) {
       return [];
     }
-    const items: ContextMenuEntry[] = [];
-
-    if (contextMenu.kind === "node") {
-      const contextAgent = agents.get(contextMenu.agentId) ?? null;
-      if (!contextAgent || !activeTabId) {
-        return [];
-      }
-      items.push({
-        label: "Add Connected Agent",
-        onClick: () => {
-          openQuickCreate({
-            kind: "linked",
-            x: contextMenu.x,
-            y: contextMenu.y,
-            anchorNodeId: contextAgent.id,
-          });
-        },
-      });
-      items.push({
-        label: "Connect To...",
-        onClick: () => {
-          setQuickCreate(null);
-          setConnectMode(false);
-          setTargetPickSourceId(contextAgent.id);
-          setSelectedEdgeId(null);
-          selectAgent(contextAgent.id);
-        },
-      });
-      if (!contextAgent.is_leader) {
-        items.push("divider");
-        items.push({
-          label: "Stop Agent",
-          danger: true,
-          onClick: () => {
-            terminateNode(contextAgent.id).catch(() =>
-              toast.error("Failed to terminate agent"),
-            );
-          },
-        });
-        items.push({
-          label: "Delete Agent",
-          danger: true,
-          onClick: () => {
-            void onDeleteAgent({
-              tabId: activeTabId,
-              node: contextAgent,
-              tabAgents: visibleAgents,
-            }).catch((error) => {
-              toast.error(
-                error instanceof Error
-                  ? error.message
-                  : "Failed to delete agent",
-              );
-            });
-          },
-        });
-      }
-      return items;
-    }
-
-    if (contextMenu.kind === "edge") {
-      if (!activeTabId) {
-        return [];
-      }
-      items.push({
-        label: "Insert Agent Between",
-        onClick: () => {
-          openQuickCreate({
-            kind: "between",
-            x: contextMenu.x,
-            y: contextMenu.y,
-            sourceNodeId: contextMenu.sourceId,
-            targetNodeId: contextMenu.targetId,
-          });
-        },
-      });
-      items.push({
-        label: "Delete Connection",
+    return [
+      {
+        label: "Delete Edge",
         danger: true,
         onClick: () => {
           void onDeleteConnection(
@@ -930,67 +663,17 @@ export function useAgentGraphController({
             contextMenu.targetId,
           ).catch((error) => {
             toast.error(
-              error instanceof Error
-                ? error.message
-                : "Failed to delete connection",
+              error instanceof Error ? error.message : "Failed to delete edge",
             );
           });
         },
-      });
-      return items;
-    }
+      },
+    ];
+  }, [activeTabId, contextMenu, onDeleteConnection]);
 
-    items.push({
-      label: "Add Agent",
-      disabled: !activeTabId,
-      onClick: () => {
-        openQuickCreate({
-          kind: "standalone",
-          x: contextMenu.x,
-          y: contextMenu.y,
-        });
-      },
-    });
-    items.push({
-      label: "Connect Agents...",
-      disabled: !activeTabId || visibleAgents.length < 2,
-      onClick: onOpenConnectDialog,
-    });
-    items.push("divider");
-    items.push({
-      label: "Fit View",
-      disabled: !flowInstance,
-      onClick: () => {
-        void fitViewport({
-          padding: VIEWPORT_FIT_PADDING,
-          maxZoom: VIEWPORT_FIT_MAX_ZOOM,
-          duration: 350,
-        });
-      },
-    });
-    items.push({
-      label: "Clear Selection",
-      onClick: () => {
-        clearGraphSelection();
-      },
-    });
-    return items;
-  }, [
-    activeTabId,
-    agents,
-    clearGraphSelection,
-    contextMenu,
-    fitViewport,
-    flowInstance,
-    onDeleteAgent,
-    onDeleteConnection,
-    onOpenConnectDialog,
-    openQuickCreate,
-    selectAgent,
-    visibleAgents,
-  ]);
-
-  const tooltipAgent = tooltip ? (agents.get(tooltip.agentId) ?? null) : null;
+  const tooltipAgent = tooltip
+    ? (runtimeAgentMap.get(tooltip.agentId) ?? null)
+    : null;
   const tooltipToolCall =
     tooltip && tooltip.agentId
       ? (activeToolCalls.get(tooltip.agentId) ?? null)
@@ -1068,50 +751,6 @@ export function useAgentGraphController({
     };
   }, [animatedNodes.length, fitViewport, flowInstance]);
 
-  useEffect(() => {
-    if (
-      selectedEdgeId &&
-      !graphElements.edges.some((edge) => edge.id === selectedEdgeId)
-    ) {
-      setSelectedEdgeId(null);
-    }
-  }, [graphElements.edges, selectedEdgeId]);
-
-  useEffect(() => {
-    if (targetPickSourceId && !visibleAgentMap.has(targetPickSourceId)) {
-      setTargetPickSourceId(null);
-    }
-  }, [targetPickSourceId, visibleAgentMap]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") {
-        return;
-      }
-      if (quickCreate) {
-        closeQuickCreate();
-        return;
-      }
-      if (contextMenu) {
-        setContextMenu(null);
-        return;
-      }
-      if (targetPickSourceId || connectMode) {
-        resetConnectionModes();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
-    closeQuickCreate,
-    connectMode,
-    contextMenu,
-    quickCreate,
-    resetConnectionModes,
-    targetPickSourceId,
-  ]);
-
   const tooltipStyle = useMemo(() => {
     if (!tooltip || typeof window === "undefined") {
       return undefined;
@@ -1127,62 +766,12 @@ export function useAgentGraphController({
     return { left, top };
   }, [tooltip, tooltipSize]);
 
-  const availableRoles = roles;
-
-  const submitQuickCreate = useCallback(async () => {
-    if (!quickCreate || !activeTabId || !quickCreateRoleName.trim()) {
-      return;
-    }
-
-    setSubmittingQuickCreate(true);
-    try {
-      if (quickCreate.kind === "standalone") {
-        await onCreateStandaloneAgent({
-          tabId: activeTabId,
-          roleName: quickCreateRoleName,
-          name: quickCreateName,
-        });
-      } else if (quickCreate.kind === "linked") {
-        await onCreateLinkedAgent({
-          tabId: activeTabId,
-          anchorNodeId: quickCreate.anchorNodeId,
-          roleName: quickCreateRoleName,
-          name: quickCreateName,
-        });
-      } else {
-        await onInsertAgentBetween({
-          tabId: activeTabId,
-          sourceNodeId: quickCreate.sourceNodeId,
-          targetNodeId: quickCreate.targetNodeId,
-          roleName: quickCreateRoleName,
-          name: quickCreateName,
-        });
-      }
-      closeQuickCreate();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update network",
-      );
-    } finally {
-      setSubmittingQuickCreate(false);
-    }
-  }, [
-    activeTabId,
-    closeQuickCreate,
-    onCreateLinkedAgent,
-    onCreateStandaloneAgent,
-    onInsertAgentBetween,
-    quickCreate,
-    quickCreateName,
-    quickCreateRoleName,
-  ]);
-
   const emptyState = useMemo(() => {
     if (tabs.size === 0) {
       return {
         eyebrow: "Workspace",
         title: "No workflows yet",
-        description: "Create a workflow to start building an agent network.",
+        description: "Create a workflow to start building a workflow graph.",
         hint: "Use the + button in the workflow strip to open your first workspace.",
       };
     }
@@ -1190,56 +779,51 @@ export function useAgentGraphController({
       return {
         eyebrow: "Workspace",
         title: "Select a workflow",
-        description: "Choose a workflow to inspect and edit its agent network.",
-        hint: "Each workflow keeps its own goal, nodes, and connections.",
+        description: "Choose a workflow to inspect and edit its graph.",
+        hint: "Each workflow keeps its own goal, nodes, and edges.",
       };
     }
     return {
       eyebrow: "Empty canvas",
-      title: "This workflow is ready for its first agent",
-      description: "Add agents and connect them to build the network.",
-      hint: "Start with a worker, a reviewer, or another helper node.",
+      title: "This workflow is ready for its first node",
+      description: "Add nodes and connect ports to build the graph.",
+      hint: "Start with an agent, a trigger, or another workflow node.",
     };
   }, [activeTabId, tabs.size]);
 
-  const connectHintLabel = useMemo(() => {
-    if (targetPickSourceId) {
-      const sourceAgent = agents.get(targetPickSourceId);
-      return sourceAgent
-        ? `Connect ${getNodeLabel({
-            name: sourceAgent.name,
-            roleName: sourceAgent.role_name,
-            nodeType: sourceAgent.node_type,
-            isLeader: sourceAgent.is_leader,
-          })}`
-        : "Connect Agent";
-    }
-    if (connectMode) {
-      return "Connect Mode";
-    }
-    return null;
-  }, [agents, connectMode, targetPickSourceId]);
+  const connectHintLabel = connectMode ? "Connect Ports" : null;
 
   const isValidConnection = useCallback(
     (edgeOrConnection: FlowEdge | Connection) => {
-      if (!edgeOrConnection.source || !edgeOrConnection.target) {
+      if (
+        !edgeOrConnection.source ||
+        !edgeOrConnection.target ||
+        !edgeOrConnection.sourceHandle ||
+        !edgeOrConnection.targetHandle
+      ) {
         return false;
       }
-      return isValidDirectConnection(
-        edgeOrConnection.source,
-        edgeOrConnection.target,
+      if (edgeOrConnection.source === edgeOrConnection.target) {
+        return false;
+      }
+      return !workflowEdges.some(
+        (edge) =>
+          edge.from_node_id === edgeOrConnection.source &&
+          edge.from_port_key === edgeOrConnection.sourceHandle &&
+          edge.to_node_id === edgeOrConnection.target &&
+          edge.to_port_key === edgeOrConnection.targetHandle,
       );
     },
-    [isValidDirectConnection],
+    [workflowEdges],
   );
 
   return {
     activeTabId,
     animatedEdges,
     animatedNodes,
-    availableRoles,
+    availableRoles: roles,
     closeContextMenu,
-    closeQuickCreate,
+    closeQuickCreate: () => undefined,
     connectHintLabel,
     containerRef,
     contextMenu,
@@ -1262,15 +846,13 @@ export function useAgentGraphController({
     onNodeMouseMove,
     onPaneClick,
     onPaneContextMenu,
-    quickCreate,
-    quickCreateName,
-    quickCreateRoleName,
-    setQuickCreateName,
-    setQuickCreateRoleName,
-    submitQuickCreate: () => {
-      void submitQuickCreate();
-    },
-    submittingQuickCreate,
+    quickCreate: null,
+    quickCreateName: "",
+    quickCreateRoleName: "",
+    setQuickCreateName: () => undefined,
+    setQuickCreateRoleName: () => undefined,
+    submitQuickCreate: () => undefined,
+    submittingQuickCreate: false,
     tooltip,
     tooltipAgent,
     tooltipRef,

@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { useRef, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 import { nodeTypeIcon, stateColor, stateRing } from "@/lib/constants";
-import type { AgentState, NodeType } from "@/types";
+import type { AgentState, NodeType, WorkflowPort } from "@/types";
 
 interface AgentNodeData {
   label: string;
@@ -22,23 +22,10 @@ interface AgentNodeData {
   canConnect: boolean;
   showConnectionEntryHint: boolean;
   connectionState?: "source" | "valid-target" | "invalid-target" | null;
+  inputPorts: WorkflowPort[];
+  outputPorts: WorkflowPort[];
   [key: string]: unknown;
 }
-
-const connectionHandles = [
-  {
-    id: "left-entry",
-    type: "source" as const,
-    position: Position.Left,
-    side: "left" as const,
-  },
-  {
-    id: "right-entry",
-    type: "source" as const,
-    position: Position.Right,
-    side: "right" as const,
-  },
-];
 
 const nodeStateBorderClass: Record<AgentState, string> = {
   running: "border-graph-status-running/28",
@@ -72,6 +59,8 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
     canConnect,
     showConnectionEntryHint,
     connectionState,
+    inputPorts,
+    outputPorts,
   } = data as unknown as AgentNodeData;
   const leaving = Boolean((data as AgentNodeData).leaving);
   const Icon = nodeTypeIcon[node_type];
@@ -176,35 +165,62 @@ export const AgentNode = memo(function AgentNode({ data }: NodeProps) {
         )}
       />
 
-      {connectionHandles.map((handle) => (
+      {inputPorts.map((port, index) => (
         <Handle
-          key={handle.id}
-          id={handle.id}
-          type={handle.type}
-          position={handle.position}
+          key={`input-${port.key}`}
+          id={port.key}
+          type="target"
+          position={Position.Left}
           isConnectable={canConnect}
-          isConnectableStart={canConnect}
           isConnectableEnd={canConnect}
           className={cn(
             "!z-10 !h-[72%] !w-5 !-translate-y-1/2 !border-0 !bg-transparent !opacity-0 after:absolute after:-inset-3 after:content-['']",
           )}
-          style={{ top: "50%" }}
+          style={{
+            top: `${((index + 1) * 100) / (inputPorts.length + 1)}%`,
+          }}
+        />
+      ))}
+      {outputPorts.map((port, index) => (
+        <Handle
+          key={`output-${port.key}`}
+          id={port.key}
+          type="source"
+          position={Position.Right}
+          isConnectable={canConnect}
+          isConnectableStart={canConnect}
+          className={cn(
+            "!z-10 !h-[72%] !w-5 !-translate-y-1/2 !border-0 !bg-transparent !opacity-0 after:absolute after:-inset-3 after:content-['']",
+          )}
+          style={{
+            top: `${((index + 1) * 100) / (outputPorts.length + 1)}%`,
+          }}
         />
       ))}
 
       {showConnectionEntry
-        ? connectionHandles.map((handle) => (
+        ? [
             <div
-              key={`${handle.id}-entry`}
+              key="left-entry"
               aria-hidden="true"
-              data-testid={`connection-entry-${handle.side}`}
+              data-testid="connection-entry-left"
               className={cn(
                 "pointer-events-none absolute top-1/2 z-10 h-[72%] w-2.5 -translate-y-1/2 rounded-full border transition-[opacity,transform,box-shadow] duration-150",
-                handle.side === "left" ? "-left-1.5" : "-right-1.5",
+                "-left-1.5",
                 connectionEntryClass,
               )}
-            />
-          ))
+            />,
+            <div
+              key="right-entry"
+              aria-hidden="true"
+              data-testid="connection-entry-right"
+              className={cn(
+                "pointer-events-none absolute top-1/2 z-10 h-[72%] w-2.5 -translate-y-1/2 rounded-full border transition-[opacity,transform,box-shadow] duration-150",
+                "-right-1.5",
+                connectionEntryClass,
+              )}
+            />,
+          ]
         : null}
 
       <div

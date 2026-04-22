@@ -92,7 +92,7 @@ def test_worker_and_leader_are_stable_contacts_without_explicit_edge(
 
     assert edge_response.status_code == 400
     assert edge_response.json()["detail"] == (
-        "Leader does not participate in Agent Network edges"
+        "Tab Leader does not participate in Workflow Graph edges"
     )
 
 

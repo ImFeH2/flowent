@@ -1,4 +1,12 @@
-export type NodeType = "assistant" | "agent";
+export type NodeType =
+  | "assistant"
+  | "agent"
+  | "trigger"
+  | "code"
+  | "if"
+  | "merge";
+
+export type WorkflowNodeType = Exclude<NodeType, "assistant">;
 
 export interface AccessState {
   authenticated: boolean;
@@ -164,14 +172,37 @@ export interface NodeDetail {
   history: HistoryEntry[];
 }
 
-export type NetworkSourceState = "manual" | "blueprint-derived" | "drifted";
+export interface WorkflowPort {
+  key: string;
+  direction: "input" | "output";
+  kind: "control" | "data" | "event";
+  required: boolean;
+  multiple: boolean;
+}
 
-export interface NetworkSource {
-  state: NetworkSourceState;
-  blueprint_id: string | null;
-  blueprint_name: string | null;
-  blueprint_version: number | null;
-  blueprint_available: boolean;
+export interface WorkflowNodeDefinition {
+  id: string;
+  type: WorkflowNodeType;
+  config: Record<string, unknown>;
+  inputs: WorkflowPort[];
+  outputs: WorkflowPort[];
+}
+
+export interface WorkflowView {
+  positions?: Record<
+    string,
+    {
+      x: number;
+      y: number;
+    }
+  >;
+}
+
+export interface WorkflowDefinition {
+  version: number;
+  nodes: WorkflowNodeDefinition[];
+  edges: TabEdge[];
+  view?: WorkflowView;
 }
 
 export interface BlueprintSlot {
@@ -211,16 +242,19 @@ export interface TaskTab {
   leader_id?: string | null;
   created_at: number;
   updated_at: number;
-  network_source: NetworkSource;
+  definition: WorkflowDefinition;
   node_count?: number;
   edge_count?: number;
 }
 
 export interface TabEdge {
   id: string;
-  tab_id: string;
   from_node_id: string;
+  from_port_key: string;
   to_node_id: string;
+  to_port_key: string;
+  kind: "control" | "data" | "event";
+  tab_id?: string;
   created_at?: number;
 }
 

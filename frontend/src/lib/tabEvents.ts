@@ -1,20 +1,25 @@
-import type { AgentEvent, NetworkSource, Node, TaskTab } from "@/types";
-
-const NETWORK_SOURCE_STATES = new Set<NetworkSource["state"]>([
-  "manual",
-  "blueprint-derived",
-  "drifted",
-]);
+import type {
+  AgentEvent,
+  Node,
+  TabEdge,
+  TaskTab,
+  WorkflowDefinition,
+  WorkflowNodeDefinition,
+  WorkflowPort,
+  WorkflowView,
+  WorkflowNodeType,
+} from "@/types";
 
 const HAS_OWN = Object.prototype.hasOwnProperty;
-
-export const MANUAL_NETWORK_SOURCE: NetworkSource = {
-  state: "manual",
-  blueprint_id: null,
-  blueprint_name: null,
-  blueprint_version: null,
-  blueprint_available: false,
-};
+const WORKFLOW_NODE_TYPES = new Set<WorkflowNodeType>([
+  "agent",
+  "trigger",
+  "code",
+  "if",
+  "merge",
+]);
+const PORT_DIRECTIONS = new Set<WorkflowPort["direction"]>(["input", "output"]);
+const EDGE_KINDS = new Set<TabEdge["kind"]>(["control", "data", "event"]);
 
 function hasOwn(data: Record<string, unknown>, key: string): boolean {
   return HAS_OWN.call(data, key);
@@ -48,22 +53,95 @@ function readOptionalCount(
   return readNumberField(data, key);
 }
 
-function isNetworkSource(value: unknown): value is NetworkSource {
+function isWorkflowPort(value: unknown): value is WorkflowPort {
   if (!value || typeof value !== "object") {
     return false;
   }
-
-  const source = value as Record<string, unknown>;
+  const port = value as Record<string, unknown>;
   return (
-    NETWORK_SOURCE_STATES.has(source.state as NetworkSource["state"]) &&
-    (typeof source.blueprint_id === "string" || source.blueprint_id === null) &&
-    (typeof source.blueprint_name === "string" ||
-      source.blueprint_name === null) &&
-    (typeof source.blueprint_version === "number" ||
-      source.blueprint_version === null) &&
-    typeof source.blueprint_available === "boolean"
+    typeof port.key === "string" &&
+    PORT_DIRECTIONS.has(port.direction as WorkflowPort["direction"]) &&
+    EDGE_KINDS.has(port.kind as TabEdge["kind"]) &&
+    typeof port.required === "boolean" &&
+    typeof port.multiple === "boolean"
   );
 }
+
+function isTabEdge(value: unknown): value is TabEdge {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const edge = value as Record<string, unknown>;
+  return (
+    typeof edge.id === "string" &&
+    typeof edge.from_node_id === "string" &&
+    typeof edge.from_port_key === "string" &&
+    typeof edge.to_node_id === "string" &&
+    typeof edge.to_port_key === "string" &&
+    EDGE_KINDS.has(edge.kind as TabEdge["kind"])
+  );
+}
+
+function isWorkflowNodeDefinition(
+  value: unknown,
+): value is WorkflowNodeDefinition {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const node = value as Record<string, unknown>;
+  return (
+    typeof node.id === "string" &&
+    WORKFLOW_NODE_TYPES.has(node.type as WorkflowNodeType) &&
+    typeof node.config === "object" &&
+    node.config !== null &&
+    Array.isArray(node.inputs) &&
+    node.inputs.every(isWorkflowPort) &&
+    Array.isArray(node.outputs) &&
+    node.outputs.every(isWorkflowPort)
+  );
+}
+
+function isWorkflowView(value: unknown): value is WorkflowView {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const view = value as Record<string, unknown>;
+  if (view.positions === undefined) {
+    return true;
+  }
+  if (!view.positions || typeof view.positions !== "object") {
+    return false;
+  }
+  return Object.values(view.positions).every(
+    (position) =>
+      !!position &&
+      typeof position === "object" &&
+      typeof (position as { x?: unknown }).x === "number" &&
+      typeof (position as { y?: unknown }).y === "number",
+  );
+}
+
+function isWorkflowDefinition(value: unknown): value is WorkflowDefinition {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const definition = value as Record<string, unknown>;
+  return (
+    typeof definition.version === "number" &&
+    Array.isArray(definition.nodes) &&
+    definition.nodes.every(isWorkflowNodeDefinition) &&
+    Array.isArray(definition.edges) &&
+    definition.edges.every(isTabEdge) &&
+    (definition.view === undefined || isWorkflowView(definition.view))
+  );
+}
+
+export const EMPTY_WORKFLOW_DEFINITION: WorkflowDefinition = {
+  version: 1,
+  nodes: [],
+  edges: [],
+  view: {},
+};
 
 export function getTabEventId(data: AgentEvent["data"]): string | null {
   return typeof data.id === "string" ? data.id : null;
@@ -85,9 +163,9 @@ export function createTaskTabFromEvent(
     leader_id: readTabLeaderId(data) ?? null,
     created_at: readNumberField(data, "created_at") ?? now,
     updated_at: readNumberField(data, "updated_at") ?? now,
-    network_source: isNetworkSource(data.network_source)
-      ? data.network_source
-      : MANUAL_NETWORK_SOURCE,
+    definition: isWorkflowDefinition(data.definition)
+      ? data.definition
+      : EMPTY_WORKFLOW_DEFINITION,
     node_count: readOptionalCount(data, "node_count"),
     edge_count: readOptionalCount(data, "edge_count"),
   };
@@ -114,10 +192,10 @@ export function mergeTaskTabUpdate(
         : current.leader_id,
     created_at: readNumberField(data, "created_at") ?? current.created_at,
     updated_at: readNumberField(data, "updated_at") ?? current.updated_at,
-    network_source:
-      hasOwn(data, "network_source") && isNetworkSource(data.network_source)
-        ? data.network_source
-        : current.network_source,
+    definition:
+      hasOwn(data, "definition") && isWorkflowDefinition(data.definition)
+        ? data.definition
+        : current.definition,
     node_count: hasOwn(data, "node_count")
       ? readOptionalCount(data, "node_count")
       : current.node_count,

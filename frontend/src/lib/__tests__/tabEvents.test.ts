@@ -14,13 +14,7 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
     leader_id: overrides.leader_id ?? "leader-1",
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 2,
-    network_source: overrides.network_source ?? {
-      state: "manual",
-      blueprint_id: null,
-      blueprint_name: null,
-      blueprint_version: null,
-      blueprint_available: false,
-    },
+    definition: overrides.definition ?? { version: 1, nodes: [], edges: [] },
     node_count: overrides.node_count ?? 3,
     edge_count: overrides.edge_count ?? 2,
   };
@@ -43,15 +37,7 @@ function buildNode(overrides: Partial<Node> & Pick<Node, "id">): Node {
 
 describe("tabEvents", () => {
   it("merges tab updates incrementally instead of rebuilding missing fields", () => {
-    const current = buildTab({
-      network_source: {
-        state: "blueprint-derived",
-        blueprint_id: "bp-1",
-        blueprint_name: "Ops",
-        blueprint_version: 2,
-        blueprint_available: true,
-      },
-    });
+    const current = buildTab();
 
     expect(
       mergeTaskTabUpdate(current, {

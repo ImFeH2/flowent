@@ -11,6 +11,8 @@ export {
 export {
   fetchTabs,
   createTabRequest,
+  duplicateTabRequest,
+  updateTabDefinitionRequest,
   deleteTabRequest,
   fetchTabDetail,
   createTabNodeRequest,

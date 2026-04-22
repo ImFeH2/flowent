@@ -46,10 +46,6 @@ const AssistantPage = lazyPage(
   "AssistantPage",
 );
 const StatsPage = lazyPage(() => import("@/pages/StatsPage"), "StatsPage");
-const BlueprintsPage = lazyPage(
-  () => import("@/pages/BlueprintsPage"),
-  "BlueprintsPage",
-);
 const ProvidersPage = lazyPage(
   () => import("@/pages/ProvidersPage"),
   "ProvidersPage",
@@ -73,7 +69,6 @@ const SettingsPage = lazyPage(
 const lazyPageMap: Record<PageId, ComponentType> = {
   assistant: AssistantPage,
   workspace: HomePage,
-  blueprints: BlueprintsPage,
   providers: ProvidersPage,
   mcp: McpPage,
   roles: RolesPage,

@@ -375,22 +375,6 @@ class Agent:
                 append_contact(node.uuid)
             return contact_ids
 
-        with self._connections_lock:
-            for node_id in self.connections:
-                if node_id == leader_id:
-                    continue
-                append_contact(node_id)
-
-        for node in registry.get_all():
-            if node.uuid == self.uuid or node.node_type != NodeType.AGENT:
-                continue
-            if node.config.tab_id != self.config.tab_id:
-                continue
-            if node.uuid == leader_id:
-                continue
-            if node.is_connected_to(self.uuid):
-                append_contact(node.uuid)
-
         return contact_ids
 
     def get_contacts_info(self) -> list[dict[str, Any]]:
@@ -1266,7 +1250,7 @@ class Agent:
                 f"- Newly created agents still waiting for their first task: {targets}."
             )
             lines.append(
-                "- `create_agent` only creates a new peer node in the current Agent Network. It does not start work by itself."
+                "- `create_agent` only adds a new agent node to the current workflow. It does not start work by itself."
             )
             lines.append(
                 "- Before calling `idle`, dispatch each waiting agent a concrete first task with `send`."

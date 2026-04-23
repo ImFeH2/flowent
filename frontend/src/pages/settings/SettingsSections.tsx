@@ -91,63 +91,64 @@ export function AccessConfigurationSection({
   onAccessDraftChange,
 }: AccessConfigurationSectionProps) {
   return (
-    <section>
+    <section className="mt-8 first:mt-0">
       <SectionHeader title="Access Configuration" />
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <label htmlFor="new-access-code" className={formLabelClass}>
-            New Access Code
-          </label>
-          <SecretInput
-            id="new-access-code"
-            value={accessDraft.newCode}
-            onChange={(event) =>
-              onAccessDraftChange((current) => ({
-                ...current,
-                newCode: event.target.value,
-              }))
-            }
-            placeholder="Leave empty to keep the current access code"
-            showLabel="Show new access code"
-            hideLabel="Hide new access code"
-            buttonSize="default"
-          />
-        </div>
+      <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
+        <SettingsRow
+          label="New Access Code"
+          description="Leave empty to keep the current access code."
+        >
+          <div className="space-y-2 w-full">
+            <SecretInput
+              id="new-access-code"
+              value={accessDraft.newCode}
+              onChange={(event) =>
+                onAccessDraftChange((current) => ({
+                  ...current,
+                  newCode: event.target.value,
+                }))
+              }
+              placeholder="Leave empty to keep"
+              showLabel="Show new access code"
+              hideLabel="Hide new access code"
+              buttonSize="default"
+            />
+          </div>
+        </SettingsRow>
 
-        <div className="space-y-2">
-          <label htmlFor="confirm-access-code" className={formLabelClass}>
-            Confirm Access Code
-          </label>
-          <SecretInput
-            id="confirm-access-code"
-            value={accessDraft.confirmCode}
-            onChange={(event) =>
-              onAccessDraftChange((current) => ({
-                ...current,
-                confirmCode: event.target.value,
-              }))
-            }
-            placeholder="Repeat the new access code"
-            showLabel="Show confirmed access code"
-            hideLabel="Hide confirmed access code"
-            buttonSize="default"
-          />
-        </div>
-
-        <div className={cn("space-y-2", formHelpTextClass)}>
-          {accessDraftError ? (
-            <p className="text-destructive">{accessDraftError}</p>
-          ) : null}
-          <p>
-            Saving a new access code signs out all current admin sessions. You
-            will need to unlock the admin console again with the new code.
-          </p>
-          <p>
-            If no access code is configured, Autopoe generates one at startup.
-            The current access code is written to the local startup log on every
-            startup and is never shown here.
-          </p>
-        </div>
+        <SettingsRow
+          label="Confirm Access Code"
+          description="Saving a new access code signs out all current admin sessions."
+        >
+          <div className="space-y-2 w-full">
+            <SecretInput
+              id="confirm-access-code"
+              value={accessDraft.confirmCode}
+              onChange={(event) =>
+                onAccessDraftChange((current) => ({
+                  ...current,
+                  confirmCode: event.target.value,
+                }))
+              }
+              placeholder="Repeat the new access code"
+              showLabel="Show confirmed access code"
+              hideLabel="Hide confirmed access code"
+              buttonSize="default"
+            />
+            <div className={cn("space-y-2 pt-1", formHelpTextClass)}>
+              {accessDraftError ? (
+                <p className="text-destructive font-medium">
+                  {accessDraftError}
+                </p>
+              ) : null}
+              <p>
+                If no access code is configured, Autopoe generates one at
+                startup. The current access code is written to the local startup
+                log on every startup and is never shown here.
+              </p>
+            </div>
+          </div>
+        </SettingsRow>
       </div>
     </section>
   );
@@ -163,9 +164,9 @@ export function PathConfigurationSection({
   settings,
 }: PathConfigurationSectionProps) {
   return (
-    <section className="mt-12 border-t border-border pt-8">
+    <section className="mt-10">
       <SectionHeader title="Path Configuration" />
-      <div className="border border-dashed border-border rounded-lg bg-card/30">
+      <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
         <SettingsRow
           label="App Data Directory"
           description="Instance storage root"
@@ -226,9 +227,9 @@ export function AssistantConfigurationSection({
   settings,
 }: AssistantConfigurationSectionProps) {
   return (
-    <section className="mt-12 border-t border-border pt-8">
+    <section className="mt-10">
       <SectionHeader title="Assistant Configuration" />
-      <div className="border border-dashed border-border rounded-lg bg-card/30">
+      <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
         <SettingsRow label="Assistant Role" description="System role">
           <Select
             value={settings.assistant.role_name}
@@ -348,9 +349,9 @@ export function LeaderConfigurationSection({
   settings,
 }: LeaderConfigurationSectionProps) {
   return (
-    <section className="mt-12 border-t border-border pt-8">
+    <section className="mt-10">
       <SectionHeader title="Leader Configuration" />
-      <div className="border border-dashed border-border rounded-lg bg-card/30">
+      <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
         <SettingsRow
           label="Leader Role"
           description="Default workflow owner role"
@@ -420,9 +421,9 @@ export function ModelConfigurationSection({
   settings,
 }: ModelConfigurationSectionProps) {
   return (
-    <section className="mt-12 border-t border-border pt-8">
+    <section className="mt-10">
       <SectionHeader title="Model Configuration" />
-      <div className="border border-dashed border-border rounded-lg bg-card/30">
+      <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
         <SettingsRow
           label="Active Provider"
           description="Used when roles do not override"
@@ -994,7 +995,7 @@ interface SettingsFooterProps {
 
 export function SettingsFooter({ appVersion }: SettingsFooterProps) {
   return (
-    <div className="mt-10 flex flex-col items-center border-t border-border pt-6 text-center">
+    <div className="mt-12 flex flex-col items-center pt-2 pb-6 text-center">
       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Autopoe Agent Studio v{appVersion ?? "—"}
       </p>

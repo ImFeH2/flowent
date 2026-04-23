@@ -98,10 +98,12 @@ export function SectionHeader({
   description?: string;
 }) {
   return (
-    <div className="mb-5">
-      <h2 className="text-base font-medium text-foreground">{title}</h2>
+    <div className="mb-2.5 px-1">
+      <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        {title}
+      </h2>
       {description ? (
-        <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>
+        <p className="mt-1 text-[12px] text-muted-foreground">{description}</p>
       ) : null}
     </div>
   );
@@ -109,28 +111,34 @@ export function SectionHeader({
 
 export function SettingsRow({
   label,
+  description,
   children,
   valueClassName,
 }: {
   label: string;
-  description?: string; // Kept in interface so usages don't break
+  description?: string;
   children: ReactNode;
   valueClassName?: string;
 }) {
   return (
-    <div className="px-4 py-3 flex flex-col md:flex-row md:items-center justify-between border-b border-dashed last:border-b-0 gap-4">
-      <div className="min-w-0 shrink-0 md:max-w-[30%]">
-        <label className="text-[13px] font-medium text-muted-foreground">
+    <div className="flex flex-col gap-3 border-b border-border/50 px-4 py-4 last:border-b-0 md:flex-row md:items-start md:justify-between md:gap-4 transition-colors hover:bg-muted/30">
+      <div className="min-w-0 shrink-0 md:w-[35%] pt-0.5">
+        <label className="block text-[13px] font-medium text-foreground">
           {label}
         </label>
+        {description ? (
+          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground/80">
+            {description}
+          </p>
+        ) : null}
       </div>
       <div
         className={cn(
-          "w-full min-w-0 flex-1 md:max-w-[70%] flex md:justify-end",
+          "w-full min-w-0 flex-1 md:w-[65%] flex md:justify-end",
           valueClassName,
         )}
       >
-        {children}
+        <div className="w-full md:max-w-md space-y-3">{children}</div>
       </div>
     </div>
   );

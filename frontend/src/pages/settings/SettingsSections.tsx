@@ -138,6 +138,15 @@ export function AccessConfigurationSection({
           {accessDraftError ? (
             <p className="text-destructive">{accessDraftError}</p>
           ) : null}
+          <p>
+            Saving a new access code signs out all current admin sessions. You
+            will need to unlock the admin console again with the new code.
+          </p>
+          <p>
+            If no access code is configured, Autopoe generates one at startup.
+            The current access code is written to the local startup log on every
+            startup and is never shown here.
+          </p>
         </div>
       </div>
     </section>

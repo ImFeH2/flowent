@@ -263,6 +263,23 @@ describe("SettingsPage", () => {
     expect(guidance).toHaveTextContent(/system default entry/i);
   });
 
+  it("shows access guidance without revealing the current access code", async () => {
+    fetchSettingsBootstrap.mockResolvedValue(buildBootstrapData());
+
+    renderSettingsPage();
+
+    expect(
+      await screen.findByText(
+        /Saving a new access code signs out all current admin sessions/i,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /The current access code is written to the local startup log on every startup and is never shown here/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("saves normalized settings payload after focused edits", async () => {
     fetchSettingsBootstrap.mockResolvedValue(buildBootstrapData());
     saveSettings.mockResolvedValue({

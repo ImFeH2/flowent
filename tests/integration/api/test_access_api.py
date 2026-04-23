@@ -69,6 +69,7 @@ def test_admin_session_survives_backend_restart(monkeypatch, tmp_path):
     assert login_response.status_code == 200
     assert session_cookie
     persisted_settings, _ = settings_module._read_settings_file()
+    assert persisted_settings.access.code == "TEST-ACCESS-CODE"
     assert persisted_settings.access.session_signing_secret
 
     with _create_client(monkeypatch, tmp_path, configured=True) as restarted_client:
@@ -141,3 +142,41 @@ def test_access_state_reports_bootstrap_generated_code(monkeypatch, tmp_path):
         "bootstrap_generated": True,
         "requires_restart": False,
     }
+
+
+def test_legacy_hashed_only_access_rotates_to_persisted_code_at_startup(
+    monkeypatch,
+    tmp_path,
+):
+    import app.settings as settings_module
+    from app.access import set_access_code, verify_access_code
+
+    settings_file = tmp_path / "settings.json"
+    monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    settings = settings_module.Settings()
+    set_access_code(settings, "OLD-ACCESS-CODE")
+    settings.access.code = ""
+    settings_module.save_settings(settings)
+    monkeypatch.setattr(settings_module, "_cached_settings", None)
+
+    with TestClient(create_app()) as client:
+        access_state = client.get("/api/access/state")
+
+    assert access_state.status_code == 200
+    assert access_state.json() == {
+        "authenticated": False,
+        "configured": True,
+        "bootstrap_generated": True,
+        "requires_restart": False,
+    }
+
+    persisted_settings = settings_module.load_settings()
+    assert persisted_settings.access.code
+    assert persisted_settings.access.code != "OLD-ACCESS-CODE"
+    assert verify_access_code(
+        persisted_settings.access,
+        persisted_settings.access.code,
+    )
+    assert not verify_access_code(persisted_settings.access, "OLD-ACCESS-CODE")

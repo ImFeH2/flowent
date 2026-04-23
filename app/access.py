@@ -51,7 +51,9 @@ def generate_access_code() -> str:
 
 
 def is_access_configured(access: AccessSettings) -> bool:
-    return bool(access.code_hash.strip() and access.code_salt.strip())
+    return bool(
+        access.code.strip() and access.code_hash.strip() and access.code_salt.strip()
+    )
 
 
 def set_access_code(settings: Settings, code: str) -> None:
@@ -59,6 +61,7 @@ def set_access_code(settings: Settings, code: str) -> None:
     current_generation = settings.access.session_generation
     session_signing_secret = settings.access.session_signing_secret
     settings.access = AccessSettings(
+        code=code,
         code_hash=_hash_access_code(code, salt),
         code_salt=salt,
         session_generation=1 if current_generation <= 0 else current_generation + 1,
@@ -96,7 +99,7 @@ def ensure_access_bootstrap(settings: Settings) -> str | None:
     if not is_access_configured(settings.access):
         generated_code = generate_access_code()
         set_access_code(settings, generated_code)
-        logger.warning("Generated Autopoe admin access code: {}", generated_code)
+    logger.warning("Autopoe admin access code: {}", settings.access.code)
     with _runtime_lock:
         _runtime_state.bootstrap_generated = generated_code is not None
     return generated_code

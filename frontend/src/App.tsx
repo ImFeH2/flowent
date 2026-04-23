@@ -260,9 +260,7 @@ function AccessGate() {
   const accessUnavailable = state.requires_restart;
   const description = accessUnavailable
     ? "Access was reset locally. Restart Autopoe to generate a new access code in the startup log."
-    : state.bootstrap_generated
-      ? "A new access code was generated at startup. Read the local startup log and enter it here to unlock the admin console."
-      : "Enter the shared admin access code to unlock the admin console.";
+    : "Read the current admin access code from the local startup log and enter it here to unlock the admin console.";
 
   const handleSubmit = async () => {
     if (accessUnavailable) {

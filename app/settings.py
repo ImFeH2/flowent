@@ -202,6 +202,7 @@ class EventLogSettings:
 
 @dataclass
 class AccessSettings:
+    code: str = ""
     code_hash: str = ""
     code_salt: str = ""
     session_generation: int = 0
@@ -1069,7 +1070,9 @@ def serialize_settings(
     )
     data["access"] = {
         "configured": bool(
-            settings.access.code_hash.strip() and settings.access.code_salt.strip()
+            settings.access.code.strip()
+            and settings.access.code_hash.strip()
+            and settings.access.code_salt.strip()
         )
     }
     data["mcp_servers"] = [
@@ -1741,8 +1744,10 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         migrated = True
     raw_access_code_hash = access_data.get("code_hash", "")
     raw_access_code_salt = access_data.get("code_salt", "")
+    raw_access_code = access_data.get("code", "")
     raw_access_session_generation = access_data.get("session_generation", 0)
     raw_access_session_signing_secret = access_data.get("session_signing_secret", "")
+    access_code = raw_access_code.strip() if isinstance(raw_access_code, str) else ""
     access_code_hash = (
         raw_access_code_hash.strip() if isinstance(raw_access_code_hash, str) else ""
     )
@@ -1754,6 +1759,8 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         if isinstance(raw_access_session_signing_secret, str)
         else ""
     )
+    if raw_access_code is not None and not isinstance(raw_access_code, str):
+        migrated = True
     if raw_access_code_hash is not None and not isinstance(raw_access_code_hash, str):
         migrated = True
     if raw_access_code_salt is not None and not isinstance(raw_access_code_salt, str):
@@ -1774,12 +1781,14 @@ def _build_settings(data: dict[str, object]) -> tuple[Settings, bool]:
         access_session_generation = max(raw_access_session_generation, 0)
         if access_session_generation != raw_access_session_generation:
             migrated = True
-    if not access_code_hash or not access_code_salt:
-        if access_code_hash or access_code_salt:
+    if not access_code or not access_code_hash or not access_code_salt:
+        if access_code or access_code_hash or access_code_salt:
             migrated = True
+        access_code = ""
         access_code_hash = ""
         access_code_salt = ""
     access = AccessSettings(
+        code=access_code,
         code_hash=access_code_hash,
         code_salt=access_code_salt,
         session_generation=access_session_generation,

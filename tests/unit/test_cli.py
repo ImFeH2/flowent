@@ -28,6 +28,7 @@ def test_access_refresh_command_generates_new_persisted_access_code(
     assert output.startswith("Generated new access code: ")
     next_code = output.removeprefix("Generated new access code: ").strip()
     assert next_code
+    assert reloaded_settings.access.code == next_code
     assert verify_access_code(reloaded_settings.access, next_code)
     assert not verify_access_code(reloaded_settings.access, "OLD-ACCESS-CODE")
 
@@ -54,6 +55,7 @@ def test_access_reset_command_clears_persisted_access_code(
     assert output == (
         "Access configuration cleared. Restart Autopoe to generate a new access code."
     )
+    assert reloaded_settings.access.code == ""
     assert not is_access_configured(reloaded_settings.access)
 
 

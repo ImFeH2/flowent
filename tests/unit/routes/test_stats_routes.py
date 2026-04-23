@@ -48,9 +48,7 @@ def test_get_stats_returns_current_snapshots_and_recent_records(monkeypatch):
     )
     monkeypatch.setattr("app.routes.stats.get_settings", lambda: settings)
 
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Main Task", goal="", leader_id="leader-1")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Main Task", leader_id="leader-1"))
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,

@@ -67,7 +67,7 @@ def test_worker_and_leader_are_stable_contacts_without_explicit_edge(
 ):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
     worker = client.post(
         f"/api/tabs/{tab['id']}/nodes",
@@ -154,7 +154,7 @@ def test_assistant_cannot_be_terminated_via_nodes_api(client: TestClient):
 def test_tab_leader_cannot_be_terminated_directly(client: TestClient):
     created_tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
 
     response = client.post(f"/api/nodes/{created_tab['leader_id']}/terminate")
@@ -230,7 +230,7 @@ def test_assistant_chat_can_be_cleared_via_nodes_api(client: TestClient):
 def test_human_input_can_be_sent_directly_to_workflow_leader(client: TestClient):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
 
     response = client.post(
@@ -269,7 +269,7 @@ def test_leader_retry_rewrites_tail_and_reuses_image_parts(monkeypatch, client):
     assistant_id = _get_assistant_id(client)
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
     leader = registry.get(tab["leader_id"])
     assert leader is not None
@@ -354,7 +354,7 @@ def test_leader_retry_rejects_non_human_anchor(client: TestClient):
     assistant_id = _get_assistant_id(client)
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
     leader = registry.get(tab["leader_id"])
     assert leader is not None
@@ -375,7 +375,7 @@ def test_leader_retry_rejects_non_human_anchor(client: TestClient):
 def test_regular_worker_retry_is_not_available_via_nodes_api(client: TestClient):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
     worker = client.post(
         f"/api/tabs/{tab['id']}/nodes",
@@ -393,7 +393,7 @@ def test_regular_worker_retry_is_not_available_via_nodes_api(client: TestClient)
 def test_human_input_cannot_target_regular_worker(client: TestClient):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
     worker = client.post(
         f"/api/tabs/{tab['id']}/nodes",
@@ -414,7 +414,7 @@ def test_human_input_cannot_target_regular_worker(client: TestClient):
 def test_browser_cannot_spoof_non_human_sender_for_node_messages(client: TestClient):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
     worker = client.post(
         f"/api/tabs/{tab['id']}/nodes",
@@ -437,7 +437,7 @@ def test_leader_message_supports_structured_parts_and_image_validation(
 ):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Execution", "goal": "Coordinate work"},
+        json={"title": "Execution"},
     ).json()
     leader = registry.get(tab["leader_id"])
     assert leader is not None

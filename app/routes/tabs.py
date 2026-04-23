@@ -28,7 +28,6 @@ router = APIRouter()
 class CreateTabRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str
-    goal: str = ""
     allow_network: bool = False
     write_dirs: list[str] = []
 
@@ -118,7 +117,6 @@ async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
     try:
         tab = create_tab(
             title=title,
-            goal=req.goal,
             allow_network=req.allow_network,
             write_dirs=req.write_dirs,
         )

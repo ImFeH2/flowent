@@ -13,7 +13,6 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
   return {
     id: overrides.id ?? "tab-1",
     title: overrides.title ?? "Execution",
-    goal: overrides.goal ?? "Coordinate work",
     leader_id: overrides.leader_id ?? "leader-1",
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 1,
@@ -43,7 +42,7 @@ describe("useTabs", () => {
       timestamp: Date.now(),
       data: {
         id: "tab-1",
-        goal: "Review findings",
+        title: "Review findings",
         updated_at: 9,
       },
     };
@@ -54,7 +53,7 @@ describe("useTabs", () => {
 
     expect(result.current.tabs.get("tab-1")).toEqual({
       ...buildTab(),
-      goal: "Review findings",
+      title: "Review findings",
       updated_at: 9,
     });
   });

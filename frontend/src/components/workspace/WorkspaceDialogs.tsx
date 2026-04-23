@@ -49,9 +49,7 @@ export interface WorkspacePortOption {
 
 interface CreateTabDialogProps {
   allowNetwork: boolean;
-  goal: string;
   onAllowNetworkChange: (nextValue: boolean) => void;
-  onGoalChange: (nextValue: string) => void;
   onOpenChange: (open: boolean) => void;
   onSubmit: () => void;
   onTitleChange: (nextValue: string) => void;
@@ -64,9 +62,7 @@ interface CreateTabDialogProps {
 
 export function CreateTabDialog({
   allowNetwork,
-  goal,
   onAllowNetworkChange,
-  onGoalChange,
   onOpenChange,
   onSubmit,
   onTitleChange,
@@ -104,15 +100,6 @@ export function CreateTabDialog({
           onChange={(event) => onTitleChange(event.target.value)}
           placeholder="Release checklist"
           className={cn("h-10 rounded-md", workspaceDialogInputClass)}
-        />
-      </WorkspaceDialogField>
-      <WorkspaceDialogField label="Goal" hint="Optional">
-        <Textarea
-          value={goal}
-          aria-label="Workflow goal"
-          onChange={(event) => onGoalChange(event.target.value)}
-          placeholder="Summarize the task or outcome this workspace should drive."
-          className={cn("min-h-[116px] rounded-md", workspaceDialogInputClass)}
         />
       </WorkspaceDialogField>
       <WorkspaceDialogMeta>

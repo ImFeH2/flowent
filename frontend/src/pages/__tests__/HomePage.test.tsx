@@ -206,7 +206,6 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
   return {
     id: overrides.id ?? "tab-1",
     title: overrides.title ?? "Example Tab",
-    goal: overrides.goal ?? "Ship the workspace polish",
     leader_id: overrides.leader_id ?? "leader-1",
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 1,
@@ -271,7 +270,6 @@ function useMockHomePageState() {
     | null
   >(null);
   const [createTabTitle, setCreateTabTitle] = useState("");
-  const [createTabGoal, setCreateTabGoal] = useState("");
   const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
   const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
   const [createNodeType, setCreateNodeType] = useState<
@@ -328,7 +326,6 @@ function useMockHomePageState() {
     createNodeRoleName,
     createNodeType,
     createTabAllowNetwork,
-    createTabGoal,
     createTabTitle,
     createTabWriteDirs,
     definitionDraft,
@@ -378,7 +375,6 @@ function useMockHomePageState() {
       setPendingAction("create-tab");
       const createdTab = await createTabRequestMock(
         createTabTitle,
-        createTabGoal,
         createTabAllowNetwork,
         createTabWriteDirs
           .split("\n")
@@ -443,7 +439,6 @@ function useMockHomePageState() {
     setCreateNodeRoleName,
     setCreateNodeType,
     setCreateTabAllowNetwork,
-    setCreateTabGoal,
     setCreateTabTitle,
     setCreateTabWriteDirs,
     setDefinitionDraft,
@@ -554,7 +549,6 @@ describe("HomePage", () => {
     createTabRequestMock.mockResolvedValue({
       id: "tab-2",
       title: "Release Prep",
-      goal: "Coordinate the launch work",
       definition: { version: 1, nodes: [], edges: [] },
     });
 
@@ -564,15 +558,11 @@ describe("HomePage", () => {
     fireEvent.change(screen.getByLabelText("Workflow title"), {
       target: { value: "Release Prep" },
     });
-    fireEvent.change(screen.getByLabelText("Workflow goal"), {
-      target: { value: "Coordinate the launch work" },
-    });
     fireEvent.click(screen.getByRole("button", { name: "Create Workflow" }));
 
     await waitFor(() =>
       expect(createTabRequestMock).toHaveBeenCalledWith(
         "Release Prep",
-        "Coordinate the launch work",
         false,
         [],
       ),

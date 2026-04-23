@@ -10,7 +10,6 @@ from app.models.graph import WorkflowDefinition
 class Tab:
     id: str
     title: str
-    goal: str = ""
     leader_id: str | None = None
     definition: WorkflowDefinition = field(default_factory=WorkflowDefinition)
     created_at: float = field(default_factory=time.time)
@@ -20,7 +19,6 @@ class Tab:
         return {
             "id": self.id,
             "title": self.title,
-            "goal": self.goal,
             "leader_id": self.leader_id,
             "definition": self.definition.serialize(),
             "created_at": self.created_at,
@@ -35,7 +33,6 @@ class Tab:
         return cls(
             id=str(data.get("id", "")),
             title=str(data.get("title", "")),
-            goal=str(data.get("goal", "")),
             leader_id=str(data["leader_id"])
             if isinstance(data.get("leader_id"), str)
             else None,

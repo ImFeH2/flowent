@@ -54,7 +54,6 @@ def _serialize_tab_snapshots() -> list[dict[str, object]]:
         {
             "id": tab.id,
             "title": tab.title,
-            "goal": tab.goal,
             "leader_id": tab.leader_id,
             "created_at": tab.created_at,
             "updated_at": tab.updated_at,

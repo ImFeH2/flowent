@@ -93,7 +93,6 @@ export function useHomePageState() {
   const [pendingAction, setPendingAction] =
     useState<WorkspacePendingAction>(null);
   const [createTabTitle, setCreateTabTitle] = useState("");
-  const [createTabGoal, setCreateTabGoal] = useState("");
   const [createTabAllowNetwork, setCreateTabAllowNetwork] = useState(false);
   const [createTabWriteDirs, setCreateTabWriteDirs] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
@@ -390,7 +389,6 @@ export function useHomePageState() {
 
   const openCreateTabDialog = useCallback(() => {
     setCreateTabTitle("");
-    setCreateTabGoal("");
     setCreateTabAllowNetwork(false);
     setCreateTabWriteDirs("");
     setActiveDialog("create-tab");
@@ -409,14 +407,12 @@ export function useHomePageState() {
         .filter(Boolean);
       const tab = await createTabRequest(
         title,
-        createTabGoal.trim(),
         createTabAllowNetwork,
         writeDirsArray,
       );
       setActiveTabId(tab.id);
       setActiveDialog(null);
       setCreateTabTitle("");
-      setCreateTabGoal("");
       setCreateTabAllowNetwork(false);
       setCreateTabWriteDirs("");
     } catch (error) {
@@ -428,7 +424,6 @@ export function useHomePageState() {
     }
   }, [
     createTabAllowNetwork,
-    createTabGoal,
     createTabTitle,
     createTabWriteDirs,
     setActiveTabId,
@@ -633,7 +628,6 @@ export function useHomePageState() {
     createNodeRoleName,
     createNodeType,
     createTabAllowNetwork,
-    createTabGoal,
     createTabTitle,
     createTabWriteDirs,
     definitionDraft,
@@ -678,7 +672,6 @@ export function useHomePageState() {
     setCreateNodeRoleName,
     setCreateNodeType,
     setCreateTabAllowNetwork,
-    setCreateTabGoal,
     setCreateTabTitle,
     setCreateTabWriteDirs,
     setDefinitionDraft,

@@ -238,7 +238,6 @@ export interface AgentBlueprint {
 export interface TaskTab {
   id: string;
   title: string;
-  goal: string;
   leader_id?: string | null;
   created_at: number;
   updated_at: number;
@@ -486,7 +485,6 @@ export interface StatsUsage {
 export interface StatsTabSnapshot {
   id: string;
   title: string;
-  goal: string;
   leader_id?: string | null;
   created_at: number;
   updated_at: number;

@@ -21,7 +21,6 @@ export function HomePage() {
     createNodeRoleName,
     createNodeType,
     createTabAllowNetwork,
-    createTabGoal,
     createTabTitle,
     createTabWriteDirs,
     definitionDraft,
@@ -66,7 +65,6 @@ export function HomePage() {
     setCreateNodeRoleName,
     setCreateNodeType,
     setCreateTabAllowNetwork,
-    setCreateTabGoal,
     setCreateTabTitle,
     setCreateTabWriteDirs,
     setDefinitionDraft,
@@ -136,8 +134,6 @@ export function HomePage() {
         pending={pendingAction === "create-tab"}
         title={createTabTitle}
         onTitleChange={setCreateTabTitle}
-        goal={createTabGoal}
-        onGoalChange={setCreateTabGoal}
         allowNetwork={createTabAllowNetwork}
         onAllowNetworkChange={setCreateTabAllowNetwork}
         writeDirs={createTabWriteDirs}

@@ -47,7 +47,7 @@ def test_delete_tab_tool_deletes_tab_and_graph(monkeypatch):
     )
     registry.register(assistant)
 
-    tab = create_tab(title="Cleanup", goal="Remove this tab")
+    tab = create_tab(title="Cleanup")
     left, error = create_agent_node(role_name="Worker", tab_id=tab.id, name="Left")
     assert error is None and left is not None
     right, error = create_agent_node(role_name="Worker", tab_id=tab.id, name="Right")

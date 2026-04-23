@@ -267,16 +267,6 @@ export function AgentDetailPanel({
                     {detailRoleName ?? "None"}
                   </p>
                 </div>
-                {detailTab?.goal ? (
-                  <div className="sm:col-span-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Goal
-                    </p>
-                    <p className="mt-1 select-text text-foreground">
-                      {detailTab.goal}
-                    </p>
-                  </div>
-                ) : null}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">

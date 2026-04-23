@@ -780,7 +780,7 @@ export function useAgentGraphController({
         eyebrow: "Workspace",
         title: "Select a workflow",
         description: "Choose a workflow to inspect and edit its graph.",
-        hint: "Each workflow keeps its own goal, nodes, and edges.",
+        hint: "Each workflow keeps its own nodes and edges.",
       };
     }
     return {

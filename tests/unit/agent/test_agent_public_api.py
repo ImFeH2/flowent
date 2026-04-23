@@ -226,9 +226,7 @@ def test_contacts_tool_uses_agent_public_api(monkeypatch):
 def test_agent_get_contacts_info_keeps_only_leader_for_regular_agents():
     registry.reset()
     workspace_store.reset_cache()
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Task", leader_id="leader-a"))
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -280,9 +278,7 @@ def test_agent_get_contacts_info_keeps_only_leader_for_regular_agents():
 def test_agent_get_contacts_info_keeps_leader_stable_when_explicitly_connected():
     registry.reset()
     workspace_store.reset_cache()
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Task", leader_id="leader-a"))
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -324,9 +320,7 @@ def test_agent_get_contacts_info_keeps_leader_stable_when_explicitly_connected()
 def test_agent_get_contacts_info_ignores_peer_only_connections():
     registry.reset()
     workspace_store.reset_cache()
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Task", leader_id="leader-a"))
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -378,9 +372,7 @@ def test_agent_get_contacts_info_ignores_peer_only_connections():
 def test_leader_get_contacts_info_includes_assistant_and_all_tab_agents():
     registry.reset()
     workspace_store.reset_cache()
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Task", leader_id="leader-a"))
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
         uuid="assistant-a",
@@ -472,9 +464,7 @@ def test_leader_get_contacts_info_includes_assistant_and_all_tab_agents():
 def test_assistant_get_contacts_info_lists_registered_tab_leaders():
     registry.reset()
     workspace_store.reset_cache()
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Task", goal="", leader_id="leader-a")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Task", leader_id="leader-a"))
     assistant = Agent(
         NodeConfig(node_type=NodeType.ASSISTANT, role_name="Steward", name="Assistant"),
         uuid="assistant-a",
@@ -705,7 +695,7 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
     registry.reset()
 
     try:
-        tab = create_tab(title="Review", goal="Inspect code")
+        tab = create_tab(title="Review")
         left, error = create_agent_node(role_name="Worker", tab_id=tab.id, name="Left")
         assert error is None and left is not None
         right, error = create_agent_node(
@@ -724,7 +714,6 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
         assert len(summaries) == 1
         assert summaries[0]["id"] == tab.id
         assert summaries[0]["title"] == tab.title
-        assert summaries[0]["goal"] == tab.goal
         assert summaries[0]["created_at"] == tab.created_at
         assert isinstance(summaries[0]["updated_at"], float)
         assert summaries[0]["node_count"] == 2

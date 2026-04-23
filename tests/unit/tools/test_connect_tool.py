@@ -91,7 +91,7 @@ def register_graph_node(
 
 
 def test_connect_tool_creates_directed_workflow_edge():
-    tab = create_tab(title="Task", goal="Connect workflow")
+    tab = create_tab(title="Task")
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -155,7 +155,7 @@ def test_connect_tool_creates_directed_workflow_edge():
 
 
 def test_connect_tool_resolves_non_agent_workflow_nodes_by_name():
-    tab = create_tab(title="Task", goal="Connect workflow")
+    tab = create_tab(title="Task")
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -195,7 +195,7 @@ def test_connect_tool_resolves_non_agent_workflow_nodes_by_name():
 
 
 def test_connect_tool_rejects_leader_endpoints():
-    tab = create_tab(title="Task", goal="Reject leader edges")
+    tab = create_tab(title="Task")
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,

@@ -61,9 +61,7 @@ def reset_runtime_state(monkeypatch, tmp_path):
 
 
 def _register_tab_leader(*, tab_id: str = "tab-1", leader_id: str = "leader") -> Agent:
-    workspace_store.upsert_tab(
-        Tab(id=tab_id, title="Task", goal="", leader_id=leader_id)
-    )
+    workspace_store.upsert_tab(Tab(id=tab_id, title="Task", leader_id=leader_id))
     leader = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -186,9 +184,7 @@ def test_agent_retries_transient_llm_errors_before_succeeding(monkeypatch):
 
 
 def test_chat_with_retries_records_single_request_stat(monkeypatch):
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Task", leader_id="leader-1"))
     agent = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,
@@ -566,9 +562,7 @@ def test_get_llm_retry_429_delay_uses_active_provider_only_for_429(monkeypatch):
 
 
 def test_prepare_messages_records_auto_compact_stat(monkeypatch):
-    workspace_store.upsert_tab(
-        Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
-    )
+    workspace_store.upsert_tab(Tab(id="tab-1", title="Task", leader_id="leader-1"))
     agent = Agent(
         NodeConfig(
             node_type=NodeType.AGENT,

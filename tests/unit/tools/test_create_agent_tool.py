@@ -42,7 +42,7 @@ def test_leader_create_agent_defaults_to_current_tab_without_network_edge(
             ]
         ),
     )
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     owner = Agent(
         NodeConfig(
@@ -86,7 +86,7 @@ def test_create_agent_places_new_agent_after_anchor(monkeypatch):
             ]
         ),
     )
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     owner = Agent(
         NodeConfig(
@@ -137,7 +137,7 @@ def test_create_agent_rejects_assistant_for_ordinary_nodes(monkeypatch):
             roles=[RoleConfig(name="Worker", system_prompt="Do work.")],
         ),
     )
-    create_tab(title="Task", goal="Do work")
+    create_tab(title="Task")
 
     assistant = Agent(
         NodeConfig(
@@ -173,7 +173,7 @@ def test_create_agent_allows_explicitly_granted_task_node(monkeypatch):
             ],
         ),
     )
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     leader = Agent(
         NodeConfig(
@@ -220,7 +220,7 @@ def test_create_agent_rejects_task_node_without_tool(monkeypatch):
         "app.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     worker = Agent(
         NodeConfig(
@@ -249,7 +249,7 @@ def test_create_agent_rejects_tab_id_parameter(monkeypatch):
         "app.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     owner = Agent(
         NodeConfig(
@@ -281,7 +281,7 @@ def test_create_agent_rejects_reserved_conductor_role(monkeypatch):
             roles=[RoleConfig(name=CONDUCTOR_ROLE_NAME, system_prompt="Orchestrate.")],
         ),
     )
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     leader = Agent(
         NodeConfig(
@@ -319,7 +319,7 @@ def test_create_agent_respects_write_dir_and_network_boundaries(monkeypatch, tmp
     allowed_dir.mkdir()
     disallowed_dir = tmp_path / "disallowed"
     disallowed_dir.mkdir()
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     owner = Agent(
         NodeConfig(
@@ -372,7 +372,7 @@ def test_create_agent_also_respects_tab_leader_boundaries(monkeypatch, tmp_path)
     creator_dir.mkdir()
     creator_child = creator_dir / "child"
     creator_child.mkdir()
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     leader = Agent(
         NodeConfig(
@@ -445,7 +445,7 @@ def test_create_agent_rejects_removed_connect_to_creator_parameter(monkeypatch):
         "app.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
-    tab = create_tab(title="Task", goal="Do work")
+    tab = create_tab(title="Task")
 
     owner = Agent(
         NodeConfig(

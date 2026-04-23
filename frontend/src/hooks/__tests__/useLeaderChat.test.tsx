@@ -76,7 +76,6 @@ function buildActiveTab(): TaskTab {
   return {
     id: "tab-1",
     title: "Execution",
-    goal: "Coordinate work",
     leader_id: "leader",
     created_at: 1,
     updated_at: 1,

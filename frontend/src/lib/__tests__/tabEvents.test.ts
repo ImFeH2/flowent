@@ -10,7 +10,6 @@ function buildTab(overrides: Partial<TaskTab> = {}): TaskTab {
   return {
     id: overrides.id ?? "tab-1",
     title: overrides.title ?? "Execution",
-    goal: overrides.goal ?? "Coordinate work",
     leader_id: overrides.leader_id ?? "leader-1",
     created_at: overrides.created_at ?? 1,
     updated_at: overrides.updated_at ?? 2,
@@ -42,12 +41,12 @@ describe("tabEvents", () => {
     expect(
       mergeTaskTabUpdate(current, {
         id: current.id,
-        goal: "Ship review fixes",
+        title: "Ship review fixes",
         updated_at: 10,
       }),
     ).toEqual({
       ...current,
-      goal: "Ship review fixes",
+      title: "Ship review fixes",
       updated_at: 10,
     });
   });
@@ -79,7 +78,6 @@ describe("tabEvents", () => {
     ).toMatchObject({
       id: "tab-2",
       title: "Inspect",
-      goal: "",
       leader_id: null,
     });
 

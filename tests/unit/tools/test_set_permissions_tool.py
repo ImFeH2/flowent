@@ -75,7 +75,7 @@ def test_set_permissions_updates_leader_and_clamps_existing_workers(tmp_path):
     keep_dir.mkdir(parents=True)
     drop_dir.mkdir(parents=True)
 
-    tab = Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    tab = Tab(id="tab-1", title="Task", leader_id="leader-1")
     workspace_store.upsert_tab(tab)
     leader = _make_record(
         node_id="leader-1",
@@ -149,7 +149,7 @@ def test_set_permissions_keeps_omitted_fields_unchanged(tmp_path):
     root_dir.mkdir()
     narrowed_dir.mkdir()
 
-    tab = Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    tab = Tab(id="tab-1", title="Task", leader_id="leader-1")
     workspace_store.upsert_tab(tab)
     leader = _make_record(
         node_id="leader-1",
@@ -193,7 +193,7 @@ def test_set_permissions_does_not_auto_broaden_existing_workers(tmp_path):
     worker_dir = current_boundary / "child"
     worker_dir.mkdir(parents=True)
 
-    tab = Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    tab = Tab(id="tab-1", title="Task", leader_id="leader-1")
     workspace_store.upsert_tab(tab)
     leader = _make_record(
         node_id="leader-1",
@@ -245,7 +245,7 @@ def test_set_permissions_rejects_allow_network_outside_caller_boundary(tmp_path)
     root_dir = tmp_path / "root"
     root_dir.mkdir()
 
-    tab = Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    tab = Tab(id="tab-1", title="Task", leader_id="leader-1")
     workspace_store.upsert_tab(tab)
     workspace_store.upsert_node_record(
         _make_record(
@@ -288,7 +288,7 @@ def test_set_permissions_rejects_write_dirs_outside_caller_boundary(tmp_path):
     caller_dir.mkdir()
     other_dir.mkdir()
 
-    tab = Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    tab = Tab(id="tab-1", title="Task", leader_id="leader-1")
     workspace_store.upsert_tab(tab)
     workspace_store.upsert_node_record(
         _make_record(
@@ -329,7 +329,7 @@ def test_set_permissions_allows_explicitly_granted_non_assistant_agent(tmp_path)
     root_dir.mkdir()
     narrowed_dir.mkdir()
 
-    tab = Tab(id="tab-1", title="Task", goal="", leader_id="leader-1")
+    tab = Tab(id="tab-1", title="Task", leader_id="leader-1")
     workspace_store.upsert_tab(tab)
     workspace_store.upsert_node_record(
         _make_record(

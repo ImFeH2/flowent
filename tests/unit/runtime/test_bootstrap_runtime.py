@@ -462,7 +462,6 @@ def test_bootstrap_runtime_backfills_state_history_for_restored_nodes(
                     {
                         "id": "tab-1",
                         "title": "Restore",
-                        "goal": "",
                         "created_at": 1,
                         "updated_at": 1,
                     }
@@ -538,7 +537,6 @@ def test_bootstrap_runtime_restores_active_nodes_as_idle(
                     {
                         "id": "tab-1",
                         "title": "Restore",
-                        "goal": "",
                         "created_at": 1,
                         "updated_at": 1,
                     }
@@ -624,7 +622,6 @@ def test_bootstrap_runtime_restores_workflow_definition_without_runtime_connecti
                     {
                         "id": "tab-1",
                         "title": "Restore",
-                        "goal": "",
                         "leader_id": "leader-1",
                         "created_at": 1,
                         "updated_at": 1,
@@ -769,7 +766,6 @@ def test_bootstrap_runtime_preserves_error_state_for_restored_nodes(
                     {
                         "id": "tab-1",
                         "title": "Restore",
-                        "goal": "",
                         "created_at": 1,
                         "updated_at": 1,
                     }
@@ -850,7 +846,6 @@ def test_bootstrap_runtime_skips_terminated_restored_nodes(monkeypatch, tmp_path
                     {
                         "id": "tab-1",
                         "title": "Restore",
-                        "goal": "",
                         "created_at": 1,
                         "updated_at": 1,
                     }
@@ -925,7 +920,6 @@ def test_shutdown_runtime_keeps_persistent_workspace_nodes_unterminated(
                     {
                         "id": "tab-1",
                         "title": "Restore",
-                        "goal": "",
                         "created_at": 1,
                         "updated_at": 1,
                     }

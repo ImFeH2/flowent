@@ -376,7 +376,6 @@ function buildTab(nodes: Node[], overrides: Partial<TaskTab> = {}): TaskTab {
   return {
     id: "tab-1",
     title: "Research Task",
-    goal: "Inspect the repository",
     leader_id: "leader-1",
     created_at: 1,
     updated_at: 1,

@@ -159,7 +159,6 @@ export function createTaskTabFromEvent(
   return {
     id,
     title: data.title,
-    goal: typeof data.goal === "string" ? data.goal : "",
     leader_id: readTabLeaderId(data) ?? null,
     created_at: readNumberField(data, "created_at") ?? now,
     updated_at: readNumberField(data, "updated_at") ?? now,
@@ -185,7 +184,6 @@ export function mergeTaskTabUpdate(
   return {
     ...current,
     title: typeof data.title === "string" ? data.title : current.title,
-    goal: typeof data.goal === "string" ? data.goal : current.goal,
     leader_id:
       hasOwn(data, "leader_id") && nextLeaderId !== undefined
         ? nextLeaderId

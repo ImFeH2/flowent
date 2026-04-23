@@ -22,10 +22,6 @@ class CreateTabTool(Tool):
                 "type": "string",
                 "description": "Human-readable tab title",
             },
-            "goal": {
-                "type": "string",
-                "description": "Optional task goal for the tab",
-            },
             "allow_network": {
                 "type": "boolean",
                 "description": "Whether the tab's leader should have network access (default False)",
@@ -41,13 +37,10 @@ class CreateTabTool(Tool):
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         title = args.get("title")
-        goal = args.get("goal", "")
         allow_network = args.get("allow_network", False)
         write_dirs = args.get("write_dirs", [])
         if not isinstance(title, str) or not title.strip():
             return json.dumps({"error": "title must be a non-empty string"})
-        if not isinstance(goal, str):
-            return json.dumps({"error": "goal must be a string"})
         if not isinstance(allow_network, bool):
             return json.dumps({"error": "allow_network must be a boolean"})
         if not isinstance(write_dirs, list) or not all(
@@ -58,7 +51,6 @@ class CreateTabTool(Tool):
         try:
             tab = create_tab(
                 title=title,
-                goal=goal,
                 allow_network=allow_network,
                 write_dirs=write_dirs,
             )

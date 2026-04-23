@@ -22,7 +22,6 @@ function buildStatsPayload(
       {
         id: "tab-1",
         title: "Main Task",
-        goal: "",
         leader_id: "leader-1",
         created_at: 1,
         updated_at: 2,

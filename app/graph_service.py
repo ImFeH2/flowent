@@ -289,7 +289,6 @@ def serialize_tab_summary(tab: Tab) -> dict[str, object]:
     return {
         "id": tab.id,
         "title": tab.title,
-        "goal": tab.goal,
         "leader_id": tab.leader_id,
         "created_at": tab.created_at,
         "updated_at": tab.updated_at,
@@ -505,7 +504,6 @@ def _start_tab_runtime(tab_id: str) -> None:
 def create_tab(
     *,
     title: str,
-    goal: str = "",
     allow_network: bool = False,
     write_dirs: list[str] | None = None,
 ) -> Tab:
@@ -514,7 +512,6 @@ def create_tab(
     tab = Tab(
         id=str(uuid.uuid4()),
         title=title.strip(),
-        goal=goal.strip(),
         leader_id=leader_id,
         definition=WorkflowDefinition(),
     )
@@ -591,7 +588,6 @@ def duplicate_tab(
     new_tab = Tab(
         id=str(uuid.uuid4()),
         title=f"{source_tab.title} Copy",
-        goal=source_tab.goal,
         leader_id=str(uuid.uuid4()),
         definition=WorkflowDefinition(
             version=duplicated_definition.version,

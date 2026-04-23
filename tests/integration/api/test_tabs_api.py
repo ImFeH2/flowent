@@ -55,17 +55,26 @@ def test_create_tab_rejects_removed_mcp_servers_field(client: TestClient):
     assert response.status_code == 422
 
 
+def test_create_tab_rejects_removed_goal_field(client: TestClient):
+    response = client.post(
+        "/api/tabs",
+        json={"title": "Review Task", "goal": "Inspect changed files"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_create_tab_node_and_edge_round_trip(client: TestClient):
     create_tab_response = client.post(
         "/api/tabs",
-        json={"title": "Review Task", "goal": "Inspect changed files"},
+        json={"title": "Review Task"},
     )
 
     assert create_tab_response.status_code == 200
     tab = create_tab_response.json()
     tab_id = tab["id"]
     assert tab["title"] == "Review Task"
-    assert tab["goal"] == "Inspect changed files"
+    assert "goal" not in tab
     assert tab["node_count"] == 0
     assert tab["edge_count"] == 0
     assert tab["definition"] == {"version": 1, "nodes": [], "edges": []}
@@ -105,6 +114,7 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     assert tab_detail_response.status_code == 200
     tab_detail = tab_detail_response.json()
     assert tab_detail["tab"]["id"] == tab_id
+    assert "goal" not in tab_detail["tab"]
     assert tab_detail["tab"]["node_count"] == 2
     assert tab_detail["tab"]["edge_count"] == 1
     assert {node["name"] for node in tab_detail["nodes"]} == {"Reader", "Writer"}
@@ -126,7 +136,7 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
 def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     create_tab_response = client.post(
         "/api/tabs",
-        json={"title": "Disposable", "goal": "Delete me"},
+        json={"title": "Disposable"},
     )
 
     assert create_tab_response.status_code == 200
@@ -170,7 +180,7 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
 ):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Edge Delete", "goal": "Trim one connection"},
+        json={"title": "Edge Delete"},
     ).json()
     tab_id = tab["id"]
 
@@ -222,7 +232,7 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
 def test_delete_tab_node_removes_node_and_all_incident_edges(client: TestClient):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Node Delete", "goal": "Remove one worker"},
+        json={"title": "Node Delete"},
     ).json()
     tab_id = tab["id"]
 
@@ -263,7 +273,7 @@ def test_tab_edge_creation_enforces_directed_ports_and_single_input(
 ):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Edge Validation", "goal": "Enforce graph rules"},
+        json={"title": "Edge Validation"},
     ).json()
     tab_id = tab["id"]
     worker = _create_agent_node(client, tab_id=tab_id, name="Worker")
@@ -310,7 +320,7 @@ def test_tab_edge_creation_enforces_directed_ports_and_single_input(
 def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
     source_tab = client.post(
         "/api/tabs",
-        json={"title": "Original Workflow", "goal": "Duplicate me"},
+        json={"title": "Original Workflow"},
     ).json()
     source_tab_id = source_tab["id"]
 
@@ -351,13 +361,14 @@ def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
     assert duplicate_response.status_code == 200
     duplicated_tab = duplicate_response.json()
     assert duplicated_tab["title"] == "Original Workflow Copy"
-    assert duplicated_tab["goal"] == "Duplicate me"
+    assert "goal" not in duplicated_tab
     assert duplicated_tab["node_count"] == 2
     assert duplicated_tab["edge_count"] == 1
     assert duplicated_tab["id"] != source_tab_id
     assert duplicated_tab["leader_id"] != source_tab["leader_id"]
 
     duplicated_detail = client.get(f"/api/tabs/{duplicated_tab['id']}").json()
+    assert "goal" not in duplicated_detail["tab"]
     assert {node["name"] for node in duplicated_detail["nodes"]} == {
         "Reviewer",
         "Formatter",
@@ -373,7 +384,7 @@ def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
 def test_update_tab_definition_updates_metadata_and_positions(client: TestClient):
     tab = client.post(
         "/api/tabs",
-        json={"title": "JSON Editor", "goal": "Patch definition"},
+        json={"title": "JSON Editor"},
     ).json()
     tab_id = tab["id"]
 
@@ -443,7 +454,7 @@ def test_update_tab_definition_updates_metadata_and_positions(client: TestClient
 def test_update_tab_definition_rejects_agent_set_changes(client: TestClient):
     tab = client.post(
         "/api/tabs",
-        json={"title": "Guard Rails", "goal": "Reject invalid JSON"},
+        json={"title": "Guard Rails"},
     ).json()
     tab_id = tab["id"]
 

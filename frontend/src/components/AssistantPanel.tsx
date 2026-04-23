@@ -44,7 +44,8 @@ export function AssistantPanel({
     timelineItems,
   } = useAssistantChat({ bottomInset: composerHeight });
   const isFloating = variant === "floating";
-  const chatVariant = isFloating ? "floating" : "panel";
+  const isPage = variant === "page";
+  const chatVariant = variant;
   const assistantRoleName =
     Array.from(agents.values()).find((agent) => agent.node_type === "assistant")
       ?.role_name ?? null;
@@ -55,23 +56,28 @@ export function AssistantPanel({
         "relative flex h-full flex-col overflow-hidden text-foreground",
         isFloating
           ? "overflow-hidden rounded-xl border border-border bg-surface-2 text-foreground shadow-md"
-          : variant === "page"
-            ? "bg-surface-overlay/94 shadow-sm"
+          : isPage
+            ? "bg-transparent"
             : "border-l border-border bg-surface-overlay/94 shadow-sm",
       )}
     >
       <div
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-0 border transition-[opacity,border-color,box-shadow] duration-300",
+          "pointer-events-none absolute inset-0 transition-[opacity,border-color,box-shadow] duration-300",
           assistantActivity.running
-            ? "animate-pulse border-ring/25 opacity-100 shadow-lg shadow-ring/10"
-            : "border-transparent opacity-0",
+            ? "animate-pulse shadow-lg shadow-ring/5"
+            : "opacity-0",
+          !isPage && "border",
+          assistantActivity.running &&
+            !isPage &&
+            "border-ring/25 opacity-100 shadow-ring/10",
         )}
       />
       <PanelHeader
         connected={connected}
         floating={isFloating}
+        page={isPage}
         onClearChat={() => void clearChat()}
         onOpenDetails={onOpenDetails}
         roleName={assistantRoleName}
@@ -88,6 +94,14 @@ export function AssistantPanel({
           retryImageInputEnabled={supportsInputImage}
           retryingMessageId={retryingMessageId}
           scrollRef={scrollRef}
+          runningHint={
+            assistantActivity.running
+              ? {
+                  label: "Assistant is working...",
+                  toolName: null,
+                }
+              : null
+          }
           variant={chatVariant}
         />
         <div
@@ -96,33 +110,38 @@ export function AssistantPanel({
             paddingBottom: "calc(14px + env(safe-area-inset-bottom, 0px))",
           }}
           className={cn(
-            "pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4",
+            "absolute inset-x-0 bottom-0 z-10 px-4",
+            isPage ? "mx-auto w-full max-w-3xl" : "",
             isFloating
-              ? "bg-gradient-to-b from-transparent via-background/70 to-background/95 pt-8"
-              : "bg-gradient-to-b from-transparent via-background/80 to-background pt-10",
+              ? "bg-gradient-to-b from-transparent via-background/70 to-background/95 pt-8 pointer-events-none"
+              : isPage
+                ? "bg-gradient-to-b from-transparent via-background/90 to-background pt-12 pointer-events-none"
+                : "bg-gradient-to-b from-transparent via-background/80 to-background pt-10 pointer-events-none",
           )}
         >
-          <AssistantChatComposer
-            disabled={
-              (!input.trim() && draftImages.length === 0) ||
-              hasUploadingImages ||
-              sending
-            }
-            commandsEnabled
-            images={draftImages}
-            imageInputEnabled={supportsInputImage}
-            input={input}
-            onAddImages={(files) => void addImages(files)}
-            onChange={setInput}
-            onNavigateHistory={navigateInputHistory}
-            onKeyDown={handleKeyDown}
-            onRemoveImage={removeImage}
-            onSend={() => void sendMessage()}
-            overlay
-            suppressCommandNavigation={isBrowsingInputHistory}
-            targetLabel="Assistant"
-            variant={chatVariant}
-          />
+          <div className="pointer-events-auto">
+            <AssistantChatComposer
+              disabled={
+                (!input.trim() && draftImages.length === 0) ||
+                hasUploadingImages ||
+                sending
+              }
+              commandsEnabled
+              images={draftImages}
+              imageInputEnabled={supportsInputImage}
+              input={input}
+              onAddImages={(files) => void addImages(files)}
+              onChange={setInput}
+              onNavigateHistory={navigateInputHistory}
+              onKeyDown={handleKeyDown}
+              onRemoveImage={removeImage}
+              onSend={() => void sendMessage()}
+              overlay
+              suppressCommandNavigation={isBrowsingInputHistory}
+              targetLabel="Assistant"
+              variant={chatVariant}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -133,6 +152,7 @@ function PanelHeader({
   clearing,
   connected,
   floating,
+  page,
   onClearChat,
   onOpenDetails,
   roleName,
@@ -140,6 +160,7 @@ function PanelHeader({
   clearing: boolean;
   connected: boolean;
   floating: boolean;
+  page?: boolean;
   onClearChat: () => void;
   onOpenDetails?: () => void;
   roleName?: string | null;
@@ -147,13 +168,20 @@ function PanelHeader({
   return (
     <div
       className={cn(
-        "relative z-10 flex items-center justify-between border-b px-4 py-3",
+        "relative z-10 flex items-center justify-between px-4 py-3",
         floating
-          ? "border-border bg-accent/20"
-          : "border-border bg-background/20",
+          ? "border-b border-border bg-accent/20"
+          : page
+            ? "bg-transparent"
+            : "border-b border-border bg-background/20",
       )}
     >
-      <div className="min-w-0">
+      <div
+        className={cn(
+          "min-w-0",
+          page && "opacity-0 select-none pointer-events-none",
+        )}
+      >
         <div className="text-[13px] font-medium tracking-wide text-foreground">
           Assistant
         </div>
@@ -170,7 +198,7 @@ function PanelHeader({
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant={page ? "ghost" : "outline"}
           disabled={clearing}
           onClick={onClearChat}
         >
@@ -179,7 +207,7 @@ function PanelHeader({
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant={page ? "ghost" : "outline"}
           disabled={!onOpenDetails}
           onClick={onOpenDetails}
         >

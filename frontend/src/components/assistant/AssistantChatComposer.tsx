@@ -72,6 +72,7 @@ export function AssistantChatComposer({
   variant,
 }: AssistantChatComposerProps) {
   const isWorkspace = variant === "workspace";
+  const isPage = variant === "page";
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const actionLabel = busy ? (stopping ? "Stopping..." : "Stop") : "Send";
@@ -325,10 +326,12 @@ export function AssistantChatComposer({
       ) : null}
       <div
         className={cn(
-          "rounded-md border px-2 py-1 transition-[border-color,background-color,box-shadow] duration-200",
+          "border transition-[border-color,background-color,box-shadow] duration-200",
           isWorkspace
-            ? "border-border bg-background/30 shadow-sm hover:border-ring/35 focus-within:border-ring/45 focus-within:ring-[3px] focus-within:ring-ring/35"
-            : "border-border bg-surface-2/90 shadow-sm hover:border-ring/30 focus-within:border-ring/40 focus-within:ring-[3px] focus-within:ring-ring/30",
+            ? "rounded-md border-border bg-background/30 px-2 py-1 shadow-sm hover:border-ring/35 focus-within:border-ring/45 focus-within:ring-[3px] focus-within:ring-ring/35"
+            : isPage
+              ? "rounded-[20px] border-border bg-surface-2 px-3 py-2 shadow-sm hover:border-ring/30 focus-within:border-ring/40 focus-within:ring-[3px] focus-within:ring-ring/30"
+              : "rounded-md border-border bg-surface-2/90 px-2 py-1 shadow-sm hover:border-ring/30 focus-within:border-ring/40 focus-within:ring-[3px] focus-within:ring-ring/30",
         )}
       >
         {images.length > 0 ? (

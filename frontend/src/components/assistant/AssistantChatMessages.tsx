@@ -63,6 +63,7 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
 }: AssistantChatMessagesProps) {
   const isWorkspace = variant === "workspace";
   const isFloating = variant === "floating";
+  const isPage = variant === "page";
   const baseBottomPadding = isWorkspace ? 14 : 16;
   const visibleItems = items.filter(
     (item) => item.type !== "SystemEntry" && item.type !== "StateEntry",
@@ -79,6 +80,7 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
       className={cn(
         "flex-1 space-y-2.5 overflow-y-auto",
         isWorkspace ? "px-3 pt-3" : "px-3.5 pt-3.5",
+        isPage ? "px-4 pt-6 space-y-6" : "",
       )}
     >
       {visibleItems.length === 0 &&
@@ -86,13 +88,16 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
         (isWorkspace ? (
           <WorkspaceEmptyState />
         ) : (
-          <PanelEmptyState floating={isFloating} />
+          <PanelEmptyState floating={isFloating} page={isPage} />
         ))}
 
       {visibleItems.map((item, index) => (
         <div
           key={getTimelineItemKey(item, index)}
-          className="[content-visibility:auto] [contain-intrinsic-size:auto_100px]"
+          className={cn(
+            "[content-visibility:auto] [contain-intrinsic-size:auto_100px]",
+            isPage ? "mx-auto w-full max-w-3xl" : "",
+          )}
         >
           <TimelineItem
             allowHumanMessageRetry={allowHumanMessageRetry}
@@ -107,11 +112,13 @@ export const AssistantChatMessages = memo(function AssistantChatMessages({
       ))}
 
       {runningHint ? (
-        <AssistantRunningHint
-          label={runningHint.label}
-          toolName={runningHint.toolName}
-          variant={variant}
-        />
+        <div className={cn(isPage ? "mx-auto w-full max-w-3xl" : "")}>
+          <AssistantRunningHint
+            label={runningHint.label}
+            toolName={runningHint.toolName}
+            variant={variant}
+          />
+        </div>
       ) : null}
     </div>
   );
@@ -758,17 +765,39 @@ function WorkspaceEmptyState() {
   );
 }
 
-function PanelEmptyState({ floating }: { floating: boolean }) {
+function PanelEmptyState({
+  floating,
+  page,
+}: {
+  floating: boolean;
+  page?: boolean;
+}) {
   return (
-    <div className="flex h-full items-center justify-center">
-      <div className="max-w-[260px] space-y-2 text-center">
+    <div
+      className={cn(
+        "flex h-full items-center justify-center",
+        page ? "pb-[10vh]" : "",
+      )}
+    >
+      <div
+        className={cn(
+          "space-y-2 text-center",
+          page ? "max-w-md" : "max-w-[260px]",
+        )}
+      >
         <Sparkles
           className={cn(
-            "mx-auto size-5",
-            floating ? "text-foreground/72" : "text-muted-foreground",
+            "mx-auto",
+            page ? "size-7 mb-4 text-muted-foreground/50" : "size-5",
+            floating && !page ? "text-foreground/72" : "text-muted-foreground",
           )}
         />
-        <p className="text-sm text-muted-foreground">
+        <p
+          className={cn(
+            "text-muted-foreground",
+            page ? "text-base" : "text-sm",
+          )}
+        >
           Ask the Assistant to plan tasks, summarize progress, or coordinate
           next steps.
         </p>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 import time
 from collections.abc import Sequence
@@ -29,6 +30,17 @@ FILE_FORMAT = (
     "{extra[source]}{extra[agent_suffix]} | "
     "{message}{exception}"
 )
+
+
+class HealthcheckAccessFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if not isinstance(args, tuple) or len(args) < 3:
+            return True
+        full_path = args[2]
+        if not isinstance(full_path, str):
+            return True
+        return full_path.split("?", 1)[0] != "/health"
 
 
 def detect_runtime_mode(
@@ -96,6 +108,13 @@ def prune_old_logs(log_dir: Path, keep: int = 10) -> None:
         path.unlink(missing_ok=True)
 
 
+def configure_uvicorn_access_logging() -> None:
+    access_logger = logging.getLogger("uvicorn.access")
+    if any(isinstance(f, HealthcheckAccessFilter) for f in access_logger.filters):
+        return
+    access_logger.addFilter(HealthcheckAccessFilter())
+
+
 def setup_logging(
     config: Config | None = None,
     *,
@@ -110,6 +129,7 @@ def setup_logging(
 
     logger.remove()
     logger.configure(patcher=_patch_record)
+    configure_uvicorn_access_logging()
 
     log_dir = _get_log_dir(runtime_dir)
     log_dir.mkdir(parents=True, exist_ok=True)

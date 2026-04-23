@@ -1,3 +1,4 @@
+import logging
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -5,7 +6,12 @@ from pathlib import Path
 import pytest
 from loguru import logger
 
-from app.logging import detect_runtime_mode, setup_logging
+from app.logging import (
+    HealthcheckAccessFilter,
+    configure_uvicorn_access_logging,
+    detect_runtime_mode,
+    setup_logging,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -75,3 +81,52 @@ def test_setup_logging_sets_console_level_from_runtime_mode(
     assert "visible release info" in release_output
     assert "visible release info\n\n" not in release_output
     assert "visible dev debug" in dev_output
+
+
+def test_healthcheck_access_filter_blocks_health_endpoint() -> None:
+    access_filter = HealthcheckAccessFilter()
+    record = logging.LogRecord(
+        name="uvicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='%s - "%s %s HTTP/%s" %d',
+        args=("127.0.0.1:12345", "GET", "/health?source=docker", "1.1", 200),
+        exc_info=None,
+    )
+
+    assert access_filter.filter(record) is False
+
+
+def test_healthcheck_access_filter_keeps_other_requests() -> None:
+    access_filter = HealthcheckAccessFilter()
+    record = logging.LogRecord(
+        name="uvicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg='%s - "%s %s HTTP/%s" %d',
+        args=("127.0.0.1:12345", "GET", "/api/meta", "1.1", 200),
+        exc_info=None,
+    )
+
+    assert access_filter.filter(record) is True
+
+
+def test_configure_uvicorn_access_logging_installs_filter_once() -> None:
+    access_logger = logging.getLogger("uvicorn.access")
+    original_filters = list(access_logger.filters)
+    access_logger.filters = [
+        f for f in access_logger.filters if not isinstance(f, HealthcheckAccessFilter)
+    ]
+
+    try:
+        configure_uvicorn_access_logging()
+        configure_uvicorn_access_logging()
+
+        filters = [
+            f for f in access_logger.filters if isinstance(f, HealthcheckAccessFilter)
+        ]
+        assert len(filters) == 1
+    finally:
+        access_logger.filters = original_filters

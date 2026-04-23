@@ -218,6 +218,7 @@ describe("useAssistantChat", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("falls back to thinking after a completed tool call finishes", async () => {
@@ -566,8 +567,12 @@ describe("useAssistantChat", () => {
       expect(result.current.timelineItems).toHaveLength(1);
     });
 
+    vi.useFakeTimers();
+
     await act(async () => {
-      await result.current.retryMessage("msg-old");
+      const retryPromise = result.current.retryMessage("msg-old");
+      await vi.advanceTimersByTimeAsync(120);
+      await retryPromise;
     });
 
     expect(interruptNodeMock).toHaveBeenCalledWith("assistant");

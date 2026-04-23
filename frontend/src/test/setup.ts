@@ -1,6 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import type { Edge, Node } from "@xyflow/react";
-import { getAgentGraphLayoutedElements } from "../lib/agentGraphLayout";
+import type { Node } from "@xyflow/react";
 
 if (!window.requestAnimationFrame) {
   window.requestAnimationFrame = (callback) =>
@@ -35,22 +34,25 @@ if (!Element.prototype.scrollIntoView) {
 
 class WorkerMock {
   onmessage: ((ev: MessageEvent) => void) | null = null;
-  postMessage(data: { nodes: Node[]; edges: Edge[]; key: string }) {
+  postMessage(data: { nodes: Node[]; key: string }) {
     if (!this.onmessage) {
       return;
     }
 
-    void getAgentGraphLayoutedElements(data.nodes, data.edges).then(
-      (layouted) => {
-        const positions = layouted.nodes.map((n) => ({
-          id: n.id,
-          position: n.position,
-        }));
-        this.onmessage?.({
-          data: { positions, key: data.key },
-        } as MessageEvent);
+    const columnCount = Math.max(1, Math.ceil(Math.sqrt(data.nodes.length)));
+    const positions = data.nodes.map((node, index) => ({
+      id: node.id,
+      position: {
+        x: (index % columnCount) * 260,
+        y: Math.floor(index / columnCount) * 180,
       },
-    );
+    }));
+
+    queueMicrotask(() => {
+      this.onmessage?.({
+        data: { positions, key: data.key },
+      } as MessageEvent);
+    });
   }
   terminate() {}
 }

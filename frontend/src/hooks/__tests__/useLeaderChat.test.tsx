@@ -166,6 +166,7 @@ describe("useLeaderChat", () => {
   afterEach(() => {
     cleanup();
     clearChatInputHistoryForTests();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -284,8 +285,12 @@ describe("useLeaderChat", () => {
       expect(result.current.timelineItems).toHaveLength(1);
     });
 
+    vi.useFakeTimers();
+
     await act(async () => {
-      await result.current.retryMessage("msg-old");
+      const retryPromise = result.current.retryMessage("msg-old");
+      await vi.advanceTimersByTimeAsync(120);
+      await retryPromise;
     });
 
     expect(interruptNodeMock).toHaveBeenCalledWith("leader");

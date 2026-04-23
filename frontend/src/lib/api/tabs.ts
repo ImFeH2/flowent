@@ -2,13 +2,13 @@ import { requestJson, requestVoid } from "./shared";
 import type { TaskTab, TabEdge, WorkflowDefinition } from "@/types";
 
 interface TabsResponse {
-  tabs: TaskTab[];
+  workflows: TaskTab[];
 }
 
 interface TabDetailNode {
   id: string;
   node_type: string;
-  tab_id: string | null;
+  workflow_id: string | null;
   role_name: string | null;
   is_leader: boolean;
   state: string;
@@ -31,12 +31,12 @@ interface TabDetailResponse {
 }
 
 export async function fetchTabs(signal?: AbortSignal): Promise<TaskTab[]> {
-  return requestJson<TabsResponse, TaskTab[]>("/api/tabs", {
+  return requestJson<TabsResponse, TaskTab[]>("/api/workflows", {
     method: "GET",
     signal,
-    errorMessage: "Failed to fetch tabs",
+    errorMessage: "Failed to fetch workflows",
     fallback: [],
-    map: (data) => data?.tabs ?? [],
+    map: (data) => data?.workflows ?? [],
   });
 }
 
@@ -45,15 +45,15 @@ export async function createTabRequest(
   allow_network = false,
   write_dirs: string[] = [],
 ): Promise<TaskTab> {
-  return requestJson<TaskTab, TaskTab>("/api/tabs", {
+  return requestJson<TaskTab, TaskTab>("/api/workflows", {
     method: "POST",
     body: { title, allow_network, write_dirs },
-    errorMessage: "Failed to create tab",
+    errorMessage: "Failed to create workflow",
   });
 }
 
 export async function duplicateTabRequest(tabId: string): Promise<TaskTab> {
-  return requestJson<TaskTab, TaskTab>(`/api/tabs/${tabId}/duplicate`, {
+  return requestJson<TaskTab, TaskTab>(`/api/workflows/${tabId}/duplicate`, {
     method: "POST",
     errorMessage: "Failed to duplicate workflow",
   });
@@ -63,7 +63,7 @@ export async function updateTabDefinitionRequest(
   tabId: string,
   definition: WorkflowDefinition,
 ): Promise<TaskTab> {
-  return requestJson<TaskTab, TaskTab>(`/api/tabs/${tabId}/definition`, {
+  return requestJson<TaskTab, TaskTab>(`/api/workflows/${tabId}/definition`, {
     method: "PUT",
     body: { definition },
     errorMessage: "Failed to update workflow definition",
@@ -71,9 +71,9 @@ export async function updateTabDefinitionRequest(
 }
 
 export async function deleteTabRequest(tabId: string): Promise<void> {
-  await requestVoid(`/api/tabs/${tabId}`, {
+  await requestVoid(`/api/workflows/${tabId}`, {
     method: "DELETE",
-    errorMessage: "Failed to delete tab",
+    errorMessage: "Failed to delete workflow",
   });
 }
 
@@ -81,14 +81,30 @@ export async function fetchTabDetail(
   tabId: string,
   signal?: AbortSignal,
 ): Promise<TabDetailResponse> {
-  return requestJson<TabDetailResponse, TabDetailResponse>(
-    `/api/tabs/${tabId}`,
+  return requestJson<
     {
-      method: "GET",
-      signal,
-      errorMessage: "Failed to fetch tab detail",
+      workflow?: TaskTab;
+      nodes?: TabDetailNode[];
+      edges?: TabEdge[];
     },
-  );
+    TabDetailResponse
+  >(`/api/workflows/${tabId}`, {
+    method: "GET",
+    signal,
+    errorMessage: "Failed to fetch workflow detail",
+    map: (data) => ({
+      tab: data?.workflow ?? {
+        id: tabId,
+        title: "",
+        leader_id: null,
+        created_at: 0,
+        updated_at: 0,
+        definition: { version: 1, nodes: [], edges: [], view: {} },
+      },
+      nodes: data?.nodes ?? [],
+      edges: data?.edges ?? [],
+    }),
+  });
 }
 
 export async function createTabNodeRequest(
@@ -104,7 +120,7 @@ export async function createTabNodeRequest(
   },
 ): Promise<TabDetailNode> {
   return requestJson<Record<string, unknown>, TabDetailNode>(
-    `/api/tabs/${tabId}/nodes`,
+    `/api/workflows/${tabId}/nodes`,
     {
       method: "POST",
       body,
@@ -114,7 +130,8 @@ export async function createTabNodeRequest(
           id: typeof data?.id === "string" ? data.id : "",
           node_type:
             typeof data?.node_type === "string" ? data.node_type : "agent",
-          tab_id: typeof data?.tab_id === "string" ? data.tab_id : null,
+          workflow_id:
+            typeof data?.workflow_id === "string" ? data.workflow_id : null,
           role_name:
             typeof data?.role_name === "string" ? data.role_name : null,
           is_leader: data?.is_leader === true,
@@ -147,14 +164,17 @@ export async function createTabNodeRequest(
             : undefined,
         }) satisfies TabDetailNode,
     },
-  );
+  ).then((node) => ({
+    ...node,
+    tab_id: node.workflow_id,
+  })) as Promise<TabDetailNode>;
 }
 
 export async function deleteTabNodeRequest(
   tabId: string,
   nodeId: string,
 ): Promise<void> {
-  await requestVoid(`/api/tabs/${tabId}/nodes/${nodeId}`, {
+  await requestVoid(`/api/workflows/${tabId}/nodes/${nodeId}`, {
     method: "DELETE",
     errorMessage: "Failed to delete node",
   });
@@ -170,7 +190,7 @@ export async function createTabEdgeRequest(
     kind?: "control" | "data" | "event";
   },
 ): Promise<TabEdge> {
-  return requestJson<TabEdge, TabEdge>(`/api/tabs/${tabId}/edges`, {
+  return requestJson<TabEdge, TabEdge>(`/api/workflows/${tabId}/edges`, {
     method: "POST",
     body: {
       from_node_id: input.fromNodeId,
@@ -209,7 +229,7 @@ export async function deleteTabEdgeRequest(
   if (input.toPortKey) {
     params.set("to_port_key", input.toPortKey);
   }
-  await requestVoid(`/api/tabs/${tabId}/edges?${params.toString()}`, {
+  await requestVoid(`/api/workflows/${tabId}/edges?${params.toString()}`, {
     method: "DELETE",
     errorMessage: "Failed to delete edge",
   });

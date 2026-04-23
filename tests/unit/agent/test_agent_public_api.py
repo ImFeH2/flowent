@@ -553,8 +553,8 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "exec",
             ],
             "optional_tools": [
-                "create_tab",
-                "delete_tab",
+                "create_workflow",
+                "delete_workflow",
                 "set_permissions",
                 "create_agent",
                 "connect",
@@ -565,7 +565,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "edit",
                 "fetch",
                 "list_roles",
-                "list_tabs",
+                "list_workflows",
                 "list_tools",
                 "list_mcp_resources",
                 "list_mcp_resource_templates",
@@ -586,8 +586,8 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "send",
             ],
             "optional_tools": [
-                "create_tab",
-                "delete_tab",
+                "create_workflow",
+                "delete_workflow",
                 "set_permissions",
                 "create_agent",
                 "connect",
@@ -599,7 +599,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
                 "edit",
                 "exec",
                 "list_roles",
-                "list_tabs",
+                "list_workflows",
                 "list_tools",
                 "list_mcp_resources",
                 "list_mcp_resource_templates",
@@ -632,8 +632,8 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "edit",
         "exec",
         "fetch",
-        "create_tab",
-        "delete_tab",
+        "create_workflow",
+        "delete_workflow",
         "set_permissions",
         "create_agent",
         "connect",
@@ -642,7 +642,7 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
         "manage_settings",
         "manage_prompts",
         "list_roles",
-        "list_tabs",
+        "list_workflows",
         "list_tools",
         "list_mcp_resources",
         "list_mcp_resource_templates",
@@ -706,7 +706,7 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
         assert error is None and edge is not None
 
         agent = Agent(
-            NodeConfig(node_type=NodeType.ASSISTANT, tools=["list_tabs"]),
+            NodeConfig(node_type=NodeType.ASSISTANT, tools=["list_workflows"]),
             uuid="assistant",
         )
 
@@ -719,8 +719,8 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
         assert summaries[0]["node_count"] == 2
         assert summaries[0]["edge_count"] == 1
 
-        detail = json.loads(ListTabsTool().execute(agent, {"tab_id": tab.id}))
-        assert detail["tab"]["id"] == tab.id
+        detail = json.loads(ListTabsTool().execute(agent, {"workflow_id": tab.id}))
+        assert detail["workflow"]["id"] == tab.id
         assert {node["name"] for node in detail["nodes"]} == {"Left", "Right"}
         assert detail["edges"] == [edge.serialize()]
     finally:

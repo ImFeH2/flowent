@@ -2,29 +2,47 @@ import type { ContentPart, Node, NodeDetail } from "@/types";
 import { requestJson, requestVoid } from "./shared";
 
 export async function fetchNodes(): Promise<Node[]> {
-  return requestJson<{ nodes?: Node[] }, Node[]>("/api/nodes", {
-    errorMessage: "Failed to fetch nodes",
-    fallback: [],
-    map: (data) => data?.nodes ?? [],
-  });
+  return requestJson<{ nodes?: Array<Record<string, unknown>> }, Node[]>(
+    "/api/nodes",
+    {
+      errorMessage: "Failed to fetch nodes",
+      fallback: [],
+      map: (data) =>
+        (data?.nodes ?? []).map(
+          (node) =>
+            ({
+              ...node,
+              tab_id:
+                typeof node.workflow_id === "string" ? node.workflow_id : null,
+            }) as Node,
+        ),
+    },
+  );
 }
 
 export async function fetchNodeDetail(
   nodeId: string,
   signal?: AbortSignal,
 ): Promise<NodeDetail | null> {
-  return requestJson<NodeDetail, NodeDetail | null>(`/api/nodes/${nodeId}`, {
-    errorMessage: "Failed to fetch node detail",
-    fallback: null,
-    signal,
-    swallowHttpError: true,
-    map: (data) => {
-      if (!data || !Array.isArray(data.history)) {
-        return null;
-      }
-      return data;
+  return requestJson<Record<string, unknown>, NodeDetail | null>(
+    `/api/nodes/${nodeId}`,
+    {
+      errorMessage: "Failed to fetch node detail",
+      fallback: null,
+      signal,
+      swallowHttpError: true,
+      map: (data) => {
+        if (!data || !Array.isArray(data.history)) {
+          return null;
+        }
+        return {
+          ...(data as unknown as NodeDetail),
+          tab_id:
+            typeof data.workflow_id === "string" ? data.workflow_id : null,
+        };
+      },
     },
-  });
+  );
 }
 
 export async function terminateNode(nodeId: string): Promise<void> {

@@ -824,7 +824,12 @@ def test_update_settings_keeps_live_assistant_entry_semantics_for_non_steward_ro
         NodeConfig(
             node_type=NodeType.ASSISTANT,
             role_name="Steward",
-            tools=["create_tab", "delete_tab", "set_permissions", "manage_settings"],
+            tools=[
+                "create_workflow",
+                "delete_workflow",
+                "set_permissions",
+                "manage_settings",
+            ],
         )
     )
     saved: list[Settings] = []
@@ -851,8 +856,8 @@ def test_update_settings_keeps_live_assistant_entry_semantics_for_non_steward_ro
             "write_dirs": build_default_assistant_write_dirs(),
         }
         assert assistant.config.role_name == "Reviewer"
-        assert "create_tab" in assistant.config.tools
-        assert "delete_tab" in assistant.config.tools
+        assert "create_workflow" in assistant.config.tools
+        assert "delete_workflow" in assistant.config.tools
         assert "set_permissions" in assistant.config.tools
         assert "manage_settings" in assistant.config.tools
         assert "read" in assistant.config.tools

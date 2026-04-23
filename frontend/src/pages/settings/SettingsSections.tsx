@@ -351,7 +351,10 @@ export function LeaderConfigurationSection({
     <section className="mt-12 border-t border-border pt-8">
       <SectionHeader title="Leader Configuration" />
       <div className="border border-dashed border-border rounded-lg bg-card/30">
-        <SettingsRow label="Leader Role" description="Default tab owner role">
+        <SettingsRow
+          label="Leader Role"
+          description="Default workflow owner role"
+        >
           <Select
             value={settings.leader.role_name}
             onValueChange={(value) =>

@@ -66,11 +66,11 @@ def test_worker_and_leader_are_stable_contacts_without_explicit_edge(
     client: TestClient,
 ):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
     worker = client.post(
-        f"/api/tabs/{tab['id']}/nodes",
+        f"/api/workflows/{tab['id']}/nodes",
         json={"role_name": "Worker", "name": "Worker"},
     ).json()
 
@@ -83,7 +83,7 @@ def test_worker_and_leader_are_stable_contacts_without_explicit_edge(
     assert worker["id"] in leader_without_edge.json()["contacts"]
 
     edge_response = client.post(
-        f"/api/tabs/{tab['id']}/edges",
+        f"/api/workflows/{tab['id']}/edges",
         json={
             "from_node_id": tab["leader_id"],
             "to_node_id": worker["id"],
@@ -92,7 +92,7 @@ def test_worker_and_leader_are_stable_contacts_without_explicit_edge(
 
     assert edge_response.status_code == 400
     assert edge_response.json()["detail"] == (
-        "Tab Leader does not participate in Workflow Graph edges"
+        "Workflow Leader does not participate in Workflow Graph edges"
     )
 
 
@@ -153,14 +153,14 @@ def test_assistant_cannot_be_terminated_via_nodes_api(client: TestClient):
 
 def test_tab_leader_cannot_be_terminated_directly(client: TestClient):
     created_tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
 
     response = client.post(f"/api/nodes/{created_tab['leader_id']}/terminate")
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Cannot terminate a tab Leader directly"}
+    assert response.json() == {"detail": "Cannot terminate a workflow Leader directly"}
 
 
 def test_assistant_retry_is_not_available_via_nodes_api(client: TestClient):
@@ -229,7 +229,7 @@ def test_assistant_chat_can_be_cleared_via_nodes_api(client: TestClient):
 
 def test_human_input_can_be_sent_directly_to_workflow_leader(client: TestClient):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
 
@@ -268,7 +268,7 @@ def test_human_input_can_be_sent_directly_to_workflow_leader(client: TestClient)
 def test_leader_retry_rewrites_tail_and_reuses_image_parts(monkeypatch, client):
     assistant_id = _get_assistant_id(client)
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
     leader = registry.get(tab["leader_id"])
@@ -353,7 +353,7 @@ def test_leader_retry_rewrites_tail_and_reuses_image_parts(monkeypatch, client):
 def test_leader_retry_rejects_non_human_anchor(client: TestClient):
     assistant_id = _get_assistant_id(client)
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
     leader = registry.get(tab["leader_id"])
@@ -374,11 +374,11 @@ def test_leader_retry_rejects_non_human_anchor(client: TestClient):
 
 def test_regular_worker_retry_is_not_available_via_nodes_api(client: TestClient):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
     worker = client.post(
-        f"/api/tabs/{tab['id']}/nodes",
+        f"/api/workflows/{tab['id']}/nodes",
         json={"role_name": "Worker", "name": "Worker"},
     ).json()
 
@@ -392,11 +392,11 @@ def test_regular_worker_retry_is_not_available_via_nodes_api(client: TestClient)
 
 def test_human_input_cannot_target_regular_worker(client: TestClient):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
     worker = client.post(
-        f"/api/tabs/{tab['id']}/nodes",
+        f"/api/workflows/{tab['id']}/nodes",
         json={"role_name": "Worker", "name": "Worker"},
     ).json()
 
@@ -413,11 +413,11 @@ def test_human_input_cannot_target_regular_worker(client: TestClient):
 
 def test_browser_cannot_spoof_non_human_sender_for_node_messages(client: TestClient):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
     worker = client.post(
-        f"/api/tabs/{tab['id']}/nodes",
+        f"/api/workflows/{tab['id']}/nodes",
         json={"role_name": "Worker", "name": "Worker"},
     ).json()
 
@@ -436,7 +436,7 @@ def test_leader_message_supports_structured_parts_and_image_validation(
     monkeypatch, client: TestClient
 ):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Execution"},
     ).json()
     leader = registry.get(tab["leader_id"])

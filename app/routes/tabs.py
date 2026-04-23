@@ -64,7 +64,7 @@ def _serialize_workflow_node(
 ) -> dict[str, object]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
-        raise HTTPException(status_code=404, detail="Tab not found")
+        raise HTTPException(status_code=404, detail="Workflow not found")
     definition = tab.definition.get_node(node_id)
     if definition is None:
         raise HTTPException(status_code=404, detail="Node not found")
@@ -87,7 +87,7 @@ def _serialize_workflow_node(
     return {
         "id": definition.id,
         "node_type": definition.type.value,
-        "tab_id": tab_id,
+        "workflow_id": tab_id,
         "role_name": role_name if isinstance(role_name, str) else None,
         "is_leader": False,
         "state": state,
@@ -103,14 +103,14 @@ def _serialize_workflow_node(
     }
 
 
-@router.get("/api/tabs")
-async def list_tabs() -> dict[str, object]:
+@router.get("/api/workflows")
+async def list_workflows() -> dict[str, object]:
     tabs = workspace_store.list_tabs()
-    return {"tabs": [serialize_tab_summary(tab) for tab in tabs]}
+    return {"workflows": [serialize_tab_summary(tab) for tab in tabs]}
 
 
-@router.post("/api/tabs")
-async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
+@router.post("/api/workflows")
+async def create_workflow_route(req: CreateTabRequest) -> dict[str, object]:
     title = req.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="title must not be empty")
@@ -125,8 +125,8 @@ async def create_tab_route(req: CreateTabRequest) -> dict[str, object]:
     return serialize_tab_summary(tab)
 
 
-@router.post("/api/tabs/{tab_id}/duplicate")
-async def duplicate_tab_route(tab_id: str) -> dict[str, object]:
+@router.post("/api/workflows/{tab_id}/duplicate")
+async def duplicate_workflow_route(tab_id: str) -> dict[str, object]:
     duplicated, error = duplicate_tab(tab_id=tab_id)
     if error is not None or duplicated is None:
         raise HTTPException(
@@ -136,25 +136,25 @@ async def duplicate_tab_route(tab_id: str) -> dict[str, object]:
     return serialize_tab_summary(duplicated)
 
 
-@router.get("/api/tabs/{tab_id}")
-async def get_tab(tab_id: str) -> dict[str, object]:
+@router.get("/api/workflows/{tab_id}")
+async def get_workflow(tab_id: str) -> dict[str, object]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
-        raise HTTPException(status_code=404, detail="Tab not found")
+        raise HTTPException(status_code=404, detail="Workflow not found")
     nodes = [
         _serialize_workflow_node(tab_id=tab_id, node_id=node.id)
         for node in list_workflow_nodes(tab_id)
     ]
     edges = [edge.serialize() for edge in list_tab_edges(tab_id)]
     return {
-        "tab": serialize_tab_summary(tab),
+        "workflow": serialize_tab_summary(tab),
         "nodes": nodes,
         "edges": edges,
     }
 
 
-@router.put("/api/tabs/{tab_id}/definition")
-async def update_tab_definition_route(
+@router.put("/api/workflows/{tab_id}/definition")
+async def update_workflow_definition_route(
     tab_id: str,
     req: UpdateTabDefinitionRequest,
 ) -> dict[str, object]:
@@ -171,19 +171,23 @@ async def update_tab_definition_route(
     return serialize_tab_summary(updated)
 
 
-@router.delete("/api/tabs/{tab_id}")
-async def delete_tab_route(tab_id: str) -> dict[str, object]:
+@router.delete("/api/workflows/{tab_id}")
+async def delete_workflow_route(tab_id: str) -> dict[str, object]:
     deleted, error = delete_tab(tab_id=tab_id)
     if error is not None or deleted is None:
         status_code = 404 if error and error.endswith("not found") else 400
         raise HTTPException(
-            status_code=status_code, detail=error or "Failed to delete tab"
+            status_code=status_code,
+            detail=error or "Failed to delete workflow",
         )
     return deleted
 
 
-@router.post("/api/tabs/{tab_id}/nodes")
-async def create_tab_node(tab_id: str, req: CreateTabNodeRequest) -> dict[str, object]:
+@router.post("/api/workflows/{tab_id}/nodes")
+async def create_workflow_node(
+    tab_id: str,
+    req: CreateTabNodeRequest,
+) -> dict[str, object]:
     try:
         node_type = WorkflowNodeKind(req.node_type.strip())
     except ValueError as exc:
@@ -224,11 +228,14 @@ async def create_tab_node(tab_id: str, req: CreateTabNodeRequest) -> dict[str, o
     return _serialize_workflow_node(tab_id=tab_id, node_id=node.id)
 
 
-@router.post("/api/tabs/{tab_id}/edges")
-async def create_tab_edge(tab_id: str, req: CreateTabEdgeRequest) -> dict[str, object]:
+@router.post("/api/workflows/{tab_id}/edges")
+async def create_workflow_edge(
+    tab_id: str,
+    req: CreateTabEdgeRequest,
+) -> dict[str, object]:
     tab = workspace_store.get_tab(tab_id)
     if tab is None:
-        raise HTTPException(status_code=404, detail="Tab not found")
+        raise HTTPException(status_code=404, detail="Workflow not found")
     try:
         edge_kind = EdgeKind(req.kind.strip())
     except ValueError as exc:
@@ -246,8 +253,8 @@ async def create_tab_edge(tab_id: str, req: CreateTabEdgeRequest) -> dict[str, o
     return edge.serialize()
 
 
-@router.delete("/api/tabs/{tab_id}/nodes/{node_id}")
-async def delete_tab_node(tab_id: str, node_id: str) -> dict[str, object]:
+@router.delete("/api/workflows/{tab_id}/nodes/{node_id}")
+async def delete_workflow_node(tab_id: str, node_id: str) -> dict[str, object]:
     deleted, error = delete_agent_node(
         tab_id=tab_id,
         node_id=node_id,
@@ -260,8 +267,8 @@ async def delete_tab_node(tab_id: str, node_id: str) -> dict[str, object]:
     return deleted
 
 
-@router.delete("/api/tabs/{tab_id}/edges")
-async def delete_tab_edge(
+@router.delete("/api/workflows/{tab_id}/edges")
+async def delete_workflow_edge(
     tab_id: str,
     edge_id: str | None = None,
     from_node_id: str | None = None,

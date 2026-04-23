@@ -347,8 +347,8 @@ def test_bootstrap_runtime_preserves_steward_tools_for_non_steward_assistant_rol
         assistant = registry.get_assistant()
         assert assistant is not None
         assert assistant.config.role_name == WORKER_ROLE_NAME
-        assert "create_tab" in assistant.config.tools
-        assert "delete_tab" in assistant.config.tools
+        assert "create_workflow" in assistant.config.tools
+        assert "delete_workflow" in assistant.config.tools
         assert "set_permissions" in assistant.config.tools
         assert "manage_settings" in assistant.config.tools
         assert "read" in assistant.config.tools

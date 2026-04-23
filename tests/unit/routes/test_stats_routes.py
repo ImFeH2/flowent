@@ -120,18 +120,21 @@ def test_get_stats_returns_current_snapshots_and_recent_records(monkeypatch):
     result = asyncio.run(get_stats(range="24h"))
 
     assert result["range"] == "24h"
-    assert len(result["tabs"]) == 1
-    assert result["tabs"][0]["title"] == "Main Task"
+    assert len(result["workflows"]) == 1
+    assert result["workflows"][0]["title"] == "Main Task"
     assert len(result["nodes"]) == 1
     assert result["nodes"][0]["id"] == "leader-1"
     assert result["nodes"][0]["state"] == "running"
+    assert result["nodes"][0]["workflow_id"] == "tab-1"
     assert result["nodes"][0]["provider_id"] == "provider-1"
     assert result["nodes"][0]["model"] == "gpt-5.2"
     assert len(result["requests"]) == 1
     assert result["requests"][0]["retry_count"] == 1
+    assert result["requests"][0]["workflow_id"] == "tab-1"
     assert result["requests"][0]["raw_usage"] == {"total_tokens": 120}
     assert len(result["compacts"]) == 1
     assert result["compacts"][0]["trigger_type"] == "auto"
+    assert result["compacts"][0]["workflow_id"] == "tab-1"
 
 
 def test_get_stats_rejects_invalid_range():

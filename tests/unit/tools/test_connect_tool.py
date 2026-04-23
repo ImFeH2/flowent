@@ -224,6 +224,6 @@ def test_connect_tool_rejects_leader_endpoints():
     )
 
     assert result == {
-        "error": "Tab Leader does not participate in Workflow Graph edges"
+        "error": "Workflow Leader does not participate in Workflow Graph edges"
     }
     assert workspace_store.list_edges(tab.id) == []

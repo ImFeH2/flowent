@@ -594,7 +594,7 @@ describe("AgentGraph", () => {
     });
   });
 
-  it("renders only nodes from the active task tab and keeps leaders out of the graph", async () => {
+  it("renders only nodes from the active workflow and keeps leaders out of the graph", async () => {
     renderGraph([
       buildNode({
         id: "leader-1",

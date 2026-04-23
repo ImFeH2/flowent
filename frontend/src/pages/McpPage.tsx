@@ -1213,7 +1213,7 @@ export function McpPage() {
                                         ) : null}
                                         {entry.tab_id ? (
                                           <span>
-                                            Tab {entry.tab_id.slice(0, 8)}
+                                            Workflow {entry.tab_id.slice(0, 8)}
                                           </span>
                                         ) : null}
                                         {entry.tool_name ? (

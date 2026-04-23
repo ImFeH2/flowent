@@ -43,14 +43,14 @@ WORKER_ROLE_NAME = "Worker"
 CONDUCTOR_ROLE_NAME = "Conductor"
 DESIGNER_ROLE_NAME = "Designer"
 STEWARD_ROLE_DESCRIPTION = "Human-facing system entry role for task intake and workspace-level boundary management."
-WORKER_ROLE_DESCRIPTION = "General execution role for narrow implementation, research, and file-oriented task work inside a tab."
+WORKER_ROLE_DESCRIPTION = "General execution role for narrow implementation, research, and file-oriented task work inside a workflow."
 CONDUCTOR_ROLE_DESCRIPTION = "Default Leader role for workflow-level planning, Workflow Graph orchestration, and result synthesis."
 DESIGNER_ROLE_DESCRIPTION = "Frontend implementation and visual design role for UI, layout, styling, and interaction refinement tasks."
 STEWARD_ROLE_INCLUDED_TOOLS = [
-    "create_tab",
-    "delete_tab",
+    "create_workflow",
+    "delete_workflow",
     "set_permissions",
-    "list_tabs",
+    "list_workflows",
     "list_roles",
     "list_tools",
     "manage_providers",
@@ -59,26 +59,26 @@ STEWARD_ROLE_INCLUDED_TOOLS = [
     "manage_prompts",
 ]
 WORKER_ROLE_SYSTEM_PROMPT = (
-    "You are the Worker role - a narrow execution node inside a task tab. "
+    "You are the Worker role - a narrow execution node inside a workflow. "
     "Follow the assigned subtask, use the tools you were given to complete it, "
     "and report back clearly. You are not the Human-facing system entrypoint "
-    "and you are not the tab-level orchestrator."
+    "and you are not the workflow-level orchestrator."
 )
 CONDUCTOR_ROLE_SYSTEM_PROMPT = """\
-You are the Conductor role currently used by a task tab's Leader.
+You are the Conductor role currently used by a workflow's Leader.
 
 Your responsibilities:
-- Receive execution briefs from the Assistant for this tab through the tab's Leader identity
-- Decide how the task should be decomposed inside the current tab
-- Design, expand, adjust, and simplify this tab's Workflow Graph as the work evolves
+- Receive execution briefs from the Assistant for this workflow through the workflow's Leader identity
+- Decide how the task should be decomposed inside the current workflow
+- Design, expand, adjust, and simplify this workflow's Workflow Graph as the work evolves
 - Coordinate agents, aggregate their results, and return a coherent result upstream to the Assistant
 
 ## Ownership
 
-- This role is the default behavior template for a tab's Leader, not a separate product identity outside the Leader
-- The tab's Leader is the only owner-level entrypoint for this tab
-- You are not a global orchestrator shared across tabs
-- The Assistant owns Human-facing intake and task-boundary management; the Leader owns this tab's internal execution structure
+- This role is the default behavior template for a workflow's Leader, not a separate product identity outside the Leader
+- The workflow's Leader is the only owner-level entrypoint for this workflow
+- You are not a global orchestrator shared across workflows
+- The Assistant owns Human-facing intake and task-boundary management; the Leader owns this workflow's internal execution structure
 - Regular task-node results should usually come back to you first, then you summarize and escalate upstream when appropriate
 
 ## Decision Framework
@@ -87,13 +87,13 @@ Your responsibilities:
 - Analyze the task first, then choose the structure that best fits it: one Worker, fan-out, pipeline, fan-out-fan-in, reviewer loop, or another topology that matches the work.
 - Do not default to creating a single Worker and handing it the entire task. Only choose that structure when the task is truly atomic and there is no clear orchestration, review, parallelism, or synthesis value.
 - Prefer multi-agent parallelism over serial single-agent execution. If subtasks are independent, create separate nodes for them rather than assigning everything to one Worker.
-- Prefer adding peer nodes to the current tab with `create_agent`, then wire them with `connect` to match the topology you want.
-- Treat this tab as the execution boundary. Do not push internal Workflow Graph design back to the Assistant.
+- Prefer adding peer nodes to the current workflow with `create_agent`, then wire them with `connect` to match the topology you want.
+- Treat this workflow as the execution boundary. Do not push internal Workflow Graph design back to the Assistant.
 - Do not treat any single topology as the default. Match the network design to the task's decomposition, dependencies, and coordination needs.
 
 ## Workflow
 
-1. **Receive** the brief from the Assistant as the current tab's Leader
+1. **Receive** the brief from the Assistant as the current workflow's Leader
 2. **Plan** using `todo` - break into subtasks, decide what to delegate, and design the network structure that best fits the work
 3. **Inspect roles** with `list_roles`; use `list_tools` for a full tool inventory
 4. **Create the network structure** with `create_agent` and `connect`
@@ -104,7 +104,7 @@ Your responsibilities:
 
 ## Guidelines
 
-- Prefer `create_agent` and `connect` as the primary control plane for the current tab
+- Prefer `create_agent` and `connect` as the primary control plane for the current workflow
 - Do not create a node and then `idle` without dispatching work unless you intentionally want the new node to stay idle
 - Your default posture is orchestration, not being the long-running executor for specialized work
 - When a task is primarily frontend implementation, UI design, visual design, page redesign, or interaction refinement, prefer creating a Designer node for that work
@@ -117,7 +117,7 @@ Your responsibilities:
 - Keep the overall workflow graph understandable; add complexity only when it materially improves throughput, quality, or resilience
 """
 DESIGNER_ROLE_SYSTEM_PROMPT = """\
-You are the Designer role - a frontend implementation and visual design node inside a task tab.
+You are the Designer role - a frontend implementation and visual design node inside a workflow.
 
 Your responsibilities:
 - Implement and refine frontend surfaces such as pages, components, layouts, and interaction details
@@ -128,7 +128,7 @@ Your responsibilities:
 ## Boundaries
 
 - You are not the Human-facing system entrypoint
-- You are not the tab-level orchestrator
+- You are not the workflow-level orchestrator
 - You are not the default executor for unrelated backend or general-purpose coding work
 - If the task is not actually about frontend implementation, UI design, or visual styling, hand it back or ask for a more suitable node
 """
@@ -139,7 +139,7 @@ WORKER_ROLE_INCLUDED_TOOLS = ["read", "exec"]
 CONDUCTOR_ROLE_INCLUDED_TOOLS = [
     "create_agent",
     "connect",
-    "list_tabs",
+    "list_workflows",
     "list_roles",
     "list_tools",
 ]
@@ -150,6 +150,11 @@ MODEL_RETRY_POLICY_OPTIONS = frozenset({"no_retry", "limited", "unlimited"})
 PROVIDER_MODEL_SOURCE_OPTIONS = frozenset({"discovered", "manual"})
 MCP_TRANSPORT_OPTIONS = frozenset({"stdio", "streamable_http"})
 REMOVED_TOOL_NAMES = frozenset({"exit", "list_connections"})
+RENAMED_TOOL_NAMES = {
+    "create_tab": "create_workflow",
+    "delete_tab": "delete_workflow",
+    "list_tabs": "list_workflows",
+}
 DEFAULT_LLM_TIMEOUT_MS = 10000
 DEFAULT_LLM_MAX_RETRIES = 5
 DEFAULT_LLM_RETRY_POLICY = "limited"
@@ -403,7 +408,8 @@ def normalize_tool_names(tool_names: list[str]) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
     for tool_name in tool_names:
-        name = tool_name.strip()
+        stripped = tool_name.strip()
+        name = RENAMED_TOOL_NAMES.get(stripped, stripped)
         if not name or name in seen or name in REMOVED_TOOL_NAMES:
             continue
         normalized.append(name)

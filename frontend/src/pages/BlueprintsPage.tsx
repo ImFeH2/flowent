@@ -647,7 +647,7 @@ function BlueprintStageColumn({
             </p>
             <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
               The stage previews slot topology here so the collaboration
-              structure stays readable before you create a task tab.
+              structure stays readable before you create a workflow.
             </p>
           </div>
         </div>

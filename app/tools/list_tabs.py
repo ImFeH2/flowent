@@ -18,28 +18,30 @@ if TYPE_CHECKING:
 
 
 class ListTabsTool(Tool):
-    name = "list_tabs"
+    name = "list_workflows"
     description = "List persistent workflows. Optionally include the full Workflow Graph for one workflow."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
-            "tab_id": {
+            "workflow_id": {
                 "type": "string",
-                "description": "Optional tab ID to inspect in detail",
+                "description": "Optional workflow ID to inspect in detail",
             }
         },
         "required": [],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        tab_id = args.get("tab_id")
-        if tab_id is not None and not isinstance(tab_id, str):
-            return json.dumps({"error": "tab_id must be a string"})
+        workflow_id = args.get("workflow_id")
+        if workflow_id is not None and not isinstance(workflow_id, str):
+            return json.dumps({"error": "workflow_id must be a string"})
 
-        if isinstance(tab_id, str) and tab_id.strip():
-            tab = workspace_store.get_tab(tab_id.strip())
+        if isinstance(workflow_id, str) and workflow_id.strip():
+            tab = workspace_store.get_tab(workflow_id.strip())
             if tab is None:
-                return json.dumps({"error": f"Tab '{tab_id.strip()}' not found"})
+                return json.dumps(
+                    {"error": f"Workflow '{workflow_id.strip()}' not found"}
+                )
             nodes = [
                 {
                     "id": node.id,
@@ -65,7 +67,7 @@ class ListTabsTool(Tool):
             ]
             return json.dumps(
                 {
-                    "tab": serialize_tab_summary(tab),
+                    "workflow": serialize_tab_summary(tab),
                     "nodes": nodes,
                     "runtime_nodes": [
                         {

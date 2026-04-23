@@ -106,7 +106,9 @@ class ConnectTool(Tool):
         if kind not in {"control", "data", "event"}:
             return json.dumps({"error": "kind must be control, data, or event"})
         if not agent.config.tab_id:
-            return json.dumps({"error": "Only a tab Leader may connect task nodes"})
+            return json.dumps(
+                {"error": "Only a workflow Leader may connect task nodes"}
+            )
 
         source = _resolve_workflow_node_ref(
             tab_id=agent.config.tab_id,
@@ -124,17 +126,21 @@ class ConnectTool(Tool):
         source_id, source_tab_id = source
         target_id, target_tab_id = target
         if source_tab_id != target_tab_id:
-            return json.dumps({"error": "Both nodes must belong to the same tab"})
+            return json.dumps({"error": "Both nodes must belong to the same workflow"})
         if agent.node_type == NodeType.ASSISTANT:
             return json.dumps(
                 {"error": "Assistant may not rewire a Workflow Graph directly"}
             )
         if agent.config.tab_id != source_tab_id:
             return json.dumps(
-                {"error": "A tab Leader may only connect peers inside its own tab"}
+                {
+                    "error": "A workflow Leader may only connect peers inside its own workflow"
+                }
             )
         if not is_tab_leader(node_id=agent.uuid, tab_id=agent.config.tab_id):
-            return json.dumps({"error": "Only a tab Leader may connect task nodes"})
+            return json.dumps(
+                {"error": "Only a workflow Leader may connect task nodes"}
+            )
 
         edge, error = create_edge(
             tab_id=source_tab_id,

@@ -121,7 +121,7 @@ def test_set_permissions_updates_leader_and_clamps_existing_workers(tmp_path):
         SetPermissionsTool().execute(
             assistant,
             {
-                "tab_id": tab.id,
+                "workflow_id": tab.id,
                 "allow_network": False,
                 "write_dirs": [str(keep_boundary)],
             },
@@ -175,7 +175,7 @@ def test_set_permissions_keeps_omitted_fields_unchanged(tmp_path):
         SetPermissionsTool().execute(
             assistant,
             {
-                "tab_id": tab.id,
+                "workflow_id": tab.id,
                 "write_dirs": [str(narrowed_dir)],
             },
         )
@@ -228,7 +228,7 @@ def test_set_permissions_does_not_auto_broaden_existing_workers(tmp_path):
         SetPermissionsTool().execute(
             assistant,
             {
-                "tab_id": tab.id,
+                "workflow_id": tab.id,
                 "allow_network": True,
                 "write_dirs": [str(root_dir)],
             },
@@ -271,7 +271,7 @@ def test_set_permissions_rejects_allow_network_outside_caller_boundary(tmp_path)
         SetPermissionsTool().execute(
             assistant,
             {
-                "tab_id": tab.id,
+                "workflow_id": tab.id,
                 "allow_network": True,
             },
         )
@@ -314,7 +314,7 @@ def test_set_permissions_rejects_write_dirs_outside_caller_boundary(tmp_path):
         SetPermissionsTool().execute(
             assistant,
             {
-                "tab_id": tab.id,
+                "workflow_id": tab.id,
                 "write_dirs": [str(other_dir)],
             },
         )
@@ -359,7 +359,7 @@ def test_set_permissions_allows_explicitly_granted_non_assistant_agent(tmp_path)
         SetPermissionsTool().execute(
             leader,
             {
-                "tab_id": tab.id,
+                "workflow_id": tab.id,
                 "write_dirs": [str(narrowed_dir)],
             },
         )
@@ -373,19 +373,19 @@ def test_set_permissions_tool_schema_matches_patch_contract():
     assert SetPermissionsTool.parameters == {
         "type": "object",
         "properties": {
-            "tab_id": {
+            "workflow_id": {
                 "type": "string",
-                "description": "ID of the tab whose permission boundary should be updated",
+                "description": "ID of the workflow whose permission boundary should be updated",
             },
             "allow_network": {
                 "type": "boolean",
-                "description": "Optional patched network permission for the tab boundary",
+                "description": "Optional patched network permission for the workflow boundary",
             },
             "write_dirs": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional patched writable directory boundary for the tab",
+                "description": "Optional patched writable directory boundary for the workflow",
             },
         },
-        "required": ["tab_id"],
+        "required": ["workflow_id"],
     }

@@ -12,28 +12,28 @@ if TYPE_CHECKING:
 
 
 class DeleteTabTool(Tool):
-    name = "delete_tab"
-    description = "Delete a task tab and clean up its workflow."
+    name = "delete_workflow"
+    description = "Delete a workflow and clean up its graph."
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
-            "tab_id": {
+            "workflow_id": {
                 "type": "string",
-                "description": "ID of the tab to delete",
+                "description": "ID of the workflow to delete",
             }
         },
-        "required": ["tab_id"],
+        "required": ["workflow_id"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
         if agent.node_type != NodeType.ASSISTANT:
-            return json.dumps({"error": "Only the Assistant may delete tabs"})
+            return json.dumps({"error": "Only the Assistant may delete workflows"})
 
-        tab_id = args.get("tab_id")
-        if not isinstance(tab_id, str) or not tab_id.strip():
-            return json.dumps({"error": "tab_id must be a non-empty string"})
+        workflow_id = args.get("workflow_id")
+        if not isinstance(workflow_id, str) or not workflow_id.strip():
+            return json.dumps({"error": "workflow_id must be a non-empty string"})
 
-        deleted, error = delete_tab(tab_id=tab_id.strip())
+        deleted, error = delete_tab(tab_id=workflow_id.strip())
         if error is not None or deleted is None:
-            return json.dumps({"error": error or "Failed to delete tab"})
+            return json.dumps({"error": error or "Failed to delete workflow"})
         return json.dumps(deleted)

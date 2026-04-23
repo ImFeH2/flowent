@@ -63,7 +63,7 @@ export async function saveTabAsBlueprintRequest(
   description = "",
 ): Promise<AgentBlueprint> {
   return requestJson<AgentBlueprint, AgentBlueprint>(
-    `/api/tabs/${tabId}/blueprint`,
+    `/api/workflows/${tabId}/blueprint`,
     {
       method: "POST",
       body: { name, description },

@@ -488,7 +488,7 @@ export function StatsPage() {
 
   const overviewCards = [
     {
-      title: "Active Tabs",
+      title: "Active Workflows",
       value: formatInteger(overview.activeTabs),
       icon: Layers3,
     },
@@ -627,16 +627,16 @@ export function StatsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <span className={statsFilterLabelClass}>Tab</span>
+              <span className={statsFilterLabelClass}>Workflow</span>
               <Select
                 value={effectiveFilters.tabId ?? FILTER_ALL}
                 onValueChange={(value) => handleFilterChange("tabId", value)}
               >
                 <SelectTrigger className={`w-full ${statsSelectTriggerClass}`}>
-                  <SelectValue placeholder="All Tabs" />
+                  <SelectValue placeholder="All Workflows" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={FILTER_ALL}>All Tabs</SelectItem>
+                  <SelectItem value={FILTER_ALL}>All Workflows</SelectItem>
                   {filterOptions.tabs.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
@@ -825,8 +825,8 @@ export function StatsPage() {
                 <div className="space-y-6">
                   <SoftPanel className="overflow-hidden">
                     <StatsSectionTitle
-                      title="By Tab / Agent"
-                      description="Current activity and historical request aggregates grouped by task tab and by node."
+                      title="By Workflow / Agent"
+                      description="Current activity and historical request aggregates grouped by workflow and by node."
                       action={
                         <Select
                           value={sortKey}

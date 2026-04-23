@@ -34,13 +34,13 @@ def test_tool_registry_merges_explicit_allow_list_with_minimum_tools():
 def test_tool_registry_registers_connect_and_removes_create_root():
     tool_names = [tool.name for tool in build_tool_registry().list_tools()]
 
-    assert "create_tab" in tool_names
-    assert "delete_tab" in tool_names
+    assert "create_workflow" in tool_names
+    assert "delete_workflow" in tool_names
     assert "set_permissions" in tool_names
     assert "create_agent" in tool_names
     assert "connect" in tool_names
     assert "send" in tool_names
-    assert "list_tabs" in tool_names
+    assert "list_workflows" in tool_names
     assert "create_root" not in tool_names
     assert "manage_providers" in tool_names
     assert "manage_roles" in tool_names
@@ -48,16 +48,16 @@ def test_tool_registry_registers_connect_and_removes_create_root():
     assert "manage_prompts" in tool_names
 
 
-def test_tool_registry_grants_tab_graph_tools_when_explicitly_allowed():
+def test_tool_registry_grants_workflow_graph_tools_when_explicitly_allowed():
     agent = Agent(
         NodeConfig(
             node_type=NodeType.ASSISTANT,
             tools=[
-                "create_tab",
-                "delete_tab",
+                "create_workflow",
+                "delete_workflow",
                 "create_agent",
                 "connect",
-                "list_tabs",
+                "list_workflows",
             ],
         )
     )
@@ -70,11 +70,11 @@ def test_tool_registry_grants_tab_graph_tools_when_explicitly_allowed():
         "todo",
         "contacts",
         "send",
-        "create_tab",
-        "delete_tab",
+        "create_workflow",
+        "delete_workflow",
         "create_agent",
         "connect",
-        "list_tabs",
+        "list_workflows",
     ]
 
 

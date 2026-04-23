@@ -12,27 +12,27 @@ if TYPE_CHECKING:
 class SetPermissionsTool(Tool):
     name = "set_permissions"
     description = (
-        "Update a task tab's permission boundary by patching its bound Leader's "
+        "Update a workflow's permission boundary by patching its bound Leader's "
         "allow_network and write_dirs."
     )
     parameters: ClassVar[dict[str, Any]] = {
         "type": "object",
         "properties": {
-            "tab_id": {
+            "workflow_id": {
                 "type": "string",
-                "description": "ID of the tab whose permission boundary should be updated",
+                "description": "ID of the workflow whose permission boundary should be updated",
             },
             "allow_network": {
                 "type": "boolean",
-                "description": "Optional patched network permission for the tab boundary",
+                "description": "Optional patched network permission for the workflow boundary",
             },
             "write_dirs": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional patched writable directory boundary for the tab",
+                "description": "Optional patched writable directory boundary for the workflow",
             },
         },
-        "required": ["tab_id"],
+        "required": ["workflow_id"],
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
@@ -42,12 +42,12 @@ class SetPermissionsTool(Tool):
             build_assistant_write_dirs,
         )
 
-        tab_id = args.get("tab_id")
+        workflow_id = args.get("workflow_id")
         raw_allow_network = args.get("allow_network")
         raw_write_dirs = args.get("write_dirs")
 
-        if not isinstance(tab_id, str) or not tab_id.strip():
-            return json.dumps({"error": "tab_id must be a non-empty string"})
+        if not isinstance(workflow_id, str) or not workflow_id.strip():
+            return json.dumps({"error": "workflow_id must be a non-empty string"})
 
         allow_network: bool | None = None
         if "allow_network" in args:
@@ -70,7 +70,7 @@ class SetPermissionsTool(Tool):
                 return json.dumps({"error": str(exc)})
 
         result, error = set_tab_permissions(
-            tab_id=tab_id.strip(),
+            tab_id=workflow_id.strip(),
             allow_network=allow_network,
             write_dirs=write_dirs,
             caller_allow_network=agent.config.allow_network,
@@ -78,5 +78,7 @@ class SetPermissionsTool(Tool):
             actor_id=agent.uuid,
         )
         if error is not None or result is None:
-            return json.dumps({"error": error or "Failed to update tab permissions"})
+            return json.dumps(
+                {"error": error or "Failed to update workflow permissions"}
+            )
         return json.dumps(result)

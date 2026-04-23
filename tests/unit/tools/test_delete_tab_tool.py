@@ -42,7 +42,7 @@ def test_delete_tab_tool_deletes_tab_and_graph(monkeypatch):
     )
 
     assistant = Agent(
-        NodeConfig(node_type=NodeType.ASSISTANT, tools=["delete_tab"]),
+        NodeConfig(node_type=NodeType.ASSISTANT, tools=["delete_workflow"]),
         uuid="assistant",
     )
     registry.register(assistant)
@@ -55,7 +55,7 @@ def test_delete_tab_tool_deletes_tab_and_graph(monkeypatch):
     edge, error = create_edge(from_node_id=left.id, to_node_id=right.id)
     assert error is None and edge is not None
 
-    result = json.loads(DeleteTabTool().execute(assistant, {"tab_id": tab.id}))
+    result = json.loads(DeleteTabTool().execute(assistant, {"workflow_id": tab.id}))
 
     assert result["id"] == tab.id
     assert set(result["removed_node_ids"]) == {tab.leader_id, left.id, right.id}
@@ -70,10 +70,14 @@ def test_delete_tab_tool_deletes_tab_and_graph(monkeypatch):
 
 def test_delete_tab_tool_rejects_non_assistant():
     agent = Agent(
-        NodeConfig(node_type=NodeType.AGENT, role_name="Worker", tools=["delete_tab"]),
+        NodeConfig(
+            node_type=NodeType.AGENT,
+            role_name="Worker",
+            tools=["delete_workflow"],
+        ),
         uuid="worker",
     )
 
-    result = json.loads(DeleteTabTool().execute(agent, {"tab_id": "tab-1"}))
+    result = json.loads(DeleteTabTool().execute(agent, {"workflow_id": "tab-1"}))
 
-    assert result == {"error": "Only the Assistant may delete tabs"}
+    assert result == {"error": "Only the Assistant may delete workflows"}

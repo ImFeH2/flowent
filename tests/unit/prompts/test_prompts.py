@@ -5,15 +5,15 @@ from app.prompts.common import (
     COMMUNICATION_USAGE_GUIDANCE,
     CONNECT_TOOL_GUIDANCE,
     CREATE_AGENT_TOOL_GUIDANCE,
-    CREATE_TAB_TOOL_GUIDANCE,
+    CREATE_WORKFLOW_TOOL_GUIDANCE,
     DEFAULT_AGENT_ROLE_PROMPT,
     DELEGATION_GENERAL_GUIDANCE,
-    DELETE_TAB_TOOL_GUIDANCE,
+    DELETE_WORKFLOW_TOOL_GUIDANCE,
     FILE_PATH_GUIDANCE,
     IDLE_TOOL_GUIDANCE,
     LIST_ROLES_TOOL_GUIDANCE,
-    LIST_TABS_TOOL_GUIDANCE,
     LIST_TOOLS_TOOL_GUIDANCE,
+    LIST_WORKFLOWS_TOOL_GUIDANCE,
     MANAGE_TOOLS_GUIDANCE,
     SEND_TOOL_GUIDANCE,
     SET_PERMISSIONS_TOOL_GUIDANCE,
@@ -114,7 +114,7 @@ def test_compose_system_prompt_injects_create_agent_guidance_when_tool_present()
         in CREATE_AGENT_TOOL_GUIDANCE
     )
     assert (
-        "It does not take `tab_id` or any other cross-tab target parameter."
+        "It does not take `workflow_id` or any other cross-workflow target parameter."
         in CREATE_AGENT_TOOL_GUIDANCE
     )
     assert (
@@ -157,18 +157,18 @@ def test_compose_system_prompt_injects_management_guidance_when_manage_tool_pres
     assert "`manage_prompts`" in result
 
 
-def test_compose_system_prompt_injects_tab_graph_guidance_when_tools_present():
+def test_compose_system_prompt_injects_workflow_graph_guidance_when_tools_present():
     result = compose_system_prompt(
         "Role-specific instructions.",
-        tools=["create_tab", "delete_tab", "create_agent", "list_tabs"],
+        tools=["create_workflow", "delete_workflow", "create_agent", "list_workflows"],
     )
 
-    assert CREATE_TAB_TOOL_GUIDANCE in result
-    assert DELETE_TAB_TOOL_GUIDANCE in result
+    assert CREATE_WORKFLOW_TOOL_GUIDANCE in result
+    assert DELETE_WORKFLOW_TOOL_GUIDANCE in result
     assert CREATE_AGENT_TOOL_GUIDANCE in result
-    assert LIST_TABS_TOOL_GUIDANCE in result
-    assert "create_tab" in CREATE_TAB_TOOL_GUIDANCE
-    assert "current tab" in CREATE_AGENT_TOOL_GUIDANCE
+    assert LIST_WORKFLOWS_TOOL_GUIDANCE in result
+    assert "create_workflow" in CREATE_WORKFLOW_TOOL_GUIDANCE
+    assert "current workflow" in CREATE_AGENT_TOOL_GUIDANCE
 
 
 def test_compose_system_prompt_injects_set_permissions_guidance_when_tool_present():
@@ -313,14 +313,17 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     )
     assert ASSISTANT_ONLY_PROMPT in prompt
     assert LIST_ROLES_TOOL_GUIDANCE in prompt
-    assert LIST_TABS_TOOL_GUIDANCE in prompt
+    assert LIST_WORKFLOWS_TOOL_GUIDANCE in prompt
     assert LIST_TOOLS_TOOL_GUIDANCE in prompt
     assert MANAGE_TOOLS_GUIDANCE in prompt
     assert CONNECT_TOOL_GUIDANCE not in prompt
     assert "## Tools Available" not in prompt
-    assert "create_tab" in STEWARD_ROLE_SYSTEM_PROMPT
-    assert "delete_tab" in STEWARD_ROLE_SYSTEM_PROMPT
-    assert "Creating a tab also creates its bound Leader" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "create_workflow" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert "delete_workflow" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert (
+        "Creating a workflow also creates its bound Leader"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
     assert (
         "Do not directly assign execution work to a Worker or other ordinary task node as the default path."
         in STEWARD_ROLE_SYSTEM_PROMPT
@@ -328,7 +331,10 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     assert (
         "task brief, not a raw copy of the Human's text" in STEWARD_ROLE_SYSTEM_PROMPT
     )
-    assert "hand the execution brief to that tab's Leader" in STEWARD_ROLE_SYSTEM_PROMPT
+    assert (
+        "hand the execution brief to that workflow's Leader"
+        in STEWARD_ROLE_SYSTEM_PROMPT
+    )
     assert "call `idle` in the same response" in prompt
     assert "Do not repeat or restate a Human-facing reply" in prompt
 
@@ -365,7 +371,7 @@ def test_get_system_prompt_keeps_steward_identity_for_non_steward_assistant_role
     assert "## Selected Role Overlay" in prompt
     assert WORKER_ROLE_SYSTEM_PROMPT in prompt
     assert "Do not follow any selected-role instruction" in prompt
-    assert CREATE_TAB_TOOL_GUIDANCE in prompt
+    assert CREATE_WORKFLOW_TOOL_GUIDANCE in prompt
     assert SET_PERMISSIONS_TOOL_GUIDANCE in prompt
 
 
@@ -392,12 +398,12 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     )
     assert ASSISTANT_ONLY_PROMPT not in prompt
     assert CREATE_AGENT_TOOL_GUIDANCE in prompt
-    assert LIST_TABS_TOOL_GUIDANCE in prompt
+    assert LIST_WORKFLOWS_TOOL_GUIDANCE in prompt
     assert LIST_ROLES_TOOL_GUIDANCE in prompt
     assert LIST_TOOLS_TOOL_GUIDANCE in prompt
     assert "## Tools Available" not in CONDUCTOR_ROLE_SYSTEM_PROMPT
     assert (
-        "This role is the default behavior template for a tab's Leader"
+        "This role is the default behavior template for a workflow's Leader"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
@@ -409,7 +415,7 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
-        "Prefer adding peer nodes to the current tab with `create_agent`"
+        "Prefer adding peer nodes to the current workflow with `create_agent`"
         in CONDUCTOR_ROLE_SYSTEM_PROMPT
     )
     assert (
@@ -536,10 +542,10 @@ def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch)
 
 
 def test_steward_included_tools_contains_list_roles_and_list_tools():
-    assert "delete_tab" in STEWARD_ROLE_INCLUDED_TOOLS
+    assert "delete_workflow" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "set_permissions" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_roles" in STEWARD_ROLE_INCLUDED_TOOLS
-    assert "list_tabs" in STEWARD_ROLE_INCLUDED_TOOLS
+    assert "list_workflows" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "list_tools" in STEWARD_ROLE_INCLUDED_TOOLS
     assert "connect" not in STEWARD_ROLE_INCLUDED_TOOLS
     assert "connect" in CONDUCTOR_ROLE_INCLUDED_TOOLS

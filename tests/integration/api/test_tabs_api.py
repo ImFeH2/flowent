@@ -12,7 +12,7 @@ def _create_agent_node(
     role_name: str = "Worker",
 ) -> dict[str, Any]:
     response = client.post(
-        f"/api/tabs/{tab_id}/nodes",
+        f"/api/workflows/{tab_id}/nodes",
         json={"role_name": role_name, "name": name},
     )
     assert response.status_code == 200
@@ -28,7 +28,7 @@ def _create_graph_node(
     config: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     response = client.post(
-        f"/api/tabs/{tab_id}/nodes",
+        f"/api/workflows/{tab_id}/nodes",
         json={
             "node_type": node_type,
             "name": name,
@@ -40,15 +40,15 @@ def _create_graph_node(
 
 
 def test_list_tabs_is_empty_at_startup(client: TestClient):
-    response = client.get("/api/tabs")
+    response = client.get("/api/workflows")
 
     assert response.status_code == 200
-    assert response.json() == {"tabs": []}
+    assert response.json() == {"workflows": []}
 
 
 def test_create_tab_rejects_removed_mcp_servers_field(client: TestClient):
     response = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Review Task", "mcp_servers": ["filesystem"]},
     )
 
@@ -57,7 +57,7 @@ def test_create_tab_rejects_removed_mcp_servers_field(client: TestClient):
 
 def test_create_tab_rejects_removed_goal_field(client: TestClient):
     response = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Review Task", "goal": "Inspect changed files"},
     )
 
@@ -66,7 +66,7 @@ def test_create_tab_rejects_removed_goal_field(client: TestClient):
 
 def test_create_tab_node_and_edge_round_trip(client: TestClient):
     create_tab_response = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Review Task"},
     )
 
@@ -83,15 +83,15 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     reader = _create_agent_node(client, tab_id=tab_id, name="Reader")
     writer = _create_agent_node(client, tab_id=tab_id, name="Writer")
 
-    assert reader["tab_id"] == tab_id
-    assert writer["tab_id"] == tab_id
+    assert reader["workflow_id"] == tab_id
+    assert writer["workflow_id"] == tab_id
     assert reader["node_type"] == "agent"
     assert writer["node_type"] == "agent"
     assert reader["config"]["role_name"] == "Worker"
     assert writer["config"]["role_name"] == "Worker"
 
     edge_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={
             "from_node_id": reader["id"],
             "from_port_key": "out",
@@ -110,32 +110,32 @@ def test_create_tab_node_and_edge_round_trip(client: TestClient):
     assert edge["to_port_key"] == "in"
     assert edge["kind"] == "control"
 
-    tab_detail_response = client.get(f"/api/tabs/{tab_id}")
+    tab_detail_response = client.get(f"/api/workflows/{tab_id}")
     assert tab_detail_response.status_code == 200
     tab_detail = tab_detail_response.json()
-    assert tab_detail["tab"]["id"] == tab_id
-    assert "goal" not in tab_detail["tab"]
-    assert tab_detail["tab"]["node_count"] == 2
-    assert tab_detail["tab"]["edge_count"] == 1
+    assert tab_detail["workflow"]["id"] == tab_id
+    assert "goal" not in tab_detail["workflow"]
+    assert tab_detail["workflow"]["node_count"] == 2
+    assert tab_detail["workflow"]["edge_count"] == 1
     assert {node["name"] for node in tab_detail["nodes"]} == {"Reader", "Writer"}
     assert tab_detail["edges"] == [edge]
-    assert len(tab_detail["tab"]["definition"]["nodes"]) == 2
-    assert tab_detail["tab"]["definition"]["edges"] == [edge]
+    assert len(tab_detail["workflow"]["definition"]["nodes"]) == 2
+    assert tab_detail["workflow"]["definition"]["edges"] == [edge]
 
     nodes_response = client.get("/api/nodes")
     assert nodes_response.status_code == 200
     nodes = nodes_response.json()["nodes"]
     reader_node = next(node for node in nodes if node["id"] == reader["id"])
     writer_node = next(node for node in nodes if node["id"] == writer["id"])
-    assert reader_node["tab_id"] == tab_id
-    assert writer_node["tab_id"] == tab_id
+    assert reader_node["workflow_id"] == tab_id
+    assert writer_node["workflow_id"] == tab_id
     assert reader_node["connections"] == [writer["id"]]
     assert writer_node["connections"] == [reader["id"]]
 
 
 def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     create_tab_response = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Disposable"},
     )
 
@@ -148,13 +148,13 @@ def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     right = _create_agent_node(client, tab_id=tab_id, name="Right")
 
     edge_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": left["id"], "to_node_id": right["id"]},
     )
     assert edge_response.status_code == 200
     edge_id = edge_response.json()["id"]
 
-    delete_response = client.delete(f"/api/tabs/{tab_id}")
+    delete_response = client.delete(f"/api/workflows/{tab_id}")
 
     assert delete_response.status_code == 200
     assert delete_response.json()["id"] == tab_id
@@ -165,7 +165,7 @@ def test_delete_tab_cleans_up_nodes_and_edges(client: TestClient):
     }
     assert delete_response.json()["removed_edge_ids"] == [edge_id]
 
-    tab_detail_response = client.get(f"/api/tabs/{tab_id}")
+    tab_detail_response = client.get(f"/api/workflows/{tab_id}")
     assert tab_detail_response.status_code == 404
 
     nodes_response = client.get("/api/nodes")
@@ -179,7 +179,7 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
     client: TestClient,
 ):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Edge Delete"},
     ).json()
     tab_id = tab["id"]
@@ -189,11 +189,11 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
     right = _create_agent_node(client, tab_id=tab_id, name="Right")
 
     left_to_middle = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": left["id"], "to_node_id": middle["id"]},
     )
     middle_to_right = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": middle["id"], "to_node_id": right["id"]},
     )
 
@@ -201,7 +201,7 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
     assert middle_to_right.status_code == 200
 
     reverse_delete_response = client.delete(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         params={
             "from_node_id": middle["id"],
             "to_node_id": left["id"],
@@ -211,7 +211,7 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
     assert reverse_delete_response.json()["detail"] == "Edge not found"
 
     delete_response = client.delete(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         params={
             "from_node_id": left["id"],
             "to_node_id": middle["id"],
@@ -222,7 +222,7 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
     assert delete_response.json()["from_node_id"] == left["id"]
     assert delete_response.json()["to_node_id"] == middle["id"]
 
-    detail = client.get(f"/api/tabs/{tab_id}").json()
+    detail = client.get(f"/api/workflows/{tab_id}").json()
     remaining_edges = {
         (edge["from_node_id"], edge["to_node_id"]) for edge in detail["edges"]
     }
@@ -231,7 +231,7 @@ def test_delete_tab_edge_requires_exact_direction_and_removes_only_target_edge(
 
 def test_delete_tab_node_removes_node_and_all_incident_edges(client: TestClient):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Node Delete"},
     ).json()
     tab_id = tab["id"]
@@ -242,25 +242,25 @@ def test_delete_tab_node_removes_node_and_all_incident_edges(client: TestClient)
 
     assert (
         client.post(
-            f"/api/tabs/{tab_id}/edges",
+            f"/api/workflows/{tab_id}/edges",
             json={"from_node_id": left["id"], "to_node_id": middle["id"]},
         ).status_code
         == 200
     )
     assert (
         client.post(
-            f"/api/tabs/{tab_id}/edges",
+            f"/api/workflows/{tab_id}/edges",
             json={"from_node_id": middle["id"], "to_node_id": right["id"]},
         ).status_code
         == 200
     )
 
-    delete_response = client.delete(f"/api/tabs/{tab_id}/nodes/{middle['id']}")
+    delete_response = client.delete(f"/api/workflows/{tab_id}/nodes/{middle['id']}")
 
     assert delete_response.status_code == 200
     assert delete_response.json()["id"] == middle["id"]
 
-    detail = client.get(f"/api/tabs/{tab_id}").json()
+    detail = client.get(f"/api/workflows/{tab_id}").json()
     remaining_nodes = {node["id"] for node in detail["nodes"]}
     assert middle["id"] not in remaining_nodes
     assert left["id"] in remaining_nodes
@@ -272,7 +272,7 @@ def test_tab_edge_creation_enforces_directed_ports_and_single_input(
     client: TestClient,
 ):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Edge Validation"},
     ).json()
     tab_id = tab["id"]
@@ -281,33 +281,33 @@ def test_tab_edge_creation_enforces_directed_ports_and_single_input(
     observer = _create_agent_node(client, tab_id=tab_id, name="Observer")
 
     self_loop_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": worker["id"], "to_node_id": worker["id"]},
     )
     assert self_loop_response.status_code == 400
     assert self_loop_response.json()["detail"] == "Self-loop edges are not allowed"
 
     first_edge_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": worker["id"], "to_node_id": reviewer["id"]},
     )
     assert first_edge_response.status_code == 200
 
     duplicate_edge_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": worker["id"], "to_node_id": reviewer["id"]},
     )
     assert duplicate_edge_response.status_code == 400
     assert duplicate_edge_response.json()["detail"] == "Duplicate edges are not allowed"
 
     reverse_edge_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": reviewer["id"], "to_node_id": worker["id"]},
     )
     assert reverse_edge_response.status_code == 200
 
     conflicting_input_response = client.post(
-        f"/api/tabs/{tab_id}/edges",
+        f"/api/workflows/{tab_id}/edges",
         json={"from_node_id": observer["id"], "to_node_id": reviewer["id"]},
     )
     assert conflicting_input_response.status_code == 400
@@ -319,7 +319,7 @@ def test_tab_edge_creation_enforces_directed_ports_and_single_input(
 
 def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
     source_tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Original Workflow"},
     ).json()
     source_tab_id = source_tab["id"]
@@ -332,8 +332,8 @@ def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
         name="Formatter",
         config={"language": "python"},
     )
-    source_detail = client.get(f"/api/tabs/{source_tab_id}").json()
-    source_definition = deepcopy(source_detail["tab"]["definition"])
+    source_detail = client.get(f"/api/workflows/{source_tab_id}").json()
+    source_definition = deepcopy(source_detail["workflow"]["definition"])
     source_definition["view"] = {
         "positions": {
             reviewer["id"]: {"x": 20, "y": 40},
@@ -351,12 +351,12 @@ def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
         }
     ]
     update_response = client.put(
-        f"/api/tabs/{source_tab_id}/definition",
+        f"/api/workflows/{source_tab_id}/definition",
         json={"definition": source_definition},
     )
     assert update_response.status_code == 200
 
-    duplicate_response = client.post(f"/api/tabs/{source_tab_id}/duplicate")
+    duplicate_response = client.post(f"/api/workflows/{source_tab_id}/duplicate")
 
     assert duplicate_response.status_code == 200
     duplicated_tab = duplicate_response.json()
@@ -367,8 +367,8 @@ def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
     assert duplicated_tab["id"] != source_tab_id
     assert duplicated_tab["leader_id"] != source_tab["leader_id"]
 
-    duplicated_detail = client.get(f"/api/tabs/{duplicated_tab['id']}").json()
-    assert "goal" not in duplicated_detail["tab"]
+    duplicated_detail = client.get(f"/api/workflows/{duplicated_tab['id']}").json()
+    assert "goal" not in duplicated_detail["workflow"]
     assert {node["name"] for node in duplicated_detail["nodes"]} == {
         "Reviewer",
         "Formatter",
@@ -378,12 +378,12 @@ def test_duplicate_tab_copies_definition_and_runtime_agents(client: TestClient):
     assert duplicated_node_ids.isdisjoint(source_node_ids)
     assert duplicated_detail["edges"][0]["from_node_id"] in duplicated_node_ids
     assert duplicated_detail["edges"][0]["to_node_id"] in duplicated_node_ids
-    assert duplicated_detail["tab"]["definition"]["view"]["positions"]
+    assert duplicated_detail["workflow"]["definition"]["view"]["positions"]
 
 
 def test_update_tab_definition_updates_metadata_and_positions(client: TestClient):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "JSON Editor"},
     ).json()
     tab_id = tab["id"]
@@ -396,7 +396,7 @@ def test_update_tab_definition_updates_metadata_and_positions(client: TestClient
         name="Formatter",
     )
 
-    current = client.get(f"/api/tabs/{tab_id}").json()["tab"]["definition"]
+    current = client.get(f"/api/workflows/{tab_id}").json()["workflow"]["definition"]
     definition = deepcopy(current)
     for node in definition["nodes"]:
         if node["id"] == agent_node["id"]:
@@ -422,7 +422,7 @@ def test_update_tab_definition_updates_metadata_and_positions(client: TestClient
     ]
 
     update_response = client.put(
-        f"/api/tabs/{tab_id}/definition",
+        f"/api/workflows/{tab_id}/definition",
         json={"definition": definition},
     )
 
@@ -434,7 +434,7 @@ def test_update_tab_definition_updates_metadata_and_positions(client: TestClient
     }
     assert updated["definition"]["edges"][0]["kind"] == "control"
 
-    detail = client.get(f"/api/tabs/{tab_id}").json()
+    detail = client.get(f"/api/workflows/{tab_id}").json()
     reviewer_detail = next(
         node for node in detail["nodes"] if node["id"] == agent_node["id"]
     )
@@ -453,13 +453,15 @@ def test_update_tab_definition_updates_metadata_and_positions(client: TestClient
 
 def test_update_tab_definition_rejects_agent_set_changes(client: TestClient):
     tab = client.post(
-        "/api/tabs",
+        "/api/workflows",
         json={"title": "Guard Rails"},
     ).json()
     tab_id = tab["id"]
 
     agent_node = _create_agent_node(client, tab_id=tab_id, name="Existing Worker")
-    definition = deepcopy(client.get(f"/api/tabs/{tab_id}").json()["tab"]["definition"])
+    definition = deepcopy(
+        client.get(f"/api/workflows/{tab_id}").json()["workflow"]["definition"]
+    )
     definition["nodes"].append(
         {
             "id": "new-agent",
@@ -487,7 +489,7 @@ def test_update_tab_definition_rejects_agent_set_changes(client: TestClient):
     )
 
     response = client.put(
-        f"/api/tabs/{tab_id}/definition",
+        f"/api/workflows/{tab_id}/definition",
         json={"definition": definition},
     )
 

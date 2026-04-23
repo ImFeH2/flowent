@@ -194,7 +194,7 @@ function getModelLabel(model: string | null | undefined): string {
 }
 
 function getTabLabel(tabTitle: string | null | undefined): string {
-  return tabTitle || "Unknown tab";
+  return tabTitle || "Unknown workflow";
 }
 
 function getAgentLabel(label: string | null | undefined): string {

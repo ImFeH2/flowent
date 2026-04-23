@@ -15,11 +15,11 @@ describe("WorkspaceCommandDialog", () => {
       <WorkspaceCommandDialog
         open
         onOpenChange={vi.fn()}
-        title="Create Task Tab"
+        title="Create Workflow"
         footer={
           <>
             <button type="button">Cancel</button>
-            <button type="button">Create Task Tab</button>
+            <button type="button">Create Workflow</button>
           </>
         }
       >
@@ -34,13 +34,13 @@ describe("WorkspaceCommandDialog", () => {
       </WorkspaceCommandDialog>,
     );
 
-    const dialog = screen.getByRole("dialog", { name: "Create Task Tab" });
+    const dialog = screen.getByRole("dialog", { name: "Create Workflow" });
     const body = screen.getByTestId("workspace-command-dialog-body");
 
     expect(dialog.className).toContain("max-h-[calc(100svh-2rem)]");
     expect(body.className).toContain("overflow-y-auto");
     expect(
-      screen.getByRole("button", { name: "Create Task Tab" }),
+      screen.getByRole("button", { name: "Create Workflow" }),
     ).toBeVisible();
   }, 10000);
 });

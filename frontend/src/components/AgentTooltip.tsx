@@ -86,7 +86,7 @@ export function AgentTooltip({
               <span className="text-foreground/80">
                 {agent.connections.length}
               </span>
-              <span>Task Tab</span>
+              <span>Workflow</span>
               <span className="font-mono text-foreground/80">
                 {agent.tab_id?.slice(0, 8) ?? "—"}
               </span>

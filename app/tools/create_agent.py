@@ -66,8 +66,8 @@ class CreateAgentTool(Tool):
     }
 
     def execute(self, agent: Agent, args: dict[str, Any], **_kwargs: Any) -> str:
-        if "tab_id" in args:
-            return json.dumps({"error": "create_agent does not accept tab_id"})
+        if "workflow_id" in args or "tab_id" in args:
+            return json.dumps({"error": "create_agent does not accept workflow_id"})
         if "connect_to_creator" in args:
             return json.dumps(
                 {
@@ -124,7 +124,9 @@ class CreateAgentTool(Tool):
             )
         if not agent.config.tab_id:
             return json.dumps(
-                {"error": "Only a node inside a tab may create ordinary task nodes"}
+                {
+                    "error": "Only a node inside a workflow may create ordinary task nodes"
+                }
             )
         if "create_agent" not in agent.config.tools:
             return json.dumps({"error": "create_agent is not enabled for this node"})
@@ -132,7 +134,9 @@ class CreateAgentTool(Tool):
 
         leader_id = get_tab_leader_id(agent.config.tab_id)
         if leader_id is None:
-            return json.dumps({"error": "Current tab does not have a bound Leader"})
+            return json.dumps(
+                {"error": "Current workflow does not have a bound Leader"}
+            )
         from app.registry import registry
         from app.workspace_store import workspace_store
 
@@ -197,7 +201,7 @@ class CreateAgentTool(Tool):
         if allow_network and not leader_allow_network:
             return json.dumps(
                 {
-                    "error": "allow_network boundary exceeded: tab Leader disallows network access"
+                    "error": "allow_network boundary exceeded: workflow Leader disallows network access"
                 }
             )
 

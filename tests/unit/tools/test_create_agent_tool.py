@@ -244,7 +244,7 @@ def test_create_agent_rejects_task_node_without_tool(monkeypatch):
     assert result == {"error": "create_agent is not enabled for this node"}
 
 
-def test_create_agent_rejects_tab_id_parameter(monkeypatch):
+def test_create_agent_rejects_workflow_id_parameter(monkeypatch):
     monkeypatch.setattr(
         "app.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
@@ -271,7 +271,7 @@ def test_create_agent_rejects_tab_id_parameter(monkeypatch):
         )
     )
 
-    assert result == {"error": "create_agent does not accept tab_id"}
+    assert result == {"error": "create_agent does not accept workflow_id"}
 
 
 def test_create_agent_rejects_reserved_conductor_role(monkeypatch):
@@ -305,7 +305,7 @@ def test_create_agent_rejects_reserved_conductor_role(monkeypatch):
     )
 
     assert result == {
-        "error": f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a tab Leader"
+        "error": f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a workflow Leader"
     }
 
 
@@ -436,7 +436,7 @@ def test_create_agent_also_respects_tab_leader_boundaries(monkeypatch, tmp_path)
         "error": f"write_dirs boundary exceeded: {creator_child}"
     }
     assert network_result == {
-        "error": "allow_network boundary exceeded: tab Leader disallows network access"
+        "error": "allow_network boundary exceeded: workflow Leader disallows network access"
     }
 
 

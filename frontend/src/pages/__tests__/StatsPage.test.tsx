@@ -110,7 +110,7 @@ describe("StatsPage", () => {
     expect(
       await screen.findByRole("heading", { name: "Stats" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Active Tabs")).toBeInTheDocument();
+    expect(screen.getByText("Active Workflows")).toBeInTheDocument();
     expect(screen.getByText("Running Agents")).toBeInTheDocument();
     expect(screen.getByText("By Provider / Model")).toBeInTheDocument();
     expect(screen.getByText("Primary")).toBeInTheDocument();

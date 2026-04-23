@@ -29,27 +29,27 @@ TODO_TOOL_GUIDANCE = """\
 - Use `todo` to manage your task checklist and track the current plan or remaining work.
 """
 
-CREATE_TAB_TOOL_GUIDANCE = """\
-## Create Tab Tool Rules
+CREATE_WORKFLOW_TOOL_GUIDANCE = """\
+## Create Workflow Tool Rules
 
-- Use `create_tab` to open a persistent workflow before building a Workflow Graph for that task.
-- A tab is the user-visible home for one task. Keep the title concrete and easy to recognize later.
+- Use `create_workflow` to open a persistent workflow before building a Workflow Graph for that task.
+- A workflow is the user-visible home for one task. Keep the title concrete and easy to recognize later.
 """
 
-DELETE_TAB_TOOL_GUIDANCE = """\
-## Delete Tab Tool Rules
+DELETE_WORKFLOW_TOOL_GUIDANCE = """\
+## Delete Workflow Tool Rules
 
-- Use `delete_tab` only when the Human explicitly asks to remove a tab or when you are intentionally cleaning up a task workspace that should no longer exist.
-- Deleting a tab permanently removes the workflow and its persisted Workflow Graph after active nodes are terminated.
+- Use `delete_workflow` only when the Human explicitly asks to remove a workflow or when you are intentionally cleaning up a task workspace that should no longer exist.
+- Deleting a workflow permanently removes the workflow and its persisted Workflow Graph after active nodes are terminated.
 """
 
 SET_PERMISSIONS_TOOL_GUIDANCE = """\
 ## Set Permissions Tool Rules
 
-- Use `set_permissions` to patch a tab's permission boundary after the tab already exists.
-- `set_permissions` updates the target tab by writing directly to its bound Leader's `allow_network` and `write_dirs`.
+- Use `set_permissions` to patch a workflow's permission boundary after the workflow already exists.
+- `set_permissions` updates the target workflow by writing directly to its bound Leader's `allow_network` and `write_dirs`.
 - Treat `allow_network` and `write_dirs` as patch fields: omitted fields stay unchanged.
-- When the Human asks to change a tab's network or writable directory boundary, prefer `set_permissions` instead of delegating that change to the tab's Leader.
+- When the Human asks to change a workflow's network or writable directory boundary, prefer `set_permissions` instead of delegating that change to the workflow's Leader.
 """
 
 CREATE_AGENT_TOOL_GUIDANCE = """\
@@ -57,7 +57,7 @@ CREATE_AGENT_TOOL_GUIDANCE = """\
 
 - Use `create_agent` to add a new agent node to the current workflow.
 - Prefer creating the right set of agents up front. If you also have `connect`, wire workflow edges as needed.
-- `create_agent` always creates the new peer in your current tab. It does not take `tab_id` or any other cross-tab target parameter.
+- `create_agent` always creates the new peer in your current workflow. It does not take `workflow_id` or any other cross-workflow target parameter.
 - Ordinary task nodes may use `create_agent` only when that tool was explicitly granted to them.
 - `create_agent` can place the new node as a standalone node, after another node, or between two nodes in the current Workflow Graph.
 - Creating an agent does not start work by itself; explicitly dispatch its first task with `send`.
@@ -114,11 +114,11 @@ LIST_ROLES_TOOL_GUIDANCE = """\
 - Use `list_roles` to inspect all registered roles and their included or optional tool configuration before choosing what nodes to create.
 """
 
-LIST_TABS_TOOL_GUIDANCE = """\
-## List Tabs Tool Rules
+LIST_WORKFLOWS_TOOL_GUIDANCE = """\
+## List Workflows Tool Rules
 
-- Use `list_tabs` to inspect the current persistent task tabs.
-- Pass `tab_id` when you need the detailed node and edge structure for one tab before changing or continuing its work.
+- Use `list_workflows` to inspect the current persistent workflows.
+- Pass `workflow_id` when you need the detailed node and edge structure for one workflow before changing or continuing its work.
 """
 
 LIST_TOOLS_TOOL_GUIDANCE = """\
@@ -134,7 +134,7 @@ MANAGE_TOOLS_GUIDANCE = """\
 - `manage_roles` manages role configuration.
 - `manage_settings` reads and updates runtime defaults.
 - `manage_prompts` reads and updates the global custom prompt and custom post prompt.
-- `set_permissions` updates an existing tab's permission boundary.
+- `set_permissions` updates an existing workflow's permission boundary.
 """
 
 COMMUNICATION_USAGE_GUIDANCE = """\
@@ -199,10 +199,10 @@ def _build_conditional_tool_guidance(tools: list[str]) -> list[str]:
         parts.append(SLEEP_TOOL_GUIDANCE.strip())
     if "todo" in tool_names:
         parts.append(TODO_TOOL_GUIDANCE.strip())
-    if "create_tab" in tool_names:
-        parts.append(CREATE_TAB_TOOL_GUIDANCE.strip())
-    if "delete_tab" in tool_names:
-        parts.append(DELETE_TAB_TOOL_GUIDANCE.strip())
+    if "create_workflow" in tool_names:
+        parts.append(CREATE_WORKFLOW_TOOL_GUIDANCE.strip())
+    if "delete_workflow" in tool_names:
+        parts.append(DELETE_WORKFLOW_TOOL_GUIDANCE.strip())
     if "set_permissions" in tool_names:
         parts.append(SET_PERMISSIONS_TOOL_GUIDANCE.strip())
     if "create_agent" in tool_names:
@@ -217,8 +217,8 @@ def _build_conditional_tool_guidance(tools: list[str]) -> list[str]:
         parts.append(SEND_TOOL_GUIDANCE.strip())
     if "list_roles" in tool_names:
         parts.append(LIST_ROLES_TOOL_GUIDANCE.strip())
-    if "list_tabs" in tool_names:
-        parts.append(LIST_TABS_TOOL_GUIDANCE.strip())
+    if "list_workflows" in tool_names:
+        parts.append(LIST_WORKFLOWS_TOOL_GUIDANCE.strip())
     if "list_tools" in tool_names:
         parts.append(LIST_TOOLS_TOOL_GUIDANCE.strip())
     if _MANAGEMENT_TOOL_NAMES & tool_names:

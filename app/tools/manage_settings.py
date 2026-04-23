@@ -53,7 +53,7 @@ class ManageSettingsTool(Tool):
             },
             "leader_role_name": {
                 "type": "string",
-                "description": "Role name used by tab Leaders",
+                "description": "Role name used by workflow Leaders",
             },
             "active_model": {
                 "type": "string",

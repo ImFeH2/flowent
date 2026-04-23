@@ -49,7 +49,7 @@ def _build_node_label(
     return "Agent"
 
 
-def _serialize_tab_snapshots() -> list[dict[str, object]]:
+def _serialize_workflow_snapshots() -> list[dict[str, object]]:
     return [
         {
             "id": tab.id,
@@ -99,7 +99,7 @@ def _resolve_current_model_source(role_name: str | None) -> dict[str, str | None
 
 
 def _serialize_node_snapshots(
-    tab_titles: dict[str, str],
+    workflow_titles: dict[str, str],
 ) -> list[dict[str, object]]:
     nodes_by_id: dict[str, dict[str, object]] = {}
 
@@ -119,8 +119,8 @@ def _serialize_node_snapshots(
             "node_type": assistant.config.node_type.value,
             "is_leader": False,
             "state": assistant.state.value,
-            "tab_id": None,
-            "tab_title": None,
+            "workflow_id": None,
+            "workflow_title": None,
             **model_source,
         }
 
@@ -141,9 +141,9 @@ def _serialize_node_snapshots(
             "node_type": record.config.node_type.value,
             "is_leader": is_leader,
             "state": (live.state if live is not None else record.state).value,
-            "tab_id": record.config.tab_id,
-            "tab_title": (
-                tab_titles.get(record.config.tab_id)
+            "workflow_id": record.config.tab_id,
+            "workflow_title": (
+                workflow_titles.get(record.config.tab_id)
                 if record.config.tab_id is not None
                 else None
             ),
@@ -168,9 +168,9 @@ def _serialize_node_snapshots(
             "node_type": node.config.node_type.value,
             "is_leader": is_leader,
             "state": node.state.value,
-            "tab_id": node.config.tab_id,
-            "tab_title": (
-                tab_titles.get(node.config.tab_id)
+            "workflow_id": node.config.tab_id,
+            "workflow_title": (
+                workflow_titles.get(node.config.tab_id)
                 if node.config.tab_id is not None
                 else None
             ),
@@ -180,28 +180,50 @@ def _serialize_node_snapshots(
     return list(nodes_by_id.values())
 
 
+def _serialize_stats_records(
+    records: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    serialized: list[dict[str, object]] = []
+    for record in records:
+        item = dict(record)
+        if "tab_id" in item:
+            item["workflow_id"] = item.pop("tab_id")
+        if "tab_title" in item:
+            item["workflow_title"] = item.pop("tab_title")
+        serialized.append(item)
+    return serialized
+
+
+def _serialize_mcp_activity() -> list[dict[str, object]]:
+    serialized: list[dict[str, object]] = []
+    for activity in mcp_service.list_activities():
+        item = activity.serialize()
+        if "tab_id" in item:
+            item["workflow_id"] = item.pop("tab_id")
+        serialized.append(item)
+    return serialized
+
+
 @router.get("/api/stats")
 async def get_stats(range: str = Query("24h")) -> dict[str, object]:
     window_seconds = _resolve_range_window(range)
     now = time.time()
     since = now - window_seconds
-    tabs = _serialize_tab_snapshots()
-    tab_titles: dict[str, str] = {}
-    for tab in tabs:
-        tab_id = tab.get("id")
-        tab_title = tab.get("title")
-        if isinstance(tab_id, str) and isinstance(tab_title, str):
-            tab_titles[tab_id] = tab_title
+    workflows = _serialize_workflow_snapshots()
+    workflow_titles: dict[str, str] = {}
+    for workflow in workflows:
+        workflow_id = workflow.get("id")
+        workflow_title = workflow.get("title")
+        if isinstance(workflow_id, str) and isinstance(workflow_title, str):
+            workflow_titles[workflow_id] = workflow_title
 
     return {
         "requested_at": now,
         "range": range,
-        "tabs": tabs,
-        "nodes": _serialize_node_snapshots(tab_titles),
-        "requests": stats_store.list_requests(since=since),
-        "compacts": stats_store.list_compacts(since=since),
+        "workflows": workflows,
+        "nodes": _serialize_node_snapshots(workflow_titles),
+        "requests": _serialize_stats_records(stats_store.list_requests(since=since)),
+        "compacts": _serialize_stats_records(stats_store.list_compacts(since=since)),
         "mcp_servers": mcp_service.list_server_payloads(),
-        "mcp_activity": [
-            activity.serialize() for activity in mcp_service.list_activities()
-        ],
+        "mcp_activity": _serialize_mcp_activity(),
     }

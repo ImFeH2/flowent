@@ -109,7 +109,7 @@ async def list_nodes() -> dict:
         nodes_by_id[assistant.uuid] = {
             "id": assistant.uuid,
             "node_type": assistant.config.node_type.value,
-            "tab_id": assistant.config.tab_id,
+            "workflow_id": assistant.config.tab_id,
             "role_name": assistant.config.role_name,
             "state": assistant.state.value,
             "connections": assistant.get_connections_snapshot(),
@@ -125,7 +125,7 @@ async def list_nodes() -> dict:
         nodes_by_id[record.id] = {
             "id": record.id,
             "node_type": record.config.node_type.value,
-            "tab_id": record.config.tab_id,
+            "workflow_id": record.config.tab_id,
             "role_name": record.config.role_name,
             "is_leader": is_tab_leader(node_id=record.id, tab_id=record.config.tab_id),
             "state": (live.state if live is not None else record.state).value,
@@ -156,7 +156,7 @@ async def list_nodes() -> dict:
         nodes_by_id[node.uuid] = {
             "id": node.uuid,
             "node_type": node.config.node_type.value,
-            "tab_id": node.config.tab_id,
+            "workflow_id": node.config.tab_id,
             "role_name": node.config.role_name,
             "is_leader": is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id),
             "state": node.state.value,
@@ -210,7 +210,7 @@ async def get_node(node_id: str) -> dict:
     return {
         "id": record_id,
         "node_type": target_config.node_type.value,
-        "tab_id": target_config.tab_id,
+        "workflow_id": target_config.tab_id,
         "role_name": target_config.role_name,
         "is_leader": is_tab_leader(node_id=record_id, tab_id=target_config.tab_id),
         "state": record_state.value,
@@ -249,7 +249,7 @@ async def terminate_node(node_id: str) -> dict:
     if is_tab_leader(node_id=node.uuid, tab_id=node.config.tab_id):
         raise HTTPException(
             status_code=400,
-            detail="Cannot terminate a tab Leader directly",
+            detail="Cannot terminate a workflow Leader directly",
         )
 
     node.request_termination("user_requested")

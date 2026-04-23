@@ -817,7 +817,7 @@ def delete_tab(
     if lingering_node_ids:
         return (
             None,
-            "Failed to delete tab because some nodes did not terminate: "
+            "Failed to delete workflow because some nodes did not terminate: "
             + ", ".join(node_id[:8] for node_id in lingering_node_ids),
         )
 
@@ -937,7 +937,7 @@ def create_agent_node(
     if error is not None or config is None:
         return None, error
     if config.role_name == CONDUCTOR_ROLE_NAME:
-        return None, f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a tab Leader"
+        return None, f"Role '{CONDUCTOR_ROLE_NAME}' is reserved for a workflow Leader"
 
     node_id = str(uuid.uuid4())
     record = GraphNodeRecord(
@@ -1111,7 +1111,7 @@ def create_edge(
         node_id=to_node_id,
         tab_id=resolved_tab_id,
     ):
-        return None, "Tab Leader does not participate in Workflow Graph edges"
+        return None, "Workflow Leader does not participate in Workflow Graph edges"
     if from_node_id == to_node_id:
         return None, "Self-loop edges are not allowed"
     source_node = tab.definition.get_node(from_node_id)
@@ -1217,7 +1217,7 @@ def delete_agent_node(
     if node_definition is None:
         return None, f"Node '{node_id}' not found"
     if is_tab_leader(node_id=node_id, tab_id=tab_id):
-        return None, "Tab Leader cannot be deleted from the graph"
+        return None, "Workflow Leader cannot be deleted from the graph"
 
     related_edges = [
         edge

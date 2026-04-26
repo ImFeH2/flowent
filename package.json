@@ -39,6 +39,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "release": "release-it --dry-run",
+    "release:exec": "release-it",
     "prepack": "pnpm build:npm",
     "prepare": "husky"
   },
@@ -73,6 +75,7 @@
     "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
+    "release-it": "^20.0.1",
     "shadcn": "^4.5.0",
     "tailwindcss": "^4",
     "tailwindcss-animate": "^1.0.7",

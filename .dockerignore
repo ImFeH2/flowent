@@ -1,0 +1,12 @@
+.git
+.github
+.husky
+.next
+.playwright-mcp
+coverage
+dist
+flowent-*.tgz
+node_modules
+npm-debug.log*
+pnpm-debug.log*
+tsconfig.tsbuildinfo

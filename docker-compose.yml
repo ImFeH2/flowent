@@ -1,0 +1,8 @@
+name: flowent
+
+services:
+  flowent:
+    image: ghcr.io/imfeh2/flowent:${FLOWENT_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "${FLOWENT_PORT:-6873}:6873"

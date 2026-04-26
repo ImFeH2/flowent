@@ -1,0 +1,22 @@
+FROM node:24-alpine
+
+ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PNPM_HOME=/pnpm
+ENV PORT=6873
+ENV PATH=$PNPM_HOME:$PATH
+
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat git \
+  && corepack enable \
+  && corepack prepare pnpm@10.29.3 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store HUSKY=0 pnpm install --frozen-lockfile
+
+COPY . .
+
+EXPOSE 6873
+
+CMD ["pnpm", "exec", "next", "dev", "--hostname", "0.0.0.0", "--port", "6873"]

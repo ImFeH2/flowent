@@ -54,6 +54,7 @@ const child = spawn(process.execPath, [serverPath], {
   env: {
     ...process.env,
     HOSTNAME: hostname,
+    NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED ?? "1",
     PORT: port,
   },
 });

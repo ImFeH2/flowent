@@ -1,0 +1,18 @@
+name: flowent-dev
+
+services:
+  flowent:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: flowent:dev
+    ports:
+      - "${FLOWENT_DEV_PORT:-6873}:6873"
+    volumes:
+      - .:/app
+      - flowent-dev-node-modules:/app/node_modules
+      - flowent-dev-next:/app/.next
+
+volumes:
+  flowent-dev-node-modules:
+  flowent-dev-next:

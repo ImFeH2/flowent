@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/flowent-banner.png" alt="Flowent" width="720" />
+  <img src="./assets/flowent-banner.png" alt="Flowent" width="100%" />
 </p>
 
 <p align="center">

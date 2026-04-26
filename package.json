@@ -1,6 +1,6 @@
 {
   "name": "flowent",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "description": "A workflow orchestration platform for multi-agent collaboration.",
   "license": "Apache-2.0",
   "private": false,

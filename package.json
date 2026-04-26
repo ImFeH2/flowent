@@ -31,7 +31,7 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 6873",
     "build": "next build",
     "build:npm": "pnpm build && node scripts/prepare-npm-package.mjs",
     "start": "next start",

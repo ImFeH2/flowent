@@ -10,3 +10,5 @@
 </div>
 
 # Flowent
+
+A workflow orchestration platform for multi-agent collaboration.

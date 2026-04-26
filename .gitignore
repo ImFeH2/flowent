@@ -22,8 +22,10 @@ node_modules/
 out/
 build/
 coverage/
+dist/
 .vercel/
 *.tsbuildinfo
+*.tgz
 next-env.d.ts
 
 .DS_Store

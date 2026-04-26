@@ -9,6 +9,7 @@
     "flowent": "bin/flowent.mjs"
   },
   "files": [
+    "assets/",
     "bin/",
     "dist/",
     "README.md",

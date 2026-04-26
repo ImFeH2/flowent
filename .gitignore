@@ -3,6 +3,7 @@
 .zed/
 .agents/
 .claude/
+.gemini/
 
 .env*
 *.log

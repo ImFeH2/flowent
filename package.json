@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "private": false,
   "bin": {
-    "flowent": "./bin/flowent.mjs"
+    "flowent": "bin/flowent.mjs"
   },
   "files": [
     "bin/",

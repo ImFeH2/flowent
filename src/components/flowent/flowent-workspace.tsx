@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+import { ThemeToggle } from "./theme-toggle";
 import {
   availableTools,
   providerTypeLabels,
@@ -475,6 +476,7 @@ function AppSidebar({
         </nav>
         <div className="mt-auto space-y-3">
           <Separator />
+          <ThemeToggle collapsed={collapsed} />
           <nav className="space-y-1">
             {systemNavigation.map((item) => (
               <SidebarNavButton
@@ -819,7 +821,7 @@ function CanvasWorkspace({
             nodeColor={(node) =>
               node.data.kind === "trigger" ? "var(--chart-3)" : "var(--muted)"
             }
-            maskColor="oklch(0 0 0 / 40%)"
+            maskColor="var(--canvas-minimap-mask)"
           />
         </ReactFlow>
       </div>

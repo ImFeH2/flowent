@@ -11,6 +11,7 @@ import {
   initialRoles,
 } from "@/components/flowent/model";
 import { useFlowentWorkspaceStore } from "@/components/flowent/workspace-store";
+import { themeStorageKey } from "@/lib/theme";
 
 type MockNode = {
   id: string;
@@ -161,6 +162,9 @@ function resetWorkspaceStore() {
 
 describe("Home", () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    document.documentElement.className = "";
+    document.documentElement.style.colorScheme = "";
     resetWorkspaceStore();
   });
 
@@ -176,6 +180,9 @@ describe("Home", () => {
     expect(screen.getByRole("button", { name: "Roles" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Settings" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Use Light Mode" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Launch Campaign Workflow")).toBeInTheDocument();
     expect(
@@ -272,5 +279,21 @@ describe("Home", () => {
       screen.getByRole("tab", { name: "Model Presets" }),
     ).toBeInTheDocument();
     expect(screen.getByText("OpenAI Platform")).toBeInTheDocument();
+  });
+
+  it("defaults to dark mode and saves the selected theme", () => {
+    render(<Home />);
+
+    expect(document.documentElement).toHaveClass("dark");
+    expect(document.documentElement).not.toHaveClass("light");
+
+    fireEvent.click(screen.getByRole("button", { name: "Use Light Mode" }));
+
+    expect(window.localStorage.getItem(themeStorageKey)).toBe("light");
+    expect(document.documentElement).toHaveClass("light");
+    expect(document.documentElement).not.toHaveClass("dark");
+    expect(
+      screen.getByRole("button", { name: "Use Dark Mode" }),
+    ).toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
 export type WorkflowNodeKind = "trigger" | "agent";
+export type CanvasMode = "blueprint" | "workflow";
 export type TriggerMode = "manual" | "schedule" | "webhook";
 export type RunStatus = "idle" | "pending" | "running" | "success" | "error";
 export type ProviderType = "openai" | "anthropic" | "custom";

@@ -19,6 +19,7 @@ import {
   initialNodes,
   initialProviders,
   initialRoles,
+  type CanvasMode,
   type FlowEdge,
   type FlowNode,
   type ModelPreset,
@@ -34,6 +35,7 @@ type WorkspaceState = {
   roles: Role[];
   nodes: FlowNode[];
   edges: FlowEdge[];
+  canvasMode: CanvasMode;
   selectedNodeIds: string[];
   selectedEdgeIds: string[];
   nextNodeIndex: number;
@@ -55,6 +57,7 @@ type WorkspaceActions = {
   startWorkflowRun: () => void;
   advanceWorkflowRun: () => void;
   finishWorkflowRun: () => void;
+  returnToBlueprintMode: () => void;
   upsertProvider: (provider: Provider, editingId: string | null) => void;
   deleteProvider: (providerId: string) => void;
   upsertModelPreset: (
@@ -89,6 +92,16 @@ function isValidConnection(connection: Connection | Edge) {
   );
 }
 
+function resetRunState(nodes: FlowNode[], edges: FlowEdge[]) {
+  return {
+    nodes: nodes.map((node) => ({
+      ...node,
+      data: { ...node.data, status: "idle" as const },
+    })),
+    edges: edges.map((edge) => ({ ...edge, animated: false })),
+  };
+}
+
 export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
   (set, get) => ({
     providers: initialProviders,
@@ -96,6 +109,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
     roles: initialRoles,
     nodes: initialNodes,
     edges: initialEdges,
+    canvasMode: "blueprint",
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
     nextNodeIndex: 3,
@@ -116,16 +130,32 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
       }),
 
     applyNodeChanges: (changes) =>
-      set((state) => ({
-        nodes: applyNodeChanges(changes, state.nodes),
-      })),
+      set((state) => {
+        if (state.canvasMode === "workflow") {
+          return state;
+        }
+
+        return {
+          nodes: applyNodeChanges(changes, state.nodes),
+        };
+      }),
 
     applyEdgeChanges: (changes) =>
-      set((state) => ({
-        edges: applyEdgeChanges(changes, state.edges),
-      })),
+      set((state) => {
+        if (state.canvasMode === "workflow") {
+          return state;
+        }
+
+        return {
+          edges: applyEdgeChanges(changes, state.edges),
+        };
+      }),
 
     connectNodes: (connection) => {
+      if (get().canvasMode === "workflow") {
+        return;
+      }
+
       if (!isValidConnection(connection)) {
         return;
       }
@@ -137,6 +167,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
 
     addWorkflowNode: (kind, position) =>
       set((state) => {
+        if (state.canvasMode === "workflow") {
+          return state;
+        }
+
         const id = `${kind}-${state.nextNodeIndex}`;
 
         return {
@@ -148,12 +182,20 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
       }),
 
     addQuickNode: (kind) => {
+      if (get().canvasMode === "workflow") {
+        return;
+      }
+
       const { addWorkflowNode, nextNodeIndex } = get();
 
       addWorkflowNode(kind, { x: 120 + nextNodeIndex * 40, y: 120 });
     },
 
     deleteSelection: () => {
+      if (get().canvasMode === "workflow") {
+        return;
+      }
+
       const { selectedNodeIds, selectedEdgeIds } = get();
 
       if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) {
@@ -174,24 +216,37 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
     },
 
     deleteConnectedEdges: (deletedNodes) =>
-      set((state) => ({
-        edges: state.edges.filter(
-          (edge) =>
-            !getConnectedEdges(deletedNodes, state.edges).includes(edge),
-        ),
-      })),
+      set((state) => {
+        if (state.canvasMode === "workflow") {
+          return state;
+        }
+
+        return {
+          edges: state.edges.filter(
+            (edge) =>
+              !getConnectedEdges(deletedNodes, state.edges).includes(edge),
+          ),
+        };
+      }),
 
     updateNodeData: (nodeId, patch) =>
-      set((state) => ({
-        nodes: state.nodes.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: { ...node.data, ...patch } }
-            : node,
-        ),
-      })),
+      set((state) => {
+        if (state.canvasMode === "workflow") {
+          return state;
+        }
+
+        return {
+          nodes: state.nodes.map((node) =>
+            node.id === nodeId
+              ? { ...node, data: { ...node.data, ...patch } }
+              : node,
+          ),
+        };
+      }),
 
     startWorkflowRun: () =>
       set((state) => ({
+        canvasMode: "workflow",
         nodes: state.nodes.map((node) => {
           if (node.data.kind === "trigger") {
             return { ...node, data: { ...node.data, status: "success" } };
@@ -209,27 +264,45 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
       })),
 
     advanceWorkflowRun: () =>
-      set((state) => ({
-        nodes: state.nodes.map((node) => {
-          if (node.id === "agent-1") {
-            return { ...node, data: { ...node.data, status: "success" } };
-          }
+      set((state) => {
+        if (state.canvasMode !== "workflow") {
+          return state;
+        }
 
-          if (node.data.kind === "agent") {
-            return { ...node, data: { ...node.data, status: "running" } };
-          }
+        return {
+          nodes: state.nodes.map((node) => {
+            if (node.id === "agent-1") {
+              return { ...node, data: { ...node.data, status: "success" } };
+            }
 
-          return node;
-        }),
-      })),
+            if (node.data.kind === "agent") {
+              return { ...node, data: { ...node.data, status: "running" } };
+            }
+
+            return node;
+          }),
+        };
+      }),
 
     finishWorkflowRun: () =>
+      set((state) => {
+        if (state.canvasMode !== "workflow") {
+          return state;
+        }
+
+        return {
+          nodes: state.nodes.map((node) => ({
+            ...node,
+            data: { ...node.data, status: "success" },
+          })),
+          edges: state.edges.map((edge) => ({ ...edge, animated: false })),
+        };
+      }),
+
+    returnToBlueprintMode: () =>
       set((state) => ({
-        nodes: state.nodes.map((node) => ({
-          ...node,
-          data: { ...node.data, status: "success" },
-        })),
-        edges: state.edges.map((edge) => ({ ...edge, animated: false })),
+        canvasMode: "blueprint",
+        ...resetRunState(state.nodes, state.edges),
       })),
 
     upsertProvider: (provider, editingId) =>
@@ -384,6 +457,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
 
     addAgentFromRole: (roleId, position) =>
       set((state) => {
+        if (state.canvasMode === "workflow") {
+          return state;
+        }
+
         const role = state.roles.find((item) => item.id === roleId);
 
         if (

@@ -1,8 +1,16 @@
 import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
+import {
+  initialEdges,
+  initialModelPresets,
+  initialNodes,
+  initialProviders,
+  initialRoles,
+} from "@/components/flowent/model";
+import { useFlowentWorkspaceStore } from "@/components/flowent/workspace-store";
 
 type MockNode = {
   id: string;
@@ -117,7 +125,29 @@ vi.mock("@xyflow/react", async () => {
   };
 });
 
+function resetWorkspaceStore() {
+  useFlowentWorkspaceStore.setState({
+    providers: initialProviders.map((provider) => ({ ...provider })),
+    modelPresets: initialModelPresets.map((preset) => ({ ...preset })),
+    roles: initialRoles.map((role) => ({ ...role })),
+    nodes: initialNodes.map((node) => ({
+      ...node,
+      position: { ...node.position },
+      data: { ...node.data },
+    })),
+    edges: initialEdges.map((edge) => ({ ...edge })),
+    canvasMode: "blueprint",
+    selectedNodeIds: ["agent-1"],
+    selectedEdgeIds: [],
+    nextNodeIndex: 3,
+  });
+}
+
 describe("Home", () => {
+  beforeEach(() => {
+    resetWorkspaceStore();
+  });
+
   it("renders the workflow workspace", () => {
     render(<Home />);
 

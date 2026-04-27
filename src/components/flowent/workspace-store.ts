@@ -19,6 +19,7 @@ import {
   initialNodes,
   initialProviders,
   initialRoles,
+  snapCanvasPosition,
   availableTools,
   type CanvasMode,
   type FlowEdge,
@@ -93,6 +94,40 @@ function isValidConnection(connection: Connection | Edge) {
     connection.sourceHandle === "output" &&
     connection.targetHandle === "input"
   );
+}
+
+function snapNodeChange(change: NodeChange<FlowNode>): NodeChange<FlowNode> {
+  if (change.type === "position" && change.position && !change.dragging) {
+    return {
+      ...change,
+      position: snapCanvasPosition(change.position),
+      positionAbsolute: change.positionAbsolute
+        ? snapCanvasPosition(change.positionAbsolute)
+        : change.positionAbsolute,
+    };
+  }
+
+  if (change.type === "add") {
+    return {
+      ...change,
+      item: {
+        ...change.item,
+        position: snapCanvasPosition(change.item.position),
+      },
+    };
+  }
+
+  if (change.type === "replace") {
+    return {
+      ...change,
+      item: {
+        ...change.item,
+        position: snapCanvasPosition(change.item.position),
+      },
+    };
+  }
+
+  return change;
 }
 
 function resetRunState(nodes: FlowNode[], edges: FlowEdge[]) {
@@ -295,7 +330,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         }
 
         return {
-          nodes: applyNodeChanges(changes, state.nodes),
+          nodes: applyNodeChanges(changes.map(snapNodeChange), state.nodes),
         };
       }),
 

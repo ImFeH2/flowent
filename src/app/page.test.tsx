@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
 import {
+  canvasSnapGrid,
   initialEdges,
   initialModelPresets,
   initialNodes,
@@ -49,11 +50,15 @@ vi.mock("@xyflow/react", async () => {
       nodes = [],
       edges = [],
       nodesDraggable,
+      snapToGrid,
+      snapGrid,
     }: {
       children?: ReactNode;
       nodes?: MockNode[];
       edges?: MockEdge[];
       nodesDraggable?: boolean;
+      snapToGrid?: boolean;
+      snapGrid?: [number, number];
     }) {
       const statusLabels: Record<string, string> = {
         idle: "Idle",
@@ -66,6 +71,8 @@ vi.mock("@xyflow/react", async () => {
       return (
         <div
           data-read-only={nodesDraggable === false ? "true" : "false"}
+          data-snap-grid={snapGrid?.join(",") ?? ""}
+          data-snap-to-grid={snapToGrid ? "true" : "false"}
           data-testid="workflow-canvas"
         >
           {nodes.map((node) => (
@@ -85,8 +92,8 @@ vi.mock("@xyflow/react", async () => {
         </div>
       );
     },
-    Background() {
-      return <div data-testid="canvas-background" />;
+    Background({ gap }: { gap?: number }) {
+      return <div data-grid-gap={gap} data-testid="canvas-background" />;
     },
     Controls() {
       return <div data-testid="canvas-controls" />;
@@ -202,6 +209,18 @@ describe("Home", () => {
     expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
     expect(screen.getAllByText("Properties").length).toBeGreaterThan(0);
     expect(screen.getByText("Blueprint Mode")).toBeInTheDocument();
+    expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
+      "data-snap-to-grid",
+      "true",
+    );
+    expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
+      "data-snap-grid",
+      canvasSnapGrid.join(","),
+    );
+    expect(screen.getByTestId("canvas-background")).toHaveAttribute(
+      "data-grid-gap",
+      String(canvasSnapGrid[0]),
+    );
     expect(screen.getByDisplayValue("Copywriter")).toBeInTheDocument();
     expect(screen.getByLabelText("System Prompt")).toBeInTheDocument();
     expect(screen.getByText("Model Preset")).toBeInTheDocument();
@@ -223,6 +242,10 @@ describe("Home", () => {
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
       "data-read-only",
       "true",
+    );
+    expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
+      "data-snap-to-grid",
+      "false",
     );
     expect(screen.getByText("Conversation History")).toBeInTheDocument();
     expect(screen.getByText("System")).toBeInTheDocument();

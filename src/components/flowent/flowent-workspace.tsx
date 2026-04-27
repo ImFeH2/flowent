@@ -70,6 +70,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 import {
   availableTools,
+  canvasSnapGrid,
   providerTypeLabels,
   runStatusLabels,
   type CanvasMode,
@@ -360,7 +361,10 @@ function FlowentWorkspaceShell() {
 
       addWorkflowNode(
         kind,
-        screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+        screenToFlowPosition(
+          { x: event.clientX, y: event.clientY },
+          { snapToGrid: true, snapGrid: canvasSnapGrid },
+        ),
       );
     },
     [addWorkflowNode, canvasMode, screenToFlowPosition],
@@ -376,7 +380,10 @@ function FlowentWorkspaceShell() {
 
       addWorkflowNode(
         "agent",
-        screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+        screenToFlowPosition(
+          { x: event.clientX, y: event.clientY },
+          { snapToGrid: true, snapGrid: canvasSnapGrid },
+        ),
       );
     },
     [addWorkflowNode, canvasMode, screenToFlowPosition],
@@ -852,11 +859,13 @@ function CanvasWorkspace({
           nodesDraggable={!isWorkflowMode}
           nodesConnectable={!isWorkflowMode}
           edgesReconnectable={!isWorkflowMode}
+          snapToGrid={!isWorkflowMode}
+          snapGrid={canvasSnapGrid}
           multiSelectionKeyCode="Shift"
           deleteKeyCode={isWorkflowMode ? null : ["Backspace", "Delete"]}
           selectionOnDrag
         >
-          <Background gap={20} size={1} />
+          <Background gap={canvasSnapGrid[0]} size={1} />
           <Controls showInteractive={false} />
           <MiniMap
             pannable

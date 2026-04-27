@@ -1,4 +1,4 @@
-import type { Edge, Node } from "@xyflow/react";
+import type { Edge, Node, SnapGrid, XYPosition } from "@xyflow/react";
 
 export type WorkflowNodeKind = "trigger" | "agent";
 export type CanvasMode = "blueprint" | "workflow";
@@ -54,6 +54,19 @@ export type WorkflowNodeData = {
 
 export type FlowNode = Node<WorkflowNodeData, "workflow">;
 export type FlowEdge = Edge;
+
+export const canvasSnapGrid: SnapGrid = [20, 20];
+
+function snapCanvasCoordinate(value: number, interval: number) {
+  return Math.round(value / interval) * interval;
+}
+
+export function snapCanvasPosition(position: XYPosition): XYPosition {
+  return {
+    x: snapCanvasCoordinate(position.x, canvasSnapGrid[0]),
+    y: snapCanvasCoordinate(position.y, canvasSnapGrid[1]),
+  };
+}
 
 export type Provider = {
   id: string;
@@ -184,7 +197,7 @@ export const initialNodes: FlowNode[] = [
   {
     id: "agent-1",
     type: "workflow",
-    position: { x: 330, y: 40 },
+    position: { x: 340, y: 40 },
     data: {
       kind: "agent",
       title: "Copywriter",
@@ -200,7 +213,7 @@ export const initialNodes: FlowNode[] = [
   {
     id: "agent-2",
     type: "workflow",
-    position: { x: 670, y: 160 },
+    position: { x: 680, y: 160 },
     data: {
       kind: "agent",
       title: "Reviewer",
@@ -240,11 +253,13 @@ export function createNode(
   id: string,
   position: FlowNode["position"],
 ): FlowNode {
+  const snappedPosition = snapCanvasPosition(position);
+
   if (kind === "trigger") {
     return {
       id,
       type: "workflow",
-      position,
+      position: snappedPosition,
       data: {
         kind,
         title: "Manual Trigger",
@@ -260,7 +275,7 @@ export function createNode(
   return {
     id,
     type: "workflow",
-    position,
+    position: snappedPosition,
     data: {
       kind,
       title: "Agent",

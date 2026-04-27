@@ -2,11 +2,13 @@ import type { EdgeChange, NodeChange } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  canvasSnapGrid,
   initialEdges,
   initialModelPresets,
   initialNodes,
   initialProviders,
   initialRoles,
+  snapCanvasPosition,
   type FlowEdge,
   type FlowNode,
 } from "./model";
@@ -42,6 +44,11 @@ function getNode(nodeId: string) {
   return node;
 }
 
+function expectGridPosition(position: FlowNode["position"]) {
+  expect(position.x % canvasSnapGrid[0]).toBe(0);
+  expect(position.y % canvasSnapGrid[1]).toBe(0);
+}
+
 describe("useFlowentWorkspaceStore", () => {
   beforeEach(() => {
     resetStore();
@@ -49,6 +56,94 @@ describe("useFlowentWorkspaceStore", () => {
 
   it("starts in blueprint mode", () => {
     expect(useFlowentWorkspaceStore.getState().canvasMode).toBe("blueprint");
+  });
+
+  it("starts with demo nodes aligned to the canvas grid", () => {
+    for (const node of useFlowentWorkspaceStore.getState().nodes) {
+      expectGridPosition(node.position);
+    }
+  });
+
+  it("snaps newly added workflow nodes to the canvas grid", () => {
+    useFlowentWorkspaceStore
+      .getState()
+      .addWorkflowNode("agent", { x: 13, y: 27 });
+
+    const node = getNode("agent-3");
+
+    expect(node.position).toEqual(snapCanvasPosition({ x: 13, y: 27 }));
+    expect(useFlowentWorkspaceStore.getState().selectedNodeIds).toEqual([
+      "agent-3",
+    ]);
+  });
+
+  it("snaps quick-added nodes to the canvas grid", () => {
+    useFlowentWorkspaceStore.getState().addQuickNode("trigger");
+
+    expectGridPosition(getNode("trigger-3").position);
+  });
+
+  it("snaps agents created from roles to the canvas grid", () => {
+    useFlowentWorkspaceStore
+      .getState()
+      .addAgentFromRole("role-product-copywriter", { x: 491, y: 267 });
+
+    const node = getNode("agent-3");
+
+    expect(node.position).toEqual(snapCanvasPosition({ x: 491, y: 267 }));
+    expect(node.data.title).toBe("Product Copywriter");
+  });
+
+  it("keeps node movement smooth while dragging and snaps when dragging ends", () => {
+    const store = useFlowentWorkspaceStore.getState();
+
+    store.applyNodeChanges([
+      {
+        id: "agent-1",
+        type: "position",
+        position: { x: 333, y: 47 },
+        dragging: true,
+      },
+    ]);
+
+    expect(getNode("agent-1").position).toEqual({ x: 333, y: 47 });
+
+    store.applyNodeChanges([
+      {
+        id: "agent-1",
+        type: "position",
+        position: { x: 333, y: 47 },
+        dragging: false,
+      },
+    ]);
+
+    expect(getNode("agent-1").position).toEqual(
+      snapCanvasPosition({ x: 333, y: 47 }),
+    );
+  });
+
+  it("snaps non-dragging and multi-node position changes to the canvas grid", () => {
+    const store = useFlowentWorkspaceStore.getState();
+
+    store.applyNodeChanges([
+      {
+        id: "agent-1",
+        type: "position",
+        position: { x: 351, y: 58 },
+      },
+      {
+        id: "agent-2",
+        type: "position",
+        position: { x: 703, y: 186 },
+      },
+    ]);
+
+    expect(getNode("agent-1").position).toEqual(
+      snapCanvasPosition({ x: 351, y: 58 }),
+    );
+    expect(getNode("agent-2").position).toEqual(
+      snapCanvasPosition({ x: 703, y: 186 }),
+    );
   });
 
   it("moves into workflow mode when a run starts", () => {

@@ -34,7 +34,6 @@ import {
   Card,
   CardAction,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -148,10 +147,6 @@ function emptyPreset(providerId = ""): ModelPreset {
     maxTokens: 1200,
     testStatus: "idle",
   };
-}
-
-function maskKey(apiKey: string) {
-  return apiKey ? "••••••••••••" : "Not saved";
 }
 
 function getAvatarFallback(name: string) {
@@ -385,7 +380,6 @@ function FlowentWorkspaceShell() {
           ) : (
             <WorkflowDashboard
               nodeCount={nodes.length}
-              edgeCount={edges.length}
               roleCount={roles.length}
               modelPresetCount={modelPresets.length}
               onOpenCanvas={() => setActiveView("canvas")}
@@ -423,10 +417,7 @@ function AppSidebar({
         >
           {!collapsed && (
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold">Flowent</h1>
-              <p className="truncate text-xs text-muted-foreground">
-                Workflow orchestration
-              </p>
+              <h1 className="truncate text-xl font-semibold">Flowent</h1>
             </div>
           )}
           <Button
@@ -510,13 +501,11 @@ function SidebarNavButton({
 
 function WorkflowDashboard({
   nodeCount,
-  edgeCount,
   roleCount,
   modelPresetCount,
   onOpenCanvas,
 }: {
   nodeCount: number;
-  edgeCount: number;
   roleCount: number;
   modelPresetCount: number;
   onOpenCanvas: () => void;
@@ -526,10 +515,7 @@ function WorkflowDashboard({
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">Workflows</h1>
-            <p className="text-sm text-muted-foreground">
-              Local orchestration workspace
-            </p>
+            <h1 className="text-3xl font-semibold">Workflows</h1>
           </div>
           <Button onClick={onOpenCanvas}>
             <PanelRightIcon />
@@ -542,19 +528,16 @@ function WorkflowDashboard({
           <MetricCard label="Roles" value={String(roleCount)} />
           <MetricCard label="Models" value={String(modelPresetCount)} />
         </div>
-        <Card className="rounded-lg" size="sm">
-          <CardHeader>
-            <CardTitle>Launch Campaign Workflow</CardTitle>
-            <CardDescription>
-              {nodeCount} nodes · {edgeCount} connections
-            </CardDescription>
+        <Card className="rounded-lg p-6">
+          <CardHeader className="px-0 pt-0">
+            <CardTitle className="text-2xl">Launch Campaign Workflow</CardTitle>
             <CardAction>
               <Button size="sm" onClick={onOpenCanvas}>
                 Open
               </Button>
             </CardAction>
           </CardHeader>
-          <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
+          <CardContent className="grid gap-3 px-0 pb-0 text-base md:grid-cols-3">
             <div>Trigger: Manual Trigger</div>
             <div>First Agent: Copywriter</div>
             <div>Status: Draft</div>
@@ -567,11 +550,9 @@ function WorkflowDashboard({
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="rounded-lg" size="sm">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle>{value}</CardTitle>
-      </CardHeader>
+    <Card className="rounded-lg p-6">
+      <div className="text-lg font-medium">{label}</div>
+      <div className="mt-2 text-3xl font-semibold">{value}</div>
     </Card>
   );
 }
@@ -602,17 +583,14 @@ function RoleCard({
   );
 
   return (
-    <Card className="rounded-lg" size="sm">
+    <Card className="rounded-lg p-4">
       <CardHeader>
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted text-sm font-medium">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background text-lg font-medium">
             {role.avatar || getAvatarFallback(role.name)}
           </div>
           <div className="min-w-0">
-            <CardTitle className="truncate">{role.name}</CardTitle>
-            <CardDescription>
-              {getPresetName(modelPresets, role.modelPresetId)}
-            </CardDescription>
+            <CardTitle className="truncate text-xl">{role.name}</CardTitle>
           </div>
         </div>
         <CardAction className="flex gap-1">
@@ -704,14 +682,11 @@ function CanvasWorkspace({
 }) {
   return (
     <section className="flex min-h-0 min-w-0 flex-col bg-background">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4">
         <div className="min-w-0">
-          <h2 className="truncate text-base font-medium">
+          <h2 className="truncate text-xl font-medium">
             Launch Campaign Workflow
           </h2>
-          <p className="truncate text-xs text-muted-foreground">
-            {nodes.length} nodes · {edges.length} connections
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <NodeLibrary onDragStart={onDragStart} onQuickAdd={onQuickAdd} />
@@ -838,14 +813,7 @@ function PropertyPanel({
     <ScrollArea className="h-full">
       <div className="space-y-4 p-4">
         <div>
-          <h2 className="text-base font-medium">Properties</h2>
-          <p className="text-sm text-muted-foreground">
-            {selectedNode
-              ? selectedNode.data.title
-              : selectedCount > 1
-                ? `${selectedCount} items selected`
-                : "Workflow"}
-          </p>
+          <h2 className="text-xl font-medium">Properties</h2>
         </div>
         <Separator />
         {selectedNode ? (
@@ -1066,20 +1034,18 @@ function WorkflowSummary({
   modelPresets: ModelPreset[];
 }) {
   return (
-    <div className="space-y-3">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Selection</CardTitle>
-          <CardDescription>
-            {selectedCount > 0 ? `${selectedCount} items` : "No active item"}
-          </CardDescription>
-        </CardHeader>
+    <div className="space-y-4">
+      <Card className="p-3">
+        <div className="text-lg font-medium">Selection</div>
+        <div className="mt-2 text-2xl font-semibold">
+          {selectedCount > 0 ? `${selectedCount} items` : "No active item"}
+        </div>
       </Card>
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Model Presets</CardTitle>
-          <CardDescription>{modelPresets.length} available</CardDescription>
-        </CardHeader>
+      <Card className="p-3">
+        <div className="text-lg font-medium">Model Presets</div>
+        <div className="mt-2 text-2xl font-semibold">
+          {modelPresets.length} available
+        </div>
       </Card>
     </div>
   );
@@ -1132,10 +1098,7 @@ function RolesLibrary({
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold">Roles</h1>
-            <p className="text-sm text-muted-foreground">
-              Reusable Agent templates
-            </p>
+            <h1 className="text-3xl font-semibold">Roles</h1>
           </div>
           <Button
             onClick={() => {
@@ -1168,7 +1131,7 @@ function RolesLibrary({
               />
             ))}
           </div>
-          <Card className="rounded-lg" size="sm">
+          <Card className="rounded-lg p-4">
             <CardHeader>
               <CardTitle>{editingId ? "Edit Role" : "Add Role"}</CardTitle>
             </CardHeader>
@@ -1291,10 +1254,7 @@ function SettingsView() {
   return (
     <section className="flex h-full min-w-0 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Providers and model presets
-        </p>
+        <h1 className="text-3xl font-semibold">Settings</h1>
       </div>
       <Tabs defaultValue="providers" className="min-h-0 flex-1">
         <TabsList>
@@ -1349,13 +1309,9 @@ function ProviderSettings({
       <div className="space-y-4 py-4">
         <div className="space-y-2">
           {providers.map((provider) => (
-            <Card key={provider.id} size="sm">
+            <Card key={provider.id}>
               <CardHeader>
-                <CardTitle>{provider.name}</CardTitle>
-                <CardDescription>
-                  {providerTypeLabels[provider.type]} ·{" "}
-                  {maskKey(provider.apiKey)}
-                </CardDescription>
+                <CardTitle className="text-xl">{provider.name}</CardTitle>
                 <CardAction className="flex gap-1">
                   <Button
                     variant="ghost"
@@ -1511,17 +1467,10 @@ function PresetSettings({
       <div className="space-y-4 py-4">
         <div className="space-y-2">
           {modelPresets.map((preset) => {
-            const provider = providers.find(
-              (item) => item.id === preset.providerId,
-            );
-
             return (
-              <Card key={preset.id} size="sm">
+              <Card key={preset.id}>
                 <CardHeader>
-                  <CardTitle>{preset.name}</CardTitle>
-                  <CardDescription>
-                    {provider?.name ?? "No provider"} · {preset.modelId}
-                  </CardDescription>
+                  <CardTitle className="text-xl">{preset.name}</CardTitle>
                   <CardAction className="flex gap-1">
                     <Button
                       variant="outline"

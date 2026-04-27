@@ -40,18 +40,35 @@ const buttonVariants = cva(
   },
 );
 
+export interface ButtonProps
+  extends ButtonPrimitive.Props, VariantProps<typeof buttonVariants> {
+  icon?: React.ReactNode;
+  text?: React.ReactNode;
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
+  icon,
+  text,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonProps) {
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {icon && (
+        <span className="flex shrink-0 items-center justify-center">
+          {icon}
+        </span>
+      )}
+      {text && <span>{text}</span>}
+      {children}
+    </ButtonPrimitive>
   );
 }
 

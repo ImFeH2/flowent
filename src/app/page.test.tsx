@@ -187,7 +187,6 @@ describe("Home", () => {
         name: "Launch Campaign Workflow",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("4 nodes · 2 connections")).toBeInTheDocument();
     expect(screen.getAllByText("Product Copywriter").length).toBeGreaterThan(0);
   });
 

@@ -16,8 +16,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body>{children}</body>
+    <html lang="en" className={cn("dark font-sans", geist.variable)}>
+      <body className="min-h-dvh bg-background text-foreground">
+        {children}
+      </body>
     </html>
   );
 }

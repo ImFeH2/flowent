@@ -7,14 +7,18 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  type Connection,
+  type EdgeChange,
   type NodeTypes,
+  type NodeChange,
 } from "@xyflow/react";
 import { motion } from "framer-motion";
 import {
   BotIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CopyIcon,
   GitBranchIcon,
-  LibraryIcon,
   PanelRightIcon,
   PlayIcon,
   PlusIcon,
@@ -46,24 +50,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 import {
   availableTools,
   providerTypeLabels,
+  type FlowEdge,
   type FlowNode,
   type ModelPreset,
   type Provider,
   type ProviderType,
+  type Role,
   type TriggerMode,
   type WorkflowNodeData,
   type WorkflowNodeKind,
@@ -74,6 +80,8 @@ import { isValidConnection, useFlowentWorkspaceStore } from "./workspace-store";
 const nodeTypes: NodeTypes = {
   workflow: WorkflowNode,
 };
+
+type AppView = "workflows" | "canvas" | "roles" | "settings";
 
 const nodeLibrary: Array<{
   kind: WorkflowNodeKind;
@@ -94,6 +102,31 @@ const nodeLibrary: Array<{
     icon: BotIcon,
   },
 ];
+
+const primaryNavigation: Array<{
+  view: AppView;
+  label: string;
+  icon: typeof GitBranchIcon;
+}> = [
+  { view: "workflows", label: "Workflows", icon: GitBranchIcon },
+  { view: "roles", label: "Roles", icon: BotIcon },
+];
+
+const systemNavigation: Array<{
+  view: AppView;
+  label: string;
+  icon: typeof SettingsIcon;
+}> = [{ view: "settings", label: "Settings", icon: SettingsIcon }];
+
+function emptyRole(modelPresetId = ""): Role {
+  return {
+    id: "",
+    name: "",
+    avatar: "",
+    systemPrompt: "",
+    modelPresetId,
+  };
+}
 
 function emptyProvider(): Provider {
   return {
@@ -121,6 +154,31 @@ function maskKey(apiKey: string) {
   return apiKey ? "••••••••••••" : "Not saved";
 }
 
+function getAvatarFallback(name: string) {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.at(0))
+    .join("")
+    .toUpperCase();
+
+  return initials || "AI";
+}
+
+function getPresetName(modelPresets: ModelPreset[], presetId: string) {
+  return (
+    modelPresets.find((preset) => preset.id === presetId)?.name ?? "No model"
+  );
+}
+
+function getRoleNodePosition(nodeCount: number): FlowNode["position"] {
+  return {
+    x: 220 + nodeCount * 90,
+    y: 260,
+  };
+}
+
 function isWorkflowNodeKind(value: string): value is WorkflowNodeKind {
   return value === "trigger" || value === "agent";
 }
@@ -136,14 +194,15 @@ export function FlowentWorkspace() {
 function FlowentWorkspaceShell() {
   const runTimers = useRef<number[]>([]);
   const { fitView, screenToFlowPosition, setViewport } = useReactFlow();
+  const [activeView, setActiveView] = useState<AppView>("workflows");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const {
     nodes,
     edges,
     modelPresets,
+    roles,
     selectedNodeIds,
     selectedEdgeIds,
-    settingsOpen,
-    setSettingsOpen,
     setSelection,
     applyNodeChanges,
     applyEdgeChanges,
@@ -153,6 +212,9 @@ function FlowentWorkspaceShell() {
     deleteSelection,
     deleteConnectedEdges,
     updateNodeData,
+    upsertRole,
+    deleteRole,
+    addAgentFromRole,
     startWorkflowRun,
     advanceWorkflowRun,
     finishWorkflowRun,
@@ -161,10 +223,9 @@ function FlowentWorkspaceShell() {
       nodes: state.nodes,
       edges: state.edges,
       modelPresets: state.modelPresets,
+      roles: state.roles,
       selectedNodeIds: state.selectedNodeIds,
       selectedEdgeIds: state.selectedEdgeIds,
-      settingsOpen: state.settingsOpen,
-      setSettingsOpen: state.setSettingsOpen,
       setSelection: state.setSelection,
       applyNodeChanges: state.applyNodeChanges,
       applyEdgeChanges: state.applyEdgeChanges,
@@ -174,6 +235,9 @@ function FlowentWorkspaceShell() {
       deleteSelection: state.deleteSelection,
       deleteConnectedEdges: state.deleteConnectedEdges,
       updateNodeData: state.updateNodeData,
+      upsertRole: state.upsertRole,
+      deleteRole: state.deleteRole,
+      addAgentFromRole: state.addAgentFromRole,
       startWorkflowRun: state.startWorkflowRun,
       advanceWorkflowRun: state.advanceWorkflowRun,
       finishWorkflowRun: state.finishWorkflowRun,
@@ -257,92 +321,441 @@ function FlowentWorkspaceShell() {
   );
 
   return (
-    <motion.main
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="grid h-dvh grid-cols-1 grid-rows-[auto_minmax(26rem,1fr)_auto] overflow-hidden bg-background lg:grid-cols-[18rem_minmax(0,1fr)_23rem] lg:grid-rows-1"
-    >
-      <aside className="border-b bg-sidebar text-sidebar-foreground lg:border-r lg:border-b-0">
-        <ScrollArea className="h-full">
-          <div className="space-y-4 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h1 className="text-lg font-semibold">Flowent</h1>
-                <p className="text-sm text-muted-foreground">
-                  Workflow orchestration
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Open settings"
-                onClick={() => setSettingsOpen(true)}
-              >
-                <SettingsIcon />
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button onClick={runWorkflow} className="w-full">
-                <PlayIcon />
-                Run
-              </Button>
-              <Button
-                variant="outline"
-                onClick={deleteSelection}
-                disabled={
-                  selectedNodeIds.length === 0 && selectedEdgeIds.length === 0
+    <TooltipProvider>
+      <motion.main
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex h-dvh overflow-hidden bg-background text-foreground"
+      >
+        <AppSidebar
+          activeView={activeView === "canvas" ? "workflows" : activeView}
+          collapsed={sidebarCollapsed}
+          onNavigate={setActiveView}
+          onToggleCollapsed={() =>
+            setSidebarCollapsed((collapsed) => !collapsed)
+          }
+        />
+        <div className="min-w-0 flex-1">
+          {activeView === "canvas" ? (
+            <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
+              <CanvasWorkspace
+                nodes={nodesWithContext}
+                edges={edges}
+                selectedNodeIds={selectedNodeIds}
+                selectedEdgeIds={selectedEdgeIds}
+                onNodesChange={applyNodeChanges}
+                onEdgesChange={applyEdgeChanges}
+                onConnect={connectNodes}
+                onDrop={onDrop}
+                onDragStart={onDragStart}
+                onPaneContextMenu={onPaneContextMenu}
+                onNodesDelete={deleteConnectedEdges}
+                onSelectionChange={setSelection}
+                onQuickAdd={addQuickNode}
+                onRun={runWorkflow}
+                onDeleteSelection={deleteSelection}
+                onFitView={() => fitView({ padding: 0.2, duration: 250 })}
+                onResetViewport={() =>
+                  setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 250 })
                 }
-              >
-                <Trash2Icon />
-                Delete
-              </Button>
-            </div>
-            <NodeLibrary onDragStart={onDragStart} onQuickAdd={addQuickNode} />
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle>Canvas</CardTitle>
-                <CardDescription>
-                  Viewport and topology controls
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => fitView({ padding: 0.2, duration: 250 })}
-                >
-                  <PanelRightIcon />
-                  Fit
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 250 })
+              />
+              <aside className="min-h-0 border-t bg-card lg:border-t-0 lg:border-l">
+                <PropertyPanel
+                  selectedNode={selectedNode}
+                  selectedCount={
+                    selectedNodeIds.length + selectedEdgeIds.length
                   }
-                >
-                  100%
-                </Button>
-              </CardContent>
-            </Card>
+                  modelPresets={modelPresets}
+                  updateNodeData={updateNodeData}
+                />
+              </aside>
+            </div>
+          ) : activeView === "roles" ? (
+            <RolesLibrary
+              roles={roles}
+              modelPresets={modelPresets}
+              nodeCount={nodes.length}
+              upsertRole={upsertRole}
+              deleteRole={deleteRole}
+              addAgentFromRole={addAgentFromRole}
+              onOpenCanvas={() => setActiveView("canvas")}
+            />
+          ) : activeView === "settings" ? (
+            <SettingsView />
+          ) : (
+            <WorkflowDashboard
+              nodeCount={nodes.length}
+              edgeCount={edges.length}
+              roleCount={roles.length}
+              modelPresetCount={modelPresets.length}
+              onOpenCanvas={() => setActiveView("canvas")}
+            />
+          )}
+        </div>
+      </motion.main>
+    </TooltipProvider>
+  );
+}
+
+function AppSidebar({
+  activeView,
+  collapsed,
+  onNavigate,
+  onToggleCollapsed,
+}: {
+  activeView: AppView;
+  collapsed: boolean;
+  onNavigate: (view: AppView) => void;
+  onToggleCollapsed: () => void;
+}) {
+  return (
+    <motion.aside
+      animate={{ width: collapsed ? 72 : 232 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className="shrink-0 border-r bg-sidebar text-sidebar-foreground"
+    >
+      <div className="flex h-full flex-col gap-4 p-3">
+        <div
+          className={cn(
+            "flex items-center gap-3",
+            collapsed ? "justify-center" : "justify-between",
+          )}
+        >
+          {!collapsed && (
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold">Flowent</h1>
+              <p className="truncate text-xs text-muted-foreground">
+                Workflow orchestration
+              </p>
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={onToggleCollapsed}
+          >
+            {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </Button>
+        </div>
+        <Separator />
+        <nav className="space-y-1">
+          {primaryNavigation.map((item) => (
+            <SidebarNavButton
+              key={item.view}
+              item={item}
+              collapsed={collapsed}
+              active={activeView === item.view}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </nav>
+        <div className="mt-auto space-y-3">
+          <Separator />
+          <nav className="space-y-1">
+            {systemNavigation.map((item) => (
+              <SidebarNavButton
+                key={item.view}
+                item={item}
+                collapsed={collapsed}
+                active={activeView === item.view}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </nav>
+        </div>
+      </div>
+    </motion.aside>
+  );
+}
+
+function SidebarNavButton({
+  item,
+  collapsed,
+  active,
+  onNavigate,
+}: {
+  item: (typeof primaryNavigation)[number] | (typeof systemNavigation)[number];
+  collapsed: boolean;
+  active: boolean;
+  onNavigate: (view: AppView) => void;
+}) {
+  const Icon = item.icon;
+  const button = (
+    <Button
+      variant={active ? "secondary" : "ghost"}
+      className={cn(
+        "w-full justify-start gap-3",
+        collapsed && "justify-center px-0",
+      )}
+      aria-label={item.label}
+      onClick={() => onNavigate(item.view)}
+    >
+      <Icon className="size-4" />
+      {!collapsed && <span className="truncate">{item.label}</span>}
+    </Button>
+  );
+
+  if (!collapsed) {
+    return button;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger render={button} />
+      <TooltipContent side="right">{item.label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function WorkflowDashboard({
+  nodeCount,
+  edgeCount,
+  roleCount,
+  modelPresetCount,
+  onOpenCanvas,
+}: {
+  nodeCount: number;
+  edgeCount: number;
+  roleCount: number;
+  modelPresetCount: number;
+  onOpenCanvas: () => void;
+}) {
+  return (
+    <ScrollArea className="h-full">
+      <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">Workflows</h1>
+            <p className="text-sm text-muted-foreground">
+              Local orchestration workspace
+            </p>
           </div>
-        </ScrollArea>
-      </aside>
-      <section className="min-h-0 bg-background">
+          <Button onClick={onOpenCanvas}>
+            <PanelRightIcon />
+            Open Canvas
+          </Button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Workflow" value="1 active" />
+          <MetricCard label="Nodes" value={String(nodeCount)} />
+          <MetricCard label="Roles" value={String(roleCount)} />
+          <MetricCard label="Models" value={String(modelPresetCount)} />
+        </div>
+        <Card className="rounded-lg" size="sm">
+          <CardHeader>
+            <CardTitle>Launch Campaign Workflow</CardTitle>
+            <CardDescription>
+              {nodeCount} nodes · {edgeCount} connections
+            </CardDescription>
+            <CardAction>
+              <Button size="sm" onClick={onOpenCanvas}>
+                Open
+              </Button>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
+            <div>Trigger: Manual Trigger</div>
+            <div>First Agent: Copywriter</div>
+            <div>Status: Draft</div>
+          </CardContent>
+        </Card>
+      </section>
+    </ScrollArea>
+  );
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="rounded-lg" size="sm">
+      <CardHeader>
+        <CardDescription>{label}</CardDescription>
+        <CardTitle>{value}</CardTitle>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function RoleCard({
+  role,
+  modelPresets,
+  nodeCount,
+  isEditing,
+  addAgentFromRole,
+  deleteRole,
+  setDraft,
+  setEditingId,
+  onOpenCanvas,
+}: {
+  role: Role;
+  modelPresets: ModelPreset[];
+  nodeCount: number;
+  isEditing: boolean;
+  addAgentFromRole: (roleId: string, position: FlowNode["position"]) => void;
+  deleteRole: (roleId: string) => void;
+  setDraft: React.Dispatch<React.SetStateAction<Role>>;
+  setEditingId: React.Dispatch<React.SetStateAction<string | null>>;
+  onOpenCanvas: () => void;
+}) {
+  const hasValidPreset = modelPresets.some(
+    (preset) => preset.id === role.modelPresetId,
+  );
+
+  return (
+    <Card className="rounded-lg" size="sm">
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border bg-muted text-sm font-medium">
+            {role.avatar || getAvatarFallback(role.name)}
+          </div>
+          <div className="min-w-0">
+            <CardTitle className="truncate">{role.name}</CardTitle>
+            <CardDescription>
+              {getPresetName(modelPresets, role.modelPresetId)}
+            </CardDescription>
+          </div>
+        </div>
+        <CardAction className="flex gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!hasValidPreset}
+            onClick={() => {
+              addAgentFromRole(role.id, getRoleNodePosition(nodeCount));
+              onOpenCanvas();
+            }}
+          >
+            Use Role
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setEditingId(role.id);
+              setDraft(role);
+            }}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Delete ${role.name}`}
+            onClick={() => {
+              deleteRole(role.id);
+              if (isEditing) {
+                setEditingId(null);
+                setDraft(emptyRole(modelPresets.at(0)?.id));
+              }
+            }}
+          >
+            <Trash2Icon />
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <p className="line-clamp-3 text-sm text-muted-foreground">
+          {role.systemPrompt}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CanvasWorkspace({
+  nodes,
+  edges,
+  selectedNodeIds,
+  selectedEdgeIds,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onDrop,
+  onDragStart,
+  onPaneContextMenu,
+  onNodesDelete,
+  onSelectionChange,
+  onQuickAdd,
+  onRun,
+  onDeleteSelection,
+  onFitView,
+  onResetViewport,
+}: {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  selectedNodeIds: string[];
+  selectedEdgeIds: string[];
+  onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
+  onEdgesChange: (changes: EdgeChange<FlowEdge>[]) => void;
+  onConnect: (connection: Connection) => void;
+  onDrop: (event: React.DragEvent<HTMLDivElement>) => void;
+  onDragStart: (
+    event: React.DragEvent<HTMLButtonElement>,
+    kind: WorkflowNodeKind,
+  ) => void;
+  onPaneContextMenu: (event: React.MouseEvent | MouseEvent) => void;
+  onNodesDelete: (deletedNodes: FlowNode[]) => void;
+  onSelectionChange: (nodeIds: string[], edgeIds: string[]) => void;
+  onQuickAdd: (kind: WorkflowNodeKind) => void;
+  onRun: () => void;
+  onDeleteSelection: () => void;
+  onFitView: () => void;
+  onResetViewport: () => void;
+}) {
+  return (
+    <section className="flex min-h-0 min-w-0 flex-col bg-background">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-medium">
+            Launch Campaign Workflow
+          </h2>
+          <p className="truncate text-xs text-muted-foreground">
+            {nodes.length} nodes · {edges.length} connections
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <NodeLibrary onDragStart={onDragStart} onQuickAdd={onQuickAdd} />
+          <Separator orientation="vertical" className="hidden h-7 sm:block" />
+          <Button onClick={onRun}>
+            <PlayIcon />
+            Run
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onDeleteSelection}
+            disabled={
+              selectedNodeIds.length === 0 && selectedEdgeIds.length === 0
+            }
+          >
+            <Trash2Icon />
+            Delete
+          </Button>
+          <Button variant="outline" onClick={onFitView}>
+            <PanelRightIcon />
+            Fit
+          </Button>
+          <Button variant="outline" onClick={onResetViewport}>
+            100%
+          </Button>
+        </div>
+      </div>
+      <div className="min-h-0 flex-1">
         <ReactFlow
-          nodes={nodesWithContext}
+          nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          onNodesChange={applyNodeChanges}
-          onEdgesChange={applyEdgeChanges}
-          onConnect={connectNodes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={(event) => event.preventDefault()}
           onPaneContextMenu={onPaneContextMenu}
-          onNodesDelete={deleteConnectedEdges}
+          onNodesDelete={onNodesDelete}
           onSelectionChange={({
             nodes: selectionNodes,
             edges: selectionEdges,
           }) => {
-            setSelection(
+            onSelectionChange(
               selectionNodes.map((node) => node.id),
               selectionEdges.map((edge) => edge.id),
             );
@@ -364,17 +777,8 @@ function FlowentWorkspaceShell() {
             maskColor="oklch(0 0 0 / 40%)"
           />
         </ReactFlow>
-      </section>
-      <aside className="min-h-0 border-t bg-card lg:border-t-0 lg:border-l">
-        <PropertyPanel
-          selectedNode={selectedNode}
-          selectedCount={selectedNodeIds.length + selectedEdgeIds.length}
-          modelPresets={modelPresets}
-          updateNodeData={updateNodeData}
-        />
-      </aside>
-      <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
-    </motion.main>
+      </div>
+    </section>
   );
 }
 
@@ -389,54 +793,33 @@ function NodeLibrary({
   onQuickAdd: (kind: WorkflowNodeKind) => void;
 }) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LibraryIcon className="size-4" />
-          Node Library
-        </CardTitle>
-        <CardDescription>Available execution units</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {nodeLibrary.map((item) => {
-          const Icon = item.icon;
+    <div className="flex flex-wrap items-center gap-1">
+      {nodeLibrary.map((item) => {
+        const Icon = item.icon;
 
-          return (
-            <div
-              key={item.kind}
-              className="flex items-center gap-2 rounded-lg border bg-background p-2"
+        return (
+          <div key={item.kind} className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              draggable
+              title={item.subtitle}
+              onDragStart={(event) => onDragStart(event, item.kind)}
             >
-              <Button
-                variant="ghost"
-                draggable
-                onDragStart={(event) => onDragStart(event, item.kind)}
-                className="h-auto flex-1 justify-start gap-3 px-2 py-2"
-              >
-                <span className="flex size-8 items-center justify-center rounded-lg bg-muted">
-                  <Icon className="size-4" />
-                </span>
-                <span className="min-w-0 text-left">
-                  <span className="block text-sm font-medium">
-                    {item.title}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {item.subtitle}
-                  </span>
-                </span>
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label={`Add ${item.title}`}
-                onClick={() => onQuickAdd(item.kind)}
-              >
-                <PlusIcon />
-              </Button>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
+              <Icon className="size-4" />
+              {item.title}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Add ${item.title}`}
+              onClick={() => onQuickAdd(item.kind)}
+            >
+              <PlusIcon />
+            </Button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -601,7 +984,10 @@ function AgentProperties({
           id="agent-name"
           value={node.data.title}
           onChange={(event) =>
-            updateNodeData(node.id, { title: event.target.value })
+            updateNodeData(node.id, {
+              title: event.target.value,
+              name: event.target.value,
+            })
           }
         />
       </Field>
@@ -699,13 +1085,189 @@ function WorkflowSummary({
   );
 }
 
-function SettingsSheet({
-  open,
-  onOpenChange,
+function RolesLibrary({
+  roles,
+  modelPresets,
+  nodeCount,
+  upsertRole,
+  deleteRole,
+  addAgentFromRole,
+  onOpenCanvas,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  roles: Role[];
+  modelPresets: ModelPreset[];
+  nodeCount: number;
+  upsertRole: (role: Role, editingId: string | null) => void;
+  deleteRole: (roleId: string) => void;
+  addAgentFromRole: (roleId: string, position: FlowNode["position"]) => void;
+  onOpenCanvas: () => void;
 }) {
+  const [draft, setDraft] = useState<Role>(() =>
+    emptyRole(modelPresets.at(0)?.id),
+  );
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const saveRole = useCallback(() => {
+    if (
+      !draft.name.trim() ||
+      !draft.systemPrompt.trim() ||
+      !draft.modelPresetId
+    ) {
+      return;
+    }
+
+    upsertRole(
+      {
+        ...draft,
+        avatar: draft.avatar.trim() || getAvatarFallback(draft.name),
+      },
+      editingId,
+    );
+    setDraft(emptyRole(modelPresets.at(0)?.id));
+    setEditingId(null);
+  }, [draft, editingId, modelPresets, upsertRole]);
+
+  return (
+    <ScrollArea className="h-full">
+      <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">Roles</h1>
+            <p className="text-sm text-muted-foreground">
+              Reusable Agent templates
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              addAgentFromRole(
+                roles[0]?.id ?? "",
+                getRoleNodePosition(nodeCount),
+              );
+              onOpenCanvas();
+            }}
+            disabled={roles.length === 0}
+          >
+            <BotIcon />
+            Use First Role
+          </Button>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="grid gap-3 md:grid-cols-2">
+            {roles.map((role) => (
+              <RoleCard
+                key={role.id}
+                role={role}
+                modelPresets={modelPresets}
+                nodeCount={nodeCount}
+                isEditing={editingId === role.id}
+                addAgentFromRole={addAgentFromRole}
+                deleteRole={deleteRole}
+                setDraft={setDraft}
+                setEditingId={setEditingId}
+                onOpenCanvas={onOpenCanvas}
+              />
+            ))}
+          </div>
+          <Card className="rounded-lg" size="sm">
+            <CardHeader>
+              <CardTitle>{editingId ? "Edit Role" : "Add Role"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Field label="Role Name" htmlFor="role-name">
+                <Input
+                  id="role-name"
+                  value={draft.name}
+                  onChange={(event) =>
+                    setDraft((currentDraft) => ({
+                      ...currentDraft,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="Avatar" htmlFor="role-avatar">
+                <Input
+                  id="role-avatar"
+                  value={draft.avatar}
+                  maxLength={4}
+                  onChange={(event) =>
+                    setDraft((currentDraft) => ({
+                      ...currentDraft,
+                      avatar: event.target.value.toUpperCase(),
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="Default Model Preset" htmlFor="role-model">
+                <Select
+                  value={draft.modelPresetId}
+                  onValueChange={(value) => {
+                    if (typeof value === "string") {
+                      setDraft((currentDraft) => ({
+                        ...currentDraft,
+                        modelPresetId: value,
+                      }));
+                    }
+                  }}
+                  disabled={modelPresets.length === 0}
+                >
+                  <SelectTrigger id="role-model" className="w-full">
+                    <SelectValue placeholder="Select model preset">
+                      {(value: string | null) =>
+                        value
+                          ? getPresetName(modelPresets, value)
+                          : "Select model preset"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modelPresets.map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        {preset.name} · {preset.modelId}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="System Prompt" htmlFor="role-system-prompt">
+                <Textarea
+                  id="role-system-prompt"
+                  className="min-h-40"
+                  value={draft.systemPrompt}
+                  onChange={(event) =>
+                    setDraft((currentDraft) => ({
+                      ...currentDraft,
+                      systemPrompt: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={saveRole}>
+                  <PlusIcon />
+                  {editingId ? "Save Role" : "Add Role"}
+                </Button>
+                {editingId && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setDraft(emptyRole(modelPresets.at(0)?.id));
+                      setEditingId(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+    </ScrollArea>
+  );
+}
+
+function SettingsView() {
   const {
     providers,
     modelPresets,
@@ -727,42 +1289,36 @@ function SettingsSheet({
   );
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>Settings</SheetTitle>
-          <SheetDescription>
-            Manage providers and model presets for Agent nodes.
-          </SheetDescription>
-        </SheetHeader>
-        <Tabs defaultValue="providers" className="min-h-0 flex-1 px-4 pb-4">
-          <TabsList className="w-full">
-            <TabsTrigger value="providers" className="flex-1">
-              Providers
-            </TabsTrigger>
-            <TabsTrigger value="presets" className="flex-1">
-              Model Presets
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="providers" className="min-h-0">
-            <ProviderSettings
-              providers={providers}
-              upsertProvider={upsertProvider}
-              deleteProvider={deleteProvider}
-            />
-          </TabsContent>
-          <TabsContent value="presets" className="min-h-0">
-            <PresetSettings
-              providers={providers}
-              modelPresets={modelPresets}
-              upsertModelPreset={upsertModelPreset}
-              deleteModelPreset={deleteModelPreset}
-              testModelPreset={testModelPreset}
-            />
-          </TabsContent>
-        </Tabs>
-      </SheetContent>
-    </Sheet>
+    <section className="flex h-full min-w-0 flex-col gap-6 p-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Settings</h1>
+        <p className="text-sm text-muted-foreground">
+          Providers and model presets
+        </p>
+      </div>
+      <Tabs defaultValue="providers" className="min-h-0 flex-1">
+        <TabsList>
+          <TabsTrigger value="providers">Providers</TabsTrigger>
+          <TabsTrigger value="presets">Model Presets</TabsTrigger>
+        </TabsList>
+        <TabsContent value="providers" className="min-h-0">
+          <ProviderSettings
+            providers={providers}
+            upsertProvider={upsertProvider}
+            deleteProvider={deleteProvider}
+          />
+        </TabsContent>
+        <TabsContent value="presets" className="min-h-0">
+          <PresetSettings
+            providers={providers}
+            modelPresets={modelPresets}
+            upsertModelPreset={upsertModelPreset}
+            deleteModelPreset={deleteModelPreset}
+            testModelPreset={testModelPreset}
+          />
+        </TabsContent>
+      </Tabs>
+    </section>
   );
 }
 

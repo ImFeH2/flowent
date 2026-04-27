@@ -18,10 +18,12 @@ import {
   initialModelPresets,
   initialNodes,
   initialProviders,
+  initialRoles,
   type FlowEdge,
   type FlowNode,
   type ModelPreset,
   type Provider,
+  type Role,
   type WorkflowNodeData,
   type WorkflowNodeKind,
 } from "./model";
@@ -29,16 +31,15 @@ import {
 type WorkspaceState = {
   providers: Provider[];
   modelPresets: ModelPreset[];
+  roles: Role[];
   nodes: FlowNode[];
   edges: FlowEdge[];
   selectedNodeIds: string[];
   selectedEdgeIds: string[];
-  settingsOpen: boolean;
   nextNodeIndex: number;
 };
 
 type WorkspaceActions = {
-  setSettingsOpen: (open: boolean) => void;
   setSelection: (nodeIds: string[], edgeIds: string[]) => void;
   applyNodeChanges: (changes: NodeChange<FlowNode>[]) => void;
   applyEdgeChanges: (changes: EdgeChange<FlowEdge>[]) => void;
@@ -62,6 +63,9 @@ type WorkspaceActions = {
   ) => void;
   deleteModelPreset: (presetId: string) => void;
   testModelPreset: (presetId: string) => void;
+  upsertRole: (role: Role, editingId: string | null) => void;
+  deleteRole: (roleId: string) => void;
+  addAgentFromRole: (roleId: string, position: FlowNode["position"]) => void;
 };
 
 export type FlowentWorkspaceStore = WorkspaceState & WorkspaceActions;
@@ -89,24 +93,27 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
   (set, get) => ({
     providers: initialProviders,
     modelPresets: initialModelPresets,
+    roles: initialRoles,
     nodes: initialNodes,
     edges: initialEdges,
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
-    settingsOpen: false,
     nextNodeIndex: 3,
 
-    setSettingsOpen: (open) => set({ settingsOpen: open }),
-
     setSelection: (nodeIds, edgeIds) =>
-      set((state) => ({
-        selectedNodeIds: areSameIds(state.selectedNodeIds, nodeIds)
-          ? state.selectedNodeIds
-          : nodeIds,
-        selectedEdgeIds: areSameIds(state.selectedEdgeIds, edgeIds)
-          ? state.selectedEdgeIds
-          : edgeIds,
-      })),
+      set((state) => {
+        const sameNodeIds = areSameIds(state.selectedNodeIds, nodeIds);
+        const sameEdgeIds = areSameIds(state.selectedEdgeIds, edgeIds);
+
+        if (sameNodeIds && sameEdgeIds) {
+          return state;
+        }
+
+        return {
+          selectedNodeIds: sameNodeIds ? state.selectedNodeIds : nodeIds,
+          selectedEdgeIds: sameEdgeIds ? state.selectedEdgeIds : edgeIds,
+        };
+      }),
 
     applyNodeChanges: (changes) =>
       set((state) => ({
@@ -309,6 +316,11 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
                 }
               : node,
           ),
+          roles: state.roles.map((role) =>
+            role.modelPresetId === presetId
+              ? { ...role, modelPresetId: fallbackPresetId ?? "" }
+              : role,
+          ),
         };
       }),
 
@@ -335,6 +347,72 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           };
         }),
       })),
+
+    upsertRole: (role, editingId) =>
+      set((state) => {
+        if (editingId) {
+          return {
+            roles: state.roles.map((item) =>
+              item.id === editingId
+                ? {
+                    ...role,
+                    id: editingId,
+                    name: role.name.trim(),
+                    avatar: role.avatar.trim(),
+                    systemPrompt: role.systemPrompt.trim(),
+                  }
+                : item,
+            ),
+          };
+        }
+
+        return {
+          roles: state.roles.concat({
+            ...role,
+            id: makeId("role"),
+            name: role.name.trim(),
+            avatar: role.avatar.trim(),
+            systemPrompt: role.systemPrompt.trim(),
+          }),
+        };
+      }),
+
+    deleteRole: (roleId) =>
+      set((state) => ({
+        roles: state.roles.filter((role) => role.id !== roleId),
+      })),
+
+    addAgentFromRole: (roleId, position) =>
+      set((state) => {
+        const role = state.roles.find((item) => item.id === roleId);
+
+        if (
+          !role ||
+          !state.modelPresets.some((preset) => preset.id === role.modelPresetId)
+        ) {
+          return {};
+        }
+
+        const id = `agent-${state.nextNodeIndex}`;
+        const node = createNode("agent", id, position);
+
+        return {
+          nodes: state.nodes.concat({
+            ...node,
+            data: {
+              ...node.data,
+              title: role.name,
+              name: role.name,
+              avatar: role.avatar,
+              systemPrompt: role.systemPrompt,
+              modelPresetId: role.modelPresetId,
+            },
+          }),
+          selectedNodeIds: [id],
+          selectedEdgeIds: [],
+          nextNodeIndex: state.nextNodeIndex + 1,
+        };
+      }),
   }),
 );
 

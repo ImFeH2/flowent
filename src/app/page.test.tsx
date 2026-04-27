@@ -124,15 +124,27 @@ describe("Home", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Flowent" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Node Library")).toBeInTheDocument();
-    expect(screen.getByText("Manual Trigger")).toBeInTheDocument();
-    expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
-    expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Workflows" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Roles" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Settings" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Launch Campaign Workflow")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open Canvas" }),
+    ).toBeInTheDocument();
   });
 
   it("shows the selected agent configuration", () => {
     render(<Home />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Open Canvas" }));
+
+    expect(screen.getByText("Manual Trigger")).toBeInTheDocument();
+    expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
     expect(screen.getAllByText("Properties").length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue("Copywriter")).toBeInTheDocument();
     expect(screen.getByLabelText("System Prompt")).toBeInTheDocument();
@@ -142,10 +154,55 @@ describe("Home", () => {
   it("shows run state feedback on nodes", () => {
     render(<Home />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Open Canvas" }));
     fireEvent.click(screen.getByRole("button", { name: /^Run$/ }));
 
     expect(screen.getAllByText("success").length).toBeGreaterThan(0);
     expect(screen.getAllByText("running").length).toBeGreaterThan(0);
     expect(screen.getAllByText("pending").length).toBeGreaterThan(0);
+  });
+
+  it("opens the roles library", () => {
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Roles" }));
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Roles" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Product Copywriter")).toBeInTheDocument();
+    expect(screen.getByLabelText("Role Name")).toBeInTheDocument();
+    expect(screen.getByLabelText("System Prompt")).toBeInTheDocument();
+  });
+
+  it("creates an agent from a role", () => {
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Roles" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Use Role" })[0]);
+
+    expect(
+      screen.getByRole("heading", {
+        level: 2,
+        name: "Launch Campaign Workflow",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("4 nodes · 2 connections")).toBeInTheDocument();
+    expect(screen.getAllByText("Product Copywriter").length).toBeGreaterThan(0);
+  });
+
+  it("shows settings in the main view", () => {
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Settings" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Providers" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Model Presets" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("OpenAI Platform")).toBeInTheDocument();
   });
 });

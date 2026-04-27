@@ -73,6 +73,8 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
           <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted">
             {isTrigger ? (
               <TriggerIcon className="size-4" />
+            ) : data.avatar ? (
+              <span className="text-xs font-medium">{data.avatar}</span>
             ) : (
               <BotIcon className="size-4" />
             )}

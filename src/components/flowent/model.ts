@@ -8,6 +8,8 @@ export type ProviderType = "openai" | "anthropic" | "custom";
 export type WorkflowNodeData = {
   kind: WorkflowNodeKind;
   title: string;
+  name?: string;
+  avatar?: string;
   triggerMode?: TriggerMode;
   initialPayload?: string;
   cronExpression?: string;
@@ -40,6 +42,14 @@ export type ModelPreset = {
   maxTokens: number;
   testStatus?: "idle" | "success" | "error";
   testMessage?: string;
+};
+
+export type Role = {
+  id: string;
+  name: string;
+  avatar: string;
+  systemPrompt: string;
+  modelPresetId: string;
 };
 
 export const providerTypeLabels: Record<ProviderType, string> = {
@@ -99,6 +109,33 @@ export const initialModelPresets: ModelPreset[] = [
   },
 ];
 
+export const initialRoles: Role[] = [
+  {
+    id: "role-product-copywriter",
+    name: "Product Copywriter",
+    avatar: "PC",
+    systemPrompt:
+      "You are a product copywriter. Turn the input into concise, specific launch copy with a clear next action.",
+    modelPresetId: "preset-writing",
+  },
+  {
+    id: "role-code-reviewer",
+    name: "Code Reviewer",
+    avatar: "CR",
+    systemPrompt:
+      "You are a code reviewer. Inspect the input for correctness, regressions, maintainability risks, and missing tests.",
+    modelPresetId: "preset-review",
+  },
+  {
+    id: "role-research-analyst",
+    name: "Research Analyst",
+    avatar: "RA",
+    systemPrompt:
+      "You are a research analyst. Extract the key facts, compare tradeoffs, and produce a short decision-ready summary.",
+    modelPresetId: "preset-review",
+  },
+];
+
 export const initialNodes: FlowNode[] = [
   {
     id: "trigger-1",
@@ -121,6 +158,8 @@ export const initialNodes: FlowNode[] = [
     data: {
       kind: "agent",
       title: "Copywriter",
+      name: "Copywriter",
+      avatar: "CW",
       modelPresetId: "preset-writing",
       systemPrompt:
         "You are a product copywriter. Use {{payload}} to create concise, specific launch copy.",
@@ -135,6 +174,8 @@ export const initialNodes: FlowNode[] = [
     data: {
       kind: "agent",
       title: "Reviewer",
+      name: "Reviewer",
+      avatar: "RV",
       modelPresetId: "preset-review",
       systemPrompt:
         "Review the upstream result in {{input}} for clarity, accuracy, and next actions.",
@@ -193,6 +234,8 @@ export function createNode(
     data: {
       kind,
       title: "Agent",
+      name: "Agent",
+      avatar: "AI",
       modelPresetId: "preset-writing",
       systemPrompt: "Use {{payload}} to complete the assigned step.",
       tools: [],

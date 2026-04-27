@@ -4,6 +4,11 @@ export type WorkflowNodeKind = "trigger" | "agent";
 export type CanvasMode = "blueprint" | "workflow";
 export type TriggerMode = "manual" | "schedule" | "webhook";
 export type RunStatus = "idle" | "pending" | "running" | "success" | "error";
+export type BlueprintLastRunStatus =
+  | "not-run"
+  | "running"
+  | "success"
+  | "error";
 export type ProviderType = "openai" | "anthropic" | "custom";
 export type RuntimeConversationRole =
   | "system"
@@ -54,6 +59,16 @@ export type WorkflowNodeData = {
 
 export type FlowNode = Node<WorkflowNodeData, "workflow">;
 export type FlowEdge = Edge;
+
+export type BlueprintAsset = {
+  id: string;
+  name: string;
+  updatedAt: string;
+  lastRunStatus: BlueprintLastRunStatus;
+  summary: string;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+};
 
 export const canvasSnapGrid: SnapGrid = [20, 20];
 
@@ -245,6 +260,18 @@ export const initialEdges: FlowEdge[] = [
     sourceHandle: "output",
     targetHandle: "input",
     type: "smoothstep",
+  },
+];
+
+export const initialBlueprints: BlueprintAsset[] = [
+  {
+    id: "blueprint-launch-campaign",
+    name: "Launch Campaign",
+    updatedAt: "2026-04-27T09:00:00.000Z",
+    lastRunStatus: "not-run",
+    summary: "Draft launch copy, review it, and prepare the next step.",
+    nodes: initialNodes,
+    edges: initialEdges,
   },
 ];
 

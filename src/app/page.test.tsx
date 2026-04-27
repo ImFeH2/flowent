@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
 import {
   canvasSnapGrid,
+  initialBlueprints,
   initialEdges,
   initialModelPresets,
   initialNodes,
@@ -52,6 +53,7 @@ vi.mock("@xyflow/react", async () => {
       nodesDraggable,
       snapToGrid,
       snapGrid,
+      onNodeClick,
     }: {
       children?: ReactNode;
       nodes?: MockNode[];
@@ -59,6 +61,7 @@ vi.mock("@xyflow/react", async () => {
       nodesDraggable?: boolean;
       snapToGrid?: boolean;
       snapGrid?: [number, number];
+      onNodeClick?: (event: unknown, node: MockNode) => void;
     }) {
       const statusLabels: Record<string, string> = {
         idle: "Idle",
@@ -77,7 +80,9 @@ vi.mock("@xyflow/react", async () => {
         >
           {nodes.map((node) => (
             <div key={node.id}>
-              <span>{node.data.title}</span>
+              <button type="button" onClick={() => onNodeClick?.({}, node)}>
+                {node.data.title}
+              </button>
               {node.data.canvasMode === "workflow" && node.data.status && (
                 <span>{statusLabels[node.data.status]}</span>
               )}
@@ -153,6 +158,16 @@ vi.mock("@xyflow/react", async () => {
 
 function resetWorkspaceStore() {
   useFlowentWorkspaceStore.setState({
+    blueprints: initialBlueprints.map((blueprint) => ({
+      ...blueprint,
+      nodes: blueprint.nodes.map((node) => ({
+        ...node,
+        position: { ...node.position },
+        data: { ...node.data },
+      })),
+      edges: blueprint.edges.map((edge) => ({ ...edge })),
+    })),
+    activeBlueprintId: initialBlueprints[0]?.id ?? null,
     providers: initialProviders.map((provider) => ({ ...provider })),
     modelPresets: initialModelPresets.map((preset) => ({ ...preset })),
     roles: initialRoles.map((role) => ({ ...role })),
@@ -177,14 +192,20 @@ describe("Home", () => {
     resetWorkspaceStore();
   });
 
-  it("renders the workflow workspace", () => {
+  it("renders the workspace", () => {
     render(<Home />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Flowent" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { level: 1, name: "Workflows" }),
+      screen.getByRole("heading", { level: 1, name: "Workspace" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Workspace" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Blueprint" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Roles" })).toBeInTheDocument();
     expect(
@@ -193,22 +214,28 @@ describe("Home", () => {
     expect(
       screen.getByRole("button", { name: "Dark Mode" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Launch Campaign Workflow")).toBeInTheDocument();
+    expect(screen.getAllByText("Launch Campaign").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Search blueprints")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Open Canvas" }),
+      screen.getByRole("button", { name: "Create blueprint" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open blueprint" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Workflows")).not.toBeInTheDocument();
   });
 
-  it("shows the selected agent configuration", () => {
+  it("shows the selected agent configuration", async () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Canvas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
     expect(screen.getByText("Manual Trigger")).toBeInTheDocument();
     expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
     expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
     expect(screen.getAllByText("Properties").length).toBeGreaterThan(0);
-    expect(screen.getByText("Blueprint Mode")).toBeInTheDocument();
+    expect(screen.getByText("Edit state")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
       "data-snap-to-grid",
       "true",
@@ -221,7 +248,9 @@ describe("Home", () => {
       "data-grid-gap",
       String(canvasSnapGrid[0]),
     );
-    expect(screen.getByDisplayValue("Copywriter")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("Copywriter")).toBeInTheDocument(),
+    );
     expect(screen.getByLabelText("System Prompt")).toBeInTheDocument();
     expect(screen.getByText("Model Preset")).toBeInTheDocument();
     expect(screen.queryByText("Idle")).not.toBeInTheDocument();
@@ -230,13 +259,17 @@ describe("Home", () => {
     expect(screen.queryByText("Success")).not.toBeInTheDocument();
   });
 
-  it("locks the canvas and shows run state feedback in workflow mode", () => {
+  it("locks the canvas and shows run state feedback in workflow mode", async () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Canvas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("Copywriter")).toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByRole("button", { name: /^Run$/ }));
 
-    expect(screen.getByText("Workflow Mode")).toBeInTheDocument();
+    expect(screen.getByText("Run view")).toBeInTheDocument();
     expect(screen.getByText("Execution Details")).toBeInTheDocument();
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
@@ -259,9 +292,9 @@ describe("Home", () => {
     expect(screen.getAllByText("Thinking").length).toBeGreaterThan(0);
     expect(screen.getByText("Pending")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Back to Blueprint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit blueprint" }));
 
-    expect(screen.getByText("Blueprint Mode")).toBeInTheDocument();
+    expect(screen.getByText("Edit state")).toBeInTheDocument();
     expect(screen.queryByText("Read-only")).not.toBeInTheDocument();
     expect(screen.queryByText("Execution Details")).not.toBeInTheDocument();
     expect(screen.queryByText("Success")).not.toBeInTheDocument();
@@ -293,7 +326,7 @@ describe("Home", () => {
     expect(
       screen.getByRole("heading", {
         level: 2,
-        name: "Launch Campaign Workflow",
+        name: "Launch Campaign",
       }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Product Copywriter").length).toBeGreaterThan(0);

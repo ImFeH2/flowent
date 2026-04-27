@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   canvasSnapGrid,
+  initialBlueprints,
   initialEdges,
   initialModelPresets,
   initialNodes,
@@ -14,17 +15,34 @@ import {
 } from "./model";
 import { useFlowentWorkspaceStore } from "./workspace-store";
 
+function cloneNodes(nodes: FlowNode[]) {
+  return nodes.map((node) => ({
+    ...node,
+    position: { ...node.position },
+    data: {
+      ...node.data,
+      tools: node.data.tools ? [...node.data.tools] : node.data.tools,
+    },
+  }));
+}
+
+function cloneEdges(edges: FlowEdge[]) {
+  return edges.map((edge) => ({ ...edge }));
+}
+
 function resetStore() {
   useFlowentWorkspaceStore.setState({
+    blueprints: initialBlueprints.map((blueprint) => ({
+      ...blueprint,
+      nodes: cloneNodes(blueprint.nodes),
+      edges: cloneEdges(blueprint.edges),
+    })),
+    activeBlueprintId: initialBlueprints[0]?.id ?? null,
     providers: initialProviders.map((provider) => ({ ...provider })),
     modelPresets: initialModelPresets.map((preset) => ({ ...preset })),
     roles: initialRoles.map((role) => ({ ...role })),
-    nodes: initialNodes.map((node) => ({
-      ...node,
-      position: { ...node.position },
-      data: { ...node.data },
-    })),
-    edges: initialEdges.map((edge) => ({ ...edge })),
+    nodes: cloneNodes(initialNodes),
+    edges: cloneEdges(initialEdges),
     canvasMode: "blueprint",
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
@@ -55,6 +73,87 @@ describe("useFlowentWorkspaceStore", () => {
   });
 
   it("starts in blueprint mode", () => {
+    expect(useFlowentWorkspaceStore.getState().canvasMode).toBe("blueprint");
+  });
+
+  it("starts with a workspace blueprint asset selected", () => {
+    const state = useFlowentWorkspaceStore.getState();
+
+    expect(state.blueprints).toHaveLength(1);
+    expect(state.activeBlueprintId).toBe("blueprint-launch-campaign");
+    expect(state.blueprints[0]).toMatchObject({
+      name: "Launch Campaign",
+      lastRunStatus: "not-run",
+    });
+    expect(state.nodes).toHaveLength(initialNodes.length);
+    expect(state.edges).toHaveLength(initialEdges.length);
+  });
+
+  it("creates a blank blueprint and makes it current", () => {
+    const id = useFlowentWorkspaceStore
+      .getState()
+      .createBlueprint("Audience Follow-up");
+
+    const state = useFlowentWorkspaceStore.getState();
+
+    expect(state.activeBlueprintId).toBe(id);
+    expect(
+      state.blueprints.find((blueprint) => blueprint.id === id),
+    ).toMatchObject({
+      name: "Audience Follow-up",
+      lastRunStatus: "not-run",
+      summary: "Blank blueprint ready to build.",
+    });
+    expect(state.nodes).toEqual([]);
+    expect(state.edges).toEqual([]);
+    expect(state.canvasMode).toBe("blueprint");
+  });
+
+  it("opens a blueprint and loads its saved graph", () => {
+    const store = useFlowentWorkspaceStore.getState();
+    const createdId = store.createBlueprint("Blank Draft");
+
+    useFlowentWorkspaceStore.getState().addQuickNode("trigger");
+    expect(useFlowentWorkspaceStore.getState().nodes).toHaveLength(1);
+
+    useFlowentWorkspaceStore
+      .getState()
+      .openBlueprint("blueprint-launch-campaign");
+
+    expect(useFlowentWorkspaceStore.getState().activeBlueprintId).toBe(
+      "blueprint-launch-campaign",
+    );
+    expect(useFlowentWorkspaceStore.getState().nodes).toHaveLength(
+      initialNodes.length,
+    );
+
+    useFlowentWorkspaceStore.getState().openBlueprint(createdId);
+
+    expect(useFlowentWorkspaceStore.getState().activeBlueprintId).toBe(
+      createdId,
+    );
+    expect(useFlowentWorkspaceStore.getState().nodes).toHaveLength(1);
+    expect(useFlowentWorkspaceStore.getState().selectedNodeIds).toEqual([]);
+  });
+
+  it("ignores graph edits and runs when no blueprint is current", () => {
+    useFlowentWorkspaceStore.setState({
+      activeBlueprintId: null,
+      nodes: [],
+      edges: [],
+      selectedNodeIds: [],
+      selectedEdgeIds: [],
+      nextNodeIndex: 1,
+      canvasMode: "blueprint",
+    });
+
+    const store = useFlowentWorkspaceStore.getState();
+
+    store.addQuickNode("trigger");
+    store.startWorkflowRun();
+
+    expect(useFlowentWorkspaceStore.getState().nodes).toEqual([]);
+    expect(useFlowentWorkspaceStore.getState().edges).toEqual([]);
     expect(useFlowentWorkspaceStore.getState().canvasMode).toBe("blueprint");
   });
 
@@ -151,8 +250,13 @@ describe("useFlowentWorkspaceStore", () => {
 
     const state = useFlowentWorkspaceStore.getState();
     const agentDetails = getNode("agent-1").data.runDetails;
+    const activeBlueprint = state.blueprints.find(
+      (blueprint) => blueprint.id === state.activeBlueprintId,
+    );
 
+    expect(state.activeBlueprintId).toBe("blueprint-launch-campaign");
     expect(state.canvasMode).toBe("workflow");
+    expect(activeBlueprint?.lastRunStatus).toBe("running");
     expect(getNode("trigger-1").data.status).toBe("success");
     expect(getNode("agent-1").data.status).toBe("running");
     expect(getNode("agent-2").data.status).toBe("pending");
@@ -178,8 +282,14 @@ describe("useFlowentWorkspaceStore", () => {
     store.returnToBlueprintMode();
 
     const state = useFlowentWorkspaceStore.getState();
+    const activeBlueprint = state.blueprints.find(
+      (blueprint) => blueprint.id === state.activeBlueprintId,
+    );
 
     expect(state.canvasMode).toBe("blueprint");
+    expect(
+      activeBlueprint?.nodes.every((node) => node.data.status === "idle"),
+    ).toBe(true);
     expect(state.nodes.every((node) => node.data.status === "idle")).toBe(true);
     expect(state.nodes.every((node) => !node.data.runDetails)).toBe(true);
     expect(state.edges.every((edge) => edge.animated === false)).toBe(true);

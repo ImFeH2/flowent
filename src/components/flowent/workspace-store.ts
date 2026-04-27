@@ -14,13 +14,13 @@ import { create } from "zustand";
 
 import {
   createNode,
-  initialEdges,
+  initialBlueprints,
   initialModelPresets,
-  initialNodes,
   initialProviders,
   initialRoles,
   snapCanvasPosition,
   availableTools,
+  type BlueprintAsset,
   type CanvasMode,
   type FlowEdge,
   type FlowNode,
@@ -34,6 +34,8 @@ import {
 } from "./model";
 
 type WorkspaceState = {
+  blueprints: BlueprintAsset[];
+  activeBlueprintId: string | null;
   providers: Provider[];
   modelPresets: ModelPreset[];
   roles: Role[];
@@ -46,6 +48,8 @@ type WorkspaceState = {
 };
 
 type WorkspaceActions = {
+  createBlueprint: (name?: string) => string;
+  openBlueprint: (blueprintId: string) => void;
   setSelection: (nodeIds: string[], edgeIds: string[]) => void;
   applyNodeChanges: (changes: NodeChange<FlowNode>[]) => void;
   applyEdgeChanges: (changes: EdgeChange<FlowEdge>[]) => void;
@@ -86,6 +90,84 @@ function areSameIds(left: string[], right: string[]) {
 
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function cloneRunDetails(runDetails: NodeRunDetails | undefined) {
+  if (!runDetails) {
+    return undefined;
+  }
+
+  if (runDetails.kind === "agent") {
+    return {
+      ...runDetails,
+      conversation: runDetails.conversation.map((entry) => ({ ...entry })),
+    };
+  }
+
+  return { ...runDetails };
+}
+
+function cloneNodes(nodes: FlowNode[]) {
+  return nodes.map((node) => ({
+    ...node,
+    position: { ...node.position },
+    data: {
+      ...node.data,
+      tools: node.data.tools ? [...node.data.tools] : node.data.tools,
+      runDetails: cloneRunDetails(node.data.runDetails),
+    },
+  }));
+}
+
+function cloneEdges(edges: FlowEdge[]) {
+  return edges.map((edge) => ({ ...edge }));
+}
+
+function cloneBlueprint(blueprint: BlueprintAsset): BlueprintAsset {
+  return {
+    ...blueprint,
+    nodes: cloneNodes(blueprint.nodes),
+    edges: cloneEdges(blueprint.edges),
+  };
+}
+
+function getNextNodeIndex(nodes: FlowNode[]) {
+  const lastIndex = nodes.reduce((highest, node) => {
+    const match = /-(\d+)$/.exec(node.id);
+
+    if (!match) {
+      return highest;
+    }
+
+    return Math.max(highest, Number(match[1]));
+  }, 0);
+
+  return lastIndex + 1;
+}
+
+function updateActiveBlueprint(
+  state: WorkspaceState,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  patch: Partial<
+    Pick<BlueprintAsset, "lastRunStatus" | "name" | "summary" | "updatedAt">
+  > = {},
+) {
+  if (!state.activeBlueprintId) {
+    return state.blueprints;
+  }
+
+  return state.blueprints.map((blueprint) =>
+    blueprint.id === state.activeBlueprintId
+      ? {
+          ...blueprint,
+          ...patch,
+          updatedAt: patch.updatedAt ?? new Date().toISOString(),
+          nodes: cloneNodes(nodes),
+          edges: cloneEdges(edges),
+        }
+      : blueprint,
+  );
 }
 
 function isValidConnection(connection: Connection | Edge) {
@@ -298,15 +380,78 @@ function applyRunStatuses(
 
 export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
   (set, get) => ({
+    blueprints: initialBlueprints.map(cloneBlueprint),
+    activeBlueprintId: initialBlueprints[0]?.id ?? null,
     providers: initialProviders,
     modelPresets: initialModelPresets,
     roles: initialRoles,
-    nodes: initialNodes,
-    edges: initialEdges,
+    nodes: cloneNodes(initialBlueprints[0]?.nodes ?? []),
+    edges: cloneEdges(initialBlueprints[0]?.edges ?? []),
     canvasMode: "blueprint",
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
-    nextNodeIndex: 3,
+    nextNodeIndex: getNextNodeIndex(initialBlueprints[0]?.nodes ?? []),
+
+    createBlueprint: (name) => {
+      const id = makeId("blueprint");
+      const blueprint: BlueprintAsset = {
+        id,
+        name: name?.trim() || "Untitled blueprint",
+        updatedAt: new Date().toISOString(),
+        lastRunStatus: "not-run",
+        summary: "Blank blueprint ready to build.",
+        nodes: [],
+        edges: [],
+      };
+
+      set((state) => ({
+        blueprints: state.blueprints.concat(cloneBlueprint(blueprint)),
+        activeBlueprintId: id,
+        nodes: [],
+        edges: [],
+        canvasMode: "blueprint",
+        selectedNodeIds: [],
+        selectedEdgeIds: [],
+        nextNodeIndex: 1,
+      }));
+
+      return id;
+    },
+
+    openBlueprint: (blueprintId) =>
+      set((state) => {
+        const blueprint = state.blueprints.find(
+          (item) => item.id === blueprintId,
+        );
+
+        if (!blueprint) {
+          return state;
+        }
+
+        const graph = resetRunState(
+          cloneNodes(blueprint.nodes),
+          cloneEdges(blueprint.edges),
+        );
+
+        return {
+          blueprints: state.blueprints.map((item) =>
+            item.id === blueprintId
+              ? {
+                  ...item,
+                  nodes: cloneNodes(graph.nodes),
+                  edges: cloneEdges(graph.edges),
+                }
+              : item,
+          ),
+          activeBlueprintId: blueprintId,
+          nodes: graph.nodes,
+          edges: graph.edges,
+          canvasMode: "blueprint",
+          selectedNodeIds: [],
+          selectedEdgeIds: [],
+          nextNodeIndex: getNextNodeIndex(graph.nodes),
+        };
+      }),
 
     setSelection: (nodeIds, edgeIds) =>
       set((state) => {
@@ -325,28 +470,37 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
 
     applyNodeChanges: (changes) =>
       set((state) => {
-        if (state.canvasMode === "workflow") {
+        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
+        const nodes = applyNodeChanges(
+          changes.map(snapNodeChange),
+          state.nodes,
+        );
+
         return {
-          nodes: applyNodeChanges(changes.map(snapNodeChange), state.nodes),
+          nodes,
+          blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
       }),
 
     applyEdgeChanges: (changes) =>
       set((state) => {
-        if (state.canvasMode === "workflow") {
+        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
+        const edges = applyEdgeChanges(changes, state.edges);
+
         return {
-          edges: applyEdgeChanges(changes, state.edges),
+          edges,
+          blueprints: updateActiveBlueprint(state, state.nodes, edges),
         };
       }),
 
     connectNodes: (connection) => {
-      if (get().canvasMode === "workflow") {
+      if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
         return;
       }
 
@@ -354,29 +508,39 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         return;
       }
 
-      set((state) => ({
-        edges: addEdge({ ...connection, type: "smoothstep" }, state.edges),
-      }));
+      set((state) => {
+        const edges = addEdge(
+          { ...connection, type: "smoothstep" },
+          state.edges,
+        );
+
+        return {
+          edges,
+          blueprints: updateActiveBlueprint(state, state.nodes, edges),
+        };
+      });
     },
 
     addWorkflowNode: (kind, position) =>
       set((state) => {
-        if (state.canvasMode === "workflow") {
+        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
         const id = `${kind}-${state.nextNodeIndex}`;
+        const nodes = state.nodes.concat(createNode(kind, id, position));
 
         return {
-          nodes: state.nodes.concat(createNode(kind, id, position)),
+          nodes,
           selectedNodeIds: [id],
           selectedEdgeIds: [],
           nextNodeIndex: state.nextNodeIndex + 1,
+          blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
       }),
 
     addQuickNode: (kind) => {
-      if (get().canvasMode === "workflow") {
+      if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
         return;
       }
 
@@ -386,7 +550,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
     },
 
     deleteSelection: () => {
-      if (get().canvasMode === "workflow") {
+      if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
         return;
       }
 
@@ -396,52 +560,69 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         return;
       }
 
-      set((state) => ({
-        nodes: state.nodes.filter((node) => !selectedNodeIds.includes(node.id)),
-        edges: state.edges.filter(
+      set((state) => {
+        const nodes = state.nodes.filter(
+          (node) => !selectedNodeIds.includes(node.id),
+        );
+        const edges = state.edges.filter(
           (edge) =>
             !selectedEdgeIds.includes(edge.id) &&
             !selectedNodeIds.includes(edge.source) &&
             !selectedNodeIds.includes(edge.target),
-        ),
-        selectedNodeIds: [],
-        selectedEdgeIds: [],
-      }));
+        );
+
+        return {
+          nodes,
+          edges,
+          selectedNodeIds: [],
+          selectedEdgeIds: [],
+          blueprints: updateActiveBlueprint(state, nodes, edges),
+        };
+      });
     },
 
     deleteConnectedEdges: (deletedNodes) =>
       set((state) => {
-        if (state.canvasMode === "workflow") {
+        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
+        const edges = state.edges.filter(
+          (edge) =>
+            !getConnectedEdges(deletedNodes, state.edges).includes(edge),
+        );
+
         return {
-          edges: state.edges.filter(
-            (edge) =>
-              !getConnectedEdges(deletedNodes, state.edges).includes(edge),
-          ),
+          edges,
+          blueprints: updateActiveBlueprint(state, state.nodes, edges),
         };
       }),
 
     updateNodeData: (nodeId, patch) =>
       set((state) => {
-        if (state.canvasMode === "workflow") {
+        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
+        const nodes = state.nodes.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, ...patch } }
+            : node,
+        );
+
         return {
-          nodes: state.nodes.map((node) =>
-            node.id === nodeId
-              ? { ...node, data: { ...node.data, ...patch } }
-              : node,
-          ),
+          nodes,
+          blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
       }),
 
     startWorkflowRun: () =>
-      set((state) => ({
-        canvasMode: "workflow",
-        nodes: applyRunStatuses(
+      set((state) => {
+        if (!state.activeBlueprintId) {
+          return state;
+        }
+
+        const nodes = applyRunStatuses(
           state.nodes,
           state.edges,
           state.modelPresets,
@@ -451,53 +632,78 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
               : node.id === "agent-1"
                 ? "running"
                 : "pending",
-        ),
-        edges: state.edges.map((edge) => ({ ...edge, animated: true })),
-      })),
+        );
+        const edges = state.edges.map((edge) => ({ ...edge, animated: true }));
+
+        return {
+          canvasMode: "workflow",
+          nodes,
+          edges,
+          blueprints: updateActiveBlueprint(state, nodes, edges, {
+            lastRunStatus: "running",
+          }),
+        };
+      }),
 
     advanceWorkflowRun: () =>
       set((state) => {
-        if (state.canvasMode !== "workflow") {
+        if (state.canvasMode !== "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
+        const nodes = applyRunStatuses(
+          state.nodes,
+          state.edges,
+          state.modelPresets,
+          (node) =>
+            node.id === "agent-1"
+              ? "success"
+              : node.data.kind === "agent"
+                ? "running"
+                : node.data.status,
+        );
+
         return {
-          nodes: applyRunStatuses(
-            state.nodes,
-            state.edges,
-            state.modelPresets,
-            (node) =>
-              node.id === "agent-1"
-                ? "success"
-                : node.data.kind === "agent"
-                  ? "running"
-                  : node.data.status,
-          ),
+          nodes,
+          blueprints: updateActiveBlueprint(state, nodes, state.edges, {
+            lastRunStatus: "running",
+          }),
         };
       }),
 
     finishWorkflowRun: () =>
       set((state) => {
-        if (state.canvasMode !== "workflow") {
+        if (state.canvasMode !== "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
+        const nodes = applyRunStatuses(
+          state.nodes,
+          state.edges,
+          state.modelPresets,
+          () => "success",
+        );
+        const edges = state.edges.map((edge) => ({ ...edge, animated: false }));
+
         return {
-          nodes: applyRunStatuses(
-            state.nodes,
-            state.edges,
-            state.modelPresets,
-            () => "success",
-          ),
-          edges: state.edges.map((edge) => ({ ...edge, animated: false })),
+          nodes,
+          edges,
+          blueprints: updateActiveBlueprint(state, nodes, edges, {
+            lastRunStatus: "success",
+          }),
         };
       }),
 
     returnToBlueprintMode: () =>
-      set((state) => ({
-        canvasMode: "blueprint",
-        ...resetRunState(state.nodes, state.edges),
-      })),
+      set((state) => {
+        const graph = resetRunState(state.nodes, state.edges);
+
+        return {
+          canvasMode: "blueprint",
+          ...graph,
+          blueprints: updateActiveBlueprint(state, graph.nodes, graph.edges),
+        };
+      }),
 
     upsertProvider: (provider, editingId) =>
       set((state) => {
@@ -573,21 +779,24 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         );
         const fallbackPresetId = modelPresets.at(0)?.id;
 
+        const nodes = state.nodes.map((node) =>
+          node.data.modelPresetId === presetId
+            ? {
+                ...node,
+                data: { ...node.data, modelPresetId: fallbackPresetId },
+              }
+            : node,
+        );
+
         return {
           modelPresets,
-          nodes: state.nodes.map((node) =>
-            node.data.modelPresetId === presetId
-              ? {
-                  ...node,
-                  data: { ...node.data, modelPresetId: fallbackPresetId },
-                }
-              : node,
-          ),
+          nodes,
           roles: state.roles.map((role) =>
             role.modelPresetId === presetId
               ? { ...role, modelPresetId: fallbackPresetId ?? "" }
               : role,
           ),
+          blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
       }),
 
@@ -651,7 +860,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
 
     addAgentFromRole: (roleId, position) =>
       set((state) => {
-        if (state.canvasMode === "workflow") {
+        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
         }
 
@@ -666,22 +875,24 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
 
         const id = `agent-${state.nextNodeIndex}`;
         const node = createNode("agent", id, position);
+        const nodes = state.nodes.concat({
+          ...node,
+          data: {
+            ...node.data,
+            title: role.name,
+            name: role.name,
+            avatar: role.avatar,
+            systemPrompt: role.systemPrompt,
+            modelPresetId: role.modelPresetId,
+          },
+        });
 
         return {
-          nodes: state.nodes.concat({
-            ...node,
-            data: {
-              ...node.data,
-              title: role.name,
-              name: role.name,
-              avatar: role.avatar,
-              systemPrompt: role.systemPrompt,
-              modelPresetId: role.modelPresetId,
-            },
-          }),
+          nodes,
           selectedNodeIds: [id],
           selectedEdgeIds: [],
           nextNodeIndex: state.nextNodeIndex + 1,
+          blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
       }),
   }),

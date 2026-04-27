@@ -26,6 +26,7 @@ import {
   PlayIcon,
   PlusIcon,
   RotateCcwIcon,
+  SearchIcon,
   SettingsIcon,
   ShieldIcon,
   Trash2Icon,
@@ -73,6 +74,8 @@ import {
   canvasSnapGrid,
   providerTypeLabels,
   runStatusLabels,
+  type BlueprintAsset,
+  type BlueprintLastRunStatus,
   type CanvasMode,
   type FlowEdge,
   type FlowNode,
@@ -95,7 +98,7 @@ const nodeTypes: NodeTypes = {
   workflow: WorkflowNode,
 };
 
-type AppView = "workflows" | "canvas" | "roles" | "settings";
+type AppView = "workspace" | "blueprint" | "roles" | "settings";
 
 const nodeLibrary: Array<{
   kind: WorkflowNodeKind;
@@ -122,8 +125,35 @@ const primaryNavigation: Array<{
   label: string;
   icon: typeof GitBranchIcon;
 }> = [
-  { view: "workflows", label: "Workflows", icon: GitBranchIcon },
+  { view: "workspace", label: "Workspace", icon: PanelRightIcon },
+  { view: "blueprint", label: "Blueprint", icon: GitBranchIcon },
   { view: "roles", label: "Roles", icon: BotIcon },
+];
+
+type BlueprintStatusFilter = "all" | BlueprintLastRunStatus;
+
+const blueprintStatusPresentation: Record<
+  BlueprintLastRunStatus,
+  {
+    label: string;
+    badgeVariant: "default" | "secondary" | "destructive" | "outline";
+  }
+> = {
+  "not-run": { label: "Not run", badgeVariant: "outline" },
+  running: { label: "Running", badgeVariant: "secondary" },
+  success: { label: "Completed", badgeVariant: "default" },
+  error: { label: "Needs review", badgeVariant: "destructive" },
+};
+
+const blueprintStatusFilters: Array<{
+  value: BlueprintStatusFilter;
+  label: string;
+}> = [
+  { value: "all", label: "Any status" },
+  { value: "not-run", label: "Not run" },
+  { value: "running", label: "Running" },
+  { value: "success", label: "Completed" },
+  { value: "error", label: "Needs review" },
 ];
 
 const systemNavigation: Array<{
@@ -229,9 +259,11 @@ export function FlowentWorkspace() {
 function FlowentWorkspaceShell() {
   const runTimers = useRef<number[]>([]);
   const { fitView, screenToFlowPosition, setViewport } = useReactFlow();
-  const [activeView, setActiveView] = useState<AppView>("workflows");
+  const [activeView, setActiveView] = useState<AppView>("workspace");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const {
+    blueprints,
+    activeBlueprintId,
     nodes,
     edges,
     canvasMode,
@@ -255,8 +287,12 @@ function FlowentWorkspaceShell() {
     advanceWorkflowRun,
     finishWorkflowRun,
     returnToBlueprintMode,
+    createBlueprint,
+    openBlueprint,
   } = useFlowentWorkspaceStore(
     useShallow((state) => ({
+      blueprints: state.blueprints,
+      activeBlueprintId: state.activeBlueprintId,
       nodes: state.nodes,
       edges: state.edges,
       canvasMode: state.canvasMode,
@@ -280,7 +316,16 @@ function FlowentWorkspaceShell() {
       advanceWorkflowRun: state.advanceWorkflowRun,
       finishWorkflowRun: state.finishWorkflowRun,
       returnToBlueprintMode: state.returnToBlueprintMode,
+      createBlueprint: state.createBlueprint,
+      openBlueprint: state.openBlueprint,
     })),
+  );
+
+  const activeBlueprint = useMemo(
+    () =>
+      blueprints.find((blueprint) => blueprint.id === activeBlueprintId) ??
+      null,
+    [activeBlueprintId, blueprints],
   );
 
   const nodesWithContext = useMemo(
@@ -331,6 +376,21 @@ function FlowentWorkspaceShell() {
     clearRunTimers();
     returnToBlueprintMode();
   }, [clearRunTimers, returnToBlueprintMode]);
+
+  const openBlueprintView = useCallback(
+    (blueprintId: string) => {
+      clearRunTimers();
+      openBlueprint(blueprintId);
+      setActiveView("blueprint");
+    },
+    [clearRunTimers, openBlueprint],
+  );
+
+  const createBlueprintView = useCallback(() => {
+    clearRunTimers();
+    createBlueprint();
+    setActiveView("blueprint");
+  }, [clearRunTimers, createBlueprint]);
 
   const onDragStart = useCallback(
     (event: React.DragEvent<HTMLButtonElement>, kind: WorkflowNodeKind) => {
@@ -397,7 +457,7 @@ function FlowentWorkspaceShell() {
         className="flex h-dvh overflow-hidden bg-background text-foreground"
       >
         <AppSidebar
-          activeView={activeView === "canvas" ? "workflows" : activeView}
+          activeView={activeView}
           collapsed={sidebarCollapsed}
           onNavigate={setActiveView}
           onToggleCollapsed={() =>
@@ -405,43 +465,51 @@ function FlowentWorkspaceShell() {
           }
         />
         <div className="min-w-0 flex-1">
-          {activeView === "canvas" ? (
-            <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
-              <CanvasWorkspace
-                nodes={nodesWithContext}
-                edges={edges}
-                canvasMode={canvasMode}
-                selectedNodeIds={selectedNodeIds}
-                selectedEdgeIds={selectedEdgeIds}
-                onNodesChange={applyNodeChanges}
-                onEdgesChange={applyEdgeChanges}
-                onConnect={connectNodes}
-                onDrop={onDrop}
-                onDragStart={onDragStart}
-                onPaneContextMenu={onPaneContextMenu}
-                onNodesDelete={deleteConnectedEdges}
-                onSelectionChange={setSelection}
-                onQuickAdd={addQuickNode}
-                onRun={runWorkflow}
-                onReturnToBlueprint={returnToBlueprint}
-                onDeleteSelection={deleteSelection}
-                onFitView={() => fitView({ padding: 0.2, duration: 250 })}
-                onResetViewport={() =>
-                  setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 250 })
-                }
-              />
-              <aside className="min-h-0 border-t bg-card lg:border-t-0 lg:border-l">
-                <PropertyPanel
-                  selectedNode={selectedNode}
-                  selectedCount={
-                    selectedNodeIds.length + selectedEdgeIds.length
-                  }
+          {activeView === "blueprint" ? (
+            activeBlueprint ? (
+              <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
+                <CanvasWorkspace
+                  blueprintName={activeBlueprint.name}
+                  nodes={nodesWithContext}
+                  edges={edges}
                   canvasMode={canvasMode}
-                  modelPresets={modelPresets}
-                  updateNodeData={updateNodeData}
+                  selectedNodeIds={selectedNodeIds}
+                  selectedEdgeIds={selectedEdgeIds}
+                  onNodesChange={applyNodeChanges}
+                  onEdgesChange={applyEdgeChanges}
+                  onConnect={connectNodes}
+                  onDrop={onDrop}
+                  onDragStart={onDragStart}
+                  onPaneContextMenu={onPaneContextMenu}
+                  onNodesDelete={deleteConnectedEdges}
+                  onSelectionChange={setSelection}
+                  onQuickAdd={addQuickNode}
+                  onRun={runWorkflow}
+                  onReturnToBlueprint={returnToBlueprint}
+                  onDeleteSelection={deleteSelection}
+                  onFitView={() => fitView({ padding: 0.2, duration: 250 })}
+                  onResetViewport={() =>
+                    setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 250 })
+                  }
                 />
-              </aside>
-            </div>
+                <aside className="min-h-0 border-t bg-card lg:border-t-0 lg:border-l">
+                  <PropertyPanel
+                    selectedNode={selectedNode}
+                    selectedCount={
+                      selectedNodeIds.length + selectedEdgeIds.length
+                    }
+                    canvasMode={canvasMode}
+                    modelPresets={modelPresets}
+                    updateNodeData={updateNodeData}
+                  />
+                </aside>
+              </div>
+            ) : (
+              <BlueprintEmptyState
+                onCreateBlueprint={createBlueprintView}
+                onOpenWorkspace={() => setActiveView("workspace")}
+              />
+            )
           ) : activeView === "roles" ? (
             <RolesLibrary
               roles={roles}
@@ -450,16 +518,18 @@ function FlowentWorkspaceShell() {
               upsertRole={upsertRole}
               deleteRole={deleteRole}
               addAgentFromRole={addAgentFromRole}
-              onOpenCanvas={() => setActiveView("canvas")}
+              onOpenBlueprint={() => setActiveView("blueprint")}
             />
           ) : activeView === "settings" ? (
             <SettingsView />
           ) : (
-            <WorkflowDashboard
-              nodeCount={nodes.length}
+            <WorkspaceView
+              blueprints={blueprints}
+              activeBlueprintId={activeBlueprintId}
               roleCount={roles.length}
               modelPresetCount={modelPresets.length}
-              onOpenCanvas={() => setActiveView("canvas")}
+              onOpenBlueprint={openBlueprintView}
+              onCreateBlueprint={createBlueprintView}
             />
           )}
         </div>
@@ -577,60 +647,282 @@ function SidebarNavButton({
   );
 }
 
-function WorkflowDashboard({
-  nodeCount,
+function WorkspaceView({
+  blueprints,
+  activeBlueprintId,
   roleCount,
   modelPresetCount,
-  onOpenCanvas,
+  onOpenBlueprint,
+  onCreateBlueprint,
 }: {
-  nodeCount: number;
+  blueprints: BlueprintAsset[];
+  activeBlueprintId: string | null;
   roleCount: number;
   modelPresetCount: number;
-  onOpenCanvas: () => void;
+  onOpenBlueprint: (blueprintId: string) => void;
+  onCreateBlueprint: () => void;
 }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<BlueprintStatusFilter>("all");
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredBlueprints = useMemo(
+    () =>
+      blueprints.filter((blueprint) => {
+        const matchesSearch =
+          normalizedSearch.length === 0 ||
+          blueprint.name.toLowerCase().includes(normalizedSearch);
+        const matchesStatus =
+          statusFilter === "all" || blueprint.lastRunStatus === statusFilter;
+
+        return matchesSearch && matchesStatus;
+      }),
+    [blueprints, normalizedSearch, statusFilter],
+  );
+  const hasFilters = normalizedSearch.length > 0 || statusFilter !== "all";
+
   return (
     <ScrollArea className="h-full">
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">Workflows</h1>
+            <h1 className="text-3xl font-semibold">Workspace</h1>
           </div>
-          <Button onClick={onOpenCanvas}>
-            <PanelRightIcon />
-            Open Canvas
+          <Button onClick={onCreateBlueprint}>
+            <PlusIcon />
+            Create blueprint
           </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Workflow" value="1 active" />
-          <MetricCard label="Nodes" value={String(nodeCount)} />
+          <MetricCard label="Blueprints" value={String(blueprints.length)} />
+          <MetricCard
+            label="Current"
+            value={
+              activeBlueprintId
+                ? (blueprints.find(
+                    (blueprint) => blueprint.id === activeBlueprintId,
+                  )?.name ?? "Selected")
+                : "None"
+            }
+          />
           <MetricCard label="Roles" value={String(roleCount)} />
           <MetricCard label="Models" value={String(modelPresetCount)} />
         </div>
-        <Card className="rounded-lg p-6">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-2xl">Launch Campaign Workflow</CardTitle>
-            <CardAction>
-              <Button size="sm" onClick={onOpenCanvas}>
-                Open
-              </Button>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="grid gap-3 px-0 pb-0 text-base md:grid-cols-3">
-            <div>Trigger: Manual Trigger</div>
-            <div>First Agent: Copywriter</div>
-            <div>Status: Draft</div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-3 md:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              aria-label="Search blueprints"
+              className="pl-9"
+              placeholder="Search blueprints"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) =>
+              setStatusFilter(value as BlueprintStatusFilter)
+            }
+          >
+            <SelectTrigger aria-label="Filter blueprints" className="md:w-48">
+              <SelectValue>
+                {(value: BlueprintStatusFilter | null) =>
+                  blueprintStatusFilters.find((item) => item.value === value)
+                    ?.label ?? "Any status"
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {blueprintStatusFilters.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {blueprints.length === 0 ? (
+          <WorkspaceEmptyState onCreateBlueprint={onCreateBlueprint} />
+        ) : filteredBlueprints.length === 0 ? (
+          <WorkspaceNoResults
+            onClearFilters={() => {
+              setSearchTerm("");
+              setStatusFilter("all");
+            }}
+          />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {filteredBlueprints.map((blueprint) => (
+              <BlueprintCard
+                key={blueprint.id}
+                blueprint={blueprint}
+                active={blueprint.id === activeBlueprintId}
+                onOpenBlueprint={onOpenBlueprint}
+              />
+            ))}
+          </div>
+        )}
+        {hasFilters && filteredBlueprints.length > 0 && (
+          <div>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSearchTerm("");
+                setStatusFilter("all");
+              }}
+            >
+              Clear filters
+            </Button>
+          </div>
+        )}
       </section>
     </ScrollArea>
   );
+}
+
+function BlueprintCard({
+  blueprint,
+  active,
+  onOpenBlueprint,
+}: {
+  blueprint: BlueprintAsset;
+  active: boolean;
+  onOpenBlueprint: (blueprintId: string) => void;
+}) {
+  const status = blueprintStatusPresentation[blueprint.lastRunStatus];
+
+  return (
+    <Card className={cn("rounded-lg p-5", active && "border-primary/60")}>
+      <CardHeader className="px-0 pt-0">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="truncate text-xl">{blueprint.name}</CardTitle>
+            {active && <Badge variant="secondary">Current</Badge>}
+          </div>
+          <div className="mt-2 text-sm text-muted-foreground">
+            Updated {formatBlueprintDate(blueprint.updatedAt)}
+          </div>
+        </div>
+        <CardAction>
+          <Button size="sm" onClick={() => onOpenBlueprint(blueprint.id)}>
+            Open blueprint
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="space-y-4 px-0 pb-0">
+        <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
+          {blueprint.summary}
+        </p>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Badge variant={status.badgeVariant}>{status.label}</Badge>
+          <span className="text-muted-foreground">
+            {blueprint.nodes.length} nodes
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WorkspaceEmptyState({
+  onCreateBlueprint,
+}: {
+  onCreateBlueprint: () => void;
+}) {
+  return (
+    <Card className="rounded-lg p-6">
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-semibold">
+            Create your first blueprint
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Start with a blank blueprint, then add triggers, agents, and steps
+            in the editor.
+          </p>
+        </div>
+        <Button onClick={onCreateBlueprint}>
+          <PlusIcon />
+          Create blueprint
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function WorkspaceNoResults({
+  onClearFilters,
+}: {
+  onClearFilters: () => void;
+}) {
+  return (
+    <div className="rounded-lg border bg-card p-6">
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-semibold">No matching blueprints</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Clear the current filters to return to the full list.
+          </p>
+        </div>
+        <Button variant="outline" onClick={onClearFilters}>
+          Clear filters
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function BlueprintEmptyState({
+  onCreateBlueprint,
+  onOpenWorkspace,
+}: {
+  onCreateBlueprint: () => void;
+  onOpenWorkspace: () => void;
+}) {
+  return (
+    <section className="flex h-full min-w-0 items-center justify-center p-6">
+      <Card className="w-full max-w-xl rounded-lg p-6">
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-3xl font-semibold">Choose a blueprint</h1>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Open an existing blueprint from your workspace or create a new one
+              before editing.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={onOpenWorkspace}>
+              <PanelRightIcon />
+              Go to Workspace
+            </Button>
+            <Button variant="outline" onClick={onCreateBlueprint}>
+              <PlusIcon />
+              Create blueprint
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+function formatBlueprintDate(value: string) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <Card className="rounded-lg p-6">
       <div className="text-lg font-medium">{label}</div>
-      <div className="mt-2 text-3xl font-semibold">{value}</div>
+      <div className="mt-2 truncate text-3xl font-semibold" title={value}>
+        {value}
+      </div>
     </Card>
   );
 }
@@ -644,7 +936,7 @@ function RoleCard({
   deleteRole,
   setDraft,
   setEditingId,
-  onOpenCanvas,
+  onOpenBlueprint,
 }: {
   role: Role;
   modelPresets: ModelPreset[];
@@ -654,7 +946,7 @@ function RoleCard({
   deleteRole: (roleId: string) => void;
   setDraft: React.Dispatch<React.SetStateAction<Role>>;
   setEditingId: React.Dispatch<React.SetStateAction<string | null>>;
-  onOpenCanvas: () => void;
+  onOpenBlueprint: () => void;
 }) {
   const hasValidPreset = modelPresets.some(
     (preset) => preset.id === role.modelPresetId,
@@ -678,7 +970,7 @@ function RoleCard({
             disabled={!hasValidPreset}
             onClick={() => {
               addAgentFromRole(role.id, getRoleNodePosition(nodeCount));
-              onOpenCanvas();
+              onOpenBlueprint();
             }}
           >
             Use Role
@@ -719,6 +1011,7 @@ function RoleCard({
 }
 
 function CanvasWorkspace({
+  blueprintName,
   nodes,
   edges,
   canvasMode,
@@ -739,6 +1032,7 @@ function CanvasWorkspace({
   onFitView,
   onResetViewport,
 }: {
+  blueprintName: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
   canvasMode: CanvasMode;
@@ -768,19 +1062,17 @@ function CanvasWorkspace({
     <section className="flex min-h-0 min-w-0 flex-col bg-background">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="truncate text-xl font-medium">
-            Launch Campaign Workflow
-          </h2>
+          <h2 className="truncate text-xl font-medium">{blueprintName}</h2>
           <Badge variant={isWorkflowMode ? "default" : "secondary"}>
             {isWorkflowMode ? (
               <>
                 <LockIcon className="size-3.5" />
-                Workflow Mode
+                Run view
               </>
             ) : (
               <>
                 <PencilIcon className="size-3.5" />
-                Blueprint Mode
+                Edit state
               </>
             )}
           </Badge>
@@ -795,7 +1087,7 @@ function CanvasWorkspace({
           {isWorkflowMode ? (
             <Button variant="outline" onClick={onReturnToBlueprint}>
               <RotateCcwIcon />
-              Back to Blueprint
+              Edit blueprint
             </Button>
           ) : (
             <Button onClick={onRun}>
@@ -1427,7 +1719,7 @@ function RolesLibrary({
   upsertRole,
   deleteRole,
   addAgentFromRole,
-  onOpenCanvas,
+  onOpenBlueprint,
 }: {
   roles: Role[];
   modelPresets: ModelPreset[];
@@ -1435,7 +1727,7 @@ function RolesLibrary({
   upsertRole: (role: Role, editingId: string | null) => void;
   deleteRole: (roleId: string) => void;
   addAgentFromRole: (roleId: string, position: FlowNode["position"]) => void;
-  onOpenCanvas: () => void;
+  onOpenBlueprint: () => void;
 }) {
   const [draft, setDraft] = useState<Role>(() =>
     emptyRole(modelPresets.at(0)?.id),
@@ -1475,7 +1767,7 @@ function RolesLibrary({
                 roles[0]?.id ?? "",
                 getRoleNodePosition(nodeCount),
               );
-              onOpenCanvas();
+              onOpenBlueprint();
             }}
             disabled={roles.length === 0}
           >
@@ -1496,7 +1788,7 @@ function RolesLibrary({
                 deleteRole={deleteRole}
                 setDraft={setDraft}
                 setEditingId={setEditingId}
-                onOpenCanvas={onOpenCanvas}
+                onOpenBlueprint={onOpenBlueprint}
               />
             ))}
           </div>
@@ -1750,7 +2042,7 @@ function ProviderSettings({
                 }
               />
             </Field>
-            <Field label="API Key" htmlFor="provider-key">
+            <Field label="Connection key" htmlFor="provider-key">
               <Input
                 id="provider-key"
                 type="password"
@@ -1978,7 +2270,7 @@ function PresetSettings({
                 />
               </div>
             </Field>
-            <Field label="Max Tokens" htmlFor="max-tokens">
+            <Field label="Response length" htmlFor="max-tokens">
               <Input
                 id="max-tokens"
                 type="number"

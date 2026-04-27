@@ -45,9 +45,13 @@ type WorkspaceState = {
   selectedNodeIds: string[];
   selectedEdgeIds: string[];
   nextNodeIndex: number;
+  localDataStatus: "loading" | "ready" | "saving" | "error";
+  localDataMessage: string | null;
+  hasLoadedLocalData: boolean;
 };
 
 type WorkspaceActions = {
+  loadLocalSettings: () => Promise<void>;
   createBlueprint: (name?: string) => string;
   openBlueprint: (blueprintId: string) => void;
   setSelection: (nodeIds: string[], edgeIds: string[]) => void;
@@ -66,13 +70,16 @@ type WorkspaceActions = {
   advanceWorkflowRun: () => void;
   finishWorkflowRun: () => void;
   returnToBlueprintMode: () => void;
-  upsertProvider: (provider: Provider, editingId: string | null) => void;
-  deleteProvider: (providerId: string) => void;
+  upsertProvider: (
+    provider: Provider,
+    editingId: string | null,
+  ) => Promise<boolean>;
+  deleteProvider: (providerId: string) => Promise<boolean>;
   upsertModelPreset: (
     modelPreset: ModelPreset,
     editingId: string | null,
-  ) => void;
-  deleteModelPreset: (presetId: string) => void;
+  ) => Promise<boolean>;
+  deleteModelPreset: (presetId: string) => Promise<boolean>;
   testModelPreset: (presetId: string) => void;
   upsertRole: (role: Role, editingId: string | null) => void;
   deleteRole: (roleId: string) => void;
@@ -80,6 +87,26 @@ type WorkspaceActions = {
 };
 
 export type FlowentWorkspaceStore = WorkspaceState & WorkspaceActions;
+
+type LocalSettingsSnapshot = {
+  version?: number;
+  providers: Provider[];
+  modelPresets: ModelPreset[];
+  blueprints: BlueprintAsset[];
+  roles: Role[];
+};
+
+type LocalSettingsResponse = {
+  saved?: boolean;
+  settings?: LocalSettingsSnapshot | null;
+  error?: string;
+};
+
+const localSettingsEndpoint = "/api/settings";
+const localDataSaveMessage = "Saving changes...";
+const localDataLoadErrorMessage = "Saved settings could not be loaded.";
+const localDataSaveErrorMessage =
+  "Changes could not be saved. Check that Flowent can write to your home folder.";
 
 function areSameIds(left: string[], right: string[]) {
   return (
@@ -123,6 +150,22 @@ function cloneEdges(edges: FlowEdge[]) {
   return edges.map((edge) => ({ ...edge }));
 }
 
+function cloneProviders(providers: Provider[]) {
+  return providers.map((provider) => ({ ...provider }));
+}
+
+function cloneModelPresets(modelPresets: ModelPreset[]) {
+  return modelPresets.map((preset) => ({
+    ...preset,
+    testStatus: "idle" as const,
+    testMessage: undefined,
+  }));
+}
+
+function cloneRoles(roles: Role[]) {
+  return roles.map((role) => ({ ...role }));
+}
+
 function cloneBlueprint(blueprint: BlueprintAsset): BlueprintAsset {
   return {
     ...blueprint,
@@ -143,6 +186,121 @@ function getNextNodeIndex(nodes: FlowNode[]) {
   }, 0);
 
   return lastIndex + 1;
+}
+
+function hasAvailableModelPreset(
+  modelPresets: ModelPreset[],
+  presetId: string | undefined,
+) {
+  return Boolean(
+    presetId && modelPresets.some((preset) => preset.id === presetId),
+  );
+}
+
+function hasUnavailableAgentModelReference(
+  nodes: FlowNode[],
+  modelPresets: ModelPreset[],
+) {
+  return nodes.some(
+    (node) =>
+      node.data.kind === "agent" &&
+      !hasAvailableModelPreset(modelPresets, node.data.modelPresetId),
+  );
+}
+
+function createLocalSettingsSnapshot(
+  state: WorkspaceState,
+): LocalSettingsSnapshot {
+  return {
+    providers: cloneProviders(state.providers),
+    modelPresets: cloneModelPresets(state.modelPresets),
+    blueprints: state.blueprints.map(cloneBlueprint),
+    roles: cloneRoles(state.roles),
+  };
+}
+
+function getLocalDataErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+async function parseLocalSettingsResponse(response: Response) {
+  let body: LocalSettingsResponse | null = null;
+
+  try {
+    body = (await response.json()) as LocalSettingsResponse;
+  } catch {
+    body = null;
+  }
+
+  if (!body) {
+    throw new Error(
+      response.ok ? localDataLoadErrorMessage : localDataSaveErrorMessage,
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(body.error || localDataSaveErrorMessage);
+  }
+
+  return body;
+}
+
+async function readLocalSettings() {
+  const response = await fetch(localSettingsEndpoint, {
+    cache: "no-store",
+  });
+
+  return parseLocalSettingsResponse(response);
+}
+
+async function saveLocalSettings(snapshot: LocalSettingsSnapshot) {
+  const response = await fetch(localSettingsEndpoint, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ settings: snapshot }),
+  });
+  const body = await parseLocalSettingsResponse(response);
+
+  if (!body.settings) {
+    throw new Error(localDataSaveErrorMessage);
+  }
+
+  return body.settings;
+}
+
+function applyLocalSettingsSnapshot(
+  snapshot: LocalSettingsSnapshot,
+): Partial<WorkspaceState> {
+  const blueprints = snapshot.blueprints.map(cloneBlueprint);
+  const activeBlueprintId = blueprints.at(0)?.id ?? null;
+  const activeBlueprint = blueprints.at(0);
+  const graph = resetRunState(
+    cloneNodes(activeBlueprint?.nodes ?? []),
+    cloneEdges(activeBlueprint?.edges ?? []),
+  );
+
+  return {
+    providers: cloneProviders(snapshot.providers),
+    modelPresets: cloneModelPresets(snapshot.modelPresets),
+    blueprints,
+    activeBlueprintId,
+    roles: cloneRoles(snapshot.roles),
+    nodes: graph.nodes,
+    edges: graph.edges,
+    canvasMode: "blueprint",
+    selectedNodeIds: [],
+    selectedEdgeIds: [],
+    nextNodeIndex: getNextNodeIndex(graph.nodes),
+    localDataStatus: "ready",
+    localDataMessage: null,
+    hasLoadedLocalData: true,
+  };
 }
 
 function updateActiveBlueprint(
@@ -210,6 +368,24 @@ function snapNodeChange(change: NodeChange<FlowNode>): NodeChange<FlowNode> {
   }
 
   return change;
+}
+
+function shouldPersistNodeChanges(changes: NodeChange<FlowNode>[]) {
+  return changes.some((change) => {
+    if (change.type === "position") {
+      return change.dragging !== true;
+    }
+
+    return (
+      change.type === "add" ||
+      change.type === "remove" ||
+      change.type === "replace"
+    );
+  });
+}
+
+function shouldPersistEdgeChanges(changes: EdgeChange<FlowEdge>[]) {
+  return changes.some((change) => change.type !== "select");
 }
 
 function resetRunState(nodes: FlowNode[], edges: FlowEdge[]) {
@@ -378,19 +554,120 @@ function applyRunStatuses(
   return nextNodes;
 }
 
-export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
-  (set, get) => ({
+export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
+  set,
+  get,
+) => {
+  const persistLocalData = () => {
+    const state = get();
+
+    if (!state.hasLoadedLocalData) {
+      return;
+    }
+
+    set({
+      localDataStatus: "saving",
+      localDataMessage: localDataSaveMessage,
+    });
+
+    void saveLocalSettings(createLocalSettingsSnapshot(state))
+      .then(() => {
+        set({
+          localDataStatus: "ready",
+          localDataMessage: null,
+        });
+      })
+      .catch((error) => {
+        set({
+          localDataStatus: "error",
+          localDataMessage: getLocalDataErrorMessage(
+            error,
+            localDataSaveErrorMessage,
+          ),
+        });
+      });
+  };
+
+  const commitLocalDataChange = async (
+    createPatch: (state: WorkspaceState) => Partial<WorkspaceState>,
+  ) => {
+    const state = get();
+    const patch = createPatch(state);
+    const nextState = { ...state, ...patch };
+
+    set({
+      localDataStatus: "saving",
+      localDataMessage: localDataSaveMessage,
+    });
+
+    try {
+      await saveLocalSettings(createLocalSettingsSnapshot(nextState));
+      set({
+        ...patch,
+        localDataStatus: "ready",
+        localDataMessage: null,
+        hasLoadedLocalData: true,
+      });
+
+      return true;
+    } catch (error) {
+      set({
+        localDataStatus: "error",
+        localDataMessage: getLocalDataErrorMessage(
+          error,
+          localDataSaveErrorMessage,
+        ),
+      });
+
+      return false;
+    }
+  };
+
+  return {
     blueprints: initialBlueprints.map(cloneBlueprint),
     activeBlueprintId: initialBlueprints[0]?.id ?? null,
-    providers: initialProviders,
-    modelPresets: initialModelPresets,
-    roles: initialRoles,
+    providers: cloneProviders(initialProviders),
+    modelPresets: cloneModelPresets(initialModelPresets),
+    roles: cloneRoles(initialRoles),
     nodes: cloneNodes(initialBlueprints[0]?.nodes ?? []),
     edges: cloneEdges(initialBlueprints[0]?.edges ?? []),
     canvasMode: "blueprint",
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
     nextNodeIndex: getNextNodeIndex(initialBlueprints[0]?.nodes ?? []),
+    localDataStatus: "loading",
+    localDataMessage: null,
+    hasLoadedLocalData: false,
+
+    loadLocalSettings: async () => {
+      set({
+        localDataStatus: "loading",
+        localDataMessage: null,
+      });
+
+      try {
+        const body = await readLocalSettings();
+
+        if (body.saved && body.settings) {
+          set(applyLocalSettingsSnapshot(body.settings));
+          return;
+        }
+
+        set({
+          localDataStatus: "ready",
+          localDataMessage: null,
+          hasLoadedLocalData: true,
+        });
+      } catch (error) {
+        set({
+          localDataStatus: "error",
+          localDataMessage: getLocalDataErrorMessage(
+            error,
+            localDataLoadErrorMessage,
+          ),
+        });
+      }
+    },
 
     createBlueprint: (name) => {
       const id = makeId("blueprint");
@@ -414,6 +691,8 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         selectedEdgeIds: [],
         nextNodeIndex: 1,
       }));
+
+      persistLocalData();
 
       return id;
     },
@@ -468,7 +747,9 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         };
       }),
 
-    applyNodeChanges: (changes) =>
+    applyNodeChanges: (changes) => {
+      const shouldPersist = shouldPersistNodeChanges(changes);
+
       set((state) => {
         if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
@@ -483,9 +764,16 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           nodes,
           blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
-      }),
+      });
 
-    applyEdgeChanges: (changes) =>
+      if (shouldPersist) {
+        persistLocalData();
+      }
+    },
+
+    applyEdgeChanges: (changes) => {
+      const shouldPersist = shouldPersistEdgeChanges(changes);
+
       set((state) => {
         if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
@@ -497,7 +785,12 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           edges,
           blueprints: updateActiveBlueprint(state, state.nodes, edges),
         };
-      }),
+      });
+
+      if (shouldPersist) {
+        persistLocalData();
+      }
+    },
 
     connectNodes: (connection) => {
       if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
@@ -519,9 +812,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           blueprints: updateActiveBlueprint(state, state.nodes, edges),
         };
       });
+      persistLocalData();
     },
 
-    addWorkflowNode: (kind, position) =>
+    addWorkflowNode: (kind, position) => {
       set((state) => {
         if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
@@ -537,7 +831,9 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           nextNodeIndex: state.nextNodeIndex + 1,
           blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
-      }),
+      });
+      persistLocalData();
+    },
 
     addQuickNode: (kind) => {
       if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
@@ -579,9 +875,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           blueprints: updateActiveBlueprint(state, nodes, edges),
         };
       });
+      persistLocalData();
     },
 
-    deleteConnectedEdges: (deletedNodes) =>
+    deleteConnectedEdges: (deletedNodes) => {
       set((state) => {
         if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
@@ -596,9 +893,11 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           edges,
           blueprints: updateActiveBlueprint(state, state.nodes, edges),
         };
-      }),
+      });
+      persistLocalData();
+    },
 
-    updateNodeData: (nodeId, patch) =>
+    updateNodeData: (nodeId, patch) => {
       set((state) => {
         if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
@@ -614,11 +913,16 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           nodes,
           blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
-      }),
+      });
+      persistLocalData();
+    },
 
     startWorkflowRun: () =>
       set((state) => {
-        if (!state.activeBlueprintId) {
+        if (
+          !state.activeBlueprintId ||
+          hasUnavailableAgentModelReference(state.nodes, state.modelPresets)
+        ) {
           return state;
         }
 
@@ -706,7 +1010,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
       }),
 
     upsertProvider: (provider, editingId) =>
-      set((state) => {
+      commitLocalDataChange((state) => {
         if (editingId) {
           return {
             providers: state.providers.map((item) =>
@@ -735,14 +1039,25 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
       }),
 
     deleteProvider: (providerId) =>
-      set((state) => ({
-        providers: state.providers.filter(
-          (provider) => provider.id !== providerId,
-        ),
-      })),
+      commitLocalDataChange((state) => {
+        const removedPresetIds = new Set(
+          state.modelPresets
+            .filter((preset) => preset.providerId === providerId)
+            .map((preset) => preset.id),
+        );
+
+        return {
+          providers: state.providers.filter(
+            (provider) => provider.id !== providerId,
+          ),
+          modelPresets: state.modelPresets.filter(
+            (preset) => !removedPresetIds.has(preset.id),
+          ),
+        };
+      }),
 
     upsertModelPreset: (modelPreset, editingId) =>
-      set((state) => {
+      commitLocalDataChange((state) => {
         if (editingId) {
           return {
             modelPresets: state.modelPresets.map((preset) =>
@@ -773,30 +1088,13 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
       }),
 
     deleteModelPreset: (presetId) =>
-      set((state) => {
+      commitLocalDataChange((state) => {
         const modelPresets = state.modelPresets.filter(
           (preset) => preset.id !== presetId,
-        );
-        const fallbackPresetId = modelPresets.at(0)?.id;
-
-        const nodes = state.nodes.map((node) =>
-          node.data.modelPresetId === presetId
-            ? {
-                ...node,
-                data: { ...node.data, modelPresetId: fallbackPresetId },
-              }
-            : node,
         );
 
         return {
           modelPresets,
-          nodes,
-          roles: state.roles.map((role) =>
-            role.modelPresetId === presetId
-              ? { ...role, modelPresetId: fallbackPresetId ?? "" }
-              : role,
-          ),
-          blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
       }),
 
@@ -824,7 +1122,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         }),
       })),
 
-    upsertRole: (role, editingId) =>
+    upsertRole: (role, editingId) => {
       set((state) => {
         if (editingId) {
           return {
@@ -851,14 +1149,18 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
             systemPrompt: role.systemPrompt.trim(),
           }),
         };
-      }),
+      });
+      persistLocalData();
+    },
 
-    deleteRole: (roleId) =>
+    deleteRole: (roleId) => {
       set((state) => ({
         roles: state.roles.filter((role) => role.id !== roleId),
-      })),
+      }));
+      persistLocalData();
+    },
 
-    addAgentFromRole: (roleId, position) =>
+    addAgentFromRole: (roleId, position) => {
       set((state) => {
         if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
           return state;
@@ -894,8 +1196,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
           nextNodeIndex: state.nextNodeIndex + 1,
           blueprints: updateActiveBlueprint(state, nodes, state.edges),
         };
-      }),
-  }),
-);
+      });
+      persistLocalData();
+    },
+  };
+});
 
 export { isValidConnection };

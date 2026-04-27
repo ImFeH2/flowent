@@ -181,12 +181,31 @@ function resetWorkspaceStore() {
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
     nextNodeIndex: 3,
+    localDataStatus: "ready",
+    localDataMessage: null,
+    hasLoadedLocalData: false,
   });
+}
+
+function mockMissingLocalSettings() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ saved: false, settings: null }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    ),
+  );
 }
 
 describe("Home", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    vi.unstubAllGlobals();
+    mockMissingLocalSettings();
     document.documentElement.className = "";
     document.documentElement.style.colorScheme = "";
     resetWorkspaceStore();
@@ -257,6 +276,31 @@ describe("Home", () => {
     expect(screen.queryByText("Pending")).not.toBeInTheDocument();
     expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
     expect(screen.queryByText("Success")).not.toBeInTheDocument();
+  });
+
+  it("asks users to choose a model when an agent references a removed preset", async () => {
+    useFlowentWorkspaceStore.setState({
+      modelPresets: initialModelPresets.filter(
+        (preset) => preset.id !== "preset-writing",
+      ),
+    });
+
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
+
+    expect(screen.getByRole("button", { name: /^Run$/ })).toBeDisabled();
+    expect(
+      screen.getByText("Choose models before running"),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Choose an available model before running this agent.",
+        ),
+      ).toBeInTheDocument(),
+    );
   });
 
   it("locks the canvas and shows run state feedback in workflow mode", async () => {

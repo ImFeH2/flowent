@@ -92,13 +92,18 @@ import {
   type WorkflowNodeKind,
 } from "./model";
 import { WorkflowNode } from "./workflow-node";
-import { isValidConnection, useFlowentWorkspaceStore } from "./workspace-store";
+import {
+  isValidConnection,
+  type FlowentWorkspaceStore,
+  useFlowentWorkspaceStore,
+} from "./workspace-store";
 
 const nodeTypes: NodeTypes = {
   workflow: WorkflowNode,
 };
 
 type AppView = "workspace" | "blueprint" | "roles" | "settings";
+type LocalDataStatus = FlowentWorkspaceStore["localDataStatus"];
 
 const nodeLibrary: Array<{
   kind: WorkflowNodeKind;
@@ -237,6 +242,15 @@ function getPresetName(modelPresets: ModelPreset[], presetId: string) {
   );
 }
 
+function hasAvailableModelPreset(
+  modelPresets: ModelPreset[],
+  presetId: string | undefined,
+) {
+  return Boolean(
+    presetId && modelPresets.some((preset) => preset.id === presetId),
+  );
+}
+
 function getRoleNodePosition(nodeCount: number): FlowNode["position"] {
   return {
     x: 220 + nodeCount * 90,
@@ -269,8 +283,11 @@ function FlowentWorkspaceShell() {
     canvasMode,
     modelPresets,
     roles,
+    localDataStatus,
+    localDataMessage,
     selectedNodeIds,
     selectedEdgeIds,
+    loadLocalSettings,
     setSelection,
     applyNodeChanges,
     applyEdgeChanges,
@@ -298,8 +315,11 @@ function FlowentWorkspaceShell() {
       canvasMode: state.canvasMode,
       modelPresets: state.modelPresets,
       roles: state.roles,
+      localDataStatus: state.localDataStatus,
+      localDataMessage: state.localDataMessage,
       selectedNodeIds: state.selectedNodeIds,
       selectedEdgeIds: state.selectedEdgeIds,
+      loadLocalSettings: state.loadLocalSettings,
       setSelection: state.setSelection,
       applyNodeChanges: state.applyNodeChanges,
       applyEdgeChanges: state.applyEdgeChanges,
@@ -350,15 +370,34 @@ function FlowentWorkspaceShell() {
   );
 
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
+  const runBlockReason = useMemo(
+    () =>
+      nodes.some(
+        (node) =>
+          node.data.kind === "agent" &&
+          !hasAvailableModelPreset(modelPresets, node.data.modelPresetId),
+      )
+        ? "Choose models before running"
+        : null,
+    [modelPresets, nodes],
+  );
 
   const clearRunTimers = useCallback(() => {
     runTimers.current.forEach((timer) => window.clearTimeout(timer));
     runTimers.current = [];
   }, []);
 
+  useEffect(() => {
+    void loadLocalSettings();
+  }, [loadLocalSettings]);
+
   useEffect(() => clearRunTimers, [clearRunTimers]);
 
   const runWorkflow = useCallback(() => {
+    if (runBlockReason) {
+      return;
+    }
+
     clearRunTimers();
     startWorkflowRun();
 
@@ -370,7 +409,13 @@ function FlowentWorkspaceShell() {
         finishWorkflowRun();
       }, 1600),
     ];
-  }, [advanceWorkflowRun, clearRunTimers, finishWorkflowRun, startWorkflowRun]);
+  }, [
+    advanceWorkflowRun,
+    clearRunTimers,
+    finishWorkflowRun,
+    runBlockReason,
+    startWorkflowRun,
+  ]);
 
   const returnToBlueprint = useCallback(() => {
     clearRunTimers();
@@ -485,6 +530,7 @@ function FlowentWorkspaceShell() {
                   onSelectionChange={setSelection}
                   onQuickAdd={addQuickNode}
                   onRun={runWorkflow}
+                  runBlockReason={runBlockReason}
                   onReturnToBlueprint={returnToBlueprint}
                   onDeleteSelection={deleteSelection}
                   onFitView={() => fitView({ padding: 0.2, duration: 250 })}
@@ -521,7 +567,10 @@ function FlowentWorkspaceShell() {
               onOpenBlueprint={() => setActiveView("blueprint")}
             />
           ) : activeView === "settings" ? (
-            <SettingsView />
+            <SettingsView
+              localDataStatus={localDataStatus}
+              localDataMessage={localDataMessage}
+            />
           ) : (
             <WorkspaceView
               blueprints={blueprints}
@@ -1005,6 +1054,14 @@ function RoleCard({
         <p className="line-clamp-3 text-sm text-muted-foreground">
           {role.systemPrompt}
         </p>
+        {!hasValidPreset && (
+          <Badge
+            variant="destructive"
+            className="mt-3 h-auto whitespace-normal"
+          >
+            Choose an available model before using this role.
+          </Badge>
+        )}
       </CardContent>
     </Card>
   );
@@ -1027,6 +1084,7 @@ function CanvasWorkspace({
   onSelectionChange,
   onQuickAdd,
   onRun,
+  runBlockReason,
   onReturnToBlueprint,
   onDeleteSelection,
   onFitView,
@@ -1051,6 +1109,7 @@ function CanvasWorkspace({
   onSelectionChange: (nodeIds: string[], edgeIds: string[]) => void;
   onQuickAdd: (kind: WorkflowNodeKind) => void;
   onRun: () => void;
+  runBlockReason: string | null;
   onReturnToBlueprint: () => void;
   onDeleteSelection: () => void;
   onFitView: () => void;
@@ -1090,10 +1149,15 @@ function CanvasWorkspace({
               Edit blueprint
             </Button>
           ) : (
-            <Button onClick={onRun}>
+            <Button disabled={Boolean(runBlockReason)} onClick={onRun}>
               <PlayIcon />
               Run
             </Button>
+          )}
+          {runBlockReason && (
+            <Badge variant="destructive" className="h-auto whitespace-normal">
+              {runBlockReason}
+            </Badge>
           )}
           <Button
             variant="outline"
@@ -1599,8 +1663,13 @@ function AgentProperties({
   modelPresets: ModelPreset[];
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
 }) {
-  const selectedPreset =
-    node.data.modelPresetId ?? modelPresets.at(0)?.id ?? "";
+  const hasSelectedPreset = hasAvailableModelPreset(
+    modelPresets,
+    node.data.modelPresetId,
+  );
+  const selectedPreset = hasSelectedPreset
+    ? (node.data.modelPresetId ?? "")
+    : "";
   const tools = node.data.tools ?? [];
 
   return (
@@ -1619,6 +1688,14 @@ function AgentProperties({
         />
       </Field>
       <Field label="Model Preset" htmlFor="model-preset">
+        {!hasSelectedPreset && (
+          <Badge
+            variant="destructive"
+            className="mb-2 h-auto whitespace-normal"
+          >
+            Choose an available model before running this agent.
+          </Badge>
+        )}
         <Select
           value={selectedPreset}
           disabled={readOnly || modelPresets.length === 0}
@@ -1733,12 +1810,20 @@ function RolesLibrary({
     emptyRole(modelPresets.at(0)?.id),
   );
   const [editingId, setEditingId] = useState<string | null>(null);
+  const firstUsableRole = roles.find((role) =>
+    hasAvailableModelPreset(modelPresets, role.modelPresetId),
+  );
+  const draftHasAvailablePreset = hasAvailableModelPreset(
+    modelPresets,
+    draft.modelPresetId,
+  );
+  const draftPresetValue = draftHasAvailablePreset ? draft.modelPresetId : "";
 
   const saveRole = useCallback(() => {
     if (
       !draft.name.trim() ||
       !draft.systemPrompt.trim() ||
-      !draft.modelPresetId
+      !draftHasAvailablePreset
     ) {
       return;
     }
@@ -1752,7 +1837,7 @@ function RolesLibrary({
     );
     setDraft(emptyRole(modelPresets.at(0)?.id));
     setEditingId(null);
-  }, [draft, editingId, modelPresets, upsertRole]);
+  }, [draft, draftHasAvailablePreset, editingId, modelPresets, upsertRole]);
 
   return (
     <ScrollArea className="h-full">
@@ -1764,12 +1849,12 @@ function RolesLibrary({
           <Button
             onClick={() => {
               addAgentFromRole(
-                roles[0]?.id ?? "",
+                firstUsableRole?.id ?? "",
                 getRoleNodePosition(nodeCount),
               );
               onOpenBlueprint();
             }}
-            disabled={roles.length === 0}
+            disabled={!firstUsableRole}
           >
             <BotIcon />
             Use First Role
@@ -1823,8 +1908,16 @@ function RolesLibrary({
                 />
               </Field>
               <Field label="Default Model Preset" htmlFor="role-model">
+                {!draftHasAvailablePreset && (
+                  <Badge
+                    variant="destructive"
+                    className="mb-2 h-auto whitespace-normal"
+                  >
+                    Choose an available model before using this role.
+                  </Badge>
+                )}
                 <Select
-                  value={draft.modelPresetId}
+                  value={draftPresetValue}
                   onValueChange={(value) => {
                     if (typeof value === "string") {
                       setDraft((currentDraft) => ({
@@ -1891,7 +1984,13 @@ function RolesLibrary({
   );
 }
 
-function SettingsView() {
+function SettingsView({
+  localDataStatus,
+  localDataMessage,
+}: {
+  localDataStatus: LocalDataStatus;
+  localDataMessage: string | null;
+}) {
   const {
     providers,
     modelPresets,
@@ -1914,8 +2013,19 @@ function SettingsView() {
 
   return (
     <section className="flex h-full min-w-0 flex-col gap-6 p-6">
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-semibold">Settings</h1>
+        {(localDataMessage || localDataStatus === "loading") && (
+          <Badge
+            variant={localDataStatus === "error" ? "destructive" : "secondary"}
+            className="h-auto whitespace-normal"
+          >
+            {localDataMessage ??
+              (localDataStatus === "loading"
+                ? "Loading saved settings..."
+                : null)}
+          </Badge>
+        )}
       </div>
       <Tabs defaultValue="providers" className="min-h-0 flex-1">
         <TabsList>
@@ -1925,6 +2035,7 @@ function SettingsView() {
         <TabsContent value="providers" className="min-h-0">
           <ProviderSettings
             providers={providers}
+            modelPresets={modelPresets}
             upsertProvider={upsertProvider}
             deleteProvider={deleteProvider}
           />
@@ -1945,25 +2056,69 @@ function SettingsView() {
 
 function ProviderSettings({
   providers,
+  modelPresets,
   upsertProvider,
   deleteProvider,
 }: {
   providers: Provider[];
-  upsertProvider: (provider: Provider, editingId: string | null) => void;
-  deleteProvider: (providerId: string) => void;
+  modelPresets: ModelPreset[];
+  upsertProvider: (
+    provider: Provider,
+    editingId: string | null,
+  ) => Promise<boolean>;
+  deleteProvider: (providerId: string) => Promise<boolean>;
 }) {
   const [draft, setDraft] = useState<Provider>(emptyProvider);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const saveProvider = useCallback(() => {
     if (!draft.name.trim()) {
       return;
     }
 
-    upsertProvider(draft, editingId);
-    setDraft(emptyProvider());
-    setEditingId(null);
+    setIsSaving(true);
+    void upsertProvider(draft, editingId).then((saved) => {
+      setIsSaving(false);
+
+      if (!saved) {
+        return;
+      }
+
+      setDraft(emptyProvider());
+      setEditingId(null);
+    });
   }, [draft, editingId, upsertProvider]);
+
+  const confirmAndDeleteProvider = useCallback(
+    (provider: Provider) => {
+      const dependentPresetCount = modelPresets.filter(
+        (preset) => preset.providerId === provider.id,
+      ).length;
+      const confirmed =
+        dependentPresetCount === 0 ||
+        window.confirm(
+          `${provider.name} is used by ${dependentPresetCount} model preset${
+            dependentPresetCount === 1 ? "" : "s"
+          }. Delete it and remove those presets?`,
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setIsSaving(true);
+      void deleteProvider(provider.id).then((saved) => {
+        setIsSaving(false);
+
+        if (saved && editingId === provider.id) {
+          setDraft(emptyProvider());
+          setEditingId(null);
+        }
+      });
+    },
+    [deleteProvider, editingId, modelPresets],
+  );
 
   return (
     <ScrollArea className="h-[calc(100dvh-10rem)]">
@@ -1988,7 +2143,8 @@ function ProviderSettings({
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`Delete ${provider.name}`}
-                    onClick={() => deleteProvider(provider.id)}
+                    disabled={isSaving}
+                    onClick={() => confirmAndDeleteProvider(provider)}
                   >
                     <Trash2Icon />
                   </Button>
@@ -2069,7 +2225,7 @@ function ProviderSettings({
               />
             </Field>
             <div className="flex gap-2">
-              <Button onClick={saveProvider}>
+              <Button disabled={isSaving} onClick={saveProvider}>
                 <PlusIcon />
                 {editingId ? "Save Provider" : "Add Provider"}
               </Button>
@@ -2104,23 +2260,32 @@ function PresetSettings({
   upsertModelPreset: (
     modelPreset: ModelPreset,
     editingId: string | null,
-  ) => void;
-  deleteModelPreset: (presetId: string) => void;
+  ) => Promise<boolean>;
+  deleteModelPreset: (presetId: string) => Promise<boolean>;
   testModelPreset: (presetId: string) => void;
 }) {
   const [draft, setDraft] = useState<ModelPreset>(() =>
     emptyPreset(providers.at(0)?.id),
   );
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const savePreset = useCallback(() => {
     if (!draft.name.trim() || !draft.providerId || !draft.modelId.trim()) {
       return;
     }
 
-    upsertModelPreset(draft, editingId);
-    setDraft(emptyPreset(providers.at(0)?.id));
-    setEditingId(null);
+    setIsSaving(true);
+    void upsertModelPreset(draft, editingId).then((saved) => {
+      setIsSaving(false);
+
+      if (!saved) {
+        return;
+      }
+
+      setDraft(emptyPreset(providers.at(0)?.id));
+      setEditingId(null);
+    });
   }, [draft, editingId, providers, upsertModelPreset]);
 
   return (
@@ -2154,7 +2319,18 @@ function PresetSettings({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Delete ${preset.name}`}
-                      onClick={() => deleteModelPreset(preset.id)}
+                      disabled={isSaving}
+                      onClick={() => {
+                        setIsSaving(true);
+                        void deleteModelPreset(preset.id).then((saved) => {
+                          setIsSaving(false);
+
+                          if (saved && editingId === preset.id) {
+                            setEditingId(null);
+                            setDraft(emptyPreset(providers.at(0)?.id));
+                          }
+                        });
+                      }}
                     >
                       <Trash2Icon />
                     </Button>
@@ -2284,7 +2460,7 @@ function PresetSettings({
               />
             </Field>
             <div className="flex gap-2">
-              <Button onClick={savePreset}>
+              <Button disabled={isSaving} onClick={savePreset}>
                 <GitBranchIcon />
                 {editingId ? "Save Preset" : "Add Preset"}
               </Button>

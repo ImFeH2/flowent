@@ -1,5 +1,5 @@
 import type { EdgeChange, NodeChange } from "@xyflow/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   canvasSnapGrid,
@@ -47,6 +47,9 @@ function resetStore() {
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
     nextNodeIndex: 3,
+    localDataStatus: "ready",
+    localDataMessage: null,
+    hasLoadedLocalData: false,
   });
 }
 
@@ -67,8 +70,29 @@ function expectGridPosition(position: FlowNode["position"]) {
   expect(position.y % canvasSnapGrid[1]).toBe(0);
 }
 
+function mockSuccessfulSettingsSave() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+      const body =
+        typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ saved: true, settings: body?.settings }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      );
+    }),
+  );
+}
+
 describe("useFlowentWorkspaceStore", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     resetStore();
   });
 
@@ -87,6 +111,110 @@ describe("useFlowentWorkspaceStore", () => {
     });
     expect(state.nodes).toHaveLength(initialNodes.length);
     expect(state.edges).toHaveLength(initialEdges.length);
+  });
+
+  it("loads saved local settings into the workspace", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              saved: true,
+              settings: {
+                providers: [
+                  {
+                    id: "provider-custom-saved",
+                    type: "custom",
+                    name: "Saved Gateway",
+                    apiKey: "saved-key",
+                    baseUrl: "http://localhost:4400/v1",
+                  },
+                ],
+                modelPresets: [
+                  {
+                    id: "preset-saved",
+                    name: "Saved Model",
+                    providerId: "provider-custom-saved",
+                    modelId: "gpt-4.1",
+                    temperature: 0.4,
+                    maxTokens: 900,
+                  },
+                ],
+                blueprints: [
+                  {
+                    ...initialBlueprints[0],
+                    id: "blueprint-saved",
+                    name: "Saved Blueprint",
+                  },
+                ],
+                roles: [
+                  {
+                    id: "role-saved",
+                    name: "Saved Role",
+                    avatar: "SR",
+                    systemPrompt: "Use the saved model.",
+                    modelPresetId: "preset-saved",
+                  },
+                ],
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        ),
+      ),
+    );
+
+    await useFlowentWorkspaceStore.getState().loadLocalSettings();
+
+    const state = useFlowentWorkspaceStore.getState();
+
+    expect(state.localDataStatus).toBe("ready");
+    expect(state.providers[0]?.name).toBe("Saved Gateway");
+    expect(state.modelPresets[0]?.name).toBe("Saved Model");
+    expect(state.blueprints[0]?.name).toBe("Saved Blueprint");
+    expect(state.activeBlueprintId).toBe("blueprint-saved");
+    expect(state.roles[0]?.name).toBe("Saved Role");
+  });
+
+  it("keeps settings unchanged when a local save fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ error: "Settings could not be saved." }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        ),
+      ),
+    );
+
+    const saved = await useFlowentWorkspaceStore.getState().upsertProvider(
+      {
+        id: "",
+        type: "custom",
+        name: "Unsaved Gateway",
+        apiKey: "new-key",
+        baseUrl: "http://localhost:4500/v1",
+      },
+      null,
+    );
+
+    const state = useFlowentWorkspaceStore.getState();
+
+    expect(saved).toBe(false);
+    expect(
+      state.providers.some((provider) => provider.name === "Unsaved Gateway"),
+    ).toBe(false);
+    expect(state.localDataStatus).toBe("error");
+    expect(state.localDataMessage).toBe("Settings could not be saved.");
   });
 
   it("creates a blank blueprint and makes it current", () => {
@@ -273,6 +401,25 @@ describe("useFlowentWorkspaceStore", () => {
     ]);
     expect(getNode("agent-2").data.runDetails).toBeUndefined();
     expect(state.edges.every((edge) => edge.animated)).toBe(true);
+  });
+
+  it("keeps deleted model references visible for reselection", async () => {
+    mockSuccessfulSettingsSave();
+
+    await useFlowentWorkspaceStore
+      .getState()
+      .deleteModelPreset("preset-writing");
+
+    const state = useFlowentWorkspaceStore.getState();
+
+    expect(
+      state.modelPresets.some((preset) => preset.id === "preset-writing"),
+    ).toBe(false);
+    expect(getNode("agent-1").data.modelPresetId).toBe("preset-writing");
+    expect(
+      state.roles.find((role) => role.id === "role-product-copywriter")
+        ?.modelPresetId,
+    ).toBe("preset-writing");
   });
 
   it("returns to blueprint mode with run presentation cleared", () => {

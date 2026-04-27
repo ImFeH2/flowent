@@ -19,9 +19,12 @@ import {
   ChevronRightIcon,
   CopyIcon,
   GitBranchIcon,
+  LockIcon,
   PanelRightIcon,
+  PencilIcon,
   PlayIcon,
   PlusIcon,
+  RotateCcwIcon,
   SettingsIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -63,6 +66,7 @@ import { cn } from "@/lib/utils";
 import {
   availableTools,
   providerTypeLabels,
+  type CanvasMode,
   type FlowEdge,
   type FlowNode,
   type ModelPreset,
@@ -194,6 +198,7 @@ function FlowentWorkspaceShell() {
   const {
     nodes,
     edges,
+    canvasMode,
     modelPresets,
     roles,
     selectedNodeIds,
@@ -213,10 +218,12 @@ function FlowentWorkspaceShell() {
     startWorkflowRun,
     advanceWorkflowRun,
     finishWorkflowRun,
+    returnToBlueprintMode,
   } = useFlowentWorkspaceStore(
     useShallow((state) => ({
       nodes: state.nodes,
       edges: state.edges,
+      canvasMode: state.canvasMode,
       modelPresets: state.modelPresets,
       roles: state.roles,
       selectedNodeIds: state.selectedNodeIds,
@@ -236,6 +243,7 @@ function FlowentWorkspaceShell() {
       startWorkflowRun: state.startWorkflowRun,
       advanceWorkflowRun: state.advanceWorkflowRun,
       finishWorkflowRun: state.finishWorkflowRun,
+      returnToBlueprintMode: state.returnToBlueprintMode,
     })),
   );
 
@@ -245,10 +253,11 @@ function FlowentWorkspaceShell() {
         ...node,
         data: {
           ...node.data,
+          canvasMode,
           modelPresets,
         },
       })),
-    [modelPresets, nodes],
+    [canvasMode, modelPresets, nodes],
   );
 
   const selectedNodes = useMemo(
@@ -279,17 +288,32 @@ function FlowentWorkspaceShell() {
     ];
   }, [advanceWorkflowRun, clearRunTimers, finishWorkflowRun, startWorkflowRun]);
 
+  const returnToBlueprint = useCallback(() => {
+    clearRunTimers();
+    returnToBlueprintMode();
+  }, [clearRunTimers, returnToBlueprintMode]);
+
   const onDragStart = useCallback(
     (event: React.DragEvent<HTMLButtonElement>, kind: WorkflowNodeKind) => {
+      if (canvasMode === "workflow") {
+        event.preventDefault();
+        return;
+      }
+
       event.dataTransfer.setData("application/flowent-node", kind);
       event.dataTransfer.effectAllowed = "copy";
     },
-    [],
+    [canvasMode],
   );
 
   const onDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+
+      if (canvasMode === "workflow") {
+        return;
+      }
+
       const kind = event.dataTransfer.getData("application/flowent-node");
 
       if (!isWorkflowNodeKind(kind)) {
@@ -301,18 +325,23 @@ function FlowentWorkspaceShell() {
         screenToFlowPosition({ x: event.clientX, y: event.clientY }),
       );
     },
-    [addWorkflowNode, screenToFlowPosition],
+    [addWorkflowNode, canvasMode, screenToFlowPosition],
   );
 
   const onPaneContextMenu = useCallback(
     (event: React.MouseEvent | MouseEvent) => {
       event.preventDefault();
+
+      if (canvasMode === "workflow") {
+        return;
+      }
+
       addWorkflowNode(
         "agent",
         screenToFlowPosition({ x: event.clientX, y: event.clientY }),
       );
     },
-    [addWorkflowNode, screenToFlowPosition],
+    [addWorkflowNode, canvasMode, screenToFlowPosition],
   );
 
   return (
@@ -332,10 +361,11 @@ function FlowentWorkspaceShell() {
         />
         <div className="min-w-0 flex-1">
           {activeView === "canvas" ? (
-            <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
+            <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
               <CanvasWorkspace
                 nodes={nodesWithContext}
                 edges={edges}
+                canvasMode={canvasMode}
                 selectedNodeIds={selectedNodeIds}
                 selectedEdgeIds={selectedEdgeIds}
                 onNodesChange={applyNodeChanges}
@@ -348,6 +378,7 @@ function FlowentWorkspaceShell() {
                 onSelectionChange={setSelection}
                 onQuickAdd={addQuickNode}
                 onRun={runWorkflow}
+                onReturnToBlueprint={returnToBlueprint}
                 onDeleteSelection={deleteSelection}
                 onFitView={() => fitView({ padding: 0.2, duration: 250 })}
                 onResetViewport={() =>
@@ -360,6 +391,7 @@ function FlowentWorkspaceShell() {
                   selectedCount={
                     selectedNodeIds.length + selectedEdgeIds.length
                   }
+                  canvasMode={canvasMode}
                   modelPresets={modelPresets}
                   updateNodeData={updateNodeData}
                 />
@@ -643,6 +675,7 @@ function RoleCard({
 function CanvasWorkspace({
   nodes,
   edges,
+  canvasMode,
   selectedNodeIds,
   selectedEdgeIds,
   onNodesChange,
@@ -655,12 +688,14 @@ function CanvasWorkspace({
   onSelectionChange,
   onQuickAdd,
   onRun,
+  onReturnToBlueprint,
   onDeleteSelection,
   onFitView,
   onResetViewport,
 }: {
   nodes: FlowNode[];
   edges: FlowEdge[];
+  canvasMode: CanvasMode;
   selectedNodeIds: string[];
   selectedEdgeIds: string[];
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
@@ -676,30 +711,58 @@ function CanvasWorkspace({
   onSelectionChange: (nodeIds: string[], edgeIds: string[]) => void;
   onQuickAdd: (kind: WorkflowNodeKind) => void;
   onRun: () => void;
+  onReturnToBlueprint: () => void;
   onDeleteSelection: () => void;
   onFitView: () => void;
   onResetViewport: () => void;
 }) {
+  const isWorkflowMode = canvasMode === "workflow";
+
   return (
     <section className="flex min-h-0 min-w-0 flex-col bg-background">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="truncate text-xl font-medium">
             Launch Campaign Workflow
           </h2>
+          <Badge variant={isWorkflowMode ? "default" : "secondary"}>
+            {isWorkflowMode ? (
+              <>
+                <LockIcon className="size-3.5" />
+                Workflow Mode
+              </>
+            ) : (
+              <>
+                <PencilIcon className="size-3.5" />
+                Blueprint Mode
+              </>
+            )}
+          </Badge>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <NodeLibrary onDragStart={onDragStart} onQuickAdd={onQuickAdd} />
+          <NodeLibrary
+            disabled={isWorkflowMode}
+            onDragStart={onDragStart}
+            onQuickAdd={onQuickAdd}
+          />
           <Separator orientation="vertical" className="hidden h-7 sm:block" />
-          <Button onClick={onRun}>
-            <PlayIcon />
-            Run
-          </Button>
+          {isWorkflowMode ? (
+            <Button variant="outline" onClick={onReturnToBlueprint}>
+              <RotateCcwIcon />
+              Back to Blueprint
+            </Button>
+          ) : (
+            <Button onClick={onRun}>
+              <PlayIcon />
+              Run
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={onDeleteSelection}
             disabled={
-              selectedNodeIds.length === 0 && selectedEdgeIds.length === 0
+              isWorkflowMode ||
+              (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0)
             }
           >
             <Trash2Icon />
@@ -723,7 +786,11 @@ function CanvasWorkspace({
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onDrop={onDrop}
-          onDragOver={(event) => event.preventDefault()}
+          onDragOver={(event) => {
+            if (!isWorkflowMode) {
+              event.preventDefault();
+            }
+          }}
           onPaneContextMenu={onPaneContextMenu}
           onNodesDelete={onNodesDelete}
           onSelectionChange={({
@@ -737,8 +804,11 @@ function CanvasWorkspace({
           }}
           isValidConnection={isValidConnection}
           fitView
+          nodesDraggable={!isWorkflowMode}
+          nodesConnectable={!isWorkflowMode}
+          edgesReconnectable={!isWorkflowMode}
           multiSelectionKeyCode="Shift"
-          deleteKeyCode={["Backspace", "Delete"]}
+          deleteKeyCode={isWorkflowMode ? null : ["Backspace", "Delete"]}
           selectionOnDrag
         >
           <Background gap={20} size={1} />
@@ -758,9 +828,11 @@ function CanvasWorkspace({
 }
 
 function NodeLibrary({
+  disabled,
   onDragStart,
   onQuickAdd,
 }: {
+  disabled: boolean;
   onDragStart: (
     event: React.DragEvent<HTMLButtonElement>,
     kind: WorkflowNodeKind,
@@ -776,7 +848,8 @@ function NodeLibrary({
           <div key={item.kind} className="flex items-center gap-1">
             <Button
               variant="outline"
-              draggable
+              disabled={disabled}
+              draggable={!disabled}
               title={item.subtitle}
               onDragStart={(event) => onDragStart(event, item.kind)}
             >
@@ -787,6 +860,7 @@ function NodeLibrary({
               variant="ghost"
               size="icon-sm"
               aria-label={`Add ${item.title}`}
+              disabled={disabled}
               onClick={() => onQuickAdd(item.kind)}
             >
               <PlusIcon />
@@ -801,30 +875,42 @@ function NodeLibrary({
 function PropertyPanel({
   selectedNode,
   selectedCount,
+  canvasMode,
   modelPresets,
   updateNodeData,
 }: {
   selectedNode: FlowNode | null;
   selectedCount: number;
+  canvasMode: CanvasMode;
   modelPresets: ModelPreset[];
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
 }) {
+  const readOnly = canvasMode === "workflow";
+
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4 p-4">
-        <div>
+        <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-medium">Properties</h2>
+          {readOnly && (
+            <Badge variant="outline">
+              <LockIcon className="size-3.5" />
+              Read-only
+            </Badge>
+          )}
         </div>
         <Separator />
         {selectedNode ? (
           selectedNode.data.kind === "trigger" ? (
             <TriggerProperties
               node={selectedNode}
+              readOnly={readOnly}
               updateNodeData={updateNodeData}
             />
           ) : (
             <AgentProperties
               node={selectedNode}
+              readOnly={readOnly}
               modelPresets={modelPresets}
               updateNodeData={updateNodeData}
             />
@@ -842,9 +928,11 @@ function PropertyPanel({
 
 function TriggerProperties({
   node,
+  readOnly,
   updateNodeData,
 }: {
   node: FlowNode;
+  readOnly: boolean;
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
 }) {
   const mode = node.data.triggerMode ?? "manual";
@@ -855,6 +943,7 @@ function TriggerProperties({
         <Input
           id="trigger-name"
           value={node.data.title}
+          disabled={readOnly}
           onChange={(event) =>
             updateNodeData(node.id, { title: event.target.value })
           }
@@ -863,6 +952,7 @@ function TriggerProperties({
       <Field label="Trigger Type" htmlFor="trigger-type">
         <Select
           value={mode}
+          disabled={readOnly}
           onValueChange={(value) =>
             updateNodeData(node.id, { triggerMode: value as TriggerMode })
           }
@@ -890,6 +980,7 @@ function TriggerProperties({
           <Textarea
             id="initial-payload"
             value={node.data.initialPayload ?? ""}
+            disabled={readOnly}
             onChange={(event) =>
               updateNodeData(node.id, { initialPayload: event.target.value })
             }
@@ -901,6 +992,7 @@ function TriggerProperties({
           <Input
             id="cron-expression"
             value={node.data.cronExpression ?? ""}
+            disabled={readOnly}
             onChange={(event) =>
               updateNodeData(node.id, { cronExpression: event.target.value })
             }
@@ -912,6 +1004,7 @@ function TriggerProperties({
           <div className="flex gap-2">
             <Input
               id="webhook-url"
+              disabled={readOnly}
               readOnly
               value={node.data.webhookUrl ?? ""}
             />
@@ -919,6 +1012,7 @@ function TriggerProperties({
               variant="outline"
               size="icon"
               aria-label="Copy webhook URL"
+              disabled={readOnly}
               onClick={() =>
                 navigator.clipboard?.writeText(node.data.webhookUrl ?? "")
               }
@@ -934,10 +1028,12 @@ function TriggerProperties({
 
 function AgentProperties({
   node,
+  readOnly,
   modelPresets,
   updateNodeData,
 }: {
   node: FlowNode;
+  readOnly: boolean;
   modelPresets: ModelPreset[];
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
 }) {
@@ -951,6 +1047,7 @@ function AgentProperties({
         <Input
           id="agent-name"
           value={node.data.title}
+          disabled={readOnly}
           onChange={(event) =>
             updateNodeData(node.id, {
               title: event.target.value,
@@ -962,12 +1059,12 @@ function AgentProperties({
       <Field label="Model Preset" htmlFor="model-preset">
         <Select
           value={selectedPreset}
+          disabled={readOnly || modelPresets.length === 0}
           onValueChange={(value) => {
             if (typeof value === "string") {
               updateNodeData(node.id, { modelPresetId: value });
             }
           }}
-          disabled={modelPresets.length === 0}
         >
           <SelectTrigger id="model-preset" className="w-full">
             <SelectValue placeholder="Select model preset">
@@ -991,6 +1088,7 @@ function AgentProperties({
           id="system-prompt"
           className="min-h-36"
           value={node.data.systemPrompt ?? ""}
+          disabled={readOnly}
           onChange={(event) =>
             updateNodeData(node.id, { systemPrompt: event.target.value })
           }
@@ -1005,6 +1103,7 @@ function AgentProperties({
           >
             <Checkbox
               checked={tools.includes(tool.id)}
+              disabled={readOnly}
               onCheckedChange={(checked) => {
                 updateNodeData(node.id, {
                   tools: checked
@@ -1017,7 +1116,7 @@ function AgentProperties({
           </label>
         ))}
       </div>
-      {node.data.status === "error" && node.data.errorMessage && (
+      {readOnly && node.data.status === "error" && node.data.errorMessage && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
           {node.data.errorMessage}
         </div>

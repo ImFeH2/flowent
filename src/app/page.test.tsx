@@ -17,6 +17,7 @@ type MockNode = {
   data: {
     title?: string;
     status?: string;
+    canvasMode?: string;
   };
 };
 
@@ -44,17 +45,32 @@ vi.mock("@xyflow/react", async () => {
       children,
       nodes = [],
       edges = [],
+      nodesDraggable,
     }: {
       children?: ReactNode;
       nodes?: MockNode[];
       edges?: MockEdge[];
+      nodesDraggable?: boolean;
     }) {
+      const statusLabels: Record<string, string> = {
+        idle: "Idle",
+        pending: "Pending",
+        running: "Thinking",
+        success: "Success",
+        error: "Error",
+      };
+
       return (
-        <div data-testid="workflow-canvas">
+        <div
+          data-read-only={nodesDraggable === false ? "true" : "false"}
+          data-testid="workflow-canvas"
+        >
           {nodes.map((node) => (
             <div key={node.id}>
               <span>{node.data.title}</span>
-              <span>{node.data.status}</span>
+              {node.data.canvasMode === "workflow" && node.data.status && (
+                <span>{statusLabels[node.data.status]}</span>
+              )}
             </div>
           ))}
           {edges.map((edge) => (
@@ -176,20 +192,43 @@ describe("Home", () => {
     expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
     expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
     expect(screen.getAllByText("Properties").length).toBeGreaterThan(0);
+    expect(screen.getByText("Blueprint Mode")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Copywriter")).toBeInTheDocument();
     expect(screen.getByLabelText("System Prompt")).toBeInTheDocument();
     expect(screen.getByText("Model Preset")).toBeInTheDocument();
+    expect(screen.queryByText("Idle")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("Success")).not.toBeInTheDocument();
   });
 
-  it("shows run state feedback on nodes", () => {
+  it("locks the canvas and shows run state feedback in workflow mode", () => {
     render(<Home />);
 
     fireEvent.click(screen.getByRole("button", { name: "Open Canvas" }));
     fireEvent.click(screen.getByRole("button", { name: /^Run$/ }));
 
-    expect(screen.getAllByText("success").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("running").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("pending").length).toBeGreaterThan(0);
+    expect(screen.getByText("Workflow Mode")).toBeInTheDocument();
+    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
+      "data-read-only",
+      "true",
+    );
+    expect(screen.getByDisplayValue("Copywriter")).toBeDisabled();
+    expect(screen.getByLabelText("System Prompt")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(screen.getAllByText("Success").length).toBeGreaterThan(0);
+    expect(screen.getByText("Thinking")).toBeInTheDocument();
+    expect(screen.getByText("Pending")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to Blueprint" }));
+
+    expect(screen.getByText("Blueprint Mode")).toBeInTheDocument();
+    expect(screen.queryByText("Read-only")).not.toBeInTheDocument();
+    expect(screen.queryByText("Success")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("Copywriter")).not.toBeDisabled();
   });
 
   it("opens the roles library", () => {

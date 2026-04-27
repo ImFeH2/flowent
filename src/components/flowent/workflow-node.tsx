@@ -39,15 +39,16 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
   const StatusIcon = statusIcon[data.status];
   const TriggerIcon = triggerIcon[data.triggerMode ?? "manual"];
   const isTrigger = data.kind === "trigger";
+  const showRunStatus = data.canvasMode === "workflow";
 
   return (
     <Card
       className={cn(
         "w-72 border bg-card/95 shadow-md transition-colors",
         selected && "border-ring ring-2 ring-ring/30",
-        data.status === "running" && "border-primary/70",
-        data.status === "success" && "border-chart-2/70",
-        data.status === "error" && "border-destructive/80",
+        showRunStatus && data.status === "running" && "border-primary/70",
+        showRunStatus && data.status === "success" && "border-chart-2/70",
+        showRunStatus && data.status === "error" && "border-destructive/80",
       )}
     >
       {!isTrigger && (
@@ -73,15 +74,17 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
             <div className="truncate text-lg font-medium">{data.title}</div>
           </div>
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <Badge
-            variant={data.status === "error" ? "destructive" : "secondary"}
-            className="gap-1.5 px-3 py-1 text-sm"
-          >
-            <StatusIcon className="size-4" />
-            {runStatusLabels[data.status]}
-          </Badge>
-        </div>
+        {showRunStatus && (
+          <div className="flex items-center justify-between gap-2">
+            <Badge
+              variant={data.status === "error" ? "destructive" : "secondary"}
+              className="gap-1.5 px-3 py-1 text-sm"
+            >
+              <StatusIcon className="size-4" />
+              {runStatusLabels[data.status]}
+            </Badge>
+          </div>
+        )}
       </CardContent>
       <Handle
         id="output"

@@ -65,6 +65,19 @@ function getNode(nodeId: string) {
   return node;
 }
 
+function getActiveBlueprint() {
+  const state = useFlowentWorkspaceStore.getState();
+  const blueprint = state.blueprints.find(
+    (item) => item.id === state.activeBlueprintId,
+  );
+
+  if (!blueprint) {
+    throw new Error("Missing active blueprint");
+  }
+
+  return blueprint;
+}
+
 function expectGridPosition(position: FlowNode["position"]) {
   expect(position.x % canvasSnapGrid[0]).toBe(0);
   expect(position.y % canvasSnapGrid[1]).toBe(0);
@@ -178,6 +191,97 @@ describe("useFlowentWorkspaceStore", () => {
     expect(state.blueprints[0]?.name).toBe("Saved Blueprint");
     expect(state.activeBlueprintId).toBe("blueprint-saved");
     expect(state.roles[0]?.name).toBe("Saved Role");
+    expect(state.blueprints[0]?.runHistory).toEqual([]);
+    expect(state.blueprints[0]?.selectedRunId).toBeNull();
+    expect(state.canvasMode).toBe("blueprint");
+  });
+
+  it("loads saved run history while returning to edit mode", async () => {
+    const savedRun = {
+      id: "run-saved",
+      startedAt: "2026-04-27T10:00:00.000Z",
+      updatedAt: "2026-04-27T10:01:00.000Z",
+      status: "success",
+      summary: "Saved run completed.",
+      nodes: cloneNodes(initialNodes).map((node) => ({
+        ...node,
+        data: { ...node.data, status: "success" as const },
+      })),
+      edges: cloneEdges(initialEdges).map((edge) => ({
+        ...edge,
+        animated: false,
+      })),
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              saved: true,
+              settings: {
+                providers: initialProviders,
+                modelPresets: initialModelPresets,
+                blueprints: [
+                  {
+                    ...initialBlueprints[0],
+                    runHistory: [savedRun],
+                    selectedRunId: savedRun.id,
+                  },
+                ],
+                roles: initialRoles,
+              },
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        ),
+      ),
+    );
+
+    await useFlowentWorkspaceStore.getState().loadLocalSettings();
+
+    const state = useFlowentWorkspaceStore.getState();
+    const activeBlueprint = getActiveBlueprint();
+
+    expect(state.canvasMode).toBe("blueprint");
+    expect(state.nodes.every((node) => node.data.status === "idle")).toBe(true);
+    expect(activeBlueprint.runHistory).toEqual([savedRun]);
+    expect(activeBlueprint.selectedRunId).toBe(savedRun.id);
+  });
+
+  it("saves run history and the selected run with local settings", () => {
+    const fetchMock = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
+      const body =
+        typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+
+      return Promise.resolve(
+        new Response(JSON.stringify({ saved: true, settings: body.settings }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    useFlowentWorkspaceStore.setState({ hasLoadedLocalData: true });
+
+    useFlowentWorkspaceStore.getState().startWorkflowRun();
+
+    const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string);
+    const savedBlueprint = body.settings.blueprints.find(
+      (blueprint: { id: string }) => blueprint.id === getActiveBlueprint().id,
+    );
+
+    expect(savedBlueprint.runHistory).toHaveLength(1);
+    expect(savedBlueprint.selectedRunId).toBe(savedBlueprint.runHistory[0].id);
+    expect(savedBlueprint.runHistory[0]).toMatchObject({
+      status: "running",
+      summary: "Run started.",
+    });
   });
 
   it("keeps settings unchanged when a local save fails", async () => {
@@ -401,6 +505,135 @@ describe("useFlowentWorkspaceStore", () => {
     ]);
     expect(getNode("agent-2").data.runDetails).toBeUndefined();
     expect(state.edges.every((edge) => edge.animated)).toBe(true);
+  });
+
+  it("adds new runs to the top of the current blueprint history and selects them", () => {
+    const store = useFlowentWorkspaceStore.getState();
+
+    store.startWorkflowRun();
+    const firstRunId = getActiveBlueprint().selectedRunId;
+
+    store.finishWorkflowRun();
+    store.startWorkflowRun();
+
+    const state = useFlowentWorkspaceStore.getState();
+    const activeBlueprint = getActiveBlueprint();
+
+    expect(activeBlueprint.runHistory).toHaveLength(2);
+    expect(activeBlueprint.runHistory[0]?.id).not.toBe(firstRunId);
+    expect(activeBlueprint.runHistory[1]?.id).toBe(firstRunId);
+    expect(activeBlueprint.selectedRunId).toBe(
+      activeBlueprint.runHistory[0]?.id,
+    );
+    expect(state.canvasMode).toBe("workflow");
+    expect(state.nodes).toEqual(activeBlueprint.runHistory[0]?.nodes);
+    expect(state.edges).toEqual(activeBlueprint.runHistory[0]?.edges);
+  });
+
+  it("keeps run history isolated per blueprint", () => {
+    const store = useFlowentWorkspaceStore.getState();
+    const firstBlueprintId = getActiveBlueprint().id;
+
+    store.startWorkflowRun();
+    const firstRunId = getActiveBlueprint().selectedRunId;
+    const secondBlueprintId = store.createBlueprint("Second Blueprint");
+
+    useFlowentWorkspaceStore.getState().startWorkflowRun();
+
+    const state = useFlowentWorkspaceStore.getState();
+    const firstBlueprint = state.blueprints.find(
+      (blueprint) => blueprint.id === firstBlueprintId,
+    );
+    const secondBlueprint = state.blueprints.find(
+      (blueprint) => blueprint.id === secondBlueprintId,
+    );
+
+    expect(firstBlueprint?.runHistory.map((run) => run.id)).toEqual([
+      firstRunId,
+    ]);
+    expect(secondBlueprint?.runHistory).toHaveLength(1);
+    expect(secondBlueprint?.runHistory[0]?.id).not.toBe(firstRunId);
+
+    useFlowentWorkspaceStore.getState().openBlueprint(firstBlueprintId);
+
+    expect(getActiveBlueprint().runHistory.map((run) => run.id)).toEqual([
+      firstRunId,
+    ]);
+    expect(useFlowentWorkspaceStore.getState().canvasMode).toBe("blueprint");
+  });
+
+  it("selects historical runs with matching node details", () => {
+    const store = useFlowentWorkspaceStore.getState();
+
+    store.updateNodeData("trigger-1", {
+      initialPayload: "First payload",
+    });
+    store.startWorkflowRun();
+    store.finishWorkflowRun();
+    store.returnToBlueprintMode();
+    store.updateNodeData("trigger-1", {
+      initialPayload: "Second payload",
+    });
+    store.startWorkflowRun();
+    store.finishWorkflowRun();
+
+    const [secondRun, firstRun] = getActiveBlueprint().runHistory;
+
+    if (!firstRun || !secondRun) {
+      throw new Error("Missing run history");
+    }
+
+    store.setSelection(["agent-1"], []);
+    store.selectWorkflowRun(firstRun.id);
+
+    const firstDetails = getNode("agent-1").data.runDetails;
+    expect(useFlowentWorkspaceStore.getState().selectedNodeIds).toEqual([
+      "agent-1",
+    ]);
+    expect(firstDetails?.kind).toBe("agent");
+    if (firstDetails?.kind !== "agent") {
+      throw new Error("Missing first run details");
+    }
+    expect(firstDetails.inputPayload).toBe("First payload");
+
+    store.selectWorkflowRun(secondRun.id);
+
+    const secondDetails = getNode("agent-1").data.runDetails;
+    expect(secondDetails?.kind).toBe("agent");
+    if (secondDetails?.kind !== "agent") {
+      throw new Error("Missing second run details");
+    }
+    expect(secondDetails.inputPayload).toBe("Second payload");
+  });
+
+  it("returns to the editable blueprint without saving run snapshots into it", () => {
+    const store = useFlowentWorkspaceStore.getState();
+
+    store.startWorkflowRun();
+    store.finishWorkflowRun();
+
+    const runSnapshot = getActiveBlueprint().runHistory[0];
+
+    expect(
+      runSnapshot?.nodes.every((node) => node.data.status === "success"),
+    ).toBe(true);
+
+    store.returnToBlueprintMode();
+
+    const state = useFlowentWorkspaceStore.getState();
+    const activeBlueprint = getActiveBlueprint();
+
+    expect(state.canvasMode).toBe("blueprint");
+    expect(
+      activeBlueprint.nodes.every((node) => node.data.status === "idle"),
+    ).toBe(true);
+    expect(activeBlueprint.nodes.every((node) => !node.data.runDetails)).toBe(
+      true,
+    );
+    expect(state.nodes.every((node) => node.data.status === "idle")).toBe(true);
+    expect(state.nodes.every((node) => !node.data.runDetails)).toBe(true);
+    expect(state.edges.every((edge) => edge.animated === false)).toBe(true);
+    expect(activeBlueprint.runHistory[0]?.nodes).toEqual(runSnapshot?.nodes);
   });
 
   it("keeps deleted model references visible for reselection", async () => {

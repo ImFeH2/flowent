@@ -52,6 +52,8 @@ function createSettingsSnapshot() {
         summary: "Draft launch copy.",
         nodes: [],
         edges: [],
+        runHistory: [],
+        selectedRunId: null,
       },
     ],
     roles: [
@@ -136,6 +138,65 @@ describe("local settings store", () => {
       parseLocalSettingsSnapshot({
         providers: [],
         modelPresets: [{ id: "preset-writing" }],
+      }),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("normalizes older blueprints that do not have run history", () => {
+    expect(
+      parseLocalSettingsSnapshot({
+        providers: [],
+        modelPresets: [],
+        blueprints: [
+          {
+            id: "blueprint-old",
+            name: "Old Blueprint",
+            updatedAt: "2026-04-27T09:00:00.000Z",
+            lastRunStatus: "not-run",
+            summary: "Saved before run history.",
+            nodes: [],
+            edges: [],
+          },
+        ],
+        roles: [],
+      }),
+    ).toMatchObject({
+      ok: true,
+      settings: {
+        blueprints: [
+          {
+            runHistory: [],
+            selectedRunId: null,
+          },
+        ],
+      },
+    });
+  });
+
+  it("rejects malformed run history data", () => {
+    expect(
+      parseLocalSettingsSnapshot({
+        providers: [],
+        modelPresets: [],
+        blueprints: [
+          {
+            id: "blueprint-launch",
+            name: "Launch Campaign",
+            updatedAt: "2026-04-27T09:00:00.000Z",
+            lastRunStatus: "success",
+            summary: "Draft launch copy.",
+            nodes: [],
+            edges: [],
+            runHistory: [
+              {
+                id: "run-broken",
+                status: "not-run",
+              },
+            ],
+            selectedRunId: "run-broken",
+          },
+        ],
+        roles: [],
       }),
     ).toMatchObject({ ok: false });
   });

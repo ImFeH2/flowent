@@ -7,6 +7,7 @@ import type {
   ModelPreset,
   Provider,
   Role,
+  WorkflowRun,
 } from "@/components/flowent/model";
 
 const localDataDirectoryName = ".flowent";
@@ -21,6 +22,7 @@ const blueprintLastRunStatuses = new Set([
   "success",
   "error",
 ]);
+const workflowRunStatuses = new Set(["running", "success", "error"]);
 
 export type LocalSettingsSnapshot = {
   version: typeof localSettingsVersion;
@@ -129,19 +131,72 @@ function isPlainJsonValue(value: unknown): boolean {
   return false;
 }
 
-function isBlueprintAsset(value: unknown): value is BlueprintAsset {
+function isWorkflowRun(value: unknown): value is WorkflowRun {
   return (
     isRecord(value) &&
     isString(value.id) &&
-    isString(value.name) &&
+    isString(value.startedAt) &&
     isString(value.updatedAt) &&
-    blueprintLastRunStatuses.has(value.lastRunStatus as string) &&
+    workflowRunStatuses.has(value.status as string) &&
     isString(value.summary) &&
     Array.isArray(value.nodes) &&
     value.nodes.every(isPlainJsonValue) &&
     Array.isArray(value.edges) &&
     value.edges.every(isPlainJsonValue)
   );
+}
+
+function parseBlueprintAsset(value: unknown): BlueprintAsset | null {
+  if (
+    !isRecord(value) ||
+    !isString(value.id) ||
+    !isString(value.name) ||
+    !isString(value.updatedAt) ||
+    !blueprintLastRunStatuses.has(value.lastRunStatus as string) ||
+    !isString(value.summary) ||
+    !Array.isArray(value.nodes) ||
+    !value.nodes.every(isPlainJsonValue) ||
+    !Array.isArray(value.edges) ||
+    !value.edges.every(isPlainJsonValue)
+  ) {
+    return null;
+  }
+
+  if (value.runHistory !== undefined && !Array.isArray(value.runHistory)) {
+    return null;
+  }
+
+  const runHistory = value.runHistory ?? [];
+
+  if (!runHistory.every(isWorkflowRun)) {
+    return null;
+  }
+
+  if (
+    value.selectedRunId !== undefined &&
+    value.selectedRunId !== null &&
+    !isString(value.selectedRunId)
+  ) {
+    return null;
+  }
+
+  const selectedRunId =
+    value.selectedRunId &&
+    runHistory.some((run) => run.id === value.selectedRunId)
+      ? value.selectedRunId
+      : null;
+
+  return {
+    id: value.id,
+    name: value.name,
+    updatedAt: value.updatedAt,
+    lastRunStatus: value.lastRunStatus as BlueprintAsset["lastRunStatus"],
+    summary: value.summary,
+    nodes: value.nodes as BlueprintAsset["nodes"],
+    edges: value.edges as BlueprintAsset["edges"],
+    runHistory,
+    selectedRunId,
+  };
 }
 
 function validateArray<T>(
@@ -161,6 +216,23 @@ function validateArray<T>(
   }
 
   return { ok: true as const, value };
+}
+
+function validateBlueprints(value: unknown) {
+  if (!Array.isArray(value)) {
+    return { ok: false as const, message: "blueprints must be a list." };
+  }
+
+  const blueprints = value.map(parseBlueprintAsset);
+
+  if (blueprints.some((blueprint) => !blueprint)) {
+    return {
+      ok: false as const,
+      message: "blueprints contains an item with an invalid format.",
+    };
+  }
+
+  return { ok: true as const, value: blueprints as BlueprintAsset[] };
 }
 
 export function parseLocalSettingsSnapshot(value: unknown): ValidationResult {
@@ -189,11 +261,7 @@ export function parseLocalSettingsSnapshot(value: unknown): ValidationResult {
     return modelPresetResult;
   }
 
-  const blueprintResult = validateArray(
-    value.blueprints ?? [],
-    "blueprints",
-    isBlueprintAsset,
-  );
+  const blueprintResult = validateBlueprints(value.blueprints ?? []);
   if (!blueprintResult.ok) {
     return blueprintResult;
   }

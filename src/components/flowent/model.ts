@@ -9,6 +9,7 @@ export type BlueprintLastRunStatus =
   | "running"
   | "success"
   | "error";
+export type WorkflowRunStatus = Exclude<BlueprintLastRunStatus, "not-run">;
 export type ProviderType = "openai" | "anthropic" | "custom";
 export type RuntimeConversationRole =
   | "system"
@@ -60,6 +61,16 @@ export type WorkflowNodeData = {
 export type FlowNode = Node<WorkflowNodeData, "workflow">;
 export type FlowEdge = Edge;
 
+export type WorkflowRun = {
+  id: string;
+  startedAt: string;
+  updatedAt: string;
+  status: WorkflowRunStatus;
+  summary: string;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+};
+
 export type BlueprintAsset = {
   id: string;
   name: string;
@@ -68,6 +79,8 @@ export type BlueprintAsset = {
   summary: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
+  runHistory: WorkflowRun[];
+  selectedRunId: string | null;
 };
 
 export const canvasSnapGrid: SnapGrid = [20, 20];
@@ -272,6 +285,8 @@ export const initialBlueprints: BlueprintAsset[] = [
     summary: "Draft launch copy, review it, and prepare the next step.",
     nodes: initialNodes,
     edges: initialEdges,
+    runHistory: [],
+    selectedRunId: null,
   },
 ];
 

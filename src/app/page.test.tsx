@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import Home from "./page";
@@ -242,6 +248,7 @@ describe("Home", () => {
       screen.getByRole("button", { name: "Open blueprint" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Workflows")).not.toBeInTheDocument();
+    expect(screen.queryByText("Run history")).not.toBeInTheDocument();
   });
 
   it("shows the selected agent configuration", async () => {
@@ -250,6 +257,11 @@ describe("Home", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
+    expect(screen.getByText("Run history")).toBeInTheDocument();
+    expect(screen.getByText("No runs yet")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start first run" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Manual Trigger")).toBeInTheDocument();
     expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
     expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
@@ -291,9 +303,7 @@ describe("Home", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
     expect(screen.getByRole("button", { name: /^Run$/ })).toBeDisabled();
-    expect(
-      screen.getByText("Choose models before running"),
-    ).toBeInTheDocument();
+    expect(screen.getAllByText("Choose models before running").length).toBe(2);
     await waitFor(() =>
       expect(
         screen.getByText(
@@ -313,6 +323,8 @@ describe("Home", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /^Run$/ }));
 
+    expect(screen.getByText("Run history")).toBeInTheDocument();
+    expect(screen.getByText("Run started.")).toBeInTheDocument();
     expect(screen.getByText("Run view")).toBeInTheDocument();
     expect(screen.getByText("Execution Details")).toBeInTheDocument();
     expect(screen.getByText("Read-only")).toBeInTheDocument();
@@ -341,11 +353,43 @@ describe("Home", () => {
     expect(screen.getByText("Edit state")).toBeInTheDocument();
     expect(screen.queryByText("Read-only")).not.toBeInTheDocument();
     expect(screen.queryByText("Execution Details")).not.toBeInTheDocument();
-    expect(screen.queryByText("Success")).not.toBeInTheDocument();
-    expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
-    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("workflow-canvas")).queryByText("Success"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("workflow-canvas")).queryByText("Thinking"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("workflow-canvas")).queryByText("Pending"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Properties")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Copywriter")).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("Copywriter")).not.toBeDisabled(),
+    );
+
+    fireEvent.click(screen.getByText("Run started."));
+
+    expect(screen.getByText("Run view")).toBeInTheDocument();
+    expect(screen.getByText("Execution Details")).toBeInTheDocument();
+    expect(screen.getByText("Read-only")).toBeInTheDocument();
+  });
+
+  it("can collapse and reopen the run history panel", () => {
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide run history" }));
+
+    expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Show run history" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show run history" }));
+
+    expect(screen.getByText("No runs yet")).toBeInTheDocument();
   });
 
   it("opens the roles library", () => {

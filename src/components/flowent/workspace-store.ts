@@ -19,12 +19,15 @@ import {
   initialNodes,
   initialProviders,
   initialRoles,
+  availableTools,
   type CanvasMode,
   type FlowEdge,
   type FlowNode,
   type ModelPreset,
+  type NodeRunDetails,
   type Provider,
   type Role,
+  type RunStatus,
   type WorkflowNodeData,
   type WorkflowNodeKind,
 } from "./model";
@@ -96,10 +99,166 @@ function resetRunState(nodes: FlowNode[], edges: FlowEdge[]) {
   return {
     nodes: nodes.map((node) => ({
       ...node,
-      data: { ...node.data, status: "idle" as const },
+      data: { ...node.data, status: "idle" as const, runDetails: undefined },
     })),
     edges: edges.map((edge) => ({ ...edge, animated: false })),
   };
+}
+
+function findModelPreset(
+  modelPresets: ModelPreset[],
+  presetId: string | undefined,
+) {
+  return modelPresets.find((preset) => preset.id === presetId);
+}
+
+function getToolLabels(toolIds: string[] | undefined) {
+  return (toolIds ?? []).map(
+    (toolId) =>
+      availableTools.find((tool) => tool.id === toolId)?.label ?? toolId,
+  );
+}
+
+function replacePayloadReferences(template: string, payload: string) {
+  return template
+    .replaceAll("{{payload}}", payload)
+    .replaceAll("{{input}}", payload);
+}
+
+function getUpstreamPayload(
+  node: FlowNode,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+) {
+  return edges
+    .filter((edge) => edge.target === node.id)
+    .map((edge) => nodes.find((item) => item.id === edge.source))
+    .map((sourceNode) => {
+      if (!sourceNode) {
+        return "";
+      }
+
+      if (sourceNode.data.runDetails?.outputPayload) {
+        return sourceNode.data.runDetails.outputPayload;
+      }
+
+      if (sourceNode.data.kind === "trigger") {
+        return sourceNode.data.initialPayload ?? "";
+      }
+
+      return sourceNode.data.title
+        ? `${sourceNode.data.title} output is not available yet.`
+        : "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function buildNodeRunDetails(
+  node: FlowNode,
+  status: Exclude<RunStatus, "idle" | "pending">,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  modelPresets: ModelPreset[],
+): NodeRunDetails {
+  if (node.data.kind === "trigger") {
+    const payload = node.data.initialPayload?.trim() || "No initial payload.";
+
+    return {
+      kind: "trigger",
+      inputPayload: payload,
+      outputPayload: payload,
+    };
+  }
+
+  const upstreamPayload =
+    getUpstreamPayload(node, nodes, edges).trim() || "No upstream payload.";
+  const preset = findModelPreset(modelPresets, node.data.modelPresetId);
+  const systemPrompt = replacePayloadReferences(
+    node.data.systemPrompt?.trim() || "No system prompt was set.",
+    upstreamPayload,
+  );
+  const toolLabels = getToolLabels(node.data.tools);
+  const toolSummary =
+    toolLabels.length > 0
+      ? `Available tools: ${toolLabels.join(", ")}.\nNo live tool result was needed for this run preview.`
+      : "No tools were selected for this run.";
+  const outputPayload =
+    status === "running"
+      ? `${node.data.title} is preparing a response from the received input.`
+      : status === "error"
+        ? node.data.errorMessage ||
+          `${node.data.title} stopped before sending a result.`
+        : `${node.data.title} completed the step from the received input.`;
+
+  return {
+    kind: "agent",
+    inputPayload: upstreamPayload,
+    outputPayload,
+    modelPresetName: preset?.name,
+    modelId: preset?.modelId,
+    conversation: [
+      {
+        id: `${node.id}-system`,
+        role: "system",
+        content: systemPrompt,
+      },
+      {
+        id: `${node.id}-user`,
+        role: "user",
+        content: upstreamPayload,
+      },
+      {
+        id: `${node.id}-tool-calls`,
+        role: "tool-calls",
+        content: toolSummary,
+      },
+      {
+        id: `${node.id}-assistant`,
+        role: "assistant",
+        content: outputPayload,
+      },
+    ],
+  };
+}
+
+function applyRunStatus(
+  node: FlowNode,
+  status: RunStatus,
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  modelPresets: ModelPreset[],
+) {
+  const runDetails =
+    status === "idle" || status === "pending"
+      ? undefined
+      : buildNodeRunDetails(node, status, nodes, edges, modelPresets);
+
+  return {
+    ...node,
+    data: { ...node.data, status, runDetails },
+  };
+}
+
+function applyRunStatuses(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  modelPresets: ModelPreset[],
+  getStatus: (node: FlowNode) => RunStatus,
+) {
+  const nextNodes: FlowNode[] = [];
+
+  for (const node of nodes) {
+    const contextNodes = nodes.map(
+      (item) => nextNodes.find((nextNode) => nextNode.id === item.id) ?? item,
+    );
+
+    nextNodes.push(
+      applyRunStatus(node, getStatus(node), contextNodes, edges, modelPresets),
+    );
+  }
+
+  return nextNodes;
 }
 
 export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
@@ -247,19 +406,17 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
     startWorkflowRun: () =>
       set((state) => ({
         canvasMode: "workflow",
-        nodes: state.nodes.map((node) => {
-          if (node.data.kind === "trigger") {
-            return { ...node, data: { ...node.data, status: "success" } };
-          }
-
-          return {
-            ...node,
-            data: {
-              ...node.data,
-              status: node.id === "agent-1" ? "running" : "pending",
-            },
-          };
-        }),
+        nodes: applyRunStatuses(
+          state.nodes,
+          state.edges,
+          state.modelPresets,
+          (node) =>
+            node.data.kind === "trigger"
+              ? "success"
+              : node.id === "agent-1"
+                ? "running"
+                : "pending",
+        ),
         edges: state.edges.map((edge) => ({ ...edge, animated: true })),
       })),
 
@@ -270,17 +427,17 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         }
 
         return {
-          nodes: state.nodes.map((node) => {
-            if (node.id === "agent-1") {
-              return { ...node, data: { ...node.data, status: "success" } };
-            }
-
-            if (node.data.kind === "agent") {
-              return { ...node, data: { ...node.data, status: "running" } };
-            }
-
-            return node;
-          }),
+          nodes: applyRunStatuses(
+            state.nodes,
+            state.edges,
+            state.modelPresets,
+            (node) =>
+              node.id === "agent-1"
+                ? "success"
+                : node.data.kind === "agent"
+                  ? "running"
+                  : node.data.status,
+          ),
         };
       }),
 
@@ -291,10 +448,12 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()(
         }
 
         return {
-          nodes: state.nodes.map((node) => ({
-            ...node,
-            data: { ...node.data, status: "success" },
-          })),
+          nodes: applyRunStatuses(
+            state.nodes,
+            state.edges,
+            state.modelPresets,
+            () => "success",
+          ),
           edges: state.edges.map((edge) => ({ ...edge, animated: false })),
         };
       }),

@@ -55,11 +55,24 @@ describe("useFlowentWorkspaceStore", () => {
     useFlowentWorkspaceStore.getState().startWorkflowRun();
 
     const state = useFlowentWorkspaceStore.getState();
+    const agentDetails = getNode("agent-1").data.runDetails;
 
     expect(state.canvasMode).toBe("workflow");
     expect(getNode("trigger-1").data.status).toBe("success");
     expect(getNode("agent-1").data.status).toBe("running");
     expect(getNode("agent-2").data.status).toBe("pending");
+    expect(getNode("trigger-1").data.runDetails?.kind).toBe("trigger");
+    expect(agentDetails?.kind).toBe("agent");
+    if (agentDetails?.kind !== "agent") {
+      throw new Error("Missing agent run details");
+    }
+    expect(agentDetails.conversation.map((entry) => entry.role)).toEqual([
+      "system",
+      "user",
+      "tool-calls",
+      "assistant",
+    ]);
+    expect(getNode("agent-2").data.runDetails).toBeUndefined();
     expect(state.edges.every((edge) => edge.animated)).toBe(true);
   });
 
@@ -73,6 +86,7 @@ describe("useFlowentWorkspaceStore", () => {
 
     expect(state.canvasMode).toBe("blueprint");
     expect(state.nodes.every((node) => node.data.status === "idle")).toBe(true);
+    expect(state.nodes.every((node) => !node.data.runDetails)).toBe(true);
     expect(state.edges.every((edge) => edge.animated === false)).toBe(true);
 
     store.advanceWorkflowRun();
@@ -83,6 +97,30 @@ describe("useFlowentWorkspaceStore", () => {
         .getState()
         .nodes.every((node) => node.data.status === "idle"),
     ).toBe(true);
+  });
+
+  it("keeps agent run details current as the workflow advances", () => {
+    const store = useFlowentWorkspaceStore.getState();
+
+    store.startWorkflowRun();
+    store.advanceWorkflowRun();
+
+    const firstAgentDetails = getNode("agent-1").data.runDetails;
+    const secondAgentDetails = getNode("agent-2").data.runDetails;
+
+    expect(getNode("agent-1").data.status).toBe("success");
+    expect(getNode("agent-2").data.status).toBe("running");
+    expect(firstAgentDetails?.kind).toBe("agent");
+    expect(secondAgentDetails?.kind).toBe("agent");
+    if (
+      firstAgentDetails?.kind !== "agent" ||
+      secondAgentDetails?.kind !== "agent"
+    ) {
+      throw new Error("Missing agent run details");
+    }
+    expect(secondAgentDetails.inputPayload).toBe(
+      firstAgentDetails.outputPayload,
+    );
   });
 
   it("ignores topology and node configuration edits in workflow mode", () => {

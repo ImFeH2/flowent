@@ -5,6 +5,34 @@ export type CanvasMode = "blueprint" | "workflow";
 export type TriggerMode = "manual" | "schedule" | "webhook";
 export type RunStatus = "idle" | "pending" | "running" | "success" | "error";
 export type ProviderType = "openai" | "anthropic" | "custom";
+export type RuntimeConversationRole =
+  | "system"
+  | "user"
+  | "tool-calls"
+  | "assistant";
+
+export type RuntimeConversationEntry = {
+  id: string;
+  role: RuntimeConversationRole;
+  content: string;
+};
+
+export type TriggerRunDetails = {
+  kind: "trigger";
+  inputPayload: string;
+  outputPayload: string;
+};
+
+export type AgentRunDetails = {
+  kind: "agent";
+  inputPayload: string;
+  outputPayload: string;
+  modelPresetName?: string;
+  modelId?: string;
+  conversation: RuntimeConversationEntry[];
+};
+
+export type NodeRunDetails = TriggerRunDetails | AgentRunDetails;
 
 export type WorkflowNodeData = {
   kind: WorkflowNodeKind;
@@ -20,6 +48,7 @@ export type WorkflowNodeData = {
   tools?: string[];
   status: RunStatus;
   errorMessage?: string;
+  runDetails?: NodeRunDetails;
   [key: string]: unknown;
 };
 

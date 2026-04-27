@@ -20,13 +20,17 @@ import {
   CopyIcon,
   GitBranchIcon,
   LockIcon,
+  MessageSquareIcon,
   PanelRightIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
   RotateCcwIcon,
   SettingsIcon,
+  ShieldIcon,
   Trash2Icon,
+  UserIcon,
+  WrenchIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -67,13 +71,18 @@ import { ThemeToggle } from "./theme-toggle";
 import {
   availableTools,
   providerTypeLabels,
+  runStatusLabels,
   type CanvasMode,
   type FlowEdge,
   type FlowNode,
   type ModelPreset,
+  type NodeRunDetails,
   type Provider,
   type ProviderType,
   type Role,
+  type RuntimeConversationEntry,
+  type RuntimeConversationRole,
+  type RunStatus,
   type TriggerMode,
   type WorkflowNodeData,
   type WorkflowNodeKind,
@@ -121,6 +130,31 @@ const systemNavigation: Array<{
   label: string;
   icon: typeof SettingsIcon;
 }> = [{ view: "settings", label: "Settings", icon: SettingsIcon }];
+
+const conversationRolePresentation: Record<
+  RuntimeConversationRole,
+  {
+    label: string;
+    icon: typeof ShieldIcon;
+  }
+> = {
+  system: {
+    label: "System",
+    icon: ShieldIcon,
+  },
+  user: {
+    label: "User",
+    icon: UserIcon,
+  },
+  "tool-calls": {
+    label: "Tool Calls",
+    icon: WrenchIcon,
+  },
+  assistant: {
+    label: "Assistant",
+    icon: MessageSquareIcon,
+  },
+};
 
 function emptyRole(modelPresetId = ""): Role {
   return {
@@ -256,9 +290,12 @@ function FlowentWorkspaceShell() {
           ...node.data,
           canvasMode,
           modelPresets,
+          onSelectNode: () => {
+            window.setTimeout(() => setSelection([node.id], []), 0);
+          },
         },
       })),
-    [canvasMode, modelPresets, nodes],
+    [canvasMode, modelPresets, nodes, setSelection],
   );
 
   const selectedNodes = useMemo(
@@ -795,6 +832,12 @@ function CanvasWorkspace({
           }}
           onPaneContextMenu={onPaneContextMenu}
           onNodesDelete={onNodesDelete}
+          onNodeClick={(_, node) => {
+            window.setTimeout(() => onSelectionChange([node.id], []), 0);
+          }}
+          onEdgeClick={(_, edge) => {
+            window.setTimeout(() => onSelectionChange([], [edge.id]), 0);
+          }}
           onSelectionChange={({
             nodes: selectionNodes,
             edges: selectionEdges,
@@ -889,17 +932,20 @@ function PropertyPanel({
 }) {
   const readOnly = canvasMode === "workflow";
 
+  if (readOnly) {
+    return (
+      <ExecutionDetailsPanel
+        selectedNode={selectedNode}
+        selectedCount={selectedCount}
+      />
+    );
+  }
+
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4 p-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-medium">Properties</h2>
-          {readOnly && (
-            <Badge variant="outline">
-              <LockIcon className="size-3.5" />
-              Read-only
-            </Badge>
-          )}
         </div>
         <Separator />
         {selectedNode ? (
@@ -925,6 +971,219 @@ function PropertyPanel({
         )}
       </div>
     </ScrollArea>
+  );
+}
+
+function ExecutionDetailsPanel({
+  selectedNode,
+  selectedCount,
+}: {
+  selectedNode: FlowNode | null;
+  selectedCount: number;
+}) {
+  const details = selectedNode?.data.runDetails;
+  const status = selectedNode?.data.status ?? "idle";
+
+  return (
+    <ScrollArea className="h-full">
+      <div className="space-y-4 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-medium">Execution Details</h2>
+          <Badge variant="outline">
+            <LockIcon className="size-3.5" />
+            Read-only
+          </Badge>
+        </div>
+        <Separator />
+        {selectedNode &&
+        details &&
+        status !== "idle" &&
+        status !== "pending" ? (
+          <NodeExecutionDetails
+            node={selectedNode}
+            details={details}
+            status={status}
+          />
+        ) : (
+          <ExecutionEmptyState
+            selectedCount={selectedCount}
+            selectedStatus={selectedNode?.data.status}
+          />
+        )}
+      </div>
+    </ScrollArea>
+  );
+}
+
+function NodeExecutionDetails({
+  node,
+  details,
+  status,
+}: {
+  node: FlowNode;
+  details: NodeRunDetails;
+  status: Exclude<RunStatus, "idle" | "pending">;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-background p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-lg font-medium">
+              {node.data.title}
+            </div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {node.data.kind === "agent" ? "Agent step" : "Trigger step"}
+            </div>
+          </div>
+          <RunStatusBadge status={status} />
+        </div>
+      </div>
+      {details.kind === "agent" ? (
+        <AgentExecutionDetails details={details} />
+      ) : (
+        <TriggerExecutionDetails details={details} />
+      )}
+    </div>
+  );
+}
+
+function RunStatusBadge({
+  status,
+}: {
+  status: Exclude<RunStatus, "idle" | "pending">;
+}) {
+  return (
+    <Badge variant={status === "error" ? "destructive" : "secondary"}>
+      {runStatusLabels[status]}
+    </Badge>
+  );
+}
+
+function AgentExecutionDetails({
+  details,
+}: {
+  details: Extract<NodeRunDetails, { kind: "agent" }>;
+}) {
+  return (
+    <div className="space-y-4">
+      {(details.modelPresetName || details.modelId) && (
+        <div className="grid gap-2 rounded-lg border bg-background p-3 text-sm">
+          {details.modelPresetName && (
+            <ExecutionMetaItem
+              label="Model Preset"
+              value={details.modelPresetName}
+            />
+          )}
+          {details.modelId && (
+            <ExecutionMetaItem label="Model" value={details.modelId} />
+          )}
+        </div>
+      )}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <MessageSquareIcon className="size-4 text-muted-foreground" />
+          <h3 className="text-base font-medium">Conversation History</h3>
+        </div>
+        <ol className="space-y-0">
+          {details.conversation.map((entry, index) => (
+            <ConversationHistoryItem
+              key={entry.id}
+              entry={entry}
+              step={index + 1}
+            />
+          ))}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
+function TriggerExecutionDetails({
+  details,
+}: {
+  details: Extract<NodeRunDetails, { kind: "trigger" }>;
+}) {
+  return (
+    <div className="space-y-3">
+      <ExecutionPayloadBlock label="Input" value={details.inputPayload} />
+      <ExecutionPayloadBlock label="Output" value={details.outputPayload} />
+    </div>
+  );
+}
+
+function ConversationHistoryItem({
+  entry,
+  step,
+}: {
+  entry: RuntimeConversationEntry;
+  step: number;
+}) {
+  const presentation = conversationRolePresentation[entry.role];
+  const Icon = presentation.icon;
+
+  return (
+    <li className="relative border-l border-border pb-4 pl-5 last:pb-0">
+      <span className="absolute -left-2 top-0 flex size-4 items-center justify-center rounded-full border bg-card">
+        <Icon className="size-3" />
+      </span>
+      <div className="space-y-2 rounded-lg border bg-background p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Badge variant="outline">{presentation.label}</Badge>
+          <span className="text-xs text-muted-foreground">Step {step}</span>
+        </div>
+        <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
+          {entry.content}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function ExecutionPayloadBlock({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <section className="space-y-2 rounded-lg border bg-background p-3">
+      <h3 className="text-sm font-medium">{label}</h3>
+      <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
+        {value}
+      </p>
+    </section>
+  );
+}
+
+function ExecutionMetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate font-medium">{value}</span>
+    </div>
+  );
+}
+
+function ExecutionEmptyState({
+  selectedCount,
+  selectedStatus,
+}: {
+  selectedCount: number;
+  selectedStatus?: RunStatus;
+}) {
+  const message =
+    selectedStatus === "pending"
+      ? "This node has not started yet."
+      : selectedCount > 0
+        ? "Select a running, completed, or failed node to inspect this run."
+        : "Select a node to inspect this run.";
+
+  return (
+    <div className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">
+      {message}
+    </div>
   );
 }
 

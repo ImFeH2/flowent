@@ -218,25 +218,33 @@ describe("Home", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Run$/ }));
 
     expect(screen.getByText("Workflow Mode")).toBeInTheDocument();
+    expect(screen.getByText("Execution Details")).toBeInTheDocument();
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
       "data-read-only",
       "true",
     );
-    expect(screen.getByDisplayValue("Copywriter")).toBeDisabled();
-    expect(screen.getByLabelText("System Prompt")).toBeDisabled();
+    expect(screen.getByText("Conversation History")).toBeInTheDocument();
+    expect(screen.getByText("System")).toBeInTheDocument();
+    expect(screen.getByText("User")).toBeInTheDocument();
+    expect(screen.getByText("Tool Calls")).toBeInTheDocument();
+    expect(screen.getByText("Assistant")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Copywriter")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("System Prompt")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     expect(screen.getAllByText("Success").length).toBeGreaterThan(0);
-    expect(screen.getByText("Thinking")).toBeInTheDocument();
+    expect(screen.getAllByText("Thinking").length).toBeGreaterThan(0);
     expect(screen.getByText("Pending")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Back to Blueprint" }));
 
     expect(screen.getByText("Blueprint Mode")).toBeInTheDocument();
     expect(screen.queryByText("Read-only")).not.toBeInTheDocument();
+    expect(screen.queryByText("Execution Details")).not.toBeInTheDocument();
     expect(screen.queryByText("Success")).not.toBeInTheDocument();
     expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
     expect(screen.queryByText("Pending")).not.toBeInTheDocument();
+    expect(screen.getByText("Properties")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Copywriter")).not.toBeDisabled();
   });
 

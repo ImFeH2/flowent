@@ -40,9 +40,14 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
   const TriggerIcon = triggerIcon[data.triggerMode ?? "manual"];
   const isTrigger = data.kind === "trigger";
   const showRunStatus = data.canvasMode === "workflow";
+  const onSelectNode =
+    typeof data.onSelectNode === "function"
+      ? (data.onSelectNode as () => void)
+      : undefined;
 
   return (
     <Card
+      onClick={onSelectNode}
       className={cn(
         "w-72 border bg-card/95 shadow-md transition-colors",
         selected && "border-ring ring-2 ring-ring/30",

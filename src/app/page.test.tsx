@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -182,7 +184,7 @@ describe("Home", () => {
       screen.getByRole("button", { name: "Settings" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Use Light Mode" }),
+      screen.getByRole("button", { name: "Dark Mode" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Launch Campaign Workflow")).toBeInTheDocument();
     expect(
@@ -286,14 +288,28 @@ describe("Home", () => {
 
     expect(document.documentElement).toHaveClass("dark");
     expect(document.documentElement).not.toHaveClass("light");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
 
-    fireEvent.click(screen.getByRole("button", { name: "Use Light Mode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dark Mode" }));
 
     expect(window.localStorage.getItem(themeStorageKey)).toBe("light");
     expect(document.documentElement).toHaveClass("light");
     expect(document.documentElement).not.toHaveClass("dark");
+    expect(document.documentElement.style.colorScheme).toBe("light");
     expect(
-      screen.getByRole("button", { name: "Use Dark Mode" }),
+      screen.getByRole("button", { name: "Light Mode" }),
     ).toBeInTheDocument();
+  });
+
+  it("scopes theme selectors to the app root", () => {
+    const css = readFileSync(
+      join(process.cwd(), "src/app/globals.css"),
+      "utf8",
+    );
+
+    expect(css).toContain("html.dark {");
+    expect(css).toContain("html.light {");
+    expect(css).not.toMatch(/\n\.dark\s*\{/);
+    expect(css).not.toMatch(/\n\.light\s*\{/);
   });
 });

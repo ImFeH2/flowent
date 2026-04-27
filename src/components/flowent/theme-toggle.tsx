@@ -58,8 +58,8 @@ export function ThemeToggle({ collapsed }: { collapsed: boolean }) {
   }, [themeMode]);
 
   const nextThemeMode = themeMode === "dark" ? "light" : "dark";
-  const label = nextThemeMode === "light" ? "Use Light Mode" : "Use Dark Mode";
-  const Icon = nextThemeMode === "light" ? SunIcon : MoonIcon;
+  const label = themeMode === "dark" ? "Dark Mode" : "Light Mode";
+  const Icon = themeMode === "dark" ? MoonIcon : SunIcon;
 
   const toggleThemeMode = useCallback(() => {
     persistThemeMode(nextThemeMode);

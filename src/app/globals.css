@@ -5,7 +5,7 @@
 
 @plugin "tailwindcss-animate";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(html.dark, html.dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -86,11 +86,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 45%);
   --sidebar-ring: oklch(1 0 0 / 20%);
+  --canvas-pattern: oklch(1 0 0 / 18%);
   --canvas-selection: oklch(1 0 0 / 8%);
+  --canvas-minimap-background: oklch(0 0 0);
+  --canvas-minimap-node: oklch(1 0 0 / 18%);
   --canvas-minimap-mask: oklch(0 0 0 / 40%);
 }
 
-.dark {
+html.dark {
   color-scheme: dark;
   --background: oklch(0 0 0);
   --foreground: oklch(0.985 0 0);
@@ -124,13 +127,16 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 45%);
   --sidebar-ring: oklch(1 0 0 / 20%);
+  --canvas-pattern: oklch(1 0 0 / 18%);
   --canvas-selection: oklch(1 0 0 / 8%);
+  --canvas-minimap-background: oklch(0 0 0);
+  --canvas-minimap-node: oklch(1 0 0 / 18%);
   --canvas-minimap-mask: oklch(0 0 0 / 40%);
 }
 
-.light {
+html.light {
   color-scheme: light;
-  --background: oklch(0.985 0 0);
+  --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -162,7 +168,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --canvas-pattern: oklch(0.205 0 0 / 18%);
   --canvas-selection: oklch(0.205 0 0 / 8%);
+  --canvas-minimap-background: oklch(1 0 0);
+  --canvas-minimap-node: oklch(0.205 0 0 / 12%);
   --canvas-minimap-mask: oklch(1 0 0 / 72%);
 }
 
@@ -181,10 +190,19 @@
   }
 }
 
-.react-flow {
+.react-flow,
+.react-flow.light,
+.react-flow.dark {
   --xy-background-color-default: var(--background);
+  --xy-background-pattern-dots-color-default: var(--canvas-pattern);
+  --xy-background-pattern-lines-color-default: var(--canvas-pattern);
+  --xy-background-pattern-cross-color-default: var(--canvas-pattern);
   --xy-edge-stroke-default: var(--border);
   --xy-edge-stroke-selected-default: var(--primary);
+  --xy-minimap-background-color-default: var(--canvas-minimap-background);
+  --xy-minimap-mask-background-color-default: var(--canvas-minimap-mask);
+  --xy-minimap-node-background-color-default: var(--canvas-minimap-node);
+  --xy-minimap-node-stroke-color-default: var(--border);
   --xy-selection-background-color-default: var(--canvas-selection);
   --xy-selection-border-default: 1px solid var(--ring);
   background: var(--background);

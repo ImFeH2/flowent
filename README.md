@@ -36,7 +36,7 @@ Run the server with Docker Compose:
 docker compose up
 ```
 
-## Technology Stack
+## Tech Stack
 
 - Next.js: application framework and server runtime.
 - React: UI rendering model.

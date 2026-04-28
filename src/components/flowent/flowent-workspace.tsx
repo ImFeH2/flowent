@@ -76,17 +76,18 @@ import { ThemeToggle } from "./theme-toggle";
 import {
   availableTools,
   canvasSnapGrid,
-  providerTypeLabels,
+  connectionTypeLabels,
+  connectionTypeParameterSupport,
   runStatusLabels,
   type BlueprintAsset,
   type BlueprintLastRunStatus,
   type CanvasMode,
+  type ConnectionType,
   type FlowEdge,
   type FlowNode,
+  type ModelConnection,
   type ModelPreset,
   type NodeRunDetails,
-  type Provider,
-  type ProviderType,
   type Role,
   type RuntimeConversationEntry,
   type RuntimeConversationRole,
@@ -208,24 +209,24 @@ function emptyRole(modelPresetId = ""): Role {
   };
 }
 
-function emptyProvider(): Provider {
+function emptyModelConnection(): ModelConnection {
   return {
     id: "",
     type: "openai",
     name: "",
-    apiKey: "",
-    baseUrl: "",
+    accessKey: "",
+    endpointUrl: "",
   };
 }
 
-function emptyPreset(providerId = ""): ModelPreset {
+function emptyPreset(modelConnectionId = ""): ModelPreset {
   return {
     id: "",
     name: "",
-    providerId,
-    modelId: "",
+    modelConnectionId,
+    modelName: "",
     temperature: 0.7,
-    maxTokens: 1200,
+    outputLimit: 1200,
     testStatus: "idle",
   };
 }
@@ -1626,7 +1627,7 @@ function AgentExecutionDetails({
 }) {
   return (
     <div className="space-y-4">
-      {(details.modelPresetName || details.modelId) && (
+      {(details.modelPresetName || details.modelName) && (
         <div className="grid gap-2 rounded-lg border bg-background p-3 text-sm">
           {details.modelPresetName && (
             <ExecutionMetaItem
@@ -1634,8 +1635,8 @@ function AgentExecutionDetails({
               value={details.modelPresetName}
             />
           )}
-          {details.modelId && (
-            <ExecutionMetaItem label="Model" value={details.modelId} />
+          {details.modelName && (
+            <ExecutionMetaItem label="Model" value={details.modelName} />
           )}
         </div>
       )}
@@ -1910,7 +1911,7 @@ function AgentProperties({
           <SelectContent>
             {modelPresets.map((preset) => (
               <SelectItem key={preset.id} value={preset.id}>
-                {preset.name} · {preset.modelId}
+                {preset.name} · {preset.modelName}
               </SelectItem>
             ))}
           </SelectContent>
@@ -2134,7 +2135,7 @@ function RolesLibrary({
                   <SelectContent>
                     {modelPresets.map((preset) => (
                       <SelectItem key={preset.id} value={preset.id}>
-                        {preset.name} · {preset.modelId}
+                        {preset.name} · {preset.modelName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -2186,19 +2187,19 @@ function SettingsView({
   localDataMessage: string | null;
 }) {
   const {
-    providers,
+    modelConnections,
     modelPresets,
-    upsertProvider,
-    deleteProvider,
+    upsertModelConnection,
+    deleteModelConnection,
     upsertModelPreset,
     deleteModelPreset,
     testModelPreset,
   } = useFlowentWorkspaceStore(
     useShallow((state) => ({
-      providers: state.providers,
+      modelConnections: state.modelConnections,
       modelPresets: state.modelPresets,
-      upsertProvider: state.upsertProvider,
-      deleteProvider: state.deleteProvider,
+      upsertModelConnection: state.upsertModelConnection,
+      deleteModelConnection: state.deleteModelConnection,
       upsertModelPreset: state.upsertModelPreset,
       deleteModelPreset: state.deleteModelPreset,
       testModelPreset: state.testModelPreset,
@@ -2221,22 +2222,22 @@ function SettingsView({
           </Badge>
         )}
       </div>
-      <Tabs defaultValue="providers" className="min-h-0 flex-1">
+      <Tabs defaultValue="connections" className="min-h-0 flex-1">
         <TabsList>
-          <TabsTrigger value="providers">Providers</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="presets">Model Presets</TabsTrigger>
         </TabsList>
-        <TabsContent value="providers" className="min-h-0">
-          <ProviderSettings
-            providers={providers}
+        <TabsContent value="connections" className="min-h-0">
+          <ConnectionSettings
+            modelConnections={modelConnections}
             modelPresets={modelPresets}
-            upsertProvider={upsertProvider}
-            deleteProvider={deleteProvider}
+            upsertModelConnection={upsertModelConnection}
+            deleteModelConnection={deleteModelConnection}
           />
         </TabsContent>
         <TabsContent value="presets" className="min-h-0">
           <PresetSettings
-            providers={providers}
+            modelConnections={modelConnections}
             modelPresets={modelPresets}
             upsertModelPreset={upsertModelPreset}
             deleteModelPreset={deleteModelPreset}
@@ -2248,51 +2249,91 @@ function SettingsView({
   );
 }
 
-function ProviderSettings({
-  providers,
+function getConnectionStatus(connection: ModelConnection) {
+  return connection.endpointUrl.trim() && connection.accessKey
+    ? "Ready"
+    : "Needs details";
+}
+
+function getPresetConnection(
+  modelConnections: ModelConnection[],
+  preset: ModelPreset,
+) {
+  return modelConnections.find(
+    (connection) => connection.id === preset.modelConnectionId,
+  );
+}
+
+function normalizePresetForConnectionType(
+  preset: ModelPreset,
+  connectionType: ConnectionType,
+): ModelPreset {
+  const supportedParameters = connectionTypeParameterSupport[connectionType];
+
+  return {
+    ...preset,
+    topP: supportedParameters.topP ? preset.topP : undefined,
+    frequencyPenalty: supportedParameters.frequencyPenalty
+      ? preset.frequencyPenalty
+      : undefined,
+  };
+}
+
+function ConnectionSettings({
+  modelConnections,
   modelPresets,
-  upsertProvider,
-  deleteProvider,
+  upsertModelConnection,
+  deleteModelConnection,
 }: {
-  providers: Provider[];
+  modelConnections: ModelConnection[];
   modelPresets: ModelPreset[];
-  upsertProvider: (
-    provider: Provider,
+  upsertModelConnection: (
+    modelConnection: ModelConnection,
     editingId: string | null,
   ) => Promise<boolean>;
-  deleteProvider: (providerId: string) => Promise<boolean>;
+  deleteModelConnection: (modelConnectionId: string) => Promise<boolean>;
 }) {
-  const [draft, setDraft] = useState<Provider>(emptyProvider);
+  const [draft, setDraft] = useState<ModelConnection>(emptyModelConnection);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const editingConnection = editingId
+    ? modelConnections.find((connection) => connection.id === editingId)
+    : null;
+  const showTypeChangePrompt = Boolean(
+    editingConnection && editingConnection.type !== draft.type,
+  );
 
-  const saveProvider = useCallback(() => {
-    if (!draft.name.trim()) {
+  const saveConnection = useCallback(() => {
+    if (
+      !draft.name.trim() ||
+      !draft.endpointUrl.trim() ||
+      (!editingId && !draft.accessKey.trim())
+    ) {
       return;
     }
 
     setIsSaving(true);
-    void upsertProvider(draft, editingId).then((saved) => {
+    void upsertModelConnection(draft, editingId).then((saved) => {
       setIsSaving(false);
 
       if (!saved) {
         return;
       }
 
-      setDraft(emptyProvider());
+      setDraft(emptyModelConnection());
       setEditingId(null);
     });
-  }, [draft, editingId, upsertProvider]);
+  }, [draft, editingId, upsertModelConnection]);
 
-  const confirmAndDeleteProvider = useCallback(
-    (provider: Provider) => {
+  const confirmAndDeleteConnection = useCallback(
+    (connection: ModelConnection) => {
       const dependentPresetCount = modelPresets.filter(
-        (preset) => preset.providerId === provider.id,
+        (preset) => preset.modelConnectionId === connection.id,
       ).length;
       const confirmed =
         dependentPresetCount === 0 ||
         window.confirm(
-          `${provider.name} is used by ${dependentPresetCount} model preset${
+          `${connection.name} is used by ${dependentPresetCount} model preset${
             dependentPresetCount === 1 ? "" : "s"
           }. Delete it and remove those presets?`,
         );
@@ -2302,87 +2343,130 @@ function ProviderSettings({
       }
 
       setIsSaving(true);
-      void deleteProvider(provider.id).then((saved) => {
+      void deleteModelConnection(connection.id).then((saved) => {
         setIsSaving(false);
 
-        if (saved && editingId === provider.id) {
-          setDraft(emptyProvider());
+        if (saved && editingId === connection.id) {
+          setDraft(emptyModelConnection());
           setEditingId(null);
         }
       });
     },
-    [deleteProvider, editingId, modelPresets],
+    [deleteModelConnection, editingId, modelPresets],
   );
 
   return (
     <ScrollArea className="h-[calc(100dvh-10rem)]">
       <div className="space-y-4 py-4">
         <div className="space-y-2">
-          {providers.map((provider) => (
-            <Card key={provider.id}>
-              <CardHeader>
-                <CardTitle className="text-xl">{provider.name}</CardTitle>
-                <CardAction className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditingId(provider.id);
-                      setDraft({ ...provider, apiKey: "" });
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Delete ${provider.name}`}
-                    disabled={isSaving}
-                    onClick={() => confirmAndDeleteProvider(provider)}
-                  >
-                    <Trash2Icon />
-                  </Button>
-                </CardAction>
-              </CardHeader>
+          {modelConnections.length === 0 ? (
+            <Card>
+              <CardContent className="py-6 text-sm text-muted-foreground">
+                No model connections yet.
+              </CardContent>
             </Card>
-          ))}
+          ) : (
+            modelConnections.map((connection) => {
+              const connectionStatus = getConnectionStatus(connection);
+
+              return (
+                <Card key={connection.id}>
+                  <CardHeader>
+                    <div className="min-w-0 space-y-1">
+                      <CardTitle className="truncate text-xl">
+                        {connection.name}
+                      </CardTitle>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary">
+                          {connectionTypeLabels[connection.type]}
+                        </Badge>
+                        <Badge
+                          variant={
+                            connectionStatus === "Ready"
+                              ? "default"
+                              : "destructive"
+                          }
+                        >
+                          {connectionStatus}
+                        </Badge>
+                      </div>
+                    </div>
+                    <CardAction className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(connection.id);
+                          setDraft({ ...connection, accessKey: "" });
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Delete ${connection.name}`}
+                        disabled={isSaving}
+                        onClick={() => confirmAndDeleteConnection(connection)}
+                      >
+                        <Trash2Icon />
+                      </Button>
+                    </CardAction>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Endpoint URL:
+                    </span>{" "}
+                    <span className="break-all">{connection.endpointUrl}</span>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </div>
         <Card size="sm">
           <CardHeader>
             <CardTitle>
-              {editingId ? "Edit Provider" : "Add Provider"}
+              {editingId ? "Edit Connection" : "Add Connection"}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Field label="Provider Type" htmlFor="provider-type">
+            <Field label="Connection type" htmlFor="connection-type">
               <Select
                 value={draft.type}
                 onValueChange={(value) =>
                   setDraft((currentDraft) => ({
                     ...currentDraft,
-                    type: value as ProviderType,
+                    type: value as ConnectionType,
                   }))
                 }
               >
-                <SelectTrigger id="provider-type" className="w-full">
+                <SelectTrigger id="connection-type" className="w-full">
                   <SelectValue>
-                    {(value: ProviderType | null) =>
-                      value ? providerTypeLabels[value] : "OpenAI"
+                    {(value: ConnectionType | null) =>
+                      value ? connectionTypeLabels[value] : "OpenAI"
                     }
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(providerTypeLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(connectionTypeLabels).map(
+                    ([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Name" htmlFor="provider-name">
+            {showTypeChangePrompt && (
+              <Badge variant="secondary" className="h-auto whitespace-normal">
+                Existing model presets may need review after this change.
+              </Badge>
+            )}
+            <Field label="Name" htmlFor="connection-name">
               <Input
-                id="provider-name"
+                id="connection-name"
                 value={draft.name}
                 onChange={(event) =>
                   setDraft((currentDraft) => ({
@@ -2392,42 +2476,42 @@ function ProviderSettings({
                 }
               />
             </Field>
-            <Field label="Connection key" htmlFor="provider-key">
+            <Field label="Endpoint URL" htmlFor="connection-endpoint-url">
               <Input
-                id="provider-key"
+                id="connection-endpoint-url"
+                value={draft.endpointUrl}
+                onChange={(event) =>
+                  setDraft((currentDraft) => ({
+                    ...currentDraft,
+                    endpointUrl: event.target.value,
+                  }))
+                }
+              />
+            </Field>
+            <Field label="Access key" htmlFor="connection-access-key">
+              <Input
+                id="connection-access-key"
                 type="password"
-                value={draft.apiKey}
+                value={draft.accessKey}
                 placeholder={editingId ? "Leave blank to keep saved key" : ""}
                 onChange={(event) =>
                   setDraft((currentDraft) => ({
                     ...currentDraft,
-                    apiKey: event.target.value,
+                    accessKey: event.target.value,
                   }))
                 }
               />
             </Field>
-            <Field label="Base URL" htmlFor="provider-base-url">
-              <Input
-                id="provider-base-url"
-                value={draft.baseUrl}
-                onChange={(event) =>
-                  setDraft((currentDraft) => ({
-                    ...currentDraft,
-                    baseUrl: event.target.value,
-                  }))
-                }
-              />
-            </Field>
-            <div className="flex gap-2">
-              <Button disabled={isSaving} onClick={saveProvider}>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={isSaving} onClick={saveConnection}>
                 <PlusIcon />
-                {editingId ? "Save Provider" : "Add Provider"}
+                {editingId ? "Save Connection" : "Add Connection"}
               </Button>
               {editingId && (
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setDraft(emptyProvider());
+                    setDraft(emptyModelConnection());
                     setEditingId(null);
                   }}
                 >
@@ -2443,13 +2527,13 @@ function ProviderSettings({
 }
 
 function PresetSettings({
-  providers,
+  modelConnections,
   modelPresets,
   upsertModelPreset,
   deleteModelPreset,
   testModelPreset,
 }: {
-  providers: Provider[];
+  modelConnections: ModelConnection[];
   modelPresets: ModelPreset[];
   upsertModelPreset: (
     modelPreset: ModelPreset,
@@ -2459,93 +2543,137 @@ function PresetSettings({
   testModelPreset: (presetId: string) => void;
 }) {
   const [draft, setDraft] = useState<ModelPreset>(() =>
-    emptyPreset(providers.at(0)?.id),
+    emptyPreset(modelConnections.at(0)?.id),
   );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const selectedConnection = modelConnections.find(
+    (connection) => connection.id === draft.modelConnectionId,
+  );
+  const parameterSupport = selectedConnection
+    ? connectionTypeParameterSupport[selectedConnection.type]
+    : null;
 
   const savePreset = useCallback(() => {
-    if (!draft.name.trim() || !draft.providerId || !draft.modelId.trim()) {
+    const selectedDraftConnection = modelConnections.find(
+      (connection) => connection.id === draft.modelConnectionId,
+    );
+
+    if (
+      !selectedDraftConnection ||
+      !draft.name.trim() ||
+      !draft.modelName.trim()
+    ) {
       return;
     }
 
     setIsSaving(true);
-    void upsertModelPreset(draft, editingId).then((saved) => {
+    void upsertModelPreset(
+      normalizePresetForConnectionType(draft, selectedDraftConnection.type),
+      editingId,
+    ).then((saved) => {
       setIsSaving(false);
 
       if (!saved) {
         return;
       }
 
-      setDraft(emptyPreset(providers.at(0)?.id));
+      setDraft(emptyPreset(modelConnections.at(0)?.id));
       setEditingId(null);
     });
-  }, [draft, editingId, providers, upsertModelPreset]);
+  }, [draft, editingId, modelConnections, upsertModelPreset]);
 
   return (
     <ScrollArea className="h-[calc(100dvh-10rem)]">
       <div className="space-y-4 py-4">
         <div className="space-y-2">
-          {modelPresets.map((preset) => {
-            return (
-              <Card key={preset.id}>
-                <CardHeader>
-                  <CardTitle className="text-xl">{preset.name}</CardTitle>
-                  <CardAction className="flex gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => testModelPreset(preset.id)}
-                    >
-                      Test Connection
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditingId(preset.id);
-                        setDraft(preset);
-                      }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Delete ${preset.name}`}
-                      disabled={isSaving}
-                      onClick={() => {
-                        setIsSaving(true);
-                        void deleteModelPreset(preset.id).then((saved) => {
-                          setIsSaving(false);
+          {modelPresets.length === 0 ? (
+            <Card>
+              <CardContent className="py-6 text-sm text-muted-foreground">
+                No model presets yet.
+              </CardContent>
+            </Card>
+          ) : (
+            modelPresets.map((preset) => {
+              const presetConnection = getPresetConnection(
+                modelConnections,
+                preset,
+              );
 
-                          if (saved && editingId === preset.id) {
-                            setEditingId(null);
-                            setDraft(emptyPreset(providers.at(0)?.id));
-                          }
-                        });
-                      }}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  </CardAction>
-                </CardHeader>
-                {preset.testMessage && (
-                  <CardContent>
-                    <Badge
-                      variant={
-                        preset.testStatus === "error"
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {preset.testMessage}
-                    </Badge>
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })}
+              return (
+                <Card key={preset.id}>
+                  <CardHeader>
+                    <div className="min-w-0 space-y-1">
+                      <CardTitle className="truncate text-xl">
+                        {preset.name}
+                      </CardTitle>
+                      <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                        <span>{preset.modelName}</span>
+                        <span>
+                          {presetConnection
+                            ? `${presetConnection.name} · ${
+                                connectionTypeLabels[presetConnection.type]
+                              }`
+                            : "Connection unavailable"}
+                        </span>
+                      </div>
+                    </div>
+                    <CardAction className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => testModelPreset(preset.id)}
+                      >
+                        Test Connection
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(preset.id);
+                          setDraft(preset);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Delete ${preset.name}`}
+                        disabled={isSaving}
+                        onClick={() => {
+                          setIsSaving(true);
+                          void deleteModelPreset(preset.id).then((saved) => {
+                            setIsSaving(false);
+
+                            if (saved && editingId === preset.id) {
+                              setEditingId(null);
+                              setDraft(emptyPreset(modelConnections.at(0)?.id));
+                            }
+                          });
+                        }}
+                      >
+                        <Trash2Icon />
+                      </Button>
+                    </CardAction>
+                  </CardHeader>
+                  {preset.testMessage && (
+                    <CardContent>
+                      <Badge
+                        variant={
+                          preset.testStatus === "error"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {preset.testMessage}
+                      </Badge>
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            })
+          )}
         </div>
         <Card size="sm">
           <CardHeader>
@@ -2554,10 +2682,16 @@ function PresetSettings({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {modelConnections.length === 0 && (
+              <Badge variant="secondary" className="h-auto whitespace-normal">
+                Create a connection before adding model presets.
+              </Badge>
+            )}
             <Field label="Preset Name" htmlFor="preset-name">
               <Input
                 id="preset-name"
                 value={draft.name}
+                disabled={modelConnections.length === 0}
                 onChange={(event) =>
                   setDraft((currentDraft) => ({
                     ...currentDraft,
@@ -2566,95 +2700,150 @@ function PresetSettings({
                 }
               />
             </Field>
-            <Field label="Provider" htmlFor="preset-provider">
+            <Field label="Model Connection" htmlFor="preset-connection">
               <Select
-                value={draft.providerId}
+                value={draft.modelConnectionId}
                 onValueChange={(value) => {
                   if (typeof value === "string") {
                     setDraft((currentDraft) => ({
                       ...currentDraft,
-                      providerId: value,
+                      modelConnectionId: value,
                     }));
                   }
                 }}
-                disabled={providers.length === 0}
+                disabled={modelConnections.length === 0}
               >
-                <SelectTrigger id="preset-provider" className="w-full">
-                  <SelectValue placeholder="Select provider">
-                    {(value: string | null) =>
-                      providers.find((provider) => provider.id === value)
-                        ?.name ?? "Select provider"
-                    }
+                <SelectTrigger id="preset-connection" className="w-full">
+                  <SelectValue placeholder="Select model connection">
+                    {(value: string | null) => {
+                      const connection = modelConnections.find(
+                        (item) => item.id === value,
+                      );
+
+                      return connection
+                        ? `${connection.name} · ${
+                            connectionTypeLabels[connection.type]
+                          }`
+                        : "Select model connection";
+                    }}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {providers.map((provider) => (
-                    <SelectItem key={provider.id} value={provider.id}>
-                      {provider.name}
+                  {modelConnections.map((connection) => (
+                    <SelectItem key={connection.id} value={connection.id}>
+                      {connection.name} ·{" "}
+                      {connectionTypeLabels[connection.type]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Model ID" htmlFor="preset-model">
+            <Field label="Model name" htmlFor="preset-model">
               <Input
                 id="preset-model"
-                value={draft.modelId}
+                value={draft.modelName}
+                disabled={modelConnections.length === 0}
                 onChange={(event) =>
                   setDraft((currentDraft) => ({
                     ...currentDraft,
-                    modelId: event.target.value,
+                    modelName: event.target.value,
                   }))
                 }
               />
             </Field>
-            <Field label={`Temperature ${draft.temperature.toFixed(1)}`}>
-              <div className="flex items-center gap-3">
-                <Slider
-                  value={[draft.temperature]}
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  onValueChange={(value) => {
-                    const temperature = Array.isArray(value) ? value[0] : value;
-                    setDraft((currentDraft) => ({
-                      ...currentDraft,
-                      temperature,
-                    }));
-                  }}
-                />
+            {parameterSupport?.temperature && (
+              <Field label={`Temperature ${draft.temperature.toFixed(1)}`}>
+                <div className="flex items-center gap-3">
+                  <Slider
+                    value={[draft.temperature]}
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    onValueChange={(value) => {
+                      const temperature = Array.isArray(value)
+                        ? (value[0] ?? 0.7)
+                        : value;
+                      setDraft((currentDraft) => ({
+                        ...currentDraft,
+                        temperature,
+                      }));
+                    }}
+                  />
+                  <Input
+                    aria-label="Temperature value"
+                    className="w-20"
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={draft.temperature}
+                    onChange={(event) =>
+                      setDraft((currentDraft) => ({
+                        ...currentDraft,
+                        temperature: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </div>
+              </Field>
+            )}
+            {parameterSupport?.outputLimit && (
+              <Field label="Output limit" htmlFor="output-limit">
                 <Input
-                  aria-label="Temperature value"
-                  className="w-20"
+                  id="output-limit"
                   type="number"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={draft.temperature}
+                  min={1}
+                  value={draft.outputLimit}
                   onChange={(event) =>
                     setDraft((currentDraft) => ({
                       ...currentDraft,
-                      temperature: Number(event.target.value),
+                      outputLimit: Number(event.target.value),
                     }))
                   }
                 />
-              </div>
-            </Field>
-            <Field label="Response length" htmlFor="max-tokens">
-              <Input
-                id="max-tokens"
-                type="number"
-                value={draft.maxTokens}
-                onChange={(event) =>
-                  setDraft((currentDraft) => ({
-                    ...currentDraft,
-                    maxTokens: Number(event.target.value),
-                  }))
-                }
-              />
-            </Field>
-            <div className="flex gap-2">
-              <Button disabled={isSaving} onClick={savePreset}>
+              </Field>
+            )}
+            {parameterSupport?.topP && (
+              <Field label="Top P" htmlFor="top-p">
+                <Input
+                  id="top-p"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={draft.topP ?? 1}
+                  onChange={(event) =>
+                    setDraft((currentDraft) => ({
+                      ...currentDraft,
+                      topP: Number(event.target.value),
+                    }))
+                  }
+                />
+              </Field>
+            )}
+            {parameterSupport?.frequencyPenalty && (
+              <Field label="Frequency Penalty" htmlFor="frequency-penalty">
+                <Input
+                  id="frequency-penalty"
+                  type="number"
+                  min={-2}
+                  max={2}
+                  step={0.1}
+                  value={draft.frequencyPenalty ?? 0}
+                  onChange={(event) =>
+                    setDraft((currentDraft) => ({
+                      ...currentDraft,
+                      frequencyPenalty: Number(event.target.value),
+                    }))
+                  }
+                />
+              </Field>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                disabled={isSaving || modelConnections.length === 0}
+                onClick={savePreset}
+              >
                 <GitBranchIcon />
                 {editingId ? "Save Preset" : "Add Preset"}
               </Button>
@@ -2662,7 +2851,7 @@ function PresetSettings({
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setDraft(emptyPreset(providers.at(0)?.id));
+                    setDraft(emptyPreset(modelConnections.at(0)?.id));
                     setEditingId(null);
                   }}
                 >

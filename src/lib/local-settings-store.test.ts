@@ -23,23 +23,23 @@ async function createHomeDirectory() {
 
 function createSettingsSnapshot() {
   return {
-    providers: [
+    modelConnections: [
       {
-        id: "provider-openai",
+        id: "connection-work-gateway",
         type: "openai",
-        name: "OpenAI Platform",
-        apiKey: "saved-key",
-        baseUrl: "https://api.openai.com/v1",
+        name: "Work gateway",
+        accessKey: "saved-key",
+        endpointUrl: "https://api.openai.com/v1",
       },
     ],
     modelPresets: [
       {
         id: "preset-writing",
         name: "Writing Model",
-        providerId: "provider-openai",
-        modelId: "gpt-4o",
+        modelConnectionId: "connection-work-gateway",
+        modelName: "gpt-4o",
         temperature: 0.7,
-        maxTokens: 1200,
+        outputLimit: 1200,
         testStatus: "idle",
       },
     ],
@@ -92,7 +92,7 @@ describe("local settings store", () => {
     expect(dataDirectory).toBe(path.join(homeDirectory, ".flowent"));
     expect(JSON.parse(fileContents)).toMatchObject({
       version: 1,
-      providers: settings.providers,
+      modelConnections: settings.modelConnections,
       modelPresets: settings.modelPresets,
       blueprints: settings.blueprints,
       roles: settings.roles,
@@ -110,7 +110,7 @@ describe("local settings store", () => {
     ).resolves.toMatchObject({
       status: "found",
       settings: {
-        providers: settings.providers,
+        modelConnections: settings.modelConnections,
         modelPresets: settings.modelPresets,
         blueprints: settings.blueprints,
         roles: settings.roles,
@@ -126,26 +126,73 @@ describe("local settings store", () => {
     );
   });
 
-  it("rejects settings with invalid provider or preset sections", () => {
+  it("rejects settings with invalid connection or preset sections", () => {
     expect(
       parseLocalSettingsSnapshot({
-        providers: [{ id: "provider-openai" }],
+        modelConnections: [{ id: "connection-work-gateway" }],
         modelPresets: [],
       }),
     ).toMatchObject({ ok: false });
 
     expect(
       parseLocalSettingsSnapshot({
-        providers: [],
+        modelConnections: [],
         modelPresets: [{ id: "preset-writing" }],
       }),
     ).toMatchObject({ ok: false });
   });
 
+  it("normalizes older saved connection settings", () => {
+    expect(
+      parseLocalSettingsSnapshot({
+        providers: [
+          {
+            id: "provider-openai",
+            type: "openai",
+            name: "OpenAI Platform",
+            apiKey: "saved-key",
+            baseUrl: "https://api.openai.com/v1",
+          },
+        ],
+        modelPresets: [
+          {
+            id: "preset-writing",
+            name: "Writing Model",
+            providerId: "provider-openai",
+            modelId: "gpt-4o",
+            temperature: 0.7,
+            maxTokens: 1200,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      ok: true,
+      settings: {
+        modelConnections: [
+          {
+            id: "connection-openai",
+            type: "openai",
+            name: "OpenAI Platform",
+            accessKey: "saved-key",
+            endpointUrl: "https://api.openai.com/v1",
+          },
+        ],
+        modelPresets: [
+          {
+            id: "preset-writing",
+            modelConnectionId: "connection-openai",
+            modelName: "gpt-4o",
+            outputLimit: 1200,
+          },
+        ],
+      },
+    });
+  });
+
   it("normalizes older blueprints that do not have run history", () => {
     expect(
       parseLocalSettingsSnapshot({
-        providers: [],
+        modelConnections: [],
         modelPresets: [],
         blueprints: [
           {
@@ -173,10 +220,64 @@ describe("local settings store", () => {
     });
   });
 
+  it("normalizes older run detail fields in saved blueprints", () => {
+    expect(
+      parseLocalSettingsSnapshot({
+        modelConnections: [],
+        modelPresets: [],
+        blueprints: [
+          {
+            id: "blueprint-run",
+            name: "Run Blueprint",
+            updatedAt: "2026-04-27T09:00:00.000Z",
+            lastRunStatus: "success",
+            summary: "Saved run.",
+            nodes: [
+              {
+                id: "agent-1",
+                data: {
+                  kind: "agent",
+                  errorMessage: "The provider returned an empty completion.",
+                  runDetails: {
+                    kind: "agent",
+                    modelId: "gpt-4o",
+                  },
+                },
+              },
+            ],
+            edges: [],
+            runHistory: [],
+            selectedRunId: null,
+          },
+        ],
+        roles: [],
+      }),
+    ).toMatchObject({
+      ok: true,
+      settings: {
+        blueprints: [
+          {
+            nodes: [
+              {
+                data: {
+                  errorMessage:
+                    "The selected service returned an empty response.",
+                  runDetails: {
+                    modelName: "gpt-4o",
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
   it("rejects malformed run history data", () => {
     expect(
       parseLocalSettingsSnapshot({
-        providers: [],
+        modelConnections: [],
         modelPresets: [],
         blueprints: [
           {

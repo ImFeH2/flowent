@@ -5,9 +5,9 @@ import {
   canvasSnapGrid,
   initialBlueprints,
   initialEdges,
+  initialModelConnections,
   initialModelPresets,
   initialNodes,
-  initialProviders,
   initialRoles,
   snapCanvasPosition,
   type FlowEdge,
@@ -38,7 +38,9 @@ function resetStore() {
       edges: cloneEdges(blueprint.edges),
     })),
     activeBlueprintId: initialBlueprints[0]?.id ?? null,
-    providers: initialProviders.map((provider) => ({ ...provider })),
+    modelConnections: initialModelConnections.map((connection) => ({
+      ...connection,
+    })),
     modelPresets: initialModelPresets.map((preset) => ({ ...preset })),
     roles: initialRoles.map((role) => ({ ...role })),
     nodes: cloneNodes(initialNodes),
@@ -135,23 +137,23 @@ describe("useFlowentWorkspaceStore", () => {
             JSON.stringify({
               saved: true,
               settings: {
-                providers: [
+                modelConnections: [
                   {
-                    id: "provider-custom-saved",
-                    type: "custom",
+                    id: "connection-saved",
+                    type: "gemini",
                     name: "Saved Gateway",
-                    apiKey: "saved-key",
-                    baseUrl: "http://localhost:4400/v1",
+                    accessKey: "saved-key",
+                    endpointUrl: "http://localhost:4400/v1",
                   },
                 ],
                 modelPresets: [
                   {
                     id: "preset-saved",
                     name: "Saved Model",
-                    providerId: "provider-custom-saved",
-                    modelId: "gpt-4.1",
+                    modelConnectionId: "connection-saved",
+                    modelName: "gemini-2.5-pro",
                     temperature: 0.4,
-                    maxTokens: 900,
+                    outputLimit: 900,
                   },
                 ],
                 blueprints: [
@@ -186,7 +188,7 @@ describe("useFlowentWorkspaceStore", () => {
     const state = useFlowentWorkspaceStore.getState();
 
     expect(state.localDataStatus).toBe("ready");
-    expect(state.providers[0]?.name).toBe("Saved Gateway");
+    expect(state.modelConnections[0]?.name).toBe("Saved Gateway");
     expect(state.modelPresets[0]?.name).toBe("Saved Model");
     expect(state.blueprints[0]?.name).toBe("Saved Blueprint");
     expect(state.activeBlueprintId).toBe("blueprint-saved");
@@ -221,7 +223,7 @@ describe("useFlowentWorkspaceStore", () => {
             JSON.stringify({
               saved: true,
               settings: {
-                providers: initialProviders,
+                modelConnections: initialModelConnections,
                 modelPresets: initialModelPresets,
                 blueprints: [
                   {
@@ -300,25 +302,117 @@ describe("useFlowentWorkspaceStore", () => {
       ),
     );
 
-    const saved = await useFlowentWorkspaceStore.getState().upsertProvider(
-      {
-        id: "",
-        type: "custom",
-        name: "Unsaved Gateway",
-        apiKey: "new-key",
-        baseUrl: "http://localhost:4500/v1",
-      },
-      null,
-    );
+    const saved = await useFlowentWorkspaceStore
+      .getState()
+      .upsertModelConnection(
+        {
+          id: "",
+          type: "openai-responses",
+          name: "Unsaved Gateway",
+          accessKey: "new-key",
+          endpointUrl: "http://localhost:4500/v1",
+        },
+        null,
+      );
 
     const state = useFlowentWorkspaceStore.getState();
 
     expect(saved).toBe(false);
     expect(
-      state.providers.some((provider) => provider.name === "Unsaved Gateway"),
+      state.modelConnections.some(
+        (connection) => connection.name === "Unsaved Gateway",
+      ),
     ).toBe(false);
     expect(state.localDataStatus).toBe("error");
     expect(state.localDataMessage).toBe("Settings could not be saved.");
+  });
+
+  it("keeps the saved access key when editing a connection with a blank key", async () => {
+    mockSuccessfulSettingsSave();
+
+    const saved = await useFlowentWorkspaceStore
+      .getState()
+      .upsertModelConnection(
+        {
+          id: "connection-work-gateway",
+          type: "openai-responses",
+          name: "Updated gateway",
+          accessKey: "",
+          endpointUrl: " http://localhost:4500/v1 ",
+        },
+        "connection-work-gateway",
+      );
+
+    const connection = useFlowentWorkspaceStore
+      .getState()
+      .modelConnections.find((item) => item.id === "connection-work-gateway");
+
+    expect(saved).toBe(true);
+    expect(connection).toMatchObject({
+      type: "openai-responses",
+      name: "Updated gateway",
+      accessKey: "saved-demo-key",
+      endpointUrl: "http://localhost:4500/v1",
+    });
+  });
+
+  it("removes presets that depend on a deleted connection", async () => {
+    mockSuccessfulSettingsSave();
+
+    const saved = await useFlowentWorkspaceStore
+      .getState()
+      .deleteModelConnection("connection-work-gateway");
+
+    const state = useFlowentWorkspaceStore.getState();
+
+    expect(saved).toBe(true);
+    expect(
+      state.modelConnections.some(
+        (connection) => connection.id === "connection-work-gateway",
+      ),
+    ).toBe(false);
+    expect(
+      state.modelPresets.some((preset) => preset.id === "preset-writing"),
+    ).toBe(false);
+    expect(
+      state.modelPresets.some(
+        (preset) => preset.modelConnectionId === "connection-work-gateway",
+      ),
+    ).toBe(false);
+  });
+
+  it("tests model presets against saved connection details", () => {
+    useFlowentWorkspaceStore.getState().testModelPreset("preset-writing");
+
+    expect(
+      useFlowentWorkspaceStore
+        .getState()
+        .modelPresets.find((preset) => preset.id === "preset-writing"),
+    ).toMatchObject({
+      testStatus: "success",
+      testMessage: "Connection details are ready for testing.",
+    });
+
+    useFlowentWorkspaceStore.setState({
+      modelConnections: useFlowentWorkspaceStore
+        .getState()
+        .modelConnections.map((connection) =>
+          connection.id === "connection-work-gateway"
+            ? { ...connection, accessKey: "" }
+            : connection,
+        ),
+    });
+
+    useFlowentWorkspaceStore.getState().testModelPreset("preset-writing");
+
+    expect(
+      useFlowentWorkspaceStore
+        .getState()
+        .modelPresets.find((preset) => preset.id === "preset-writing"),
+    ).toMatchObject({
+      testStatus: "error",
+      testMessage: "Add a saved access key and model name first.",
+    });
   });
 
   it("creates a blank blueprint and makes it current", () => {

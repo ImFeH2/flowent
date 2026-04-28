@@ -27,23 +27,23 @@ async function importSettingsRoute(homeDirectory: string) {
 
 function createSettingsSnapshot() {
   return {
-    providers: [
+    modelConnections: [
       {
-        id: "provider-custom",
-        type: "custom",
-        name: "Local Gateway",
-        apiKey: "saved-key",
-        baseUrl: "http://localhost:4000/v1",
+        id: "connection-local-service",
+        type: "openai-responses",
+        name: "Local model service",
+        accessKey: "saved-key",
+        endpointUrl: "http://localhost:4000/v1",
       },
     ],
     modelPresets: [
       {
         id: "preset-review",
         name: "Review Model",
-        providerId: "provider-custom",
-        modelId: "gpt-4.1",
+        modelConnectionId: "connection-local-service",
+        modelName: "gpt-4.1",
         temperature: 0.2,
-        maxTokens: 1800,
+        outputLimit: 1800,
       },
     ],
     blueprints: [],
@@ -98,7 +98,7 @@ describe("settings route", () => {
       saved: true,
       settings: {
         version: 1,
-        providers: settings.providers,
+        modelConnections: settings.modelConnections,
         modelPresets: settings.modelPresets,
         blueprints: settings.blueprints,
         roles: settings.roles,
@@ -108,7 +108,7 @@ describe("settings route", () => {
     await expect(readResponse.json()).resolves.toMatchObject({
       saved: true,
       settings: {
-        providers: settings.providers,
+        modelConnections: settings.modelConnections,
         modelPresets: settings.modelPresets,
       },
     });
@@ -134,7 +134,7 @@ describe("settings route", () => {
     const route = await importSettingsRoute(await createHomeDirectory());
     const response = await route.PUT(
       settingsRequest({
-        providers: "provider-openai",
+        modelConnections: "connection-work-gateway",
         modelPresets: [],
       }),
     );

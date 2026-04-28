@@ -15,8 +15,8 @@ import { create } from "zustand";
 import {
   createNode,
   initialBlueprints,
+  initialModelConnections,
   initialModelPresets,
-  initialProviders,
   initialRoles,
   snapCanvasPosition,
   availableTools,
@@ -24,9 +24,9 @@ import {
   type CanvasMode,
   type FlowEdge,
   type FlowNode,
+  type ModelConnection,
   type ModelPreset,
   type NodeRunDetails,
-  type Provider,
   type Role,
   type RunStatus,
   type WorkflowNodeData,
@@ -37,7 +37,7 @@ import {
 type WorkspaceState = {
   blueprints: BlueprintAsset[];
   activeBlueprintId: string | null;
-  providers: Provider[];
+  modelConnections: ModelConnection[];
   modelPresets: ModelPreset[];
   roles: Role[];
   nodes: FlowNode[];
@@ -72,11 +72,11 @@ type WorkspaceActions = {
   finishWorkflowRun: () => void;
   selectWorkflowRun: (runId: string) => void;
   returnToBlueprintMode: () => void;
-  upsertProvider: (
-    provider: Provider,
+  upsertModelConnection: (
+    modelConnection: ModelConnection,
     editingId: string | null,
   ) => Promise<boolean>;
-  deleteProvider: (providerId: string) => Promise<boolean>;
+  deleteModelConnection: (modelConnectionId: string) => Promise<boolean>;
   upsertModelPreset: (
     modelPreset: ModelPreset,
     editingId: string | null,
@@ -92,7 +92,7 @@ export type FlowentWorkspaceStore = WorkspaceState & WorkspaceActions;
 
 type LocalSettingsSnapshot = {
   version?: number;
-  providers: Provider[];
+  modelConnections: ModelConnection[];
   modelPresets: ModelPreset[];
   blueprints: BlueprintAsset[];
   roles: Role[];
@@ -164,8 +164,8 @@ function cloneWorkflowRuns(runHistory: WorkflowRun[] | undefined) {
   return (runHistory ?? []).map(cloneWorkflowRun);
 }
 
-function cloneProviders(providers: Provider[]) {
-  return providers.map((provider) => ({ ...provider }));
+function cloneModelConnections(modelConnections: ModelConnection[]) {
+  return modelConnections.map((modelConnection) => ({ ...modelConnection }));
 }
 
 function cloneModelPresets(modelPresets: ModelPreset[]) {
@@ -239,7 +239,7 @@ function createLocalSettingsSnapshot(
   state: WorkspaceState,
 ): LocalSettingsSnapshot {
   return {
-    providers: cloneProviders(state.providers),
+    modelConnections: cloneModelConnections(state.modelConnections),
     modelPresets: cloneModelPresets(state.modelPresets),
     blueprints: state.blueprints.map(cloneBlueprint),
     roles: cloneRoles(state.roles),
@@ -313,7 +313,7 @@ function applyLocalSettingsSnapshot(
   );
 
   return {
-    providers: cloneProviders(snapshot.providers),
+    modelConnections: cloneModelConnections(snapshot.modelConnections),
     modelPresets: cloneModelPresets(snapshot.modelPresets),
     blueprints,
     activeBlueprintId,
@@ -560,7 +560,7 @@ function buildNodeRunDetails(
     inputPayload: upstreamPayload,
     outputPayload,
     modelPresetName: preset?.name,
-    modelId: preset?.modelId,
+    modelName: preset?.modelName,
     conversation: [
       {
         id: `${node.id}-system`,
@@ -697,7 +697,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
   return {
     blueprints: initialBlueprints.map(cloneBlueprint),
     activeBlueprintId: initialBlueprints[0]?.id ?? null,
-    providers: cloneProviders(initialProviders),
+    modelConnections: cloneModelConnections(initialModelConnections),
     modelPresets: cloneModelPresets(initialModelPresets),
     roles: cloneRoles(initialRoles),
     nodes: cloneNodes(initialBlueprints[0]?.nodes ?? []),
@@ -1224,18 +1224,18 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
         };
       }),
 
-    upsertProvider: (provider, editingId) =>
+    upsertModelConnection: (modelConnection, editingId) =>
       commitLocalDataChange((state) => {
         if (editingId) {
           return {
-            providers: state.providers.map((item) =>
+            modelConnections: state.modelConnections.map((item) =>
               item.id === editingId
                 ? {
                     ...item,
-                    type: provider.type,
-                    name: provider.name.trim(),
-                    apiKey: provider.apiKey || item.apiKey,
-                    baseUrl: provider.baseUrl.trim(),
+                    type: modelConnection.type,
+                    name: modelConnection.name.trim(),
+                    accessKey: modelConnection.accessKey || item.accessKey,
+                    endpointUrl: modelConnection.endpointUrl.trim(),
                   }
                 : item,
             ),
@@ -1243,27 +1243,27 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
         }
 
         return {
-          providers: state.providers.concat({
-            ...provider,
-            id: makeId("provider"),
-            name: provider.name.trim(),
-            apiKey: provider.apiKey.trim(),
-            baseUrl: provider.baseUrl.trim(),
+          modelConnections: state.modelConnections.concat({
+            ...modelConnection,
+            id: makeId("connection"),
+            name: modelConnection.name.trim(),
+            accessKey: modelConnection.accessKey.trim(),
+            endpointUrl: modelConnection.endpointUrl.trim(),
           }),
         };
       }),
 
-    deleteProvider: (providerId) =>
+    deleteModelConnection: (modelConnectionId) =>
       commitLocalDataChange((state) => {
         const removedPresetIds = new Set(
           state.modelPresets
-            .filter((preset) => preset.providerId === providerId)
+            .filter((preset) => preset.modelConnectionId === modelConnectionId)
             .map((preset) => preset.id),
         );
 
         return {
-          providers: state.providers.filter(
-            (provider) => provider.id !== providerId,
+          modelConnections: state.modelConnections.filter(
+            (modelConnection) => modelConnection.id !== modelConnectionId,
           ),
           modelPresets: state.modelPresets.filter(
             (preset) => !removedPresetIds.has(preset.id),
@@ -1281,7 +1281,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
                     ...modelPreset,
                     id: editingId,
                     name: modelPreset.name.trim(),
-                    modelId: modelPreset.modelId.trim(),
+                    modelName: modelPreset.modelName.trim(),
                     testStatus: "idle",
                     testMessage: undefined,
                   }
@@ -1295,7 +1295,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
             ...modelPreset,
             id: makeId("preset"),
             name: modelPreset.name.trim(),
-            modelId: modelPreset.modelId.trim(),
+            modelName: modelPreset.modelName.trim(),
             testStatus: "idle",
             testMessage: undefined,
           }),
@@ -1320,19 +1320,19 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
             return preset;
           }
 
-          const provider = state.providers.find(
-            (item) => item.id === preset.providerId,
+          const modelConnection = state.modelConnections.find(
+            (item) => item.id === preset.modelConnectionId,
           );
           const hasRequiredFields = Boolean(
-            provider?.apiKey && preset.modelId.trim(),
+            modelConnection?.accessKey && preset.modelName.trim(),
           );
 
           return {
             ...preset,
             testStatus: hasRequiredFields ? "success" : "error",
             testMessage: hasRequiredFields
-              ? "Saved provider fields are ready for connection testing."
-              : "Add a saved provider key and model ID first.",
+              ? "Connection details are ready for testing."
+              : "Add a saved access key and model name first.",
           };
         }),
       })),

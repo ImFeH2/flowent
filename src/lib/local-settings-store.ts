@@ -4,8 +4,8 @@ import path from "node:path";
 
 import type {
   BlueprintAsset,
+  ModelConnection,
   ModelPreset,
-  Provider,
   Role,
   WorkflowRun,
 } from "@/components/flowent/model";
@@ -14,7 +14,18 @@ const localDataDirectoryName = ".flowent";
 const localSettingsFileName = "settings.json";
 const localSettingsVersion = 1;
 
-const providerTypes = new Set(["openai", "anthropic", "custom"]);
+const connectionTypes = new Set([
+  "openai",
+  "openai-responses",
+  "anthropic",
+  "gemini",
+]);
+const legacyConnectionTypes = new Set(["openai", "anthropic", "custom"]);
+const legacyConnectionTypeMap: Record<string, ModelConnection["type"]> = {
+  openai: "openai",
+  anthropic: "anthropic",
+  custom: "openai",
+};
 const modelPresetTestStatuses = new Set(["idle", "success", "error"]);
 const blueprintLastRunStatuses = new Set([
   "not-run",
@@ -26,7 +37,7 @@ const workflowRunStatuses = new Set(["running", "success", "error"]);
 
 export type LocalSettingsSnapshot = {
   version: typeof localSettingsVersion;
-  providers: Provider[];
+  modelConnections: ModelConnection[];
   modelPresets: ModelPreset[];
   blueprints: BlueprintAsset[];
   roles: Role[];
@@ -73,15 +84,46 @@ function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || isString(value);
 }
 
-function isProvider(value: unknown): value is Provider {
+function isModelConnection(value: unknown): value is ModelConnection {
   return (
     isRecord(value) &&
     isString(value.id) &&
-    providerTypes.has(value.type as string) &&
+    connectionTypes.has(value.type as string) &&
     isString(value.name) &&
-    isString(value.apiKey) &&
-    isString(value.baseUrl)
+    isString(value.accessKey) &&
+    isString(value.endpointUrl)
   );
+}
+
+function modelConnectionIdFromLegacyId(id: string) {
+  return id.startsWith("provider-")
+    ? `connection-${id.slice("provider-".length)}`
+    : id;
+}
+
+function parseModelConnection(value: unknown): ModelConnection | null {
+  if (isModelConnection(value)) {
+    return value;
+  }
+
+  if (
+    !isRecord(value) ||
+    !isString(value.id) ||
+    !legacyConnectionTypes.has(value.type as string) ||
+    !isString(value.name) ||
+    !isString(value.apiKey) ||
+    !isString(value.baseUrl)
+  ) {
+    return null;
+  }
+
+  return {
+    id: modelConnectionIdFromLegacyId(value.id),
+    type: legacyConnectionTypeMap[value.type as string] ?? "openai",
+    name: value.name,
+    accessKey: value.apiKey,
+    endpointUrl: value.baseUrl,
+  };
 }
 
 function isModelPreset(value: unknown): value is ModelPreset {
@@ -89,14 +131,52 @@ function isModelPreset(value: unknown): value is ModelPreset {
     isRecord(value) &&
     isString(value.id) &&
     isString(value.name) &&
-    isString(value.providerId) &&
-    isString(value.modelId) &&
+    isString(value.modelConnectionId) &&
+    isString(value.modelName) &&
     isFiniteNumber(value.temperature) &&
-    isFiniteNumber(value.maxTokens) &&
+    isFiniteNumber(value.outputLimit) &&
+    (value.topP === undefined || isFiniteNumber(value.topP)) &&
+    (value.frequencyPenalty === undefined ||
+      isFiniteNumber(value.frequencyPenalty)) &&
     (value.testStatus === undefined ||
       modelPresetTestStatuses.has(value.testStatus as string)) &&
     isOptionalString(value.testMessage)
   );
+}
+
+function parseModelPreset(value: unknown): ModelPreset | null {
+  if (isModelPreset(value)) {
+    return value;
+  }
+
+  if (
+    !isRecord(value) ||
+    !isString(value.id) ||
+    !isString(value.name) ||
+    !isString(value.providerId) ||
+    !isString(value.modelId) ||
+    !isFiniteNumber(value.temperature) ||
+    !isFiniteNumber(value.maxTokens)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    name: value.name,
+    modelConnectionId: modelConnectionIdFromLegacyId(value.providerId),
+    modelName: value.modelId,
+    temperature: value.temperature,
+    outputLimit: value.maxTokens,
+    testStatus:
+      value.testStatus === undefined ||
+      modelPresetTestStatuses.has(value.testStatus as string)
+        ? (value.testStatus as ModelPreset["testStatus"])
+        : undefined,
+    testMessage: isOptionalString(value.testMessage)
+      ? value.testMessage
+      : undefined,
+  };
 }
 
 function isRole(value: unknown): value is Role {
@@ -131,19 +211,63 @@ function isPlainJsonValue(value: unknown): boolean {
   return false;
 }
 
-function isWorkflowRun(value: unknown): value is WorkflowRun {
-  return (
-    isRecord(value) &&
-    isString(value.id) &&
-    isString(value.startedAt) &&
-    isString(value.updatedAt) &&
-    workflowRunStatuses.has(value.status as string) &&
-    isString(value.summary) &&
-    Array.isArray(value.nodes) &&
-    value.nodes.every(isPlainJsonValue) &&
-    Array.isArray(value.edges) &&
-    value.edges.every(isPlainJsonValue)
+function normalizeSavedJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(normalizeSavedJson);
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const normalized = Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, normalizeSavedJson(item)]),
   );
+
+  if (
+    normalized.errorMessage === "The provider returned an empty completion."
+  ) {
+    normalized.errorMessage =
+      "The selected service returned an empty response.";
+  }
+
+  if (
+    normalized.kind === "agent" &&
+    isString(normalized.modelId) &&
+    normalized.modelName === undefined
+  ) {
+    normalized.modelName = normalized.modelId;
+    delete normalized.modelId;
+  }
+
+  return normalized;
+}
+
+function parseWorkflowRun(value: unknown): WorkflowRun | null {
+  if (
+    !isRecord(value) ||
+    !isString(value.id) ||
+    !isString(value.startedAt) ||
+    !isString(value.updatedAt) ||
+    !workflowRunStatuses.has(value.status as string) ||
+    !isString(value.summary) ||
+    !Array.isArray(value.nodes) ||
+    !value.nodes.every(isPlainJsonValue) ||
+    !Array.isArray(value.edges) ||
+    !value.edges.every(isPlainJsonValue)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    startedAt: value.startedAt,
+    updatedAt: value.updatedAt,
+    status: value.status as WorkflowRun["status"],
+    summary: value.summary,
+    nodes: value.nodes.map(normalizeSavedJson) as WorkflowRun["nodes"],
+    edges: value.edges.map(normalizeSavedJson) as WorkflowRun["edges"],
+  };
 }
 
 function parseBlueprintAsset(value: unknown): BlueprintAsset | null {
@@ -166,11 +290,13 @@ function parseBlueprintAsset(value: unknown): BlueprintAsset | null {
     return null;
   }
 
-  const runHistory = value.runHistory ?? [];
+  const parsedRunHistory = (value.runHistory ?? []).map(parseWorkflowRun);
 
-  if (!runHistory.every(isWorkflowRun)) {
+  if (parsedRunHistory.some((run) => !run)) {
     return null;
   }
+
+  const runHistory = parsedRunHistory as WorkflowRun[];
 
   if (
     value.selectedRunId !== undefined &&
@@ -192,8 +318,8 @@ function parseBlueprintAsset(value: unknown): BlueprintAsset | null {
     updatedAt: value.updatedAt,
     lastRunStatus: value.lastRunStatus as BlueprintAsset["lastRunStatus"],
     summary: value.summary,
-    nodes: value.nodes as BlueprintAsset["nodes"],
-    edges: value.edges as BlueprintAsset["edges"],
+    nodes: value.nodes.map(normalizeSavedJson) as BlueprintAsset["nodes"],
+    edges: value.edges.map(normalizeSavedJson) as BlueprintAsset["edges"],
     runHistory,
     selectedRunId,
   };
@@ -216,6 +342,27 @@ function validateArray<T>(
   }
 
   return { ok: true as const, value };
+}
+
+function parseArray<T>(
+  value: unknown,
+  name: string,
+  parser: (item: unknown) => T | null,
+) {
+  if (!Array.isArray(value)) {
+    return { ok: false as const, message: `${name} must be a list.` };
+  }
+
+  const items = value.map(parser);
+
+  if (items.some((item) => !item)) {
+    return {
+      ok: false as const,
+      message: `${name} contains an item with an invalid format.`,
+    };
+  }
+
+  return { ok: true as const, value: items as T[] };
 }
 
 function validateBlueprints(value: unknown) {
@@ -243,22 +390,41 @@ export function parseLocalSettingsSnapshot(value: unknown): ValidationResult {
     };
   }
 
-  const providerResult = validateArray(
-    value.providers,
-    "providers",
-    isProvider,
+  const rawModelConnections =
+    value.modelConnections ??
+    (value.providers !== undefined ? value.providers : undefined);
+  const modelConnectionResult = parseArray(
+    rawModelConnections,
+    "modelConnections",
+    parseModelConnection,
   );
-  if (!providerResult.ok) {
-    return providerResult;
+  if (!modelConnectionResult.ok) {
+    return modelConnectionResult;
   }
 
-  const modelPresetResult = validateArray(
+  const modelPresetResult = parseArray(
     value.modelPresets,
     "modelPresets",
-    isModelPreset,
+    parseModelPreset,
   );
   if (!modelPresetResult.ok) {
     return modelPresetResult;
+  }
+
+  const modelConnectionIds = new Set(
+    modelConnectionResult.value.map((connection) => connection.id),
+  );
+
+  if (
+    modelPresetResult.value.some(
+      (preset) => !modelConnectionIds.has(preset.modelConnectionId),
+    )
+  ) {
+    return {
+      ok: false,
+      message:
+        "modelPresets contains an item with an unavailable model connection.",
+    };
   }
 
   const blueprintResult = validateBlueprints(value.blueprints ?? []);
@@ -275,7 +441,7 @@ export function parseLocalSettingsSnapshot(value: unknown): ValidationResult {
     ok: true,
     settings: {
       version: localSettingsVersion,
-      providers: providerResult.value,
+      modelConnections: modelConnectionResult.value,
       modelPresets: modelPresetResult.value,
       blueprints: blueprintResult.value,
       roles: roleResult.value,

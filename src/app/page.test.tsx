@@ -15,9 +15,9 @@ import {
   canvasSnapGrid,
   initialBlueprints,
   initialEdges,
+  initialModelConnections,
   initialModelPresets,
   initialNodes,
-  initialProviders,
   initialRoles,
 } from "@/components/flowent/model";
 import { useFlowentWorkspaceStore } from "@/components/flowent/workspace-store";
@@ -174,7 +174,9 @@ function resetWorkspaceStore() {
       edges: blueprint.edges.map((edge) => ({ ...edge })),
     })),
     activeBlueprintId: initialBlueprints[0]?.id ?? null,
-    providers: initialProviders.map((provider) => ({ ...provider })),
+    modelConnections: initialModelConnections.map((connection) => ({
+      ...connection,
+    })),
     modelPresets: initialModelPresets.map((preset) => ({ ...preset })),
     roles: initialRoles.map((role) => ({ ...role })),
     nodes: initialNodes.map((node) => ({
@@ -428,11 +430,14 @@ describe("Home", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Settings" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Providers" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Connections" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("tab", { name: "Model Presets" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("OpenAI Platform")).toBeInTheDocument();
+    expect(screen.getByText("Work gateway")).toBeInTheDocument();
+    expect(screen.getAllByText("Endpoint URL:").length).toBeGreaterThan(0);
   });
 
   it("defaults to dark mode and saves the selected theme", () => {

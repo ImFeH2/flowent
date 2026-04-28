@@ -10,7 +10,11 @@ export type BlueprintLastRunStatus =
   | "success"
   | "error";
 export type WorkflowRunStatus = Exclude<BlueprintLastRunStatus, "not-run">;
-export type ProviderType = "openai" | "anthropic" | "custom";
+export type ConnectionType =
+  | "openai"
+  | "openai-responses"
+  | "anthropic"
+  | "gemini";
 export type RuntimeConversationRole =
   | "system"
   | "user"
@@ -34,7 +38,7 @@ export type AgentRunDetails = {
   inputPayload: string;
   outputPayload: string;
   modelPresetName?: string;
-  modelId?: string;
+  modelName?: string;
   conversation: RuntimeConversationEntry[];
 };
 
@@ -96,21 +100,23 @@ export function snapCanvasPosition(position: XYPosition): XYPosition {
   };
 }
 
-export type Provider = {
+export type ModelConnection = {
   id: string;
-  type: ProviderType;
+  type: ConnectionType;
   name: string;
-  apiKey: string;
-  baseUrl: string;
+  accessKey: string;
+  endpointUrl: string;
 };
 
 export type ModelPreset = {
   id: string;
   name: string;
-  providerId: string;
-  modelId: string;
+  modelConnectionId: string;
+  modelName: string;
   temperature: number;
-  maxTokens: number;
+  outputLimit: number;
+  topP?: number;
+  frequencyPenalty?: number;
   testStatus?: "idle" | "success" | "error";
   testMessage?: string;
 };
@@ -123,10 +129,46 @@ export type Role = {
   modelPresetId: string;
 };
 
-export const providerTypeLabels: Record<ProviderType, string> = {
+export const connectionTypeLabels: Record<ConnectionType, string> = {
   openai: "OpenAI",
+  "openai-responses": "OpenAI Responses",
   anthropic: "Anthropic",
-  custom: "Custom (OpenAI Compatible)",
+  gemini: "Gemini",
+};
+
+export const connectionTypeParameterSupport: Record<
+  ConnectionType,
+  {
+    temperature: boolean;
+    outputLimit: boolean;
+    topP: boolean;
+    frequencyPenalty: boolean;
+  }
+> = {
+  openai: {
+    temperature: true,
+    outputLimit: true,
+    topP: true,
+    frequencyPenalty: true,
+  },
+  "openai-responses": {
+    temperature: true,
+    outputLimit: true,
+    topP: true,
+    frequencyPenalty: true,
+  },
+  anthropic: {
+    temperature: true,
+    outputLimit: true,
+    topP: true,
+    frequencyPenalty: false,
+  },
+  gemini: {
+    temperature: true,
+    outputLimit: true,
+    topP: true,
+    frequencyPenalty: true,
+  },
 };
 
 export const runStatusLabels: Record<RunStatus, string> = {
@@ -142,20 +184,20 @@ export const availableTools = [
   { id: "code-execution", label: "Code Execution" },
 ];
 
-export const initialProviders: Provider[] = [
+export const initialModelConnections: ModelConnection[] = [
   {
-    id: "provider-openai",
+    id: "connection-work-gateway",
     type: "openai",
-    name: "OpenAI Platform",
-    apiKey: "saved-demo-key",
-    baseUrl: "https://api.openai.com/v1",
+    name: "Work gateway",
+    accessKey: "saved-demo-key",
+    endpointUrl: "https://api.openai.com/v1",
   },
   {
-    id: "provider-custom",
-    type: "custom",
-    name: "Local Gateway",
-    apiKey: "saved-demo-key",
-    baseUrl: "http://localhost:4000/v1",
+    id: "connection-local-service",
+    type: "openai-responses",
+    name: "Local model service",
+    accessKey: "saved-demo-key",
+    endpointUrl: "http://localhost:4000/v1",
   },
 ];
 
@@ -163,19 +205,19 @@ export const initialModelPresets: ModelPreset[] = [
   {
     id: "preset-writing",
     name: "Writing Model",
-    providerId: "provider-openai",
-    modelId: "gpt-4o",
+    modelConnectionId: "connection-work-gateway",
+    modelName: "gpt-4o",
     temperature: 0.7,
-    maxTokens: 1200,
+    outputLimit: 1200,
     testStatus: "idle",
   },
   {
     id: "preset-review",
     name: "Review Model",
-    providerId: "provider-custom",
-    modelId: "gpt-4.1",
+    modelConnectionId: "connection-local-service",
+    modelName: "gpt-4.1",
     temperature: 0.2,
-    maxTokens: 1800,
+    outputLimit: 1800,
     testStatus: "idle",
   },
 ];
@@ -252,7 +294,7 @@ export const initialNodes: FlowNode[] = [
         "Review the upstream result in {{input}} for clarity, accuracy, and next actions.",
       tools: ["code-execution"],
       status: "idle",
-      errorMessage: "The provider returned an empty completion.",
+      errorMessage: "The selected service returned an empty response.",
     },
   },
 ];

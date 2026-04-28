@@ -1137,7 +1137,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
         const run: WorkflowRun = {
           ...selectedRun,
           updatedAt: new Date().toISOString(),
-          status: "success",
+          status: "succeeded",
           summary: "Run completed.",
           nodes: cloneNodes(nodes),
           edges: cloneEdges(edges),

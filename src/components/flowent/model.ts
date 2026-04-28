@@ -9,7 +9,12 @@ export type BlueprintLastRunStatus =
   | "running"
   | "success"
   | "error";
-export type WorkflowRunStatus = Exclude<BlueprintLastRunStatus, "not-run">;
+export type WorkflowRunStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "canceled";
 export type ConnectionType =
   | "openai"
   | "openai-responses"
@@ -169,6 +174,14 @@ export const connectionTypeParameterSupport: Record<
     topP: true,
     frequencyPenalty: true,
   },
+};
+
+export const workflowRunStatusLabels: Record<WorkflowRunStatus, string> = {
+  queued: "Queued",
+  running: "Running",
+  succeeded: "Succeeded",
+  failed: "Failed",
+  canceled: "Canceled",
 };
 
 export const runStatusLabels: Record<RunStatus, string> = {

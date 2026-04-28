@@ -20,12 +20,11 @@ import {
   Clock3Icon,
   CopyIcon,
   GitBranchIcon,
-  HistoryIcon,
+  ListChecksIcon,
   LockIcon,
   MessageSquareIcon,
   PanelRightIcon,
   PanelLeftCloseIcon,
-  PanelLeftOpenIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -79,6 +78,7 @@ import {
   connectionTypeLabels,
   connectionTypeParameterSupport,
   runStatusLabels,
+  workflowRunStatusLabels,
   type BlueprintAsset,
   type BlueprintLastRunStatus,
   type CanvasMode,
@@ -282,7 +282,7 @@ function FlowentWorkspaceShell() {
   const { fitView, screenToFlowPosition, setViewport } = useReactFlow();
   const [activeView, setActiveView] = useState<AppView>("workspace");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [runHistoryCollapsed, setRunHistoryCollapsed] = useState(false);
+  const [runsCollapsed, setRunsCollapsed] = useState(false);
   const {
     blueprints,
     activeBlueprintId,
@@ -432,7 +432,7 @@ function FlowentWorkspaceShell() {
     returnToBlueprintMode();
   }, [clearRunTimers, returnToBlueprintMode]);
 
-  const selectRunHistoryItem = useCallback(
+  const selectRunItem = useCallback(
     (runId: string) => {
       clearRunTimers();
       selectWorkflowRun(runId);
@@ -521,31 +521,27 @@ function FlowentWorkspaceShell() {
       >
         <AppSidebar
           activeView={activeView}
+          activeBlueprint={activeBlueprint}
+          activeRunId={
+            canvasMode === "workflow" ? activeBlueprint?.selectedRunId : null
+          }
           collapsed={sidebarCollapsed}
+          runsCollapsed={runsCollapsed}
+          runBlockReason={runBlockReason}
           onNavigate={setActiveView}
+          onRun={runWorkflow}
+          onSelectRun={selectRunItem}
           onToggleCollapsed={() =>
             setSidebarCollapsed((collapsed) => !collapsed)
+          }
+          onToggleRunsCollapsed={() =>
+            setRunsCollapsed((collapsed) => !collapsed)
           }
         />
         <div className="min-w-0 flex-1">
           {activeView === "blueprint" ? (
             activeBlueprint ? (
-              <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[auto_minmax(0,1fr)_23rem] lg:grid-rows-1">
-                <RunHistorySidebar
-                  collapsed={runHistoryCollapsed}
-                  runHistory={activeBlueprint.runHistory}
-                  activeRunId={
-                    canvasMode === "workflow"
-                      ? activeBlueprint.selectedRunId
-                      : null
-                  }
-                  runBlockReason={runBlockReason}
-                  onToggleCollapsed={() =>
-                    setRunHistoryCollapsed((collapsed) => !collapsed)
-                  }
-                  onSelectRun={selectRunHistoryItem}
-                  onRun={runWorkflow}
-                />
+              <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
                 <CanvasWorkspace
                   blueprintName={activeBlueprint.name}
                   nodes={nodesWithContext}
@@ -622,22 +618,38 @@ function FlowentWorkspaceShell() {
 
 function AppSidebar({
   activeView,
+  activeBlueprint,
+  activeRunId,
   collapsed,
+  runsCollapsed,
+  runBlockReason,
   onNavigate,
+  onRun,
+  onSelectRun,
   onToggleCollapsed,
+  onToggleRunsCollapsed,
 }: {
   activeView: AppView;
+  activeBlueprint: BlueprintAsset | null;
+  activeRunId: string | null | undefined;
   collapsed: boolean;
+  runsCollapsed: boolean;
+  runBlockReason: string | null;
   onNavigate: (view: AppView) => void;
+  onRun: () => void;
+  onSelectRun: (runId: string) => void;
   onToggleCollapsed: () => void;
+  onToggleRunsCollapsed: () => void;
 }) {
+  const showRuns = activeView === "blueprint" && Boolean(activeBlueprint);
+
   return (
     <motion.aside
       animate={{ width: collapsed ? 72 : 232 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
       className="shrink-0 border-r bg-sidebar text-sidebar-foreground"
     >
-      <div className="flex h-full flex-col gap-4 p-3">
+      <div className="flex h-full min-h-0 flex-col gap-4 p-3">
         <div
           className={cn(
             "flex items-center gap-3",
@@ -670,6 +682,19 @@ function AppSidebar({
             />
           ))}
         </nav>
+        {showRuns && activeBlueprint && (
+          <RunsSidebarSection
+            activeRunId={activeRunId ?? null}
+            collapsed={collapsed}
+            runsCollapsed={runsCollapsed}
+            runBlockReason={runBlockReason}
+            runs={activeBlueprint.runHistory}
+            onExpandSidebar={onToggleCollapsed}
+            onRun={onRun}
+            onSelectRun={onSelectRun}
+            onToggleRunsCollapsed={onToggleRunsCollapsed}
+          />
+        )}
         <div className="mt-auto space-y-3">
           <Separator />
           <ThemeToggle collapsed={collapsed} />
@@ -1007,14 +1032,18 @@ function formatRunDate(value: string) {
   }).format(new Date(value));
 }
 
-function getRunStatusVariant(
+function getWorkflowRunStatusVariant(
   status: WorkflowRunStatus,
-): "default" | "secondary" | "destructive" {
-  if (status === "error") {
+): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "failed") {
     return "destructive";
   }
 
-  return status === "success" ? "default" : "secondary";
+  if (status === "succeeded") {
+    return "default";
+  }
+
+  return status === "canceled" ? "outline" : "secondary";
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
@@ -1028,45 +1057,72 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RunHistorySidebar({
+function RunsSidebarSection({
   collapsed,
-  runHistory,
+  runs,
   activeRunId,
+  runsCollapsed,
   runBlockReason,
-  onToggleCollapsed,
+  onExpandSidebar,
+  onToggleRunsCollapsed,
   onSelectRun,
   onRun,
 }: {
   collapsed: boolean;
-  runHistory: WorkflowRun[];
+  runs: WorkflowRun[];
   activeRunId: string | null;
+  runsCollapsed: boolean;
   runBlockReason: string | null;
-  onToggleCollapsed: () => void;
+  onExpandSidebar: () => void;
+  onToggleRunsCollapsed: () => void;
   onSelectRun: (runId: string) => void;
   onRun: () => void;
 }) {
   if (collapsed) {
     const showButton = (
       <Button
-        variant="outline"
+        variant="ghost"
         size="icon"
-        aria-label="Show run history"
-        onClick={onToggleCollapsed}
+        aria-label="Show runs"
+        onClick={onExpandSidebar}
       >
-        <PanelLeftOpenIcon />
+        <ListChecksIcon />
       </Button>
     );
 
     return (
-      <aside className="flex items-center justify-between gap-3 border-b bg-card px-4 py-3 lg:min-h-0 lg:w-14 lg:flex-col lg:justify-start lg:border-b-0 lg:border-r lg:px-2">
-        <Tooltip>
-          <TooltipTrigger render={showButton} />
-          <TooltipContent side="right">Show run history</TooltipContent>
-        </Tooltip>
-        <Badge variant="outline" className="lg:rotate-90">
-          {runHistory.length}
-        </Badge>
-      </aside>
+      <section className="space-y-2">
+        <Separator />
+        <div className="flex flex-col items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger render={showButton} />
+            <TooltipContent side="right">Show runs</TooltipContent>
+          </Tooltip>
+          <Badge variant="outline" className="px-1.5">
+            {runs.length}
+          </Badge>
+        </div>
+      </section>
+    );
+  }
+
+  if (runsCollapsed) {
+    return (
+      <section className="shrink-0 space-y-2">
+        <Separator />
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3"
+          aria-label="Show runs"
+          onClick={onToggleRunsCollapsed}
+        >
+          <ListChecksIcon className="size-4" />
+          <span className="min-w-0 flex-1 truncate text-left">Runs</span>
+          <Badge variant="outline" className="shrink-0">
+            {runs.length}
+          </Badge>
+        </Button>
+      </section>
     );
   }
 
@@ -1074,38 +1130,43 @@ function RunHistorySidebar({
     <Button
       variant="ghost"
       size="icon-sm"
-      aria-label="Hide run history"
-      onClick={onToggleCollapsed}
+      aria-label="Hide runs"
+      onClick={onToggleRunsCollapsed}
     >
       <PanelLeftCloseIcon />
     </Button>
   );
 
   return (
-    <aside className="flex max-h-64 min-h-0 flex-col border-b bg-card lg:max-h-none lg:w-72 lg:border-b-0 lg:border-r">
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+    <section className="flex min-h-0 flex-1 flex-col gap-3">
+      <Separator />
+      <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
-          <HistoryIcon className="size-4 shrink-0 text-muted-foreground" />
-          <h2 className="truncate text-base font-medium">Run history</h2>
-          <Badge variant="outline">{runHistory.length}</Badge>
+          <ListChecksIcon className="size-4 shrink-0 text-muted-foreground" />
+          <h2 className="truncate text-base font-medium">Runs</h2>
+          <Badge variant="outline">{runs.length}</Badge>
         </div>
         <Tooltip>
           <TooltipTrigger render={hideButton} />
-          <TooltipContent>Hide run history</TooltipContent>
+          <TooltipContent>Hide runs</TooltipContent>
         </Tooltip>
       </div>
-      {runHistory.length === 0 ? (
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          <div className="rounded-lg border bg-background p-4">
+      {runs.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 px-1">
+          <div className="rounded-lg border bg-background p-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Clock3Icon className="size-4 text-muted-foreground" />
               No runs yet
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Start a run to save a timeline for this blueprint.
+              Start this blueprint to watch its first run here.
             </p>
           </div>
-          <Button disabled={Boolean(runBlockReason)} onClick={onRun}>
+          <Button
+            className="w-full"
+            disabled={Boolean(runBlockReason)}
+            onClick={onRun}
+          >
             <PlayIcon />
             Start first run
           </Button>
@@ -1117,23 +1178,23 @@ function RunHistorySidebar({
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1">
-          <ol className="space-y-2 p-3">
-            {runHistory.map((run) => (
-              <RunHistoryItem
+          <motion.ol layout className="space-y-2 px-1 pb-1">
+            {runs.map((run) => (
+              <RunItem
                 key={run.id}
                 run={run}
                 active={run.id === activeRunId}
                 onSelectRun={onSelectRun}
               />
             ))}
-          </ol>
+          </motion.ol>
         </ScrollArea>
       )}
-    </aside>
+    </section>
   );
 }
 
-function RunHistoryItem({
+function RunItem({
   run,
   active,
   onSelectRun,
@@ -1142,32 +1203,38 @@ function RunHistoryItem({
   active: boolean;
   onSelectRun: (runId: string) => void;
 }) {
+  const statusLabel = workflowRunStatusLabels[run.status];
+
   return (
-    <li>
+    <motion.li layout>
       <button
         type="button"
         aria-current={active ? "true" : undefined}
+        aria-label={`${statusLabel} run from ${formatRunDate(run.startedAt)}`}
         className={cn(
           "w-full rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
           active && "border-primary bg-muted",
         )}
         onClick={() => onSelectRun(run.id)}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 truncate text-sm font-medium">
               {formatRunDate(run.startedAt)}
             </div>
-            <div className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-              {run.summary}
-            </div>
+            <Badge
+              variant={getWorkflowRunStatusVariant(run.status)}
+              className="shrink-0"
+            >
+              {statusLabel}
+            </Badge>
           </div>
-          <Badge variant={getRunStatusVariant(run.status)} className="shrink-0">
-            {runStatusLabels[run.status]}
-          </Badge>
+          <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+            {run.summary}
+          </p>
         </div>
       </button>
-    </li>
+    </motion.li>
   );
 }
 

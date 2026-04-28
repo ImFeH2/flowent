@@ -198,12 +198,12 @@ describe("useFlowentWorkspaceStore", () => {
     expect(state.canvasMode).toBe("blueprint");
   });
 
-  it("loads saved run history while returning to edit mode", async () => {
+  it("loads saved run instances while returning to edit mode", async () => {
     const savedRun = {
       id: "run-saved",
       startedAt: "2026-04-27T10:00:00.000Z",
       updatedAt: "2026-04-27T10:01:00.000Z",
-      status: "success",
+      status: "succeeded",
       summary: "Saved run completed.",
       nodes: cloneNodes(initialNodes).map((node) => ({
         ...node,
@@ -255,7 +255,7 @@ describe("useFlowentWorkspaceStore", () => {
     expect(activeBlueprint.selectedRunId).toBe(savedRun.id);
   });
 
-  it("saves run history and the selected run with local settings", () => {
+  it("saves run instances and the selected run with local settings", () => {
     const fetchMock = vi.fn((_: RequestInfo | URL, init?: RequestInit) => {
       const body =
         typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
@@ -601,7 +601,7 @@ describe("useFlowentWorkspaceStore", () => {
     expect(state.edges.every((edge) => edge.animated)).toBe(true);
   });
 
-  it("adds new runs to the top of the current blueprint history and selects them", () => {
+  it("adds new runs to the top of the current blueprint runs and selects them", () => {
     const store = useFlowentWorkspaceStore.getState();
 
     store.startWorkflowRun();
@@ -616,6 +616,8 @@ describe("useFlowentWorkspaceStore", () => {
     expect(activeBlueprint.runHistory).toHaveLength(2);
     expect(activeBlueprint.runHistory[0]?.id).not.toBe(firstRunId);
     expect(activeBlueprint.runHistory[1]?.id).toBe(firstRunId);
+    expect(activeBlueprint.runHistory[0]?.status).toBe("running");
+    expect(activeBlueprint.runHistory[1]?.status).toBe("succeeded");
     expect(activeBlueprint.selectedRunId).toBe(
       activeBlueprint.runHistory[0]?.id,
     );
@@ -624,7 +626,7 @@ describe("useFlowentWorkspaceStore", () => {
     expect(state.edges).toEqual(activeBlueprint.runHistory[0]?.edges);
   });
 
-  it("keeps run history isolated per blueprint", () => {
+  it("keeps run instances isolated per blueprint", () => {
     const store = useFlowentWorkspaceStore.getState();
     const firstBlueprintId = getActiveBlueprint().id;
 
@@ -674,7 +676,7 @@ describe("useFlowentWorkspaceStore", () => {
     const [secondRun, firstRun] = getActiveBlueprint().runHistory;
 
     if (!firstRun || !secondRun) {
-      throw new Error("Missing run history");
+      throw new Error("Missing run instances");
     }
 
     store.setSelection(["agent-1"], []);

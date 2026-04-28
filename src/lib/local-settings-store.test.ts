@@ -189,7 +189,7 @@ describe("local settings store", () => {
     });
   });
 
-  it("normalizes older blueprints that do not have run history", () => {
+  it("normalizes older blueprints that do not have run instances", () => {
     expect(
       parseLocalSettingsSnapshot({
         modelConnections: [],
@@ -200,7 +200,7 @@ describe("local settings store", () => {
             name: "Old Blueprint",
             updatedAt: "2026-04-27T09:00:00.000Z",
             lastRunStatus: "not-run",
-            summary: "Saved before run history.",
+            summary: "Saved before run instances.",
             nodes: [],
             edges: [],
           },
@@ -214,6 +214,91 @@ describe("local settings store", () => {
           {
             runHistory: [],
             selectedRunId: null,
+          },
+        ],
+      },
+    });
+  });
+
+  it("accepts run instance statuses and normalizes older completed states", () => {
+    expect(
+      parseLocalSettingsSnapshot({
+        modelConnections: [],
+        modelPresets: [],
+        blueprints: [
+          {
+            id: "blueprint-runs",
+            name: "Runs Blueprint",
+            updatedAt: "2026-04-27T09:00:00.000Z",
+            lastRunStatus: "running",
+            summary: "Saved runs.",
+            nodes: [],
+            edges: [],
+            runHistory: [
+              {
+                id: "run-queued",
+                startedAt: "2026-04-27T10:00:00.000Z",
+                updatedAt: "2026-04-27T10:00:00.000Z",
+                status: "queued",
+                summary: "Queued run.",
+                nodes: [],
+                edges: [],
+              },
+              {
+                id: "run-failed",
+                startedAt: "2026-04-27T10:01:00.000Z",
+                updatedAt: "2026-04-27T10:02:00.000Z",
+                status: "failed",
+                summary: "Failed run.",
+                nodes: [],
+                edges: [],
+              },
+              {
+                id: "run-canceled",
+                startedAt: "2026-04-27T10:03:00.000Z",
+                updatedAt: "2026-04-27T10:04:00.000Z",
+                status: "canceled",
+                summary: "Canceled run.",
+                nodes: [],
+                edges: [],
+              },
+              {
+                id: "run-legacy-success",
+                startedAt: "2026-04-27T10:05:00.000Z",
+                updatedAt: "2026-04-27T10:06:00.000Z",
+                status: "success",
+                summary: "Completed run.",
+                nodes: [],
+                edges: [],
+              },
+              {
+                id: "run-legacy-error",
+                startedAt: "2026-04-27T10:07:00.000Z",
+                updatedAt: "2026-04-27T10:08:00.000Z",
+                status: "error",
+                summary: "Stopped run.",
+                nodes: [],
+                edges: [],
+              },
+            ],
+            selectedRunId: "run-canceled",
+          },
+        ],
+        roles: [],
+      }),
+    ).toMatchObject({
+      ok: true,
+      settings: {
+        blueprints: [
+          {
+            selectedRunId: "run-canceled",
+            runHistory: [
+              { status: "queued" },
+              { status: "failed" },
+              { status: "canceled" },
+              { status: "succeeded" },
+              { status: "failed" },
+            ],
           },
         ],
       },
@@ -274,7 +359,7 @@ describe("local settings store", () => {
     });
   });
 
-  it("rejects malformed run history data", () => {
+  it("rejects malformed run instance data", () => {
     expect(
       parseLocalSettingsSnapshot({
         modelConnections: [],

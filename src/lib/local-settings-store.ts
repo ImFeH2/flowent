@@ -33,7 +33,17 @@ const blueprintLastRunStatuses = new Set([
   "success",
   "error",
 ]);
-const workflowRunStatuses = new Set(["running", "success", "error"]);
+const workflowRunStatuses = new Set([
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "canceled",
+]);
+const legacyWorkflowRunStatusMap: Record<string, WorkflowRun["status"]> = {
+  success: "succeeded",
+  error: "failed",
+};
 
 export type LocalSettingsSnapshot = {
   version: typeof localSettingsVersion;
@@ -243,13 +253,26 @@ function normalizeSavedJson(value: unknown): unknown {
   return normalized;
 }
 
+function normalizeWorkflowRunStatus(
+  value: unknown,
+): WorkflowRun["status"] | null {
+  if (!isString(value)) {
+    return null;
+  }
+
+  if (workflowRunStatuses.has(value)) {
+    return value as WorkflowRun["status"];
+  }
+
+  return legacyWorkflowRunStatusMap[value] ?? null;
+}
+
 function parseWorkflowRun(value: unknown): WorkflowRun | null {
   if (
     !isRecord(value) ||
     !isString(value.id) ||
     !isString(value.startedAt) ||
     !isString(value.updatedAt) ||
-    !workflowRunStatuses.has(value.status as string) ||
     !isString(value.summary) ||
     !Array.isArray(value.nodes) ||
     !value.nodes.every(isPlainJsonValue) ||
@@ -259,11 +282,17 @@ function parseWorkflowRun(value: unknown): WorkflowRun | null {
     return null;
   }
 
+  const status = normalizeWorkflowRunStatus(value.status);
+
+  if (!status) {
+    return null;
+  }
+
   return {
     id: value.id,
     startedAt: value.startedAt,
     updatedAt: value.updatedAt,
-    status: value.status as WorkflowRun["status"],
+    status,
     summary: value.summary,
     nodes: value.nodes.map(normalizeSavedJson) as WorkflowRun["nodes"],
     edges: value.edges.map(normalizeSavedJson) as WorkflowRun["edges"],

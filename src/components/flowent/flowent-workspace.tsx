@@ -24,7 +24,6 @@ import {
   LockIcon,
   MessageSquareIcon,
   PanelRightIcon,
-  PanelLeftCloseIcon,
   PencilIcon,
   PlayIcon,
   PlusIcon,
@@ -138,8 +137,10 @@ type SidebarNavigationItem = {
   icon: typeof GitBranchIcon;
 };
 
-const utilityNavigation: SidebarNavigationItem[] = [
+const fixedNavigation: SidebarNavigationItem[] = [
+  { view: "workflows", label: "Workflows", icon: GitBranchIcon },
   { view: "roles", label: "Roles", icon: BotIcon },
+  { view: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
 type WorkflowStatusFilter = "all" | WorkflowLastRunStatus;
@@ -167,12 +168,6 @@ const workflowStatusFilters: Array<{
   { value: "success", label: "Completed" },
   { value: "error", label: "Needs review" },
 ];
-
-const systemNavigation: Array<{
-  view: AppView;
-  label: string;
-  icon: typeof SettingsIcon;
-}> = [{ view: "settings", label: "Settings", icon: SettingsIcon }];
 
 const conversationRolePresentation: Record<
   RuntimeConversationRole,
@@ -282,7 +277,6 @@ function FlowentWorkspaceShell() {
   const { fitView, screenToFlowPosition, setViewport } = useReactFlow();
   const [activeView, setActiveView] = useState<AppView>("workflows");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [runsCollapsed, setRunsCollapsed] = useState(false);
   const [highlightedRun, setHighlightedRun] = useState<{
     workflowId: string;
     runId: string;
@@ -565,24 +559,12 @@ function FlowentWorkspaceShell() {
           activeView={activeView}
           workflows={blueprints}
           activeWorkflowId={activeBlueprintId}
-          activeWorkflow={activeWorkflow}
-          activeRunId={
-            canvasMode === "workflow" ? activeWorkflow?.selectedRunId : null
-          }
           collapsed={sidebarCollapsed}
-          runsCollapsed={runsCollapsed}
-          runBlockReason={runBlockReason}
-          highlightedRunId={highlightedRunId}
           onNavigate={setActiveView}
-          onRun={runWorkflow}
-          onSelectRun={selectRunItem}
           onOpenWorkflow={openWorkflowView}
           onCreateWorkflow={createWorkflowView}
           onToggleCollapsed={() =>
             setSidebarCollapsed((collapsed) => !collapsed)
-          }
-          onToggleRunsCollapsed={() =>
-            setRunsCollapsed((collapsed) => !collapsed)
           }
         />
         <div className="min-w-0 flex-1">
@@ -612,16 +594,33 @@ function FlowentWorkspaceShell() {
                     setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 250 })
                   }
                 />
-                <aside className="min-h-0 border-t bg-card lg:border-t-0 lg:border-l">
-                  <PropertyPanel
-                    selectedNode={selectedNode}
-                    selectedCount={
-                      selectedNodeIds.length + selectedEdgeIds.length
+                <aside
+                  aria-label="Current workflow"
+                  className="grid min-h-0 grid-rows-[minmax(11rem,0.52fr)_minmax(0,1fr)] border-t bg-card lg:border-t-0 lg:border-l"
+                >
+                  <RunsPanel
+                    runs={activeWorkflow.runHistory}
+                    activeRunId={
+                      canvasMode === "workflow"
+                        ? (activeWorkflow.selectedRunId ?? null)
+                        : null
                     }
-                    canvasMode={canvasMode}
-                    modelPresets={modelPresets}
-                    updateNodeData={updateNodeData}
+                    runBlockReason={runBlockReason}
+                    highlightedRunId={highlightedRunId}
+                    onRun={runWorkflow}
+                    onSelectRun={selectRunItem}
                   />
+                  <div className="min-h-0 border-t">
+                    <PropertyPanel
+                      selectedNode={selectedNode}
+                      selectedCount={
+                        selectedNodeIds.length + selectedEdgeIds.length
+                      }
+                      canvasMode={canvasMode}
+                      modelPresets={modelPresets}
+                      updateNodeData={updateNodeData}
+                    />
+                  </div>
                 </aside>
               </div>
             ) : (
@@ -653,41 +652,46 @@ function AppSidebar({
   activeView,
   workflows,
   activeWorkflowId,
-  activeWorkflow,
-  activeRunId,
   collapsed,
-  runsCollapsed,
-  runBlockReason,
-  highlightedRunId,
   onNavigate,
-  onRun,
-  onSelectRun,
   onOpenWorkflow,
   onCreateWorkflow,
   onToggleCollapsed,
-  onToggleRunsCollapsed,
 }: {
   activeView: AppView;
   workflows: WorkflowAsset[];
   activeWorkflowId: string | null;
-  activeWorkflow: WorkflowAsset | null;
-  activeRunId: string | null | undefined;
   collapsed: boolean;
-  runsCollapsed: boolean;
-  runBlockReason: string | null;
-  highlightedRunId: string | null;
   onNavigate: (view: AppView) => void;
-  onRun: () => void;
-  onSelectRun: (runId: string) => void;
   onOpenWorkflow: (workflowId: string) => void;
   onCreateWorkflow: () => void;
   onToggleCollapsed: () => void;
-  onToggleRunsCollapsed: () => void;
 }) {
-  const showRuns = Boolean(activeWorkflow);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<WorkflowStatusFilter>("all");
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredWorkflows = useMemo(
+    () =>
+      workflows.filter((workflow) => {
+        const matchesSearch =
+          normalizedSearch.length === 0 ||
+          workflow.name.toLowerCase().includes(normalizedSearch);
+        const matchesStatus =
+          statusFilter === "all" || workflow.lastRunStatus === statusFilter;
+
+        return matchesSearch && matchesStatus;
+      }),
+    [workflows, normalizedSearch, statusFilter],
+  );
+  const hasFilters = normalizedSearch.length > 0 || statusFilter !== "all";
+  const clearFilters = useCallback(() => {
+    setSearchTerm("");
+    setStatusFilter("all");
+  }, []);
 
   return (
     <motion.aside
+      aria-label="Workspace navigation"
       animate={{ width: collapsed ? 72 : 312 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
       className="shrink-0 border-r bg-sidebar text-sidebar-foreground"
@@ -714,54 +718,156 @@ function AppSidebar({
           </Button>
         </div>
         <Separator />
-        <WorkflowsSidebarSection
+        <SidebarFixedEntries
+          activeView={activeView}
+          collapsed={collapsed}
+          searchTerm={searchTerm}
+          statusFilter={statusFilter}
+          onCreateWorkflow={onCreateWorkflow}
+          onExpandSidebar={onToggleCollapsed}
+          onNavigate={onNavigate}
+          onSearchTermChange={setSearchTerm}
+          onStatusFilterChange={setStatusFilter}
+        />
+        <WorkflowInstanceList
           activeWorkflowId={activeWorkflowId}
           collapsed={collapsed}
+          filteredWorkflows={filteredWorkflows}
+          hasFilters={hasFilters}
           workflows={workflows}
-          onCreateWorkflow={onCreateWorkflow}
-          onOpenWorkflow={onOpenWorkflow}
+          onClearFilters={clearFilters}
           onExpandSidebar={onToggleCollapsed}
+          onOpenWorkflow={onOpenWorkflow}
         />
-        {showRuns && activeWorkflow && (
-          <RunsSidebarSection
-            activeRunId={activeRunId ?? null}
-            collapsed={collapsed}
-            runsCollapsed={runsCollapsed}
-            runBlockReason={runBlockReason}
-            highlightedRunId={highlightedRunId}
-            runs={activeWorkflow.runHistory}
-            onExpandSidebar={onToggleCollapsed}
-            onRun={onRun}
-            onSelectRun={onSelectRun}
-            onToggleRunsCollapsed={onToggleRunsCollapsed}
-          />
-        )}
-        <div className="mt-auto space-y-3">
+        <div className="shrink-0 space-y-3">
           <Separator />
-          <nav className="space-y-1">
-            {utilityNavigation.map((item) => (
-              <SidebarNavButton
-                key={item.view}
-                item={item}
-                collapsed={collapsed}
-                active={activeView === item.view}
-                onNavigate={onNavigate}
-              />
-            ))}
-            {systemNavigation.map((item) => (
-              <SidebarNavButton
-                key={item.view}
-                item={item}
-                collapsed={collapsed}
-                active={activeView === item.view}
-                onNavigate={onNavigate}
-              />
-            ))}
-          </nav>
           <ThemeToggle collapsed={collapsed} />
         </div>
       </div>
     </motion.aside>
+  );
+}
+
+function SidebarFixedEntries({
+  activeView,
+  collapsed,
+  searchTerm,
+  statusFilter,
+  onCreateWorkflow,
+  onExpandSidebar,
+  onNavigate,
+  onSearchTermChange,
+  onStatusFilterChange,
+}: {
+  activeView: AppView;
+  collapsed: boolean;
+  searchTerm: string;
+  statusFilter: WorkflowStatusFilter;
+  onCreateWorkflow: () => void;
+  onExpandSidebar: () => void;
+  onNavigate: (view: AppView) => void;
+  onSearchTermChange: (value: string) => void;
+  onStatusFilterChange: (value: WorkflowStatusFilter) => void;
+}) {
+  if (collapsed) {
+    const createButton = (
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Create workflow"
+        onClick={onCreateWorkflow}
+      >
+        <PlusIcon />
+      </Button>
+    );
+    const searchButton = (
+      <Button
+        variant={searchTerm.trim() ? "secondary" : "ghost"}
+        size="icon"
+        aria-label="Search workflows"
+        onClick={onExpandSidebar}
+      >
+        <SearchIcon />
+      </Button>
+    );
+
+    return (
+      <section className="shrink-0">
+        <div className="flex flex-col items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger render={createButton} />
+            <TooltipContent side="right">Create workflow</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger render={searchButton} />
+            <TooltipContent side="right">Search workflows</TooltipContent>
+          </Tooltip>
+          {fixedNavigation.map((item) => (
+            <SidebarNavButton
+              key={item.view}
+              item={item}
+              collapsed={collapsed}
+              active={activeView === item.view}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="shrink-0 space-y-3">
+      <Button className="w-full justify-start" onClick={onCreateWorkflow}>
+        <PlusIcon />
+        Create workflow
+      </Button>
+      <div className="space-y-2">
+        <div className="relative">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="Search workflows"
+            className="h-9 pl-9"
+            placeholder="Search workflows"
+            value={searchTerm}
+            onChange={(event) => onSearchTermChange(event.target.value)}
+          />
+        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) =>
+            onStatusFilterChange(value as WorkflowStatusFilter)
+          }
+        >
+          <SelectTrigger aria-label="Filter workflows" className="h-9 w-full">
+            <SelectValue>
+              {(value: WorkflowStatusFilter | null) =>
+                workflowStatusFilters.find((item) => item.value === value)
+                  ?.label ?? "Any status"
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {workflowStatusFilters.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <nav className="space-y-1">
+        {fixedNavigation.map((item) => (
+          <SidebarNavButton
+            key={item.view}
+            item={item}
+            collapsed={collapsed}
+            active={activeView === item.view}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </nav>
+    </section>
   );
 }
 
@@ -804,39 +910,25 @@ function SidebarNavButton({
   );
 }
 
-function WorkflowsSidebarSection({
+function WorkflowInstanceList({
   workflows,
+  filteredWorkflows,
   activeWorkflowId,
   collapsed,
-  onCreateWorkflow,
+  hasFilters,
+  onClearFilters,
   onOpenWorkflow,
   onExpandSidebar,
 }: {
   workflows: WorkflowAsset[];
+  filteredWorkflows: WorkflowAsset[];
   activeWorkflowId: string | null;
   collapsed: boolean;
-  onCreateWorkflow: () => void;
+  hasFilters: boolean;
+  onClearFilters: () => void;
   onOpenWorkflow: (workflowId: string) => void;
   onExpandSidebar: () => void;
 }) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<WorkflowStatusFilter>("all");
-  const normalizedSearch = searchTerm.trim().toLowerCase();
-  const filteredWorkflows = useMemo(
-    () =>
-      workflows.filter((workflow) => {
-        const matchesSearch =
-          normalizedSearch.length === 0 ||
-          workflow.name.toLowerCase().includes(normalizedSearch);
-        const matchesStatus =
-          statusFilter === "all" || workflow.lastRunStatus === statusFilter;
-
-        return matchesSearch && matchesStatus;
-      }),
-    [workflows, normalizedSearch, statusFilter],
-  );
-  const hasFilters = normalizedSearch.length > 0 || statusFilter !== "all";
-
   if (collapsed) {
     const button = (
       <Button
@@ -851,6 +943,7 @@ function WorkflowsSidebarSection({
 
     return (
       <section className="space-y-2">
+        <Separator />
         <div className="flex flex-col items-center gap-2">
           <Tooltip>
             <TooltipTrigger render={button} />
@@ -865,77 +958,44 @@ function WorkflowsSidebarSection({
   }
 
   return (
-    <section className="flex min-h-0 flex-[1.05] flex-col gap-3">
+    <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
           <GitBranchIcon className="size-4 shrink-0 text-muted-foreground" />
-          <h2 className="truncate text-base font-medium">Workflows</h2>
+          <h2 className="truncate text-base font-medium">Recent workflows</h2>
           <Badge variant="outline">{workflows.length}</Badge>
         </div>
-        <Button size="sm" onClick={onCreateWorkflow}>
-          <PlusIcon />
-          Create workflow
-        </Button>
-      </div>
-      <div className="space-y-2">
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            aria-label="Search workflows"
-            className="h-9 pl-9"
-            placeholder="Search workflows"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
-        </div>
-        <Select
-          value={statusFilter}
-          onValueChange={(value) =>
-            setStatusFilter(value as WorkflowStatusFilter)
-          }
-        >
-          <SelectTrigger aria-label="Filter workflows" className="h-9 w-full">
-            <SelectValue>
-              {(value: WorkflowStatusFilter | null) =>
-                workflowStatusFilters.find((item) => item.value === value)
-                  ?.label ?? "Any status"
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {workflowStatusFilters.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
       {workflows.length === 0 ? (
-        <div className="rounded-lg border bg-background p-3">
-          <div className="text-sm font-medium">No workflows yet</div>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Create your first workflow to start building.
-          </p>
-        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="px-1 pb-1">
+            <div className="rounded-lg border bg-background p-3">
+              <div className="text-sm font-medium">No workflows yet</div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Create your first workflow to start building.
+              </p>
+            </div>
+          </div>
+        </ScrollArea>
       ) : filteredWorkflows.length === 0 ? (
-        <div className="rounded-lg border bg-background p-3">
-          <div className="text-sm font-medium">No matching workflows</div>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Clear the current filters to return to the full list.
-          </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-2"
-            onClick={() => {
-              setSearchTerm("");
-              setStatusFilter("all");
-            }}
-          >
-            Clear filters
-          </Button>
-        </div>
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="px-1 pb-1">
+            <div className="rounded-lg border bg-background p-3">
+              <div className="text-sm font-medium">No matching workflows</div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Clear the current filters to return to the full list.
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2"
+                onClick={onClearFilters}
+              >
+                Clear filters
+              </Button>
+            </div>
+          </div>
+        </ScrollArea>
       ) : (
         <ScrollArea className="min-h-0 flex-1">
           <motion.ol layout className="space-y-2 px-1 pb-1">
@@ -952,14 +1012,7 @@ function WorkflowsSidebarSection({
       )}
       {hasFilters && filteredWorkflows.length > 0 && (
         <div className="px-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearchTerm("");
-              setStatusFilter("all");
-            }}
-          >
+          <Button variant="ghost" size="sm" onClick={onClearFilters}>
             Clear filters
           </Button>
         </div>
@@ -1076,103 +1129,34 @@ function getWorkflowRunStatusVariant(
   return status === "canceled" ? "outline" : "secondary";
 }
 
-function RunsSidebarSection({
-  collapsed,
+function RunsPanel({
   runs,
   activeRunId,
-  runsCollapsed,
   runBlockReason,
   highlightedRunId,
-  onExpandSidebar,
-  onToggleRunsCollapsed,
   onSelectRun,
   onRun,
 }: {
-  collapsed: boolean;
   runs: WorkflowRun[];
   activeRunId: string | null;
-  runsCollapsed: boolean;
   runBlockReason: string | null;
   highlightedRunId: string | null;
-  onExpandSidebar: () => void;
-  onToggleRunsCollapsed: () => void;
   onSelectRun: (runId: string) => void;
   onRun: () => void;
 }) {
-  if (collapsed) {
-    const showButton = (
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Show runs"
-        onClick={onExpandSidebar}
-      >
-        <ListChecksIcon />
-      </Button>
-    );
-
-    return (
-      <section className="space-y-2">
-        <Separator />
-        <div className="flex flex-col items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger render={showButton} />
-            <TooltipContent side="right">Show runs</TooltipContent>
-          </Tooltip>
-          <Badge variant="outline" className="px-1.5">
-            {runs.length}
-          </Badge>
-        </div>
-      </section>
-    );
-  }
-
-  if (runsCollapsed) {
-    return (
-      <section className="shrink-0 space-y-2">
-        <Separator />
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3"
-          aria-label="Show runs"
-          onClick={onToggleRunsCollapsed}
-        >
-          <ListChecksIcon className="size-4" />
-          <span className="min-w-0 flex-1 truncate text-left">Runs</span>
-          <Badge variant="outline" className="shrink-0">
-            {runs.length}
-          </Badge>
-        </Button>
-      </section>
-    );
-  }
-
-  const hideButton = (
-    <Button
-      variant="ghost"
-      size="icon-sm"
-      aria-label="Hide runs"
-      onClick={onToggleRunsCollapsed}
-    >
-      <PanelLeftCloseIcon />
-    </Button>
-  );
-
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-3">
-      <Separator />
-      <div className="flex items-center justify-between gap-2 px-1">
+    <section
+      aria-label="Runs"
+      className="flex min-h-0 flex-col gap-3 overflow-hidden p-4"
+    >
+      <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <ListChecksIcon className="size-4 shrink-0 text-muted-foreground" />
           <h2 className="truncate text-base font-medium">Runs</h2>
           <Badge variant="outline">{runs.length}</Badge>
         </div>
-        <Tooltip>
-          <TooltipTrigger render={hideButton} />
-          <TooltipContent>Hide runs</TooltipContent>
-        </Tooltip>
       </div>
-      <div className="px-1">
+      <div>
         <Button
           className="w-full"
           disabled={Boolean(runBlockReason)}
@@ -1191,20 +1175,18 @@ function RunsSidebarSection({
         )}
       </div>
       {runs.length === 0 ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 px-1">
-          <div className="rounded-lg border bg-background p-3">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Clock3Icon className="size-4 text-muted-foreground" />
-              No runs yet
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Run this workflow to watch its first run here.
-            </p>
+        <div className="rounded-lg border bg-background p-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Clock3Icon className="size-4 text-muted-foreground" />
+            No runs yet
           </div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Run this workflow to watch its first run here.
+          </p>
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1">
-          <motion.ol layout className="space-y-2 px-1 pb-1">
+          <motion.ol layout className="space-y-2 pr-2 pb-1">
             {runs.map((run) => (
               <RunItem
                 key={run.id}

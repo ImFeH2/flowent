@@ -221,15 +221,20 @@ describe("Home", () => {
 
   it("renders the workflows workbench", () => {
     render(<Home />);
+    const sidebar = screen.getByLabelText("Workspace navigation");
+    const workflowContext = screen.getByLabelText("Current workflow");
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Flowent" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Workflows")).toBeInTheDocument();
-    expect(screen.getByText("Runs")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Roles" })).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Settings" }),
+      within(sidebar).getByRole("button", { name: "Workflows" }),
+    ).toBeInTheDocument();
+    expect(
+      within(sidebar).getByRole("button", { name: "Roles" }),
+    ).toBeInTheDocument();
+    expect(
+      within(sidebar).getByRole("button", { name: "Settings" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Dark Mode" }),
@@ -243,9 +248,14 @@ describe("Home", () => {
     expect(
       screen.getByRole("button", { name: "Open Launch Campaign" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("No runs yet")).toBeInTheDocument();
+    expect(within(sidebar).queryByText("Runs")).not.toBeInTheDocument();
+    expect(within(sidebar).queryByText("No runs yet")).not.toBeInTheDocument();
+    expect(within(workflowContext).getByText("Runs")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Run workflow" }),
+      within(workflowContext).getByText("No runs yet"),
+    ).toBeInTheDocument();
+    expect(
+      within(workflowContext).getByRole("button", { name: "Run workflow" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
     expect(screen.queryByText("Blueprint")).not.toBeInTheDocument();
@@ -378,19 +388,21 @@ describe("Home", () => {
     expect(screen.getByText("Read-only")).toBeInTheDocument();
   });
 
-  it("can collapse and reopen the runs section", () => {
+  it("keeps workflow runs in the current workflow panel", () => {
     render(<Home />);
+    const sidebar = screen.getByLabelText("Workspace navigation");
+    const workflowContext = screen.getByLabelText("Current workflow");
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide runs" }));
-
-    expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Show runs" }),
+      within(sidebar).queryByRole("button", { name: "Run workflow" }),
+    ).not.toBeInTheDocument();
+    expect(within(sidebar).queryByText("No runs yet")).not.toBeInTheDocument();
+    expect(
+      within(workflowContext).getByRole("button", { name: "Run workflow" }),
     ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Show runs" }));
-
-    expect(screen.getByText("No runs yet")).toBeInTheDocument();
+    expect(
+      within(workflowContext).getByText("No runs yet"),
+    ).toBeInTheDocument();
   });
 
   it("creates a workflow from the sidebar and opens it", () => {

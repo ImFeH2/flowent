@@ -219,21 +219,14 @@ describe("Home", () => {
     resetWorkspaceStore();
   });
 
-  it("renders the workspace", () => {
+  it("renders the workflows workbench", () => {
     render(<Home />);
 
     expect(
       screen.getByRole("heading", { level: 1, name: "Flowent" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 1, name: "Workspace" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Workspace" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Blueprint" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Workflows")).toBeInTheDocument();
+    expect(screen.getByText("Runs")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Roles" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Settings" }),
@@ -242,33 +235,37 @@ describe("Home", () => {
       screen.getByRole("button", { name: "Dark Mode" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Launch Campaign").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("Search blueprints")).toBeInTheDocument();
+    expect(screen.getByLabelText("Search workflows")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filter workflows")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Create blueprint" }),
+      screen.getByRole("button", { name: "Create workflow" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Open blueprint" }),
+      screen.getByRole("button", { name: "Open Launch Campaign" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Workflows")).not.toBeInTheDocument();
-    expect(screen.queryByText("Runs")).not.toBeInTheDocument();
+    expect(screen.getByText("No runs yet")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Run workflow" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
+    expect(screen.queryByText("Blueprint")).not.toBeInTheDocument();
   });
 
   it("shows the selected agent configuration", async () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
     expect(screen.getByText("Runs")).toBeInTheDocument();
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Start first run" }),
+      screen.getByRole("button", { name: "Run workflow" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Manual Trigger")).toBeInTheDocument();
     expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
     expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
     expect(screen.getAllByText("Properties").length).toBeGreaterThan(0);
-    expect(screen.getByText("Edit state")).toBeInTheDocument();
+    expect(screen.getByText("Workflow editor")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
       "data-snap-to-grid",
       "true",
@@ -301,11 +298,10 @@ describe("Home", () => {
 
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
-    expect(screen.getByRole("button", { name: /^Run$/ })).toBeDisabled();
-    expect(screen.getAllByText("Choose models before running").length).toBe(2);
+    expect(screen.getByRole("button", { name: "Run workflow" })).toBeDisabled();
+    expect(screen.getAllByText("Choose models before running").length).toBe(1);
     await waitFor(() =>
       expect(
         screen.getByText(
@@ -318,16 +314,15 @@ describe("Home", () => {
   it("locks the canvas and shows run state feedback in workflow mode", async () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
     await waitFor(() =>
       expect(screen.getByDisplayValue("Copywriter")).toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByRole("button", { name: /^Run$/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Run workflow" }));
 
     expect(screen.getByText("Runs")).toBeInTheDocument();
     expect(screen.getByText("Run started.")).toBeInTheDocument();
-    expect(screen.getByText("Running")).toBeInTheDocument();
+    expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
     expect(screen.getByText("Run view")).toBeInTheDocument();
     expect(screen.getByText("Read-only run")).toBeInTheDocument();
     expect(
@@ -355,9 +350,9 @@ describe("Home", () => {
     expect(screen.getAllByText("Thinking").length).toBeGreaterThan(0);
     expect(screen.getByText("Pending")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit blueprint" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit workflow" }));
 
-    expect(screen.getByText("Edit state")).toBeInTheDocument();
+    expect(screen.getByText("Workflow editor")).toBeInTheDocument();
     expect(screen.queryByText("Read-only run")).not.toBeInTheDocument();
     expect(screen.queryByText("Read-only")).not.toBeInTheDocument();
     expect(screen.queryByText("Execution Details")).not.toBeInTheDocument();
@@ -386,8 +381,6 @@ describe("Home", () => {
   it("can collapse and reopen the runs section", () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open blueprint" }));
-
     fireEvent.click(screen.getByRole("button", { name: "Hide runs" }));
 
     expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
@@ -398,6 +391,36 @@ describe("Home", () => {
     fireEvent.click(screen.getByRole("button", { name: "Show runs" }));
 
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
+  });
+
+  it("creates a workflow from the sidebar and opens it", () => {
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create workflow" }));
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Untitled workflow" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Blank workflow ready to build."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open Untitled workflow" }),
+    ).toHaveAttribute("aria-current", "true");
+  });
+
+  it("clears workflow search filters with no results", () => {
+    render(<Home />);
+
+    fireEvent.change(screen.getByLabelText("Search workflows"), {
+      target: { value: "no matching workflow" },
+    });
+
+    expect(screen.getByText("No matching workflows")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getAllByText("Launch Campaign").length).toBeGreaterThan(0);
   });
 
   it("opens the roles library", () => {

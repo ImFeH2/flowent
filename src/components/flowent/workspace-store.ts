@@ -744,10 +744,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
       const id = makeId("blueprint");
       const blueprint: BlueprintAsset = {
         id,
-        name: name?.trim() || "Untitled blueprint",
+        name: name?.trim() || "Untitled workflow",
         updatedAt: new Date().toISOString(),
         lastRunStatus: "not-run",
-        summary: "Blank blueprint ready to build.",
+        summary: "Blank workflow ready to build.",
         nodes: [],
         edges: [],
         runHistory: [],

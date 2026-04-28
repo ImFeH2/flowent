@@ -415,7 +415,7 @@ describe("useFlowentWorkspaceStore", () => {
     });
   });
 
-  it("creates a blank blueprint and makes it current", () => {
+  it("creates a blank workflow and makes it current", () => {
     const id = useFlowentWorkspaceStore
       .getState()
       .createBlueprint("Audience Follow-up");
@@ -428,7 +428,7 @@ describe("useFlowentWorkspaceStore", () => {
     ).toMatchObject({
       name: "Audience Follow-up",
       lastRunStatus: "not-run",
-      summary: "Blank blueprint ready to build.",
+      summary: "Blank workflow ready to build.",
     });
     expect(state.nodes).toEqual([]);
     expect(state.edges).toEqual([]);

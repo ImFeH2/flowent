@@ -79,8 +79,6 @@ import {
   connectionTypeParameterSupport,
   runStatusLabels,
   workflowRunStatusLabels,
-  type BlueprintAsset,
-  type BlueprintLastRunStatus,
   type CanvasMode,
   type ConnectionType,
   type FlowEdge,
@@ -97,6 +95,8 @@ import {
   type WorkflowNodeKind,
   type WorkflowRun,
   type WorkflowRunStatus,
+  type BlueprintAsset as WorkflowAsset,
+  type BlueprintLastRunStatus as WorkflowLastRunStatus,
 } from "./model";
 import { WorkflowNode } from "./workflow-node";
 import {
@@ -109,7 +109,7 @@ const nodeTypes: NodeTypes = {
   workflow: WorkflowNode,
 };
 
-type AppView = "workspace" | "blueprint" | "roles" | "settings";
+type AppView = "workflows" | "roles" | "settings";
 type LocalDataStatus = FlowentWorkspaceStore["localDataStatus"];
 
 const nodeLibrary: Array<{
@@ -132,20 +132,20 @@ const nodeLibrary: Array<{
   },
 ];
 
-const primaryNavigation: Array<{
+type SidebarNavigationItem = {
   view: AppView;
   label: string;
   icon: typeof GitBranchIcon;
-}> = [
-  { view: "workspace", label: "Workspace", icon: PanelRightIcon },
-  { view: "blueprint", label: "Blueprint", icon: GitBranchIcon },
+};
+
+const utilityNavigation: SidebarNavigationItem[] = [
   { view: "roles", label: "Roles", icon: BotIcon },
 ];
 
-type BlueprintStatusFilter = "all" | BlueprintLastRunStatus;
+type WorkflowStatusFilter = "all" | WorkflowLastRunStatus;
 
-const blueprintStatusPresentation: Record<
-  BlueprintLastRunStatus,
+const workflowStatusPresentation: Record<
+  WorkflowLastRunStatus,
   {
     label: string;
     badgeVariant: "default" | "secondary" | "destructive" | "outline";
@@ -157,8 +157,8 @@ const blueprintStatusPresentation: Record<
   error: { label: "Needs review", badgeVariant: "destructive" },
 };
 
-const blueprintStatusFilters: Array<{
-  value: BlueprintStatusFilter;
+const workflowStatusFilters: Array<{
+  value: WorkflowStatusFilter;
   label: string;
 }> = [
   { value: "all", label: "Any status" },
@@ -280,11 +280,11 @@ export function FlowentWorkspace() {
 function FlowentWorkspaceShell() {
   const runTimers = useRef<number[]>([]);
   const { fitView, screenToFlowPosition, setViewport } = useReactFlow();
-  const [activeView, setActiveView] = useState<AppView>("workspace");
+  const [activeView, setActiveView] = useState<AppView>("workflows");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [runsCollapsed, setRunsCollapsed] = useState(false);
   const [highlightedRun, setHighlightedRun] = useState<{
-    blueprintId: string;
+    workflowId: string;
     runId: string;
   } | null>(null);
   const {
@@ -355,7 +355,7 @@ function FlowentWorkspaceShell() {
     })),
   );
 
-  const activeBlueprint = useMemo(
+  const activeWorkflow = useMemo(
     () =>
       blueprints.find((blueprint) => blueprint.id === activeBlueprintId) ??
       null,
@@ -408,7 +408,7 @@ function FlowentWorkspaceShell() {
   useEffect(() => clearRunTimers, [clearRunTimers]);
 
   const highlightedRunId =
-    highlightedRun?.blueprintId === activeBlueprintId
+    highlightedRun?.workflowId === activeBlueprintId
       ? highlightedRun.runId
       : null;
 
@@ -419,7 +419,7 @@ function FlowentWorkspaceShell() {
 
     const timer = window.setTimeout(() => {
       setHighlightedRun((run) =>
-        run?.blueprintId === highlightedRun.blueprintId &&
+        run?.workflowId === highlightedRun.workflowId &&
         run.runId === highlightedRun.runId
           ? null
           : run,
@@ -434,9 +434,10 @@ function FlowentWorkspaceShell() {
       return;
     }
 
-    const previousRunId = activeBlueprint?.runHistory[0]?.id ?? null;
+    const previousRunId = activeWorkflow?.runHistory[0]?.id ?? null;
 
     clearRunTimers();
+    setActiveView("workflows");
     startWorkflowRun();
 
     const nextRunId =
@@ -446,7 +447,7 @@ function FlowentWorkspaceShell() {
         ?.selectedRunId ?? null;
 
     if (activeBlueprintId && nextRunId && nextRunId !== previousRunId) {
-      setHighlightedRun({ blueprintId: activeBlueprintId, runId: nextRunId });
+      setHighlightedRun({ workflowId: activeBlueprintId, runId: nextRunId });
     }
 
     runTimers.current = [
@@ -459,7 +460,7 @@ function FlowentWorkspaceShell() {
     ];
   }, [
     advanceWorkflowRun,
-    activeBlueprint?.runHistory,
+    activeWorkflow?.runHistory,
     activeBlueprintId,
     clearRunTimers,
     finishWorkflowRun,
@@ -467,7 +468,7 @@ function FlowentWorkspaceShell() {
     startWorkflowRun,
   ]);
 
-  const returnToBlueprint = useCallback(() => {
+  const returnToWorkflowEditor = useCallback(() => {
     clearRunTimers();
     returnToBlueprintMode();
   }, [clearRunTimers, returnToBlueprintMode]);
@@ -475,24 +476,25 @@ function FlowentWorkspaceShell() {
   const selectRunItem = useCallback(
     (runId: string) => {
       clearRunTimers();
+      setActiveView("workflows");
       selectWorkflowRun(runId);
     },
     [clearRunTimers, selectWorkflowRun],
   );
 
-  const openBlueprintView = useCallback(
+  const openWorkflowView = useCallback(
     (blueprintId: string) => {
       clearRunTimers();
       openBlueprint(blueprintId);
-      setActiveView("blueprint");
+      setActiveView("workflows");
     },
     [clearRunTimers, openBlueprint],
   );
 
-  const createBlueprintView = useCallback(() => {
+  const createWorkflowView = useCallback(() => {
     clearRunTimers();
     createBlueprint();
-    setActiveView("blueprint");
+    setActiveView("workflows");
   }, [clearRunTimers, createBlueprint]);
 
   const onDragStart = useCallback(
@@ -561,9 +563,11 @@ function FlowentWorkspaceShell() {
       >
         <AppSidebar
           activeView={activeView}
-          activeBlueprint={activeBlueprint}
+          workflows={blueprints}
+          activeWorkflowId={activeBlueprintId}
+          activeWorkflow={activeWorkflow}
           activeRunId={
-            canvasMode === "workflow" ? activeBlueprint?.selectedRunId : null
+            canvasMode === "workflow" ? activeWorkflow?.selectedRunId : null
           }
           collapsed={sidebarCollapsed}
           runsCollapsed={runsCollapsed}
@@ -572,6 +576,8 @@ function FlowentWorkspaceShell() {
           onNavigate={setActiveView}
           onRun={runWorkflow}
           onSelectRun={selectRunItem}
+          onOpenWorkflow={openWorkflowView}
+          onCreateWorkflow={createWorkflowView}
           onToggleCollapsed={() =>
             setSidebarCollapsed((collapsed) => !collapsed)
           }
@@ -580,11 +586,11 @@ function FlowentWorkspaceShell() {
           }
         />
         <div className="min-w-0 flex-1">
-          {activeView === "blueprint" ? (
-            activeBlueprint ? (
+          {activeView === "workflows" ? (
+            activeWorkflow ? (
               <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
                 <CanvasWorkspace
-                  blueprintName={activeBlueprint.name}
+                  workflowName={activeWorkflow.name}
                   nodes={nodesWithContext}
                   edges={edges}
                   canvasMode={canvasMode}
@@ -599,9 +605,7 @@ function FlowentWorkspaceShell() {
                   onNodesDelete={deleteConnectedEdges}
                   onSelectionChange={setSelection}
                   onQuickAdd={addQuickNode}
-                  onRun={runWorkflow}
-                  runBlockReason={runBlockReason}
-                  onReturnToBlueprint={returnToBlueprint}
+                  onReturnToWorkflowEditor={returnToWorkflowEditor}
                   onDeleteSelection={deleteSelection}
                   onFitView={() => fitView({ padding: 0.2, duration: 250 })}
                   onResetViewport={() =>
@@ -621,10 +625,7 @@ function FlowentWorkspaceShell() {
                 </aside>
               </div>
             ) : (
-              <BlueprintEmptyState
-                onCreateBlueprint={createBlueprintView}
-                onOpenWorkspace={() => setActiveView("workspace")}
-              />
+              <WorkflowEmptyState onCreateWorkflow={createWorkflowView} />
             )
           ) : activeView === "roles" ? (
             <RolesLibrary
@@ -634,23 +635,14 @@ function FlowentWorkspaceShell() {
               upsertRole={upsertRole}
               deleteRole={deleteRole}
               addAgentFromRole={addAgentFromRole}
-              onOpenBlueprint={() => setActiveView("blueprint")}
+              onOpenWorkflow={() => setActiveView("workflows")}
             />
           ) : activeView === "settings" ? (
             <SettingsView
               localDataStatus={localDataStatus}
               localDataMessage={localDataMessage}
             />
-          ) : (
-            <WorkspaceView
-              blueprints={blueprints}
-              activeBlueprintId={activeBlueprintId}
-              roleCount={roles.length}
-              modelPresetCount={modelPresets.length}
-              onOpenBlueprint={openBlueprintView}
-              onCreateBlueprint={createBlueprintView}
-            />
-          )}
+          ) : null}
         </div>
       </motion.main>
     </TooltipProvider>
@@ -659,7 +651,9 @@ function FlowentWorkspaceShell() {
 
 function AppSidebar({
   activeView,
-  activeBlueprint,
+  workflows,
+  activeWorkflowId,
+  activeWorkflow,
   activeRunId,
   collapsed,
   runsCollapsed,
@@ -668,11 +662,15 @@ function AppSidebar({
   onNavigate,
   onRun,
   onSelectRun,
+  onOpenWorkflow,
+  onCreateWorkflow,
   onToggleCollapsed,
   onToggleRunsCollapsed,
 }: {
   activeView: AppView;
-  activeBlueprint: BlueprintAsset | null;
+  workflows: WorkflowAsset[];
+  activeWorkflowId: string | null;
+  activeWorkflow: WorkflowAsset | null;
   activeRunId: string | null | undefined;
   collapsed: boolean;
   runsCollapsed: boolean;
@@ -681,18 +679,20 @@ function AppSidebar({
   onNavigate: (view: AppView) => void;
   onRun: () => void;
   onSelectRun: (runId: string) => void;
+  onOpenWorkflow: (workflowId: string) => void;
+  onCreateWorkflow: () => void;
   onToggleCollapsed: () => void;
   onToggleRunsCollapsed: () => void;
 }) {
-  const showRuns = activeView === "blueprint" && Boolean(activeBlueprint);
+  const showRuns = Boolean(activeWorkflow);
 
   return (
     <motion.aside
-      animate={{ width: collapsed ? 72 : 232 }}
+      animate={{ width: collapsed ? 72 : 312 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
       className="shrink-0 border-r bg-sidebar text-sidebar-foreground"
     >
-      <div className="flex h-full min-h-0 flex-col gap-4 p-3">
+      <div className="flex h-full min-h-0 flex-col gap-3 p-3">
         <div
           className={cn(
             "flex items-center gap-3",
@@ -714,25 +714,22 @@ function AppSidebar({
           </Button>
         </div>
         <Separator />
-        <nav className="space-y-1">
-          {primaryNavigation.map((item) => (
-            <SidebarNavButton
-              key={item.view}
-              item={item}
-              collapsed={collapsed}
-              active={activeView === item.view}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </nav>
-        {showRuns && activeBlueprint && (
+        <WorkflowsSidebarSection
+          activeWorkflowId={activeWorkflowId}
+          collapsed={collapsed}
+          workflows={workflows}
+          onCreateWorkflow={onCreateWorkflow}
+          onOpenWorkflow={onOpenWorkflow}
+          onExpandSidebar={onToggleCollapsed}
+        />
+        {showRuns && activeWorkflow && (
           <RunsSidebarSection
             activeRunId={activeRunId ?? null}
             collapsed={collapsed}
             runsCollapsed={runsCollapsed}
             runBlockReason={runBlockReason}
             highlightedRunId={highlightedRunId}
-            runs={activeBlueprint.runHistory}
+            runs={activeWorkflow.runHistory}
             onExpandSidebar={onToggleCollapsed}
             onRun={onRun}
             onSelectRun={onSelectRun}
@@ -741,8 +738,16 @@ function AppSidebar({
         )}
         <div className="mt-auto space-y-3">
           <Separator />
-          <ThemeToggle collapsed={collapsed} />
           <nav className="space-y-1">
+            {utilityNavigation.map((item) => (
+              <SidebarNavButton
+                key={item.view}
+                item={item}
+                collapsed={collapsed}
+                active={activeView === item.view}
+                onNavigate={onNavigate}
+              />
+            ))}
             {systemNavigation.map((item) => (
               <SidebarNavButton
                 key={item.view}
@@ -753,6 +758,7 @@ function AppSidebar({
               />
             ))}
           </nav>
+          <ThemeToggle collapsed={collapsed} />
         </div>
       </div>
     </motion.aside>
@@ -765,7 +771,7 @@ function SidebarNavButton({
   active,
   onNavigate,
 }: {
-  item: (typeof primaryNavigation)[number] | (typeof systemNavigation)[number];
+  item: SidebarNavigationItem;
   collapsed: boolean;
   active: boolean;
   onNavigate: (view: AppView) => void;
@@ -798,267 +804,247 @@ function SidebarNavButton({
   );
 }
 
-function WorkspaceView({
-  blueprints,
-  activeBlueprintId,
-  roleCount,
-  modelPresetCount,
-  onOpenBlueprint,
-  onCreateBlueprint,
+function WorkflowsSidebarSection({
+  workflows,
+  activeWorkflowId,
+  collapsed,
+  onCreateWorkflow,
+  onOpenWorkflow,
+  onExpandSidebar,
 }: {
-  blueprints: BlueprintAsset[];
-  activeBlueprintId: string | null;
-  roleCount: number;
-  modelPresetCount: number;
-  onOpenBlueprint: (blueprintId: string) => void;
-  onCreateBlueprint: () => void;
+  workflows: WorkflowAsset[];
+  activeWorkflowId: string | null;
+  collapsed: boolean;
+  onCreateWorkflow: () => void;
+  onOpenWorkflow: (workflowId: string) => void;
+  onExpandSidebar: () => void;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState<BlueprintStatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<WorkflowStatusFilter>("all");
   const normalizedSearch = searchTerm.trim().toLowerCase();
-  const filteredBlueprints = useMemo(
+  const filteredWorkflows = useMemo(
     () =>
-      blueprints.filter((blueprint) => {
+      workflows.filter((workflow) => {
         const matchesSearch =
           normalizedSearch.length === 0 ||
-          blueprint.name.toLowerCase().includes(normalizedSearch);
+          workflow.name.toLowerCase().includes(normalizedSearch);
         const matchesStatus =
-          statusFilter === "all" || blueprint.lastRunStatus === statusFilter;
+          statusFilter === "all" || workflow.lastRunStatus === statusFilter;
 
         return matchesSearch && matchesStatus;
       }),
-    [blueprints, normalizedSearch, statusFilter],
+    [workflows, normalizedSearch, statusFilter],
   );
   const hasFilters = normalizedSearch.length > 0 || statusFilter !== "all";
 
+  if (collapsed) {
+    const button = (
+      <Button
+        variant={activeWorkflowId ? "secondary" : "ghost"}
+        size="icon"
+        aria-label="Workflows"
+        onClick={onExpandSidebar}
+      >
+        <GitBranchIcon />
+      </Button>
+    );
+
+    return (
+      <section className="space-y-2">
+        <div className="flex flex-col items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger render={button} />
+            <TooltipContent side="right">Workflows</TooltipContent>
+          </Tooltip>
+          <Badge variant="outline" className="px-1.5">
+            {workflows.length}
+          </Badge>
+        </div>
+      </section>
+    );
+  }
+
   return (
-    <ScrollArea className="h-full">
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold">Workspace</h1>
-          </div>
-          <Button onClick={onCreateBlueprint}>
-            <PlusIcon />
-            Create blueprint
-          </Button>
+    <section className="flex min-h-0 flex-[1.05] flex-col gap-3">
+      <div className="flex items-center justify-between gap-2 px-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <GitBranchIcon className="size-4 shrink-0 text-muted-foreground" />
+          <h2 className="truncate text-base font-medium">Workflows</h2>
+          <Badge variant="outline">{workflows.length}</Badge>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard label="Blueprints" value={String(blueprints.length)} />
-          <MetricCard
-            label="Current"
-            value={
-              activeBlueprintId
-                ? (blueprints.find(
-                    (blueprint) => blueprint.id === activeBlueprintId,
-                  )?.name ?? "Selected")
-                : "None"
-            }
+        <Button size="sm" onClick={onCreateWorkflow}>
+          <PlusIcon />
+          Create workflow
+        </Button>
+      </div>
+      <div className="space-y-2">
+        <div className="relative">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="Search workflows"
+            className="h-9 pl-9"
+            placeholder="Search workflows"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
           />
-          <MetricCard label="Roles" value={String(roleCount)} />
-          <MetricCard label="Models" value={String(modelPresetCount)} />
         </div>
-        <div className="flex flex-col gap-3 md:flex-row">
-          <div className="relative min-w-0 flex-1">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              aria-label="Search blueprints"
-              className="pl-9"
-              placeholder="Search blueprints"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
-          <Select
-            value={statusFilter}
-            onValueChange={(value) =>
-              setStatusFilter(value as BlueprintStatusFilter)
-            }
-          >
-            <SelectTrigger aria-label="Filter blueprints" className="md:w-48">
-              <SelectValue>
-                {(value: BlueprintStatusFilter | null) =>
-                  blueprintStatusFilters.find((item) => item.value === value)
-                    ?.label ?? "Any status"
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {blueprintStatusFilters.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) =>
+            setStatusFilter(value as WorkflowStatusFilter)
+          }
+        >
+          <SelectTrigger aria-label="Filter workflows" className="h-9 w-full">
+            <SelectValue>
+              {(value: WorkflowStatusFilter | null) =>
+                workflowStatusFilters.find((item) => item.value === value)
+                  ?.label ?? "Any status"
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {workflowStatusFilters.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {workflows.length === 0 ? (
+        <div className="rounded-lg border bg-background p-3">
+          <div className="text-sm font-medium">No workflows yet</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Create your first workflow to start building.
+          </p>
         </div>
-        {blueprints.length === 0 ? (
-          <WorkspaceEmptyState onCreateBlueprint={onCreateBlueprint} />
-        ) : filteredBlueprints.length === 0 ? (
-          <WorkspaceNoResults
-            onClearFilters={() => {
+      ) : filteredWorkflows.length === 0 ? (
+        <div className="rounded-lg border bg-background p-3">
+          <div className="text-sm font-medium">No matching workflows</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Clear the current filters to return to the full list.
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2"
+            onClick={() => {
               setSearchTerm("");
               setStatusFilter("all");
             }}
-          />
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {filteredBlueprints.map((blueprint) => (
-              <BlueprintCard
-                key={blueprint.id}
-                blueprint={blueprint}
-                active={blueprint.id === activeBlueprintId}
-                onOpenBlueprint={onOpenBlueprint}
+          >
+            Clear filters
+          </Button>
+        </div>
+      ) : (
+        <ScrollArea className="min-h-0 flex-1">
+          <motion.ol layout className="space-y-2 px-1 pb-1">
+            {filteredWorkflows.map((workflow) => (
+              <WorkflowSidebarItem
+                key={workflow.id}
+                workflow={workflow}
+                active={workflow.id === activeWorkflowId}
+                onOpenWorkflow={onOpenWorkflow}
               />
             ))}
-          </div>
-        )}
-        {hasFilters && filteredBlueprints.length > 0 && (
-          <div>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setSearchTerm("");
-                setStatusFilter("all");
-              }}
-            >
-              Clear filters
-            </Button>
-          </div>
-        )}
-      </section>
-    </ScrollArea>
-  );
-}
-
-function BlueprintCard({
-  blueprint,
-  active,
-  onOpenBlueprint,
-}: {
-  blueprint: BlueprintAsset;
-  active: boolean;
-  onOpenBlueprint: (blueprintId: string) => void;
-}) {
-  const status = blueprintStatusPresentation[blueprint.lastRunStatus];
-
-  return (
-    <Card className={cn("rounded-lg p-5", active && "border-primary/60")}>
-      <CardHeader className="px-0 pt-0">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="truncate text-xl">{blueprint.name}</CardTitle>
-            {active && <Badge variant="secondary">Current</Badge>}
-          </div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            Updated {formatBlueprintDate(blueprint.updatedAt)}
-          </div>
-        </div>
-        <CardAction>
-          <Button size="sm" onClick={() => onOpenBlueprint(blueprint.id)}>
-            Open blueprint
+          </motion.ol>
+        </ScrollArea>
+      )}
+      {hasFilters && filteredWorkflows.length > 0 && (
+        <div className="px-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchTerm("");
+              setStatusFilter("all");
+            }}
+          >
+            Clear filters
           </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-4 px-0 pb-0">
-        <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-          {blueprint.summary}
-        </p>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge variant={status.badgeVariant}>{status.label}</Badge>
-          <span className="text-muted-foreground">
-            {blueprint.nodes.length} nodes
-          </span>
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function WorkspaceEmptyState({
-  onCreateBlueprint,
-}: {
-  onCreateBlueprint: () => void;
-}) {
-  return (
-    <Card className="rounded-lg p-6">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-semibold">
-            Create your first blueprint
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Start with a blank blueprint, then add triggers, agents, and steps
-            in the editor.
-          </p>
-        </div>
-        <Button onClick={onCreateBlueprint}>
-          <PlusIcon />
-          Create blueprint
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function WorkspaceNoResults({
-  onClearFilters,
-}: {
-  onClearFilters: () => void;
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-6">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-semibold">No matching blueprints</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Clear the current filters to return to the full list.
-          </p>
-        </div>
-        <Button variant="outline" onClick={onClearFilters}>
-          Clear filters
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function BlueprintEmptyState({
-  onCreateBlueprint,
-  onOpenWorkspace,
-}: {
-  onCreateBlueprint: () => void;
-  onOpenWorkspace: () => void;
-}) {
-  return (
-    <section className="flex h-full min-w-0 items-center justify-center p-6">
-      <Card className="w-full max-w-xl rounded-lg p-6">
-        <div className="space-y-4">
-          <div>
-            <h1 className="text-3xl font-semibold">Choose a blueprint</h1>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Open an existing blueprint from your workspace or create a new one
-              before editing.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={onOpenWorkspace}>
-              <PanelRightIcon />
-              Go to Workspace
-            </Button>
-            <Button variant="outline" onClick={onCreateBlueprint}>
-              <PlusIcon />
-              Create blueprint
-            </Button>
-          </div>
-        </div>
-      </Card>
+      )}
     </section>
   );
 }
 
-function formatBlueprintDate(value: string) {
+function WorkflowSidebarItem({
+  workflow,
+  active,
+  onOpenWorkflow,
+}: {
+  workflow: WorkflowAsset;
+  active: boolean;
+  onOpenWorkflow: (workflowId: string) => void;
+}) {
+  const status = workflowStatusPresentation[workflow.lastRunStatus];
+
+  return (
+    <motion.li layout>
+      <button
+        type="button"
+        aria-current={active ? "true" : undefined}
+        aria-label={`Open ${workflow.name}`}
+        className={cn(
+          "w-full rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          active && "border-primary bg-muted",
+        )}
+        onClick={() => onOpenWorkflow(workflow.id)}
+      >
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 truncate text-sm font-medium">
+              {workflow.name}
+            </div>
+            {active && (
+              <Badge variant="secondary" className="shrink-0">
+                Current
+              </Badge>
+            )}
+          </div>
+          <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
+            {workflow.summary}
+          </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant={status.badgeVariant}>{status.label}</Badge>
+            <span>{workflow.nodes.length} nodes</span>
+            <span>Updated {formatWorkflowDate(workflow.updatedAt)}</span>
+          </div>
+        </div>
+      </button>
+    </motion.li>
+  );
+}
+
+function WorkflowEmptyState({
+  onCreateWorkflow,
+}: {
+  onCreateWorkflow: () => void;
+}) {
+  return (
+    <section className="flex h-full min-w-0 items-center justify-center p-6">
+      <div className="w-full max-w-xl rounded-lg border bg-card p-6">
+        <div className="space-y-4">
+          <div>
+            <h1 className="text-3xl font-semibold">
+              Create your first workflow
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Start with a blank workflow, then add triggers, agents, and steps
+              in the editor.
+            </p>
+          </div>
+          <Button onClick={onCreateWorkflow}>
+            <PlusIcon />
+            Create workflow
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function formatWorkflowDate(value: string) {
   return new Intl.DateTimeFormat("en", {
     month: "short",
     day: "numeric",
@@ -1088,17 +1074,6 @@ function getWorkflowRunStatusVariant(
   }
 
   return status === "canceled" ? "outline" : "secondary";
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="rounded-lg p-6">
-      <div className="text-lg font-medium">{label}</div>
-      <div className="mt-2 truncate text-3xl font-semibold" title={value}>
-        {value}
-      </div>
-    </Card>
-  );
 }
 
 function RunsSidebarSection({
@@ -1197,6 +1172,24 @@ function RunsSidebarSection({
           <TooltipContent>Hide runs</TooltipContent>
         </Tooltip>
       </div>
+      <div className="px-1">
+        <Button
+          className="w-full"
+          disabled={Boolean(runBlockReason)}
+          onClick={onRun}
+        >
+          <PlayIcon />
+          Run workflow
+        </Button>
+        {runBlockReason && (
+          <Badge
+            variant="destructive"
+            className="mt-2 h-auto whitespace-normal"
+          >
+            {runBlockReason}
+          </Badge>
+        )}
+      </div>
       {runs.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-1">
           <div className="rounded-lg border bg-background p-3">
@@ -1205,22 +1198,9 @@ function RunsSidebarSection({
               No runs yet
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Start this blueprint to watch its first run here.
+              Run this workflow to watch its first run here.
             </p>
           </div>
-          <Button
-            className="w-full"
-            disabled={Boolean(runBlockReason)}
-            onClick={onRun}
-          >
-            <PlayIcon />
-            Start first run
-          </Button>
-          {runBlockReason && (
-            <Badge variant="destructive" className="h-auto whitespace-normal">
-              {runBlockReason}
-            </Badge>
-          )}
         </div>
       ) : (
         <ScrollArea className="min-h-0 flex-1">
@@ -1306,7 +1286,7 @@ function RoleCard({
   deleteRole,
   setDraft,
   setEditingId,
-  onOpenBlueprint,
+  onOpenWorkflow,
 }: {
   role: Role;
   modelPresets: ModelPreset[];
@@ -1316,7 +1296,7 @@ function RoleCard({
   deleteRole: (roleId: string) => void;
   setDraft: React.Dispatch<React.SetStateAction<Role>>;
   setEditingId: React.Dispatch<React.SetStateAction<string | null>>;
-  onOpenBlueprint: () => void;
+  onOpenWorkflow: () => void;
 }) {
   const hasValidPreset = modelPresets.some(
     (preset) => preset.id === role.modelPresetId,
@@ -1340,7 +1320,7 @@ function RoleCard({
             disabled={!hasValidPreset}
             onClick={() => {
               addAgentFromRole(role.id, getRoleNodePosition(nodeCount));
-              onOpenBlueprint();
+              onOpenWorkflow();
             }}
           >
             Use Role
@@ -1389,7 +1369,7 @@ function RoleCard({
 }
 
 function CanvasWorkspace({
-  blueprintName,
+  workflowName,
   nodes,
   edges,
   canvasMode,
@@ -1404,14 +1384,12 @@ function CanvasWorkspace({
   onNodesDelete,
   onSelectionChange,
   onQuickAdd,
-  onRun,
-  runBlockReason,
-  onReturnToBlueprint,
+  onReturnToWorkflowEditor,
   onDeleteSelection,
   onFitView,
   onResetViewport,
 }: {
-  blueprintName: string;
+  workflowName: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
   canvasMode: CanvasMode;
@@ -1429,9 +1407,7 @@ function CanvasWorkspace({
   onNodesDelete: (deletedNodes: FlowNode[]) => void;
   onSelectionChange: (nodeIds: string[], edgeIds: string[]) => void;
   onQuickAdd: (kind: WorkflowNodeKind) => void;
-  onRun: () => void;
-  runBlockReason: string | null;
-  onReturnToBlueprint: () => void;
+  onReturnToWorkflowEditor: () => void;
   onDeleteSelection: () => void;
   onFitView: () => void;
   onResetViewport: () => void;
@@ -1452,7 +1428,7 @@ function CanvasWorkspace({
         )}
       >
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="truncate text-xl font-medium">{blueprintName}</h2>
+          <h2 className="truncate text-xl font-medium">{workflowName}</h2>
           <Badge variant={isWorkflowMode ? "default" : "secondary"}>
             {isWorkflowMode ? (
               <>
@@ -1462,7 +1438,7 @@ function CanvasWorkspace({
             ) : (
               <>
                 <PencilIcon className="size-3.5" />
-                Edit state
+                Workflow editor
               </>
             )}
           </Badge>
@@ -1474,21 +1450,11 @@ function CanvasWorkspace({
             onQuickAdd={onQuickAdd}
           />
           <Separator orientation="vertical" className="hidden h-7 sm:block" />
-          {isWorkflowMode ? (
-            <Button variant="outline" onClick={onReturnToBlueprint}>
+          {isWorkflowMode && (
+            <Button variant="outline" onClick={onReturnToWorkflowEditor}>
               <RotateCcwIcon />
-              Edit blueprint
+              Edit workflow
             </Button>
-          ) : (
-            <Button disabled={Boolean(runBlockReason)} onClick={onRun}>
-              <PlayIcon />
-              Run
-            </Button>
-          )}
-          {runBlockReason && (
-            <Badge variant="destructive" className="h-auto whitespace-normal">
-              {runBlockReason}
-            </Badge>
           )}
           <Button
             variant="outline"
@@ -2152,7 +2118,7 @@ function RolesLibrary({
   upsertRole,
   deleteRole,
   addAgentFromRole,
-  onOpenBlueprint,
+  onOpenWorkflow,
 }: {
   roles: Role[];
   modelPresets: ModelPreset[];
@@ -2160,7 +2126,7 @@ function RolesLibrary({
   upsertRole: (role: Role, editingId: string | null) => void;
   deleteRole: (roleId: string) => void;
   addAgentFromRole: (roleId: string, position: FlowNode["position"]) => void;
-  onOpenBlueprint: () => void;
+  onOpenWorkflow: () => void;
 }) {
   const [draft, setDraft] = useState<Role>(() =>
     emptyRole(modelPresets.at(0)?.id),
@@ -2208,7 +2174,7 @@ function RolesLibrary({
                 firstUsableRole?.id ?? "",
                 getRoleNodePosition(nodeCount),
               );
-              onOpenBlueprint();
+              onOpenWorkflow();
             }}
             disabled={!firstUsableRole}
           >
@@ -2229,7 +2195,7 @@ function RolesLibrary({
                 deleteRole={deleteRole}
                 setDraft={setDraft}
                 setEditingId={setEditingId}
-                onOpenBlueprint={onOpenBlueprint}
+                onOpenWorkflow={onOpenWorkflow}
               />
             ))}
           </div>

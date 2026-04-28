@@ -329,6 +329,10 @@ describe("Home", () => {
     expect(screen.getByText("Run started.")).toBeInTheDocument();
     expect(screen.getByText("Running")).toBeInTheDocument();
     expect(screen.getByText("Run view")).toBeInTheDocument();
+    expect(screen.getByText("Read-only run")).toBeInTheDocument();
+    expect(
+      screen.getByText("Editing is locked while this run is open."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Execution Details")).toBeInTheDocument();
     expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
@@ -354,6 +358,7 @@ describe("Home", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit blueprint" }));
 
     expect(screen.getByText("Edit state")).toBeInTheDocument();
+    expect(screen.queryByText("Read-only run")).not.toBeInTheDocument();
     expect(screen.queryByText("Read-only")).not.toBeInTheDocument();
     expect(screen.queryByText("Execution Details")).not.toBeInTheDocument();
     expect(

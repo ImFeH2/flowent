@@ -283,6 +283,10 @@ function FlowentWorkspaceShell() {
   const [activeView, setActiveView] = useState<AppView>("workspace");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [runsCollapsed, setRunsCollapsed] = useState(false);
+  const [highlightedRun, setHighlightedRun] = useState<{
+    blueprintId: string;
+    runId: string;
+  } | null>(null);
   const {
     blueprints,
     activeBlueprintId,
@@ -403,13 +407,47 @@ function FlowentWorkspaceShell() {
 
   useEffect(() => clearRunTimers, [clearRunTimers]);
 
+  const highlightedRunId =
+    highlightedRun?.blueprintId === activeBlueprintId
+      ? highlightedRun.runId
+      : null;
+
+  useEffect(() => {
+    if (!highlightedRun) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setHighlightedRun((run) =>
+        run?.blueprintId === highlightedRun.blueprintId &&
+        run.runId === highlightedRun.runId
+          ? null
+          : run,
+      );
+    }, 2200);
+
+    return () => window.clearTimeout(timer);
+  }, [highlightedRun]);
+
   const runWorkflow = useCallback(() => {
     if (runBlockReason) {
       return;
     }
 
+    const previousRunId = activeBlueprint?.runHistory[0]?.id ?? null;
+
     clearRunTimers();
     startWorkflowRun();
+
+    const nextRunId =
+      useFlowentWorkspaceStore
+        .getState()
+        .blueprints.find((blueprint) => blueprint.id === activeBlueprintId)
+        ?.selectedRunId ?? null;
+
+    if (activeBlueprintId && nextRunId && nextRunId !== previousRunId) {
+      setHighlightedRun({ blueprintId: activeBlueprintId, runId: nextRunId });
+    }
 
     runTimers.current = [
       window.setTimeout(() => {
@@ -421,6 +459,8 @@ function FlowentWorkspaceShell() {
     ];
   }, [
     advanceWorkflowRun,
+    activeBlueprint?.runHistory,
+    activeBlueprintId,
     clearRunTimers,
     finishWorkflowRun,
     runBlockReason,
@@ -528,6 +568,7 @@ function FlowentWorkspaceShell() {
           collapsed={sidebarCollapsed}
           runsCollapsed={runsCollapsed}
           runBlockReason={runBlockReason}
+          highlightedRunId={highlightedRunId}
           onNavigate={setActiveView}
           onRun={runWorkflow}
           onSelectRun={selectRunItem}
@@ -623,6 +664,7 @@ function AppSidebar({
   collapsed,
   runsCollapsed,
   runBlockReason,
+  highlightedRunId,
   onNavigate,
   onRun,
   onSelectRun,
@@ -635,6 +677,7 @@ function AppSidebar({
   collapsed: boolean;
   runsCollapsed: boolean;
   runBlockReason: string | null;
+  highlightedRunId: string | null;
   onNavigate: (view: AppView) => void;
   onRun: () => void;
   onSelectRun: (runId: string) => void;
@@ -688,6 +731,7 @@ function AppSidebar({
             collapsed={collapsed}
             runsCollapsed={runsCollapsed}
             runBlockReason={runBlockReason}
+            highlightedRunId={highlightedRunId}
             runs={activeBlueprint.runHistory}
             onExpandSidebar={onToggleCollapsed}
             onRun={onRun}
@@ -1063,6 +1107,7 @@ function RunsSidebarSection({
   activeRunId,
   runsCollapsed,
   runBlockReason,
+  highlightedRunId,
   onExpandSidebar,
   onToggleRunsCollapsed,
   onSelectRun,
@@ -1073,6 +1118,7 @@ function RunsSidebarSection({
   activeRunId: string | null;
   runsCollapsed: boolean;
   runBlockReason: string | null;
+  highlightedRunId: string | null;
   onExpandSidebar: () => void;
   onToggleRunsCollapsed: () => void;
   onSelectRun: (runId: string) => void;
@@ -1184,6 +1230,7 @@ function RunsSidebarSection({
                 key={run.id}
                 run={run}
                 active={run.id === activeRunId}
+                highlighted={run.id === highlightedRunId}
                 onSelectRun={onSelectRun}
               />
             ))}
@@ -1197,16 +1244,27 @@ function RunsSidebarSection({
 function RunItem({
   run,
   active,
+  highlighted,
   onSelectRun,
 }: {
   run: WorkflowRun;
   active: boolean;
+  highlighted: boolean;
   onSelectRun: (runId: string) => void;
 }) {
   const statusLabel = workflowRunStatusLabels[run.status];
 
   return (
-    <motion.li layout>
+    <motion.li
+      layout
+      initial={highlighted ? { opacity: 0, y: -8 } : false}
+      animate={
+        highlighted
+          ? { opacity: 1, y: 0, scale: [1, 1.015, 1] }
+          : { opacity: 1, y: 0, scale: 1 }
+      }
+      transition={{ duration: highlighted ? 0.42 : 0.18, ease: "easeOut" }}
+    >
       <button
         type="button"
         aria-current={active ? "true" : undefined}
@@ -1214,6 +1272,7 @@ function RunItem({
         className={cn(
           "w-full rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
           active && "border-primary bg-muted",
+          highlighted && "ring-2 ring-ring/60",
         )}
         onClick={() => onSelectRun(run.id)}
       >
@@ -1380,8 +1439,18 @@ function CanvasWorkspace({
   const isWorkflowMode = canvasMode === "workflow";
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-col bg-background">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4">
+    <section
+      className={cn(
+        "flex min-h-0 min-w-0 flex-col bg-background",
+        isWorkflowMode && "bg-muted/30",
+      )}
+    >
+      <div
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4",
+          isWorkflowMode && "bg-muted/40",
+        )}
+      >
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="truncate text-xl font-medium">{blueprintName}</h2>
           <Badge variant={isWorkflowMode ? "default" : "secondary"}>
@@ -1441,7 +1510,13 @@ function CanvasWorkspace({
           </Button>
         </div>
       </div>
-      <div className="min-h-0 flex-1">
+      {isWorkflowMode && <RunViewBanner />}
+      <div
+        className={cn(
+          "min-h-0 flex-1",
+          isWorkflowMode && "border-t border-border/60",
+        )}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -1496,6 +1571,25 @@ function CanvasWorkspace({
         </ReactFlow>
       </div>
     </section>
+  );
+}
+
+function RunViewBanner() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-6 py-2 text-sm"
+    >
+      <Badge variant="outline">
+        <LockIcon className="size-3.5" />
+        Read-only run
+      </Badge>
+      <span className="text-muted-foreground">
+        Editing is locked while this run is open.
+      </span>
+    </motion.div>
   );
 }
 

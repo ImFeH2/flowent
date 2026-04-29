@@ -770,7 +770,9 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
       return id;
     },
 
-    openBlueprint: (blueprintId) =>
+    openBlueprint: (blueprintId) => {
+      let opened = false;
+
       set((state) => {
         const blueprint = state.blueprints.find(
           (item) => item.id === blueprintId,
@@ -780,21 +782,25 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
           return state;
         }
 
+        opened = true;
+
         const graph = resetRunState(
           cloneNodes(blueprint.nodes),
           cloneEdges(blueprint.edges),
         );
+        const updatedAt = new Date().toISOString();
+        const openedBlueprint = {
+          ...blueprint,
+          updatedAt,
+          nodes: cloneNodes(graph.nodes),
+          edges: cloneEdges(graph.edges),
+        };
+        const remainingBlueprints = state.blueprints.filter(
+          (item) => item.id !== blueprintId,
+        );
 
         return {
-          blueprints: state.blueprints.map((item) =>
-            item.id === blueprintId
-              ? {
-                  ...item,
-                  nodes: cloneNodes(graph.nodes),
-                  edges: cloneEdges(graph.edges),
-                }
-              : item,
-          ),
+          blueprints: [openedBlueprint, ...remainingBlueprints],
           activeBlueprintId: blueprintId,
           nodes: graph.nodes,
           edges: graph.edges,
@@ -803,7 +809,12 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
           selectedEdgeIds: [],
           nextNodeIndex: getNextNodeIndex(graph.nodes),
         };
-      }),
+      });
+
+      if (opened) {
+        persistLocalData();
+      }
+    },
 
     setSelection: (nodeIds, edgeIds) =>
       set((state) => {

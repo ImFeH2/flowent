@@ -240,16 +240,33 @@ describe("Home", () => {
       screen.getByRole("button", { name: "Dark Mode" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Launch Campaign").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("Search workflows")).toBeInTheDocument();
-    expect(screen.getByLabelText("Filter workflows")).toBeInTheDocument();
+    expect(
+      within(sidebar).getByRole("button", { name: "Search workflows" }),
+    ).toBeInTheDocument();
+    expect(
+      within(sidebar).queryByLabelText("Filter workflows"),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Create workflow" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Open Launch Campaign" }),
     ).toBeInTheDocument();
+    expect(within(sidebar).getByText("Workflow history")).toBeInTheDocument();
+    expect(
+      within(sidebar).queryByText(
+        "Draft launch copy, review it, and prepare the next step.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(within(sidebar).queryByText("3 nodes")).not.toBeInTheDocument();
+    expect(within(sidebar).queryByText(/Updated/)).not.toBeInTheDocument();
     expect(within(sidebar).queryByText("Runs")).not.toBeInTheDocument();
     expect(within(sidebar).queryByText("No runs yet")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Draft launch copy, review it, and prepare the next step.",
+      ),
+    ).toBeInTheDocument();
     expect(within(workflowContext).getByText("Runs")).toBeInTheDocument();
     expect(
       within(workflowContext).getByText("No runs yet"),
@@ -414,25 +431,70 @@ describe("Home", () => {
       screen.getByRole("heading", { level: 2, name: "Untitled workflow" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Blank workflow ready to build."),
-    ).toBeInTheDocument();
+      screen.getAllByText("Blank workflow ready to build.").length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByRole("button", { name: "Open Untitled workflow" }),
+    ).toHaveAttribute("aria-current", "true");
+  });
+
+  it("searches workflows in the main view and opens a result", () => {
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Create workflow" }));
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Untitled workflow" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Search workflows" }));
+
+    const overview = screen.getByLabelText("Workflows overview");
+
+    fireEvent.change(within(overview).getByLabelText("Search workflows"), {
+      target: { value: "launch" },
+    });
+
+    expect(within(overview).getByText("Launch Campaign")).toBeInTheDocument();
+    expect(
+      within(overview).queryByText("Untitled workflow"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(overview).getByRole("button", { name: "Open Launch Campaign" }),
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Launch Campaign" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open Launch Campaign" }),
     ).toHaveAttribute("aria-current", "true");
   });
 
   it("clears workflow search filters with no results", () => {
     render(<Home />);
 
-    fireEvent.change(screen.getByLabelText("Search workflows"), {
+    fireEvent.click(screen.getByRole("button", { name: "Search workflows" }));
+
+    const overview = screen.getByLabelText("Workflows overview");
+
+    expect(
+      within(overview).getByLabelText("Filter workflows"),
+    ).toBeInTheDocument();
+
+    fireEvent.change(within(overview).getByLabelText("Search workflows"), {
       target: { value: "no matching workflow" },
     });
 
-    expect(screen.getByText("No matching workflows")).toBeInTheDocument();
+    expect(
+      within(overview).getByText("No matching workflows"),
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(
+      within(overview).getByRole("button", { name: "Clear filters" }),
+    );
 
-    expect(screen.getAllByText("Launch Campaign").length).toBeGreaterThan(0);
+    expect(within(overview).getByText("Launch Campaign")).toBeInTheDocument();
   });
 
   it("opens the roles library", () => {

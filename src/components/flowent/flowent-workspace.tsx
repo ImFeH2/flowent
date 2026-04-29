@@ -109,6 +109,7 @@ const nodeTypes: NodeTypes = {
 };
 
 type AppView = "workflows" | "roles" | "settings";
+type WorkflowMainMode = "editor" | "overview";
 type LocalDataStatus = FlowentWorkspaceStore["localDataStatus"];
 
 const nodeLibrary: Array<{
@@ -276,6 +277,8 @@ function FlowentWorkspaceShell() {
   const runTimers = useRef<number[]>([]);
   const { fitView, screenToFlowPosition, setViewport } = useReactFlow();
   const [activeView, setActiveView] = useState<AppView>("workflows");
+  const [workflowMainMode, setWorkflowMainMode] =
+    useState<WorkflowMainMode>("editor");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [highlightedRun, setHighlightedRun] = useState<{
     workflowId: string;
@@ -355,6 +358,15 @@ function FlowentWorkspaceShell() {
       null,
     [activeBlueprintId, blueprints],
   );
+  const workflowHistory = useMemo(
+    () =>
+      [...blueprints].sort(
+        (left, right) =>
+          new Date(right.updatedAt).getTime() -
+          new Date(left.updatedAt).getTime(),
+      ),
+    [blueprints],
+  );
 
   const nodesWithContext = useMemo(
     () =>
@@ -432,6 +444,7 @@ function FlowentWorkspaceShell() {
 
     clearRunTimers();
     setActiveView("workflows");
+    setWorkflowMainMode("editor");
     startWorkflowRun();
 
     const nextRunId =
@@ -471,6 +484,7 @@ function FlowentWorkspaceShell() {
     (runId: string) => {
       clearRunTimers();
       setActiveView("workflows");
+      setWorkflowMainMode("editor");
       selectWorkflowRun(runId);
     },
     [clearRunTimers, selectWorkflowRun],
@@ -481,6 +495,7 @@ function FlowentWorkspaceShell() {
       clearRunTimers();
       openBlueprint(blueprintId);
       setActiveView("workflows");
+      setWorkflowMainMode("editor");
     },
     [clearRunTimers, openBlueprint],
   );
@@ -489,7 +504,26 @@ function FlowentWorkspaceShell() {
     clearRunTimers();
     createBlueprint();
     setActiveView("workflows");
+    setWorkflowMainMode("editor");
   }, [clearRunTimers, createBlueprint]);
+
+  const openWorkflowsOverview = useCallback(() => {
+    clearRunTimers();
+    setActiveView("workflows");
+    setWorkflowMainMode("overview");
+  }, [clearRunTimers]);
+
+  const navigateTopLevelView = useCallback(
+    (view: AppView) => {
+      if (view === "workflows") {
+        openWorkflowsOverview();
+        return;
+      }
+
+      setActiveView(view);
+    },
+    [openWorkflowsOverview],
+  );
 
   const onDragStart = useCallback(
     (event: React.DragEvent<HTMLButtonElement>, kind: WorkflowNodeKind) => {
@@ -557,22 +591,38 @@ function FlowentWorkspaceShell() {
       >
         <AppSidebar
           activeView={activeView}
-          workflows={blueprints}
+          workflows={workflowHistory}
           activeWorkflowId={activeBlueprintId}
+          workflowOverviewOpen={
+            activeView === "workflows" && workflowMainMode === "overview"
+          }
           collapsed={sidebarCollapsed}
-          onNavigate={setActiveView}
+          onNavigate={navigateTopLevelView}
           onOpenWorkflow={openWorkflowView}
           onCreateWorkflow={createWorkflowView}
+          onOpenWorkflowsOverview={openWorkflowsOverview}
           onToggleCollapsed={() =>
             setSidebarCollapsed((collapsed) => !collapsed)
           }
         />
         <div className="min-w-0 flex-1">
           {activeView === "workflows" ? (
-            activeWorkflow ? (
+            workflowMainMode === "overview" ? (
+              <WorkflowsOverview
+                workflows={workflowHistory}
+                activeWorkflowId={activeBlueprintId}
+                onCreateWorkflow={createWorkflowView}
+                onOpenWorkflow={openWorkflowView}
+              />
+            ) : activeWorkflow ? (
               <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
                 <CanvasWorkspace
                   workflowName={activeWorkflow.name}
+                  workflowSummary={activeWorkflow.summary}
+                  workflowLastRunStatus={activeWorkflow.lastRunStatus}
+                  workflowUpdatedAt={activeWorkflow.updatedAt}
+                  workflowNodeCount={activeWorkflow.nodes.length}
+                  workflowRunCount={activeWorkflow.runHistory.length}
                   nodes={nodesWithContext}
                   edges={edges}
                   canvasMode={canvasMode}
@@ -616,6 +666,11 @@ function FlowentWorkspaceShell() {
                       selectedCount={
                         selectedNodeIds.length + selectedEdgeIds.length
                       }
+                      workflowSummary={activeWorkflow.summary}
+                      workflowLastRunStatus={activeWorkflow.lastRunStatus}
+                      workflowUpdatedAt={activeWorkflow.updatedAt}
+                      workflowNodeCount={activeWorkflow.nodes.length}
+                      workflowRunCount={activeWorkflow.runHistory.length}
                       canvasMode={canvasMode}
                       modelPresets={modelPresets}
                       updateNodeData={updateNodeData}
@@ -634,7 +689,10 @@ function FlowentWorkspaceShell() {
               upsertRole={upsertRole}
               deleteRole={deleteRole}
               addAgentFromRole={addAgentFromRole}
-              onOpenWorkflow={() => setActiveView("workflows")}
+              onOpenWorkflow={() => {
+                setActiveView("workflows");
+                setWorkflowMainMode("editor");
+              }}
             />
           ) : activeView === "settings" ? (
             <SettingsView
@@ -652,43 +710,25 @@ function AppSidebar({
   activeView,
   workflows,
   activeWorkflowId,
+  workflowOverviewOpen,
   collapsed,
   onNavigate,
   onOpenWorkflow,
   onCreateWorkflow,
+  onOpenWorkflowsOverview,
   onToggleCollapsed,
 }: {
   activeView: AppView;
   workflows: WorkflowAsset[];
   activeWorkflowId: string | null;
+  workflowOverviewOpen: boolean;
   collapsed: boolean;
   onNavigate: (view: AppView) => void;
   onOpenWorkflow: (workflowId: string) => void;
   onCreateWorkflow: () => void;
+  onOpenWorkflowsOverview: () => void;
   onToggleCollapsed: () => void;
 }) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<WorkflowStatusFilter>("all");
-  const normalizedSearch = searchTerm.trim().toLowerCase();
-  const filteredWorkflows = useMemo(
-    () =>
-      workflows.filter((workflow) => {
-        const matchesSearch =
-          normalizedSearch.length === 0 ||
-          workflow.name.toLowerCase().includes(normalizedSearch);
-        const matchesStatus =
-          statusFilter === "all" || workflow.lastRunStatus === statusFilter;
-
-        return matchesSearch && matchesStatus;
-      }),
-    [workflows, normalizedSearch, statusFilter],
-  );
-  const hasFilters = normalizedSearch.length > 0 || statusFilter !== "all";
-  const clearFilters = useCallback(() => {
-    setSearchTerm("");
-    setStatusFilter("all");
-  }, []);
-
   return (
     <motion.aside
       aria-label="Workspace navigation"
@@ -720,22 +760,16 @@ function AppSidebar({
         <Separator />
         <SidebarFixedEntries
           activeView={activeView}
+          workflowOverviewOpen={workflowOverviewOpen}
           collapsed={collapsed}
-          searchTerm={searchTerm}
-          statusFilter={statusFilter}
           onCreateWorkflow={onCreateWorkflow}
-          onExpandSidebar={onToggleCollapsed}
           onNavigate={onNavigate}
-          onSearchTermChange={setSearchTerm}
-          onStatusFilterChange={setStatusFilter}
+          onOpenWorkflowsOverview={onOpenWorkflowsOverview}
         />
-        <WorkflowInstanceList
+        <WorkflowHistoryList
           activeWorkflowId={activeWorkflowId}
           collapsed={collapsed}
-          filteredWorkflows={filteredWorkflows}
-          hasFilters={hasFilters}
           workflows={workflows}
-          onClearFilters={clearFilters}
           onExpandSidebar={onToggleCollapsed}
           onOpenWorkflow={onOpenWorkflow}
         />
@@ -750,25 +784,33 @@ function AppSidebar({
 
 function SidebarFixedEntries({
   activeView,
+  workflowOverviewOpen,
   collapsed,
-  searchTerm,
-  statusFilter,
   onCreateWorkflow,
-  onExpandSidebar,
   onNavigate,
-  onSearchTermChange,
-  onStatusFilterChange,
+  onOpenWorkflowsOverview,
 }: {
   activeView: AppView;
+  workflowOverviewOpen: boolean;
   collapsed: boolean;
-  searchTerm: string;
-  statusFilter: WorkflowStatusFilter;
   onCreateWorkflow: () => void;
-  onExpandSidebar: () => void;
   onNavigate: (view: AppView) => void;
-  onSearchTermChange: (value: string) => void;
-  onStatusFilterChange: (value: WorkflowStatusFilter) => void;
+  onOpenWorkflowsOverview: () => void;
 }) {
+  const isItemActive = (item: SidebarNavigationItem) =>
+    item.view === "workflows"
+      ? activeView === "workflows" && workflowOverviewOpen
+      : activeView === item.view;
+
+  const selectItem = (item: SidebarNavigationItem) => {
+    if (item.view === "workflows") {
+      onOpenWorkflowsOverview();
+      return;
+    }
+
+    onNavigate(item.view);
+  };
+
   if (collapsed) {
     const createButton = (
       <Button
@@ -782,10 +824,14 @@ function SidebarFixedEntries({
     );
     const searchButton = (
       <Button
-        variant={searchTerm.trim() ? "secondary" : "ghost"}
+        variant={
+          activeView === "workflows" && workflowOverviewOpen
+            ? "secondary"
+            : "ghost"
+        }
         size="icon"
         aria-label="Search workflows"
-        onClick={onExpandSidebar}
+        onClick={onOpenWorkflowsOverview}
       >
         <SearchIcon />
       </Button>
@@ -807,8 +853,8 @@ function SidebarFixedEntries({
               key={item.view}
               item={item}
               collapsed={collapsed}
-              active={activeView === item.view}
-              onNavigate={onNavigate}
+              active={isItemActive(item)}
+              onSelect={() => selectItem(item)}
             />
           ))}
         </div>
@@ -822,48 +868,26 @@ function SidebarFixedEntries({
         <PlusIcon />
         Create workflow
       </Button>
-      <div className="space-y-2">
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            aria-label="Search workflows"
-            className="h-9 pl-9"
-            placeholder="Search workflows"
-            value={searchTerm}
-            onChange={(event) => onSearchTermChange(event.target.value)}
-          />
-        </div>
-        <Select
-          value={statusFilter}
-          onValueChange={(value) =>
-            onStatusFilterChange(value as WorkflowStatusFilter)
-          }
-        >
-          <SelectTrigger aria-label="Filter workflows" className="h-9 w-full">
-            <SelectValue>
-              {(value: WorkflowStatusFilter | null) =>
-                workflowStatusFilters.find((item) => item.value === value)
-                  ?.label ?? "Any status"
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {workflowStatusFilters.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Button
+        variant={
+          activeView === "workflows" && workflowOverviewOpen
+            ? "secondary"
+            : "ghost"
+        }
+        className="w-full justify-start"
+        onClick={onOpenWorkflowsOverview}
+      >
+        <SearchIcon />
+        Search workflows
+      </Button>
       <nav className="space-y-1">
         {fixedNavigation.map((item) => (
           <SidebarNavButton
             key={item.view}
             item={item}
             collapsed={collapsed}
-            active={activeView === item.view}
-            onNavigate={onNavigate}
+            active={isItemActive(item)}
+            onSelect={() => selectItem(item)}
           />
         ))}
       </nav>
@@ -875,12 +899,12 @@ function SidebarNavButton({
   item,
   collapsed,
   active,
-  onNavigate,
+  onSelect,
 }: {
   item: SidebarNavigationItem;
   collapsed: boolean;
   active: boolean;
-  onNavigate: (view: AppView) => void;
+  onSelect: () => void;
 }) {
   const Icon = item.icon;
   const button = (
@@ -891,7 +915,7 @@ function SidebarNavButton({
         collapsed && "justify-center px-0",
       )}
       aria-label={item.label}
-      onClick={() => onNavigate(item.view)}
+      onClick={onSelect}
     >
       <Icon className="size-4" />
       {!collapsed && <span className="truncate">{item.label}</span>}
@@ -910,22 +934,16 @@ function SidebarNavButton({
   );
 }
 
-function WorkflowInstanceList({
+function WorkflowHistoryList({
   workflows,
-  filteredWorkflows,
   activeWorkflowId,
   collapsed,
-  hasFilters,
-  onClearFilters,
   onOpenWorkflow,
   onExpandSidebar,
 }: {
   workflows: WorkflowAsset[];
-  filteredWorkflows: WorkflowAsset[];
   activeWorkflowId: string | null;
   collapsed: boolean;
-  hasFilters: boolean;
-  onClearFilters: () => void;
   onOpenWorkflow: (workflowId: string) => void;
   onExpandSidebar: () => void;
 }) {
@@ -962,7 +980,7 @@ function WorkflowInstanceList({
       <div className="flex items-center justify-between gap-2 px-1">
         <div className="flex min-w-0 items-center gap-2">
           <GitBranchIcon className="size-4 shrink-0 text-muted-foreground" />
-          <h2 className="truncate text-base font-medium">Recent workflows</h2>
+          <h2 className="truncate text-base font-medium">Workflow history</h2>
           <Badge variant="outline">{workflows.length}</Badge>
         </div>
       </div>
@@ -977,29 +995,10 @@ function WorkflowInstanceList({
             </div>
           </div>
         </ScrollArea>
-      ) : filteredWorkflows.length === 0 ? (
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="px-1 pb-1">
-            <div className="rounded-lg border bg-background p-3">
-              <div className="text-sm font-medium">No matching workflows</div>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Clear the current filters to return to the full list.
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="mt-2"
-                onClick={onClearFilters}
-              >
-                Clear filters
-              </Button>
-            </div>
-          </div>
-        </ScrollArea>
       ) : (
         <ScrollArea className="min-h-0 flex-1">
-          <motion.ol layout className="space-y-2 px-1 pb-1">
-            {filteredWorkflows.map((workflow) => (
+          <motion.ol layout className="space-y-1 px-1 pb-1">
+            {workflows.map((workflow) => (
               <WorkflowSidebarItem
                 key={workflow.id}
                 workflow={workflow}
@@ -1009,13 +1008,6 @@ function WorkflowInstanceList({
             ))}
           </motion.ol>
         </ScrollArea>
-      )}
-      {hasFilters && filteredWorkflows.length > 0 && (
-        <div className="px-1">
-          <Button variant="ghost" size="sm" onClick={onClearFilters}>
-            Clear filters
-          </Button>
-        </div>
       )}
     </section>
   );
@@ -1030,8 +1022,6 @@ function WorkflowSidebarItem({
   active: boolean;
   onOpenWorkflow: (workflowId: string) => void;
 }) {
-  const status = workflowStatusPresentation[workflow.lastRunStatus];
-
   return (
     <motion.li layout>
       <button
@@ -1039,33 +1029,188 @@ function WorkflowSidebarItem({
         aria-current={active ? "true" : undefined}
         aria-label={`Open ${workflow.name}`}
         className={cn(
-          "w-full rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          "flex h-9 w-full items-center justify-between gap-2 rounded-lg px-2 text-left text-sm transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          active && "bg-muted text-foreground",
+        )}
+        onClick={() => onOpenWorkflow(workflow.id)}
+      >
+        <span className="min-w-0 truncate">{workflow.name}</span>
+        {active && (
+          <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+        )}
+      </button>
+    </motion.li>
+  );
+}
+
+function WorkflowsOverview({
+  workflows,
+  activeWorkflowId,
+  onCreateWorkflow,
+  onOpenWorkflow,
+}: {
+  workflows: WorkflowAsset[];
+  activeWorkflowId: string | null;
+  onCreateWorkflow: () => void;
+  onOpenWorkflow: (workflowId: string) => void;
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<WorkflowStatusFilter>("all");
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredWorkflows = useMemo(
+    () =>
+      workflows.filter((workflow) => {
+        const matchesSearch =
+          normalizedSearch.length === 0 ||
+          workflow.name.toLowerCase().includes(normalizedSearch);
+        const matchesStatus =
+          statusFilter === "all" || workflow.lastRunStatus === statusFilter;
+
+        return matchesSearch && matchesStatus;
+      }),
+    [normalizedSearch, statusFilter, workflows],
+  );
+  const hasFilters = normalizedSearch.length > 0 || statusFilter !== "all";
+  const clearFilters = useCallback(() => {
+    setSearchTerm("");
+    setStatusFilter("all");
+  }, []);
+
+  return (
+    <section
+      aria-label="Workflows overview"
+      className="flex h-full min-w-0 flex-col gap-5 p-6"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="truncate text-3xl font-semibold">Workflows</h1>
+        </div>
+        <Button onClick={onCreateWorkflow}>
+          <PlusIcon />
+          Create workflow
+        </Button>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
+        <div className="relative">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="Search workflows"
+            className="h-9 pl-9"
+            placeholder="Search workflows"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+          />
+        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) =>
+            setStatusFilter(value as WorkflowStatusFilter)
+          }
+        >
+          <SelectTrigger aria-label="Filter workflows" className="h-9 w-full">
+            <SelectValue>
+              {(value: WorkflowStatusFilter | null) =>
+                workflowStatusFilters.find((item) => item.value === value)
+                  ?.label ?? "Any status"
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {workflowStatusFilters.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {workflows.length === 0 ? (
+        <div className="rounded-lg border bg-card p-6">
+          <div className="text-lg font-medium">No workflows yet</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Create your first workflow to start building.
+          </p>
+        </div>
+      ) : filteredWorkflows.length === 0 ? (
+        <div className="rounded-lg border bg-card p-6">
+          <div className="text-lg font-medium">No matching workflows</div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            Clear the current filters to return to the full workflow history.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={clearFilters}
+          >
+            Clear filters
+          </Button>
+        </div>
+      ) : (
+        <ScrollArea className="min-h-0 flex-1">
+          <motion.div layout className="grid gap-3 pr-3 xl:grid-cols-2">
+            {filteredWorkflows.map((workflow) => (
+              <WorkflowOverviewCard
+                key={workflow.id}
+                workflow={workflow}
+                active={workflow.id === activeWorkflowId}
+                onOpenWorkflow={onOpenWorkflow}
+              />
+            ))}
+          </motion.div>
+        </ScrollArea>
+      )}
+      {hasFilters && filteredWorkflows.length > 0 && (
+        <div>
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function WorkflowOverviewCard({
+  workflow,
+  active,
+  onOpenWorkflow,
+}: {
+  workflow: WorkflowAsset;
+  active: boolean;
+  onOpenWorkflow: (workflowId: string) => void;
+}) {
+  const status = workflowStatusPresentation[workflow.lastRunStatus];
+
+  return (
+    <motion.article layout>
+      <button
+        type="button"
+        aria-current={active ? "true" : undefined}
+        aria-label={`Open ${workflow.name}`}
+        className={cn(
+          "w-full rounded-lg border bg-card p-4 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
           active && "border-primary bg-muted",
         )}
         onClick={() => onOpenWorkflow(workflow.id)}
       >
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 truncate text-sm font-medium">
-              {workflow.name}
-            </div>
-            {active && (
-              <Badge variant="secondary" className="shrink-0">
-                Current
-              </Badge>
-            )}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-medium">{workflow.name}</h2>
+            <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+              {workflow.summary}
+            </p>
           </div>
-          <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-            {workflow.summary}
-          </p>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant={status.badgeVariant}>{status.label}</Badge>
-            <span>{workflow.nodes.length} nodes</span>
-            <span>Updated {formatWorkflowDate(workflow.updatedAt)}</span>
-          </div>
+          {active && <Badge variant="secondary">Current</Badge>}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <Badge variant={status.badgeVariant}>{status.label}</Badge>
+          <span>{workflow.nodes.length} nodes</span>
+          <span>{workflow.runHistory.length} runs</span>
+          <span>Updated {formatWorkflowDate(workflow.updatedAt)}</span>
         </div>
       </button>
-    </motion.li>
+    </motion.article>
   );
 }
 
@@ -1352,6 +1497,11 @@ function RoleCard({
 
 function CanvasWorkspace({
   workflowName,
+  workflowSummary,
+  workflowLastRunStatus,
+  workflowUpdatedAt,
+  workflowNodeCount,
+  workflowRunCount,
   nodes,
   edges,
   canvasMode,
@@ -1372,6 +1522,11 @@ function CanvasWorkspace({
   onResetViewport,
 }: {
   workflowName: string;
+  workflowSummary: string;
+  workflowLastRunStatus: WorkflowLastRunStatus;
+  workflowUpdatedAt: string;
+  workflowNodeCount: number;
+  workflowRunCount: number;
   nodes: FlowNode[];
   edges: FlowEdge[];
   canvasMode: CanvasMode;
@@ -1395,6 +1550,7 @@ function CanvasWorkspace({
   onResetViewport: () => void;
 }) {
   const isWorkflowMode = canvasMode === "workflow";
+  const status = workflowStatusPresentation[workflowLastRunStatus];
 
   return (
     <section
@@ -1410,7 +1566,12 @@ function CanvasWorkspace({
         )}
       >
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="truncate text-xl font-medium">{workflowName}</h2>
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-medium">{workflowName}</h2>
+            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
+              {workflowSummary}
+            </p>
+          </div>
           <Badge variant={isWorkflowMode ? "default" : "secondary"}>
             {isWorkflowMode ? (
               <>
@@ -1424,6 +1585,16 @@ function CanvasWorkspace({
               </>
             )}
           </Badge>
+          <Badge variant={status.badgeVariant}>{status.label}</Badge>
+          <span className="text-sm text-muted-foreground">
+            {workflowNodeCount} nodes
+          </span>
+          <span className="text-sm text-muted-foreground">
+            {workflowRunCount} runs
+          </span>
+          <span className="text-sm text-muted-foreground">
+            Updated {formatWorkflowDate(workflowUpdatedAt)}
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <NodeLibrary
@@ -1589,12 +1760,22 @@ function NodeLibrary({
 function PropertyPanel({
   selectedNode,
   selectedCount,
+  workflowSummary,
+  workflowLastRunStatus,
+  workflowUpdatedAt,
+  workflowNodeCount,
+  workflowRunCount,
   canvasMode,
   modelPresets,
   updateNodeData,
 }: {
   selectedNode: FlowNode | null;
   selectedCount: number;
+  workflowSummary: string;
+  workflowLastRunStatus: WorkflowLastRunStatus;
+  workflowUpdatedAt: string;
+  workflowNodeCount: number;
+  workflowRunCount: number;
   canvasMode: CanvasMode;
   modelPresets: ModelPreset[];
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
@@ -1635,6 +1816,11 @@ function PropertyPanel({
         ) : (
           <WorkflowSummary
             selectedCount={selectedCount}
+            workflowSummary={workflowSummary}
+            workflowLastRunStatus={workflowLastRunStatus}
+            workflowUpdatedAt={workflowUpdatedAt}
+            workflowNodeCount={workflowNodeCount}
+            workflowRunCount={workflowRunCount}
             modelPresets={modelPresets}
           />
         )}
@@ -2070,13 +2256,39 @@ function AgentProperties({
 
 function WorkflowSummary({
   selectedCount,
+  workflowSummary,
+  workflowLastRunStatus,
+  workflowUpdatedAt,
+  workflowNodeCount,
+  workflowRunCount,
   modelPresets,
 }: {
   selectedCount: number;
+  workflowSummary: string;
+  workflowLastRunStatus: WorkflowLastRunStatus;
+  workflowUpdatedAt: string;
+  workflowNodeCount: number;
+  workflowRunCount: number;
   modelPresets: ModelPreset[];
 }) {
+  const status = workflowStatusPresentation[workflowLastRunStatus];
+
   return (
     <div className="space-y-4">
+      <Card className="p-3">
+        <div className="text-lg font-medium">Workflow details</div>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          {workflowSummary}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge variant={status.badgeVariant}>{status.label}</Badge>
+          <Badge variant="outline">{workflowNodeCount} nodes</Badge>
+          <Badge variant="outline">{workflowRunCount} runs</Badge>
+        </div>
+        <div className="mt-3 text-sm text-muted-foreground">
+          Updated {formatWorkflowDate(workflowUpdatedAt)}
+        </div>
+      </Card>
       <Card className="p-3">
         <div className="text-lg font-medium">Selection</div>
         <div className="mt-2 text-2xl font-semibold">

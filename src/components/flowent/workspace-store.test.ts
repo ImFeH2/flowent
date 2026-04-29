@@ -462,6 +462,62 @@ describe("useFlowentWorkspaceStore", () => {
     expect(useFlowentWorkspaceStore.getState().selectedNodeIds).toEqual([]);
   });
 
+  it("marks an opened blueprint as the most recent workflow", () => {
+    vi.useFakeTimers();
+
+    try {
+      const store = useFlowentWorkspaceStore.getState();
+
+      vi.setSystemTime(new Date("2026-04-29T10:00:00.000Z"));
+      store.createBlueprint("Follow-up Draft");
+
+      vi.setSystemTime(new Date("2026-04-29T10:05:00.000Z"));
+      store.openBlueprint("blueprint-launch-campaign");
+
+      const state = useFlowentWorkspaceStore.getState();
+
+      expect(state.blueprints[0]).toMatchObject({
+        id: "blueprint-launch-campaign",
+        updatedAt: "2026-04-29T10:05:00.000Z",
+      });
+      expect(state.activeBlueprintId).toBe("blueprint-launch-campaign");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("opens workflow history items in editable mode from run details", () => {
+    const store = useFlowentWorkspaceStore.getState();
+    const firstBlueprintId = getActiveBlueprint().id;
+    const secondBlueprintId = store.createBlueprint("Second Blueprint");
+
+    store.addQuickNode("trigger");
+    store.openBlueprint(firstBlueprintId);
+    store.startWorkflowRun();
+    store.finishWorkflowRun();
+
+    expect(useFlowentWorkspaceStore.getState().canvasMode).toBe("workflow");
+    expect(
+      useFlowentWorkspaceStore
+        .getState()
+        .nodes.every((node) => node.data.status === "success"),
+    ).toBe(true);
+
+    store.openBlueprint(secondBlueprintId);
+
+    const state = useFlowentWorkspaceStore.getState();
+    const activeBlueprint = getActiveBlueprint();
+
+    expect(state.activeBlueprintId).toBe(secondBlueprintId);
+    expect(state.canvasMode).toBe("blueprint");
+    expect(state.blueprints[0]?.id).toBe(secondBlueprintId);
+    expect(state.nodes).toHaveLength(1);
+    expect(state.nodes).toEqual(activeBlueprint.nodes);
+    expect(state.nodes.every((node) => node.data.status === "idle")).toBe(true);
+    expect(state.nodes.every((node) => !node.data.runDetails)).toBe(true);
+    expect(state.edges.every((edge) => edge.animated === false)).toBe(true);
+  });
+
   it("ignores graph edits and runs when no blueprint is current", () => {
     useFlowentWorkspaceStore.setState({
       activeBlueprintId: null,

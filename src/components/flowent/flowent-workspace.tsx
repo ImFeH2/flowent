@@ -599,7 +599,6 @@ function FlowentWorkspaceShell() {
           collapsed={sidebarCollapsed}
           onNavigate={navigateTopLevelView}
           onOpenWorkflow={openWorkflowView}
-          onCreateWorkflow={createWorkflowView}
           onOpenWorkflowsOverview={openWorkflowsOverview}
           onToggleCollapsed={() =>
             setSidebarCollapsed((collapsed) => !collapsed)
@@ -714,7 +713,6 @@ function AppSidebar({
   collapsed,
   onNavigate,
   onOpenWorkflow,
-  onCreateWorkflow,
   onOpenWorkflowsOverview,
   onToggleCollapsed,
 }: {
@@ -725,7 +723,6 @@ function AppSidebar({
   collapsed: boolean;
   onNavigate: (view: AppView) => void;
   onOpenWorkflow: (workflowId: string) => void;
-  onCreateWorkflow: () => void;
   onOpenWorkflowsOverview: () => void;
   onToggleCollapsed: () => void;
 }) {
@@ -762,7 +759,6 @@ function AppSidebar({
           activeView={activeView}
           workflowOverviewOpen={workflowOverviewOpen}
           collapsed={collapsed}
-          onCreateWorkflow={onCreateWorkflow}
           onNavigate={onNavigate}
           onOpenWorkflowsOverview={onOpenWorkflowsOverview}
         />
@@ -786,14 +782,12 @@ function SidebarFixedEntries({
   activeView,
   workflowOverviewOpen,
   collapsed,
-  onCreateWorkflow,
   onNavigate,
   onOpenWorkflowsOverview,
 }: {
   activeView: AppView;
   workflowOverviewOpen: boolean;
   collapsed: boolean;
-  onCreateWorkflow: () => void;
   onNavigate: (view: AppView) => void;
   onOpenWorkflowsOverview: () => void;
 }) {
@@ -812,42 +806,9 @@ function SidebarFixedEntries({
   };
 
   if (collapsed) {
-    const createButton = (
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Create workflow"
-        onClick={onCreateWorkflow}
-      >
-        <PlusIcon />
-      </Button>
-    );
-    const searchButton = (
-      <Button
-        variant={
-          activeView === "workflows" && workflowOverviewOpen
-            ? "secondary"
-            : "ghost"
-        }
-        size="icon"
-        aria-label="Search workflows"
-        onClick={onOpenWorkflowsOverview}
-      >
-        <SearchIcon />
-      </Button>
-    );
-
     return (
       <section className="shrink-0">
         <div className="flex flex-col items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger render={createButton} />
-            <TooltipContent side="right">Create workflow</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger render={searchButton} />
-            <TooltipContent side="right">Search workflows</TooltipContent>
-          </Tooltip>
           {fixedNavigation.map((item) => (
             <SidebarNavButton
               key={item.view}
@@ -863,23 +824,7 @@ function SidebarFixedEntries({
   }
 
   return (
-    <section className="shrink-0 space-y-3">
-      <Button className="w-full justify-start" onClick={onCreateWorkflow}>
-        <PlusIcon />
-        Create workflow
-      </Button>
-      <Button
-        variant={
-          activeView === "workflows" && workflowOverviewOpen
-            ? "secondary"
-            : "ghost"
-        }
-        className="w-full justify-start"
-        onClick={onOpenWorkflowsOverview}
-      >
-        <SearchIcon />
-        Search workflows
-      </Button>
+    <section className="shrink-0">
       <nav className="space-y-1">
         {fixedNavigation.map((item) => (
           <SidebarNavButton

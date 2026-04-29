@@ -241,14 +241,14 @@ describe("Home", () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText("Launch Campaign").length).toBeGreaterThan(0);
     expect(
-      within(sidebar).getByRole("button", { name: "Search workflows" }),
-    ).toBeInTheDocument();
+      within(sidebar).queryByRole("button", { name: "Search workflows" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(sidebar).queryByRole("button", { name: "Create workflow" }),
+    ).not.toBeInTheDocument();
     expect(
       within(sidebar).queryByLabelText("Filter workflows"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Create workflow" }),
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Open Launch Campaign" }),
     ).toBeInTheDocument();
@@ -276,6 +276,20 @@ describe("Home", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
     expect(screen.queryByText("Blueprint")).not.toBeInTheDocument();
+
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
+
+    const overview = screen.getByLabelText("Workflows overview");
+
+    expect(
+      within(overview).getByRole("button", { name: "Create workflow" }),
+    ).toBeInTheDocument();
+    expect(
+      within(overview).getByLabelText("Search workflows"),
+    ).toBeInTheDocument();
+    expect(
+      within(overview).getByLabelText("Filter workflows"),
+    ).toBeInTheDocument();
   });
 
   it("shows the selected agent configuration", async () => {
@@ -422,10 +436,18 @@ describe("Home", () => {
     ).toBeInTheDocument();
   });
 
-  it("creates a workflow from the sidebar and opens it", () => {
+  it("creates a workflow from the workflows overview and opens it", () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Create workflow" }));
+    const sidebar = screen.getByLabelText("Workspace navigation");
+
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
+
+    const overview = screen.getByLabelText("Workflows overview");
+
+    fireEvent.click(
+      within(overview).getByRole("button", { name: "Create workflow" }),
+    );
 
     expect(
       screen.getByRole("heading", { level: 2, name: "Untitled workflow" }),
@@ -441,14 +463,22 @@ describe("Home", () => {
   it("searches workflows in the main view and opens a result", () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Create workflow" }));
+    const sidebar = screen.getByLabelText("Workspace navigation");
+
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
+
+    let overview = screen.getByLabelText("Workflows overview");
+
+    fireEvent.click(
+      within(overview).getByRole("button", { name: "Create workflow" }),
+    );
     expect(
       screen.getByRole("heading", { level: 2, name: "Untitled workflow" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Search workflows" }));
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
 
-    const overview = screen.getByLabelText("Workflows overview");
+    overview = screen.getByLabelText("Workflows overview");
 
     fireEvent.change(within(overview).getByLabelText("Search workflows"), {
       target: { value: "launch" },
@@ -474,7 +504,9 @@ describe("Home", () => {
   it("clears workflow search filters with no results", () => {
     render(<Home />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Search workflows" }));
+    const sidebar = screen.getByLabelText("Workspace navigation");
+
+    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
 
     const overview = screen.getByLabelText("Workflows overview");
 

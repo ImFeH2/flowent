@@ -26,7 +26,6 @@ jobs:
     timeout-minutes: 10
     env:
       HUSKY: 0
-      NEXT_TELEMETRY_DISABLED: 1
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     steps:
       - name: Checkout
@@ -48,8 +47,16 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync --project backend --frozen
 
       - name: Check package version
         run: |

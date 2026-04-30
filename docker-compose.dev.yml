@@ -11,8 +11,10 @@ services:
     volumes:
       - .:/app
       - flowent-dev-node-modules:/app/node_modules
-      - flowent-dev-next:/app/.next
+      - flowent-dev-frontend-node-modules:/app/frontend/node_modules
+      - flowent-dev-backend-venv:/app/backend/.venv
 
 volumes:
   flowent-dev-node-modules:
-  flowent-dev-next:
+  flowent-dev-frontend-node-modules:
+  flowent-dev-backend-venv:

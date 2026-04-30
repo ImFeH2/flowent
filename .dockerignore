@@ -3,8 +3,10 @@
 .husky
 .next
 .playwright-mcp
+backend/.venv
 coverage
 dist
+frontend/dist
 flowent-*.tgz
 node_modules
 npm-debug.log*

@@ -54,6 +54,9 @@
 :root {
   color-scheme: dark;
   --radius: 0.625rem;
+  --font-geist-sans:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
   --background: oklch(0 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0 0 0);

@@ -1,45 +1,40 @@
-FROM node:24-alpine AS base
+FROM node:24-bookworm-slim AS frontend-builder
 
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat \
-  && corepack enable \
+RUN corepack enable \
   && corepack prepare pnpm@10.29.3 --activate
 
-FROM base AS deps
-
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY frontend/package.json ./frontend/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store HUSKY=0 pnpm install --frozen-lockfile
 
-FROM base AS builder
+COPY components.json ./
+COPY frontend ./frontend
+RUN pnpm build:frontend
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN mkdir -p public \
-  && pnpm build
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS runner
 
-FROM node:24-alpine AS runner
-
+ENV FLOWENT_STATIC_DIR=/app/frontend
 ENV HOSTNAME=0.0.0.0
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=6873
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 flowent
+COPY backend ./backend
+RUN uv sync --project backend --frozen --no-dev
 
-COPY --from=builder --chown=flowent:nodejs /app/public ./public
-COPY --from=builder --chown=flowent:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=flowent:nodejs /app/.next/static ./.next/static
+COPY --from=frontend-builder /app/frontend/dist ./frontend
+
+RUN useradd --system --uid 1001 --create-home flowent
 
 USER flowent
 
 EXPOSE 6873
 
-CMD ["node", "server.js"]
+CMD ["uv", "run", "--project", "backend", "--frozen", "--no-dev", "flowent-api"]

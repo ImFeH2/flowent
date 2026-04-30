@@ -21,7 +21,6 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/imfeh2/flowent
-  NEXT_TELEMETRY_DISABLED: 1
 
 jobs:
   publish:

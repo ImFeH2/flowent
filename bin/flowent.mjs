@@ -6,8 +6,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const appRoot = join(packageRoot, "dist");
-const serverPath = join(appRoot, "server.js");
+const backendProject = join(packageRoot, "backend");
+const staticDirectory = join(packageRoot, "dist", "frontend");
 const packageJson = JSON.parse(
   readFileSync(join(packageRoot, "package.json"), "utf8"),
 );
@@ -41,22 +41,40 @@ for (let index = 0; index < args.length; index += 1) {
   }
 }
 
-if (!existsSync(serverPath)) {
+if (!existsSync(join(backendProject, "pyproject.toml"))) {
   console.error(
     "Flowent runtime is missing. Reinstall the package and try again.",
   );
   process.exit(1);
 }
 
-const child = spawn(process.execPath, [serverPath], {
-  cwd: appRoot,
-  stdio: "inherit",
-  env: {
-    ...process.env,
-    HOSTNAME: hostname,
-    NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED ?? "1",
-    PORT: port,
+if (!existsSync(join(staticDirectory, "index.html"))) {
+  console.error(
+    "Flowent application files are missing. Reinstall the package and try again.",
+  );
+  process.exit(1);
+}
+
+const uvCommand = process.env.FLOWENT_UV_BINARY ?? "uv";
+const child = spawn(
+  uvCommand,
+  ["run", "--project", backendProject, "flowent-api"],
+  {
+    cwd: packageRoot,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      FLOWENT_STATIC_DIR: staticDirectory,
+      HOSTNAME: hostname,
+      PORT: port,
+    },
   },
+);
+
+child.on("error", (error) => {
+  console.error(error.message);
+  console.error("Install uv and try again: https://docs.astral.sh/uv/");
+  process.exit(1);
 });
 
 child.on("exit", (code, signal) => {

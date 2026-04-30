@@ -10,6 +10,7 @@
   },
   "files": [
     "assets/",
+    "backend/",
     "bin/",
     "dist/",
     "README.md",
@@ -31,62 +32,42 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "next dev -p 6873",
-    "build": "next build",
+    "dev": "concurrently -k -n frontend,backend -c cyan,magenta \"pnpm dev:frontend\" \"pnpm dev:backend\"",
+    "dev:frontend": "pnpm --dir frontend dev",
+    "dev:backend": "uv run --project backend uvicorn flowent_api.main:app --reload --host 0.0.0.0 --port 6874",
+    "build": "pnpm build:frontend && pnpm build:backend",
+    "build:frontend": "pnpm --dir frontend build",
+    "build:backend": "uv build --project backend",
     "build:npm": "pnpm build && node scripts/prepare-npm-package.mjs",
-    "start": "next start",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "start": "uv run --project backend flowent-api",
+    "format": "prettier --write . && uv run --project backend ruff format",
+    "format:check": "prettier --check . && uv run --project backend ruff format --check",
+    "lint": "pnpm lint:frontend && pnpm lint:backend",
+    "lint:frontend": "pnpm --dir frontend lint",
+    "lint:backend": "uv run --project backend ruff check",
+    "typecheck": "pnpm --dir frontend typecheck",
+    "test": "pnpm test:frontend && pnpm test:backend",
+    "test:frontend": "pnpm --dir frontend test",
+    "test:backend": "uv run --project backend pytest",
+    "test:watch": "pnpm --dir frontend test:watch",
     "release": "release-it --dry-run",
     "release:exec": "release-it",
     "prepack": "pnpm build:npm",
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,mjs,mts}": [
-      "eslint --fix",
-      "prettier --write"
+    "*.{js,jsx,ts,tsx,mjs,mts}": "prettier --write",
+    "*.py": [
+      "uv run --project backend ruff format",
+      "uv run --project backend ruff check --fix"
     ],
     "*.{css,json,jsonc,md,mdx,yml,yaml}": "prettier --write"
   },
-  "dependencies": {
-    "@base-ui/react": "^1.4.1",
-    "@xyflow/react": "^12.10.2",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "framer-motion": "^12.38.0",
-    "lucide-react": "^1.11.0",
-    "next": "16.2.4",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "tailwind-merge": "^3.5.0",
-    "zustand": "^5.0.12"
-  },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.0.1",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.4",
+    "concurrently": "^9.2.1",
     "husky": "^9.1.7",
-    "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
-    "release-it": "^20.0.1",
-    "shadcn": "^4.5.0",
-    "tailwindcss": "^4",
-    "tailwindcss-animate": "^1.0.7",
-    "tw-animate-css": "^1.4.0",
-    "typescript": "^5",
-    "vitest": "^4.1.5"
+    "release-it": "^20.0.1"
   }
 }

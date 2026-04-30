@@ -255,13 +255,9 @@ function getLocalDataErrorMessage(error: unknown, fallback: string) {
 }
 
 async function parseLocalSettingsResponse(response: Response) {
-  let body: LocalSettingsResponse | null = null;
-
-  try {
-    body = (await response.json()) as LocalSettingsResponse;
-  } catch {
-    body = null;
-  }
+  const body = await response
+    .json()
+    .catch(() => null as LocalSettingsResponse | null);
 
   if (!body) {
     throw new Error(

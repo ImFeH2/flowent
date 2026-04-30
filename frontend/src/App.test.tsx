@@ -10,7 +10,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import Home from "./page";
+import App from "./App";
 import {
   canvasSnapGrid,
   initialBlueprints,
@@ -209,7 +209,7 @@ function mockMissingLocalSettings() {
   );
 }
 
-describe("Home", () => {
+describe("App", () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.unstubAllGlobals();
@@ -220,7 +220,7 @@ describe("Home", () => {
   });
 
   it("renders the workflows workbench", () => {
-    render(<Home />);
+    render(<App />);
     const sidebar = screen.getByLabelText("Workspace navigation");
     const workflowContext = screen.getByLabelText("Current workflow");
 
@@ -293,7 +293,7 @@ describe("Home", () => {
   });
 
   it("shows the selected agent configuration", async () => {
-    render(<Home />);
+    render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
@@ -337,7 +337,7 @@ describe("Home", () => {
       ),
     });
 
-    render(<Home />);
+    render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
@@ -353,7 +353,7 @@ describe("Home", () => {
   });
 
   it("locks the canvas and shows run state feedback in workflow mode", async () => {
-    render(<Home />);
+    render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
     await waitFor(() =>
@@ -420,7 +420,7 @@ describe("Home", () => {
   });
 
   it("keeps workflow runs in the current workflow panel", () => {
-    render(<Home />);
+    render(<App />);
     const sidebar = screen.getByLabelText("Workspace navigation");
     const workflowContext = screen.getByLabelText("Current workflow");
 
@@ -437,7 +437,7 @@ describe("Home", () => {
   });
 
   it("creates a workflow from the workflows overview and opens it", () => {
-    render(<Home />);
+    render(<App />);
 
     const sidebar = screen.getByLabelText("Workspace navigation");
 
@@ -461,7 +461,7 @@ describe("Home", () => {
   });
 
   it("searches workflows in the main view and opens a result", () => {
-    render(<Home />);
+    render(<App />);
 
     const sidebar = screen.getByLabelText("Workspace navigation");
 
@@ -502,7 +502,7 @@ describe("Home", () => {
   });
 
   it("clears workflow search filters with no results", () => {
-    render(<Home />);
+    render(<App />);
 
     const sidebar = screen.getByLabelText("Workspace navigation");
 
@@ -530,7 +530,7 @@ describe("Home", () => {
   });
 
   it("opens the roles library", () => {
-    render(<Home />);
+    render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Roles" }));
 
@@ -543,7 +543,7 @@ describe("Home", () => {
   });
 
   it("creates an agent from a role", () => {
-    render(<Home />);
+    render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Roles" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Use Role" })[0]);
@@ -558,7 +558,7 @@ describe("Home", () => {
   });
 
   it("shows settings in the main view", () => {
-    render(<Home />);
+    render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 
@@ -576,7 +576,7 @@ describe("Home", () => {
   });
 
   it("defaults to dark mode and saves the selected theme", () => {
-    render(<Home />);
+    render(<App />);
 
     expect(document.documentElement).toHaveClass("dark");
     expect(document.documentElement).not.toHaveClass("light");
@@ -594,10 +594,7 @@ describe("Home", () => {
   });
 
   it("scopes theme selectors to the app root", () => {
-    const css = readFileSync(
-      join(process.cwd(), "src/app/globals.css"),
-      "utf8",
-    );
+    const css = readFileSync(join(process.cwd(), "src/globals.css"), "utf8");
 
     expect(css).toContain("html.dark {");
     expect(css).toContain("html.light {");

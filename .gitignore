@@ -15,6 +15,11 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
 .env*
 *.log
 

@@ -38,8 +38,10 @@ docker compose up
 
 ## Tech Stack
 
-- Next.js: application framework and server runtime.
+- Vite: frontend development server and build tool.
 - React: UI rendering model.
+- FastAPI: local application server and settings API.
+- uv: Python dependency and environment management.
 - Tailwind CSS: utility-first styling.
 - Shadcn UI: standard component patterns.
 - Lucide Icons: shared icon set.
@@ -51,10 +53,12 @@ Install dependencies and start the local development server:
 
 ```bash
 pnpm install
+uv sync --project backend
 pnpm dev
 ```
 
-Open `http://localhost:6873`.
+Open `http://localhost:6873`. Vite serves the frontend on port `6873` and
+proxies API requests to the Python server on port `6874`.
 
 You can also run the development container:
 

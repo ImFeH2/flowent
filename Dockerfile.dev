@@ -1,22 +1,26 @@
-FROM node:24-alpine
+FROM node:24-bookworm-slim
 
-ENV HOSTNAME=0.0.0.0
-ENV NEXT_TELEMETRY_DISABLED=1
 ENV PNPM_HOME=/pnpm
-ENV PORT=6873
 ENV PATH=$PNPM_HOME:$PATH
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
 
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat git \
-  && corepack enable \
+COPY --from=ghcr.io/astral-sh/uv:0.8.14 /uv /uvx /usr/local/bin/
+
+RUN corepack enable \
   && corepack prepare pnpm@10.29.3 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY frontend/package.json ./frontend/package.json
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store HUSKY=0 pnpm install --frozen-lockfile
+
+COPY backend/pyproject.toml backend/uv.lock ./backend/
+RUN uv sync --project backend --frozen
 
 COPY . .
 
 EXPOSE 6873
 
-CMD ["pnpm", "exec", "next", "dev", "--hostname", "0.0.0.0", "--port", "6873"]
+CMD ["pnpm", "dev"]

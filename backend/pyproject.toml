@@ -1,0 +1,26 @@
+[project]
+name = "flowent-api"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "ImFeH2", email = "i@feh2.im" }
+]
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi>=0.136.1",
+    "uvicorn>=0.46.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.3",
+    "ruff>=0.15.12",
+]
+
+[project.scripts]
+flowent-api = "flowent_api:main"
+
+[build-system]
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"

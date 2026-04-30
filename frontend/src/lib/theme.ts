@@ -38,5 +38,7 @@ export function persistThemeMode(themeMode: ThemeMode) {
 
   try {
     window.localStorage.setItem(themeStorageKey, themeMode);
-  } catch {}
+  } catch {
+    return;
+  }
 }

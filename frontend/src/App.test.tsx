@@ -252,7 +252,7 @@ describe("App", () => {
     expect(
       screen.getByRole("button", { name: "Open Launch Campaign" }),
     ).toBeInTheDocument();
-    expect(within(sidebar).getByText("Workflow history")).toBeInTheDocument();
+    expect(within(sidebar).getByText("Workflow")).toBeInTheDocument();
     expect(
       within(sidebar).queryByText(
         "Draft launch copy, review it, and prepare the next step.",

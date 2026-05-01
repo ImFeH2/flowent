@@ -986,14 +986,10 @@ function WorkflowHistoryList({
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-      <div className="flex items-center justify-between gap-2 px-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <GitBranchIcon className="size-4 shrink-0 text-muted-foreground" />
-          <h2 className="truncate text-base font-medium">Workflow history</h2>
-          <Badge variant="outline">{workflows.length}</Badge>
-        </div>
-      </div>
+    <section className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+      <h2 className="px-2 text-xs font-medium text-muted-foreground">
+        Workflow
+      </h2>
       {workflows.length === 0 ? (
         <ScrollArea className="min-h-0 flex-1">
           <div className="px-1 pb-1">

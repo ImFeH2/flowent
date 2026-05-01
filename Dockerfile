@@ -35,10 +35,13 @@ RUN uv sync --project backend --frozen --no-dev
 
 COPY --from=frontend-builder /app/frontend/dist ./frontend
 
-RUN useradd --system --uid 1001 --create-home flowent
+RUN useradd --system --uid 1001 --create-home flowent \
+  && mkdir -p /home/flowent/.flowent /workspace \
+  && chown -R flowent:flowent /home/flowent/.flowent /workspace
 
 USER flowent
+WORKDIR /workspace
 
 EXPOSE 6873
 
-CMD ["uv", "run", "--project", "backend", "--frozen", "--no-dev", "flowent-api"]
+CMD ["uv", "run", "--project", "/app/backend", "--frozen", "--no-dev", "flowent-api"]

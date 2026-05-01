@@ -8,6 +8,8 @@ services:
       - "${FLOWENT_PORT:-6873}:6873"
     volumes:
       - flowent-data:/home/flowent/.flowent
+      - flowent-workspace:/workspace
 
 volumes:
   flowent-data:
+  flowent-workspace:

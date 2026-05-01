@@ -22,14 +22,14 @@ def main(argv: list[str] | None = None) -> None:
     access_subparsers.add_parser("reset", help="Clear the persisted admin access code")
     parser.add_argument(
         "--host",
-        default="127.0.0.1",
-        help="Bind host (default: 127.0.0.1)",
+        default=os.environ.get("HOSTNAME") or "127.0.0.1",
+        help="Bind host (default: $HOSTNAME or 127.0.0.1)",
     )
     parser.add_argument(
         "--port",
         type=int,
-        default=6873,
-        help="Bind port (default: 6873)",
+        default=int(os.environ.get("PORT") or "6873"),
+        help="Bind port (default: $PORT or 6873)",
     )
     parser.add_argument(
         "--version",

@@ -8,7 +8,12 @@ export default mergeConfig(
     test: {
       environment: "jsdom",
       exclude: [...configDefaults.exclude, "dist/**"],
-      setupFiles: ["./vitest.setup.ts"],
+      setupFiles: ["./src/test/setup.ts"],
+      css: true,
+      clearMocks: true,
+      restoreMocks: true,
+      fileParallelism: true,
+      maxWorkers: "50%",
     },
   }),
 );

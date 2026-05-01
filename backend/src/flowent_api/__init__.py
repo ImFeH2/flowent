@@ -1,13 +1,3 @@
-from __future__ import annotations
+from flowent_api.cli import main
 
-import os
-
-import uvicorn
-
-
-def main() -> None:
-    uvicorn.run(
-        "flowent_api.main:app",
-        host=os.environ.get("HOSTNAME", "0.0.0.0"),
-        port=int(os.environ.get("PORT", "6873")),
-    )
+__all__ = ["main"]

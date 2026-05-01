@@ -46,6 +46,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install bubblewrap
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
       - name: Install Python dependencies
         run: uv sync --project backend --frozen
 
@@ -54,6 +57,9 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Mypy
+        run: uv run --project backend mypy --config-file backend/pyproject.toml backend/src
 
       - name: Typecheck
         run: pnpm typecheck

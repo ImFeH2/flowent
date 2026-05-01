@@ -262,11 +262,6 @@ describe("App", () => {
     expect(within(sidebar).queryByText(/Updated/)).not.toBeInTheDocument();
     expect(within(sidebar).queryByText("Runs")).not.toBeInTheDocument();
     expect(within(sidebar).queryByText("No runs yet")).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Draft launch copy, review it, and prepare the next step.",
-      ),
-    ).toBeInTheDocument();
     expect(within(workflowContext).getByText("Runs")).toBeInTheDocument();
     expect(
       within(workflowContext).getByText("No runs yet"),
@@ -306,7 +301,7 @@ describe("App", () => {
     expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
     expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
     expect(screen.getAllByText("Properties").length).toBeGreaterThan(0);
-    expect(screen.getByText("Workflow editor")).toBeInTheDocument();
+    expect(screen.getByText("Editor")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
       "data-snap-to-grid",
       "true",
@@ -342,7 +337,6 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
     expect(screen.getByRole("button", { name: "Run workflow" })).toBeDisabled();
-    expect(screen.getAllByText("Choose models before running").length).toBe(1);
     await waitFor(() =>
       expect(
         screen.getByText(
@@ -365,12 +359,6 @@ describe("App", () => {
     expect(screen.getByText("Run started.")).toBeInTheDocument();
     expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
     expect(screen.getByText("Run view")).toBeInTheDocument();
-    expect(screen.getByText("Read-only run")).toBeInTheDocument();
-    expect(
-      screen.getByText("Editing is locked while this run is open."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Execution Details")).toBeInTheDocument();
-    expect(screen.getByText("Read-only")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
       "data-read-only",
       "true",
@@ -386,17 +374,17 @@ describe("App", () => {
     expect(screen.getByText("Assistant")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Copywriter")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("System Prompt")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Delete selection" }),
+    ).toBeDisabled();
     expect(screen.getAllByText("Success").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Thinking").length).toBeGreaterThan(0);
     expect(screen.getByText("Pending")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit workflow" }));
 
-    expect(screen.getByText("Workflow editor")).toBeInTheDocument();
-    expect(screen.queryByText("Read-only run")).not.toBeInTheDocument();
-    expect(screen.queryByText("Read-only")).not.toBeInTheDocument();
-    expect(screen.queryByText("Execution Details")).not.toBeInTheDocument();
+    expect(screen.getByText("Editor")).toBeInTheDocument();
+    expect(screen.queryByText("Run view")).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("workflow-canvas")).queryByText("Success"),
     ).not.toBeInTheDocument();
@@ -415,8 +403,6 @@ describe("App", () => {
     fireEvent.click(screen.getByText("Run started."));
 
     expect(screen.getByText("Run view")).toBeInTheDocument();
-    expect(screen.getByText("Execution Details")).toBeInTheDocument();
-    expect(screen.getByText("Read-only")).toBeInTheDocument();
   });
 
   it("keeps workflow runs in the current workflow panel", () => {

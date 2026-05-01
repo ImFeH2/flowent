@@ -20,11 +20,8 @@ import {
   Clock3Icon,
   CopyIcon,
   GitBranchIcon,
-  ListChecksIcon,
-  LockIcon,
+  Maximize2Icon,
   MessageSquareIcon,
-  PanelRightIcon,
-  PencilIcon,
   PlayIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -280,6 +277,10 @@ function FlowentWorkspaceShell() {
   const [workflowMainMode, setWorkflowMainMode] =
     useState<WorkflowMainMode>("editor");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [workflowPanelOverride, setWorkflowPanelOverride] = useState<{
+    tab: "properties" | "runs";
+    signature: string;
+  } | null>(null);
   const [highlightedRun, setHighlightedRun] = useState<{
     workflowId: string;
     runId: string;
@@ -302,7 +303,6 @@ function FlowentWorkspaceShell() {
     applyEdgeChanges,
     connectNodes,
     addWorkflowNode,
-    addQuickNode,
     deleteSelection,
     deleteConnectedEdges,
     updateNodeData,
@@ -335,7 +335,6 @@ function FlowentWorkspaceShell() {
       applyEdgeChanges: state.applyEdgeChanges,
       connectNodes: state.connectNodes,
       addWorkflowNode: state.addWorkflowNode,
-      addQuickNode: state.addQuickNode,
       deleteSelection: state.deleteSelection,
       deleteConnectedEdges: state.deleteConnectedEdges,
       updateNodeData: state.updateNodeData,
@@ -406,6 +405,29 @@ function FlowentWorkspaceShell() {
     runTimers.current.forEach((timer) => window.clearTimeout(timer));
     runTimers.current = [];
   }, []);
+
+  const workflowPanelSignature =
+    canvasMode === "workflow"
+      ? selectedNodeIds.length === 1
+        ? "run-with-selection"
+        : "run-no-selection"
+      : "editor";
+  const defaultWorkflowPanelTab: "properties" | "runs" =
+    workflowPanelSignature === "run-no-selection" ? "runs" : "properties";
+  const workflowPanelTab =
+    workflowPanelOverride &&
+    workflowPanelOverride.signature === workflowPanelSignature
+      ? workflowPanelOverride.tab
+      : defaultWorkflowPanelTab;
+  const handleWorkflowPanelTabChange = useCallback(
+    (value: string) => {
+      setWorkflowPanelOverride({
+        tab: value as "properties" | "runs",
+        signature: workflowPanelSignature,
+      });
+    },
+    [workflowPanelSignature],
+  );
 
   useEffect(() => {
     void loadLocalSettings();
@@ -614,14 +636,9 @@ function FlowentWorkspaceShell() {
                 onOpenWorkflow={openWorkflowView}
               />
             ) : activeWorkflow ? (
-              <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_23rem] lg:grid-rows-1">
+              <div className="grid h-full min-w-0 grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(12rem,36dvh)] lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-1">
                 <CanvasWorkspace
                   workflowName={activeWorkflow.name}
-                  workflowSummary={activeWorkflow.summary}
-                  workflowLastRunStatus={activeWorkflow.lastRunStatus}
-                  workflowUpdatedAt={activeWorkflow.updatedAt}
-                  workflowNodeCount={activeWorkflow.nodes.length}
-                  workflowRunCount={activeWorkflow.runHistory.length}
                   nodes={nodesWithContext}
                   edges={edges}
                   canvasMode={canvasMode}
@@ -635,7 +652,6 @@ function FlowentWorkspaceShell() {
                   onPaneContextMenu={onPaneContextMenu}
                   onNodesDelete={deleteConnectedEdges}
                   onSelectionChange={setSelection}
-                  onQuickAdd={addQuickNode}
                   onReturnToWorkflowEditor={returnToWorkflowEditor}
                   onDeleteSelection={deleteSelection}
                   onFitView={() => fitView({ padding: 0.2, duration: 250 })}
@@ -645,36 +661,85 @@ function FlowentWorkspaceShell() {
                 />
                 <aside
                   aria-label="Current workflow"
-                  className="grid min-h-0 grid-rows-[minmax(11rem,0.52fr)_minmax(0,1fr)] border-t bg-card lg:border-t-0 lg:border-l"
+                  className="flex min-h-0 flex-col border-t bg-card lg:border-t-0 lg:border-l"
                 >
-                  <RunsPanel
-                    runs={activeWorkflow.runHistory}
-                    activeRunId={
-                      canvasMode === "workflow"
-                        ? (activeWorkflow.selectedRunId ?? null)
-                        : null
-                    }
-                    runBlockReason={runBlockReason}
-                    highlightedRunId={highlightedRunId}
-                    onRun={runWorkflow}
-                    onSelectRun={selectRunItem}
-                  />
-                  <div className="min-h-0 border-t">
-                    <PropertyPanel
-                      selectedNode={selectedNode}
-                      selectedCount={
-                        selectedNodeIds.length + selectedEdgeIds.length
-                      }
-                      workflowSummary={activeWorkflow.summary}
-                      workflowLastRunStatus={activeWorkflow.lastRunStatus}
-                      workflowUpdatedAt={activeWorkflow.updatedAt}
-                      workflowNodeCount={activeWorkflow.nodes.length}
-                      workflowRunCount={activeWorkflow.runHistory.length}
-                      canvasMode={canvasMode}
-                      modelPresets={modelPresets}
-                      updateNodeData={updateNodeData}
-                    />
-                  </div>
+                  <Tabs
+                    value={workflowPanelTab}
+                    onValueChange={handleWorkflowPanelTabChange}
+                    className="flex min-h-0 flex-1 flex-col"
+                  >
+                    <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
+                      <TabsList>
+                        <TabsTrigger value="properties">Properties</TabsTrigger>
+                        <TabsTrigger value="runs">
+                          <span>Runs</span>
+                          <Badge variant="outline" className="ml-1.5">
+                            {activeWorkflow.runHistory.length}
+                          </Badge>
+                        </TabsTrigger>
+                      </TabsList>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              size="icon"
+                              aria-label="Run workflow"
+                              disabled={
+                                Boolean(runBlockReason) ||
+                                canvasMode === "workflow"
+                              }
+                              onClick={runWorkflow}
+                            >
+                              <PlayIcon />
+                            </Button>
+                          }
+                        />
+                        <TooltipContent>
+                          {runBlockReason ??
+                            (canvasMode === "workflow"
+                              ? "Run view is read-only"
+                              : "Run workflow")}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <TabsContent
+                      value="properties"
+                      keepMounted
+                      className="min-h-0 flex-1 outline-none data-[hidden]:hidden"
+                    >
+                      <PropertyPanel
+                        selectedNode={selectedNode}
+                        selectedCount={
+                          selectedNodeIds.length + selectedEdgeIds.length
+                        }
+                        workflowName={activeWorkflow.name}
+                        workflowSummary={activeWorkflow.summary}
+                        workflowLastRunStatus={activeWorkflow.lastRunStatus}
+                        workflowUpdatedAt={activeWorkflow.updatedAt}
+                        workflowNodeCount={activeWorkflow.nodes.length}
+                        workflowRunCount={activeWorkflow.runHistory.length}
+                        canvasMode={canvasMode}
+                        modelPresets={modelPresets}
+                        updateNodeData={updateNodeData}
+                      />
+                    </TabsContent>
+                    <TabsContent
+                      value="runs"
+                      keepMounted
+                      className="min-h-0 flex-1 outline-none data-[hidden]:hidden"
+                    >
+                      <RunsPanel
+                        runs={activeWorkflow.runHistory}
+                        activeRunId={
+                          canvasMode === "workflow"
+                            ? (activeWorkflow.selectedRunId ?? null)
+                            : null
+                        }
+                        highlightedRunId={highlightedRunId}
+                        onSelectRun={selectRunItem}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </aside>
               </div>
             ) : (
@@ -1222,49 +1287,17 @@ function getWorkflowRunStatusVariant(
 function RunsPanel({
   runs,
   activeRunId,
-  runBlockReason,
   highlightedRunId,
   onSelectRun,
-  onRun,
 }: {
   runs: WorkflowRun[];
   activeRunId: string | null;
-  runBlockReason: string | null;
   highlightedRunId: string | null;
   onSelectRun: (runId: string) => void;
-  onRun: () => void;
 }) {
-  return (
-    <section
-      aria-label="Runs"
-      className="flex min-h-0 flex-col gap-3 overflow-hidden p-4"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <ListChecksIcon className="size-4 shrink-0 text-muted-foreground" />
-          <h2 className="truncate text-base font-medium">Runs</h2>
-          <Badge variant="outline">{runs.length}</Badge>
-        </div>
-      </div>
-      <div>
-        <Button
-          className="w-full"
-          disabled={Boolean(runBlockReason)}
-          onClick={onRun}
-        >
-          <PlayIcon />
-          Run workflow
-        </Button>
-        {runBlockReason && (
-          <Badge
-            variant="destructive"
-            className="mt-2 h-auto whitespace-normal"
-          >
-            {runBlockReason}
-          </Badge>
-        )}
-      </div>
-      {runs.length === 0 ? (
+  if (runs.length === 0) {
+    return (
+      <div className="flex h-full flex-col gap-3 p-4">
         <div className="rounded-lg border bg-background p-3">
           <div className="flex items-center gap-2 text-sm font-medium">
             <Clock3Icon className="size-4 text-muted-foreground" />
@@ -1274,22 +1307,24 @@ function RunsPanel({
             Run this workflow to watch its first run here.
           </p>
         </div>
-      ) : (
-        <ScrollArea className="min-h-0 flex-1">
-          <motion.ol layout className="space-y-2 pr-2 pb-1">
-            {runs.map((run) => (
-              <RunItem
-                key={run.id}
-                run={run}
-                active={run.id === activeRunId}
-                highlighted={run.id === highlightedRunId}
-                onSelectRun={onSelectRun}
-              />
-            ))}
-          </motion.ol>
-        </ScrollArea>
-      )}
-    </section>
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-full">
+      <motion.ol layout className="space-y-2 p-3">
+        {runs.map((run) => (
+          <RunItem
+            key={run.id}
+            run={run}
+            active={run.id === activeRunId}
+            highlighted={run.id === highlightedRunId}
+            onSelectRun={onSelectRun}
+          />
+        ))}
+      </motion.ol>
+    </ScrollArea>
   );
 }
 
@@ -1442,11 +1477,6 @@ function RoleCard({
 
 function CanvasWorkspace({
   workflowName,
-  workflowSummary,
-  workflowLastRunStatus,
-  workflowUpdatedAt,
-  workflowNodeCount,
-  workflowRunCount,
   nodes,
   edges,
   canvasMode,
@@ -1460,18 +1490,12 @@ function CanvasWorkspace({
   onPaneContextMenu,
   onNodesDelete,
   onSelectionChange,
-  onQuickAdd,
   onReturnToWorkflowEditor,
   onDeleteSelection,
   onFitView,
   onResetViewport,
 }: {
   workflowName: string;
-  workflowSummary: string;
-  workflowLastRunStatus: WorkflowLastRunStatus;
-  workflowUpdatedAt: string;
-  workflowNodeCount: number;
-  workflowRunCount: number;
   nodes: FlowNode[];
   edges: FlowEdge[];
   canvasMode: CanvasMode;
@@ -1488,99 +1512,58 @@ function CanvasWorkspace({
   onPaneContextMenu: (event: React.MouseEvent | MouseEvent) => void;
   onNodesDelete: (deletedNodes: FlowNode[]) => void;
   onSelectionChange: (nodeIds: string[], edgeIds: string[]) => void;
-  onQuickAdd: (kind: WorkflowNodeKind) => void;
   onReturnToWorkflowEditor: () => void;
   onDeleteSelection: () => void;
   onFitView: () => void;
   onResetViewport: () => void;
 }) {
   const isWorkflowMode = canvasMode === "workflow";
-  const status = workflowStatusPresentation[workflowLastRunStatus];
+  const hasSelection = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
 
   return (
-    <section
-      className={cn(
-        "flex min-h-0 min-w-0 flex-col bg-background",
-        isWorkflowMode && "bg-muted/30",
-      )}
-    >
-      <div
-        className={cn(
-          "flex flex-wrap items-center justify-between gap-4 border-b bg-card px-6 py-4",
-          isWorkflowMode && "bg-muted/40",
-        )}
-      >
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div className="min-w-0">
-            <h2 className="truncate text-xl font-medium">{workflowName}</h2>
-            <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
-              {workflowSummary}
-            </p>
-          </div>
-          <Badge variant={isWorkflowMode ? "default" : "secondary"}>
-            {isWorkflowMode ? (
-              <>
-                <LockIcon className="size-3.5" />
-                Run view
-              </>
-            ) : (
-              <>
-                <PencilIcon className="size-3.5" />
-                Workflow editor
-              </>
-            )}
-          </Badge>
-          <Badge variant={status.badgeVariant}>{status.label}</Badge>
-          <span className="text-sm text-muted-foreground">
-            {workflowNodeCount} nodes
-          </span>
-          <span className="text-sm text-muted-foreground">
-            {workflowRunCount} runs
-          </span>
-          <span className="text-sm text-muted-foreground">
-            Updated {formatWorkflowDate(workflowUpdatedAt)}
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <NodeLibrary
-            disabled={isWorkflowMode}
-            onDragStart={onDragStart}
-            onQuickAdd={onQuickAdd}
-          />
-          <Separator orientation="vertical" className="hidden h-7 sm:block" />
-          {isWorkflowMode && (
-            <Button variant="outline" onClick={onReturnToWorkflowEditor}>
-              <RotateCcwIcon />
-              Edit workflow
-            </Button>
-          )}
-          <Button
+    <section className="flex min-h-0 min-w-0 flex-col bg-background">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <h2 className="truncate text-base font-medium">{workflowName}</h2>
+          <Badge
             variant="outline"
-            onClick={onDeleteSelection}
-            disabled={
-              isWorkflowMode ||
-              (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0)
-            }
+            className={cn(
+              "gap-1.5",
+              isWorkflowMode &&
+                "border-destructive/30 bg-destructive/10 text-destructive",
+            )}
           >
-            <Trash2Icon />
-            Delete
-          </Button>
-          <Button variant="outline" onClick={onFitView}>
-            <PanelRightIcon />
-            Fit
-          </Button>
-          <Button variant="outline" onClick={onResetViewport}>
-            100%
-          </Button>
+            {isWorkflowMode && (
+              <motion.span
+                aria-hidden
+                className="size-1.5 rounded-full bg-current"
+                animate={{ opacity: [0.35, 1, 0.35] }}
+                transition={{ duration: 1.6, repeat: Infinity }}
+              />
+            )}
+            {isWorkflowMode ? "Run view" : "Editor"}
+          </Badge>
         </div>
+        {isWorkflowMode ? (
+          <Button variant="outline" onClick={onReturnToWorkflowEditor}>
+            <RotateCcwIcon />
+            Edit workflow
+          </Button>
+        ) : null}
       </div>
-      {isWorkflowMode && <RunViewBanner />}
       <div
         className={cn(
-          "min-h-0 flex-1",
-          isWorkflowMode && "border-t border-border/60",
+          "relative min-h-0 flex-1",
+          isWorkflowMode && "ring-1 ring-inset ring-destructive/30",
         )}
       >
+        {!isWorkflowMode && <FloatingNodeLibrary onDragStart={onDragStart} />}
+        <FloatingCanvasTools
+          canDelete={hasSelection && !isWorkflowMode}
+          onFitView={onFitView}
+          onResetViewport={onResetViewport}
+          onDeleteSelection={onDeleteSelection}
+        />
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -1638,66 +1621,107 @@ function CanvasWorkspace({
   );
 }
 
-function RunViewBanner() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
-      className="flex flex-wrap items-center gap-2 border-b bg-muted/30 px-6 py-2 text-sm"
-    >
-      <Badge variant="outline">
-        <LockIcon className="size-3.5" />
-        Read-only run
-      </Badge>
-      <span className="text-muted-foreground">
-        Editing is locked while this run is open.
-      </span>
-    </motion.div>
-  );
-}
-
-function NodeLibrary({
-  disabled,
+function FloatingNodeLibrary({
   onDragStart,
-  onQuickAdd,
 }: {
-  disabled: boolean;
   onDragStart: (
     event: React.DragEvent<HTMLButtonElement>,
     kind: WorkflowNodeKind,
   ) => void;
-  onQuickAdd: (kind: WorkflowNodeKind) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      {nodeLibrary.map((item) => {
-        const Icon = item.icon;
+    <div className="pointer-events-none absolute left-4 top-4 z-10">
+      <div className="pointer-events-auto group/library flex flex-col gap-1 rounded-lg border bg-card/85 p-1 shadow-sm backdrop-blur transition-[width] duration-150">
+        {nodeLibrary.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Tooltip key={item.kind}>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    draggable
+                    aria-label={`Drag ${item.title} onto canvas`}
+                    onDragStart={(event) => onDragStart(event, item.kind)}
+                    className="flex h-9 items-center gap-2 overflow-hidden rounded-md px-2 text-sm text-foreground/80 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="hidden whitespace-nowrap group-hover/library:inline">
+                      {item.title}
+                    </span>
+                  </button>
+                }
+              />
+              <TooltipContent side="right">{item.subtitle}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-        return (
-          <div key={item.kind} className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              disabled={disabled}
-              draggable={!disabled}
-              title={item.subtitle}
-              onDragStart={(event) => onDragStart(event, item.kind)}
-            >
-              <Icon className="size-4" />
-              {item.title}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Add ${item.title}`}
-              disabled={disabled}
-              onClick={() => onQuickAdd(item.kind)}
-            >
-              <PlusIcon />
-            </Button>
-          </div>
-        );
-      })}
+function FloatingCanvasTools({
+  canDelete,
+  onFitView,
+  onResetViewport,
+  onDeleteSelection,
+}: {
+  canDelete: boolean;
+  onFitView: () => void;
+  onResetViewport: () => void;
+  onDeleteSelection: () => void;
+}) {
+  return (
+    <div className="pointer-events-none absolute right-4 top-4 z-10">
+      <div className="pointer-events-auto flex flex-col gap-1 rounded-lg border bg-card/85 p-1 shadow-sm backdrop-blur">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Fit view"
+                onClick={onFitView}
+              >
+                <Maximize2Icon />
+              </Button>
+            }
+          />
+          <TooltipContent side="left">Fit to view</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Reset zoom to 100%"
+                onClick={onResetViewport}
+              >
+                <span className="text-xs font-medium">1:1</span>
+              </Button>
+            }
+          />
+          <TooltipContent side="left">Reset zoom</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Delete selection"
+                disabled={!canDelete}
+                onClick={onDeleteSelection}
+              >
+                <Trash2Icon />
+              </Button>
+            }
+          />
+          <TooltipContent side="left">Delete selection</TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   );
 }
@@ -1705,6 +1729,7 @@ function NodeLibrary({
 function PropertyPanel({
   selectedNode,
   selectedCount,
+  workflowName,
   workflowSummary,
   workflowLastRunStatus,
   workflowUpdatedAt,
@@ -1716,6 +1741,7 @@ function PropertyPanel({
 }: {
   selectedNode: FlowNode | null;
   selectedCount: number;
+  workflowName: string;
   workflowSummary: string;
   workflowLastRunStatus: WorkflowLastRunStatus;
   workflowUpdatedAt: string;
@@ -1736,41 +1762,83 @@ function PropertyPanel({
     );
   }
 
+  if (!selectedNode) {
+    const status = workflowStatusPresentation[workflowLastRunStatus];
+    return (
+      <ScrollArea className="h-full">
+        <div className="space-y-4 p-4">
+          <div className="rounded-lg border bg-background p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium">
+                  {workflowName}
+                </div>
+                <p className="mt-1 line-clamp-3 text-sm leading-6 text-muted-foreground">
+                  {workflowSummary}
+                </p>
+              </div>
+              <WorkflowStatusDot status={workflowLastRunStatus} />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>{status.label}</span>
+              <span aria-hidden>·</span>
+              <span>
+                {workflowNodeCount} nodes · {workflowRunCount} runs
+              </span>
+              <span aria-hidden>·</span>
+              <span>Updated {formatWorkflowDate(workflowUpdatedAt)}</span>
+            </div>
+          </div>
+          <p className="px-1 text-xs text-muted-foreground">
+            {selectedCount > 1
+              ? `${selectedCount} items selected`
+              : "Select a node to edit its properties."}
+          </p>
+        </div>
+      </ScrollArea>
+    );
+  }
+
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-medium">Properties</h2>
-        </div>
-        <Separator />
-        {selectedNode ? (
-          selectedNode.data.kind === "trigger" ? (
-            <TriggerProperties
-              node={selectedNode}
-              readOnly={readOnly}
-              updateNodeData={updateNodeData}
-            />
-          ) : (
-            <AgentProperties
-              node={selectedNode}
-              readOnly={readOnly}
-              modelPresets={modelPresets}
-              updateNodeData={updateNodeData}
-            />
-          )
+        {selectedNode.data.kind === "trigger" ? (
+          <TriggerProperties
+            node={selectedNode}
+            readOnly={readOnly}
+            updateNodeData={updateNodeData}
+          />
         ) : (
-          <WorkflowSummary
-            selectedCount={selectedCount}
-            workflowSummary={workflowSummary}
-            workflowLastRunStatus={workflowLastRunStatus}
-            workflowUpdatedAt={workflowUpdatedAt}
-            workflowNodeCount={workflowNodeCount}
-            workflowRunCount={workflowRunCount}
+          <AgentProperties
+            node={selectedNode}
+            readOnly={readOnly}
             modelPresets={modelPresets}
+            updateNodeData={updateNodeData}
           />
         )}
       </div>
     </ScrollArea>
+  );
+}
+
+const workflowStatusDotClass: Record<WorkflowLastRunStatus, string> = {
+  "not-run": "bg-muted-foreground/40",
+  running: "bg-secondary-foreground",
+  success: "bg-primary",
+  error: "bg-destructive",
+};
+
+function WorkflowStatusDot({ status }: { status: WorkflowLastRunStatus }) {
+  const label = workflowStatusPresentation[status].label;
+  return (
+    <span
+      aria-label={label}
+      title={label}
+      className={cn(
+        "mt-1.5 size-2 shrink-0 rounded-full",
+        workflowStatusDotClass[status],
+      )}
+    />
   );
 }
 
@@ -1787,14 +1855,6 @@ function ExecutionDetailsPanel({
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-medium">Execution Details</h2>
-          <Badge variant="outline">
-            <LockIcon className="size-3.5" />
-            Read-only
-          </Badge>
-        </div>
-        <Separator />
         {selectedNode &&
         details &&
         status !== "idle" &&
@@ -2195,57 +2255,6 @@ function AgentProperties({
           {node.data.errorMessage}
         </div>
       )}
-    </div>
-  );
-}
-
-function WorkflowSummary({
-  selectedCount,
-  workflowSummary,
-  workflowLastRunStatus,
-  workflowUpdatedAt,
-  workflowNodeCount,
-  workflowRunCount,
-  modelPresets,
-}: {
-  selectedCount: number;
-  workflowSummary: string;
-  workflowLastRunStatus: WorkflowLastRunStatus;
-  workflowUpdatedAt: string;
-  workflowNodeCount: number;
-  workflowRunCount: number;
-  modelPresets: ModelPreset[];
-}) {
-  const status = workflowStatusPresentation[workflowLastRunStatus];
-
-  return (
-    <div className="space-y-4">
-      <Card className="p-3">
-        <div className="text-lg font-medium">Workflow details</div>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          {workflowSummary}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge variant={status.badgeVariant}>{status.label}</Badge>
-          <Badge variant="outline">{workflowNodeCount} nodes</Badge>
-          <Badge variant="outline">{workflowRunCount} runs</Badge>
-        </div>
-        <div className="mt-3 text-sm text-muted-foreground">
-          Updated {formatWorkflowDate(workflowUpdatedAt)}
-        </div>
-      </Card>
-      <Card className="p-3">
-        <div className="text-lg font-medium">Selection</div>
-        <div className="mt-2 text-2xl font-semibold">
-          {selectedCount > 0 ? `${selectedCount} items` : "No active item"}
-        </div>
-      </Card>
-      <Card className="p-3">
-        <div className="text-lg font-medium">Model Presets</div>
-        <div className="mt-2 text-2xl font-semibold">
-          {modelPresets.length} available
-        </div>
-      </Card>
     </div>
   );
 }

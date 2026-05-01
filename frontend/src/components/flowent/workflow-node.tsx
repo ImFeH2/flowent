@@ -7,18 +7,18 @@ import {
   BotIcon,
   CircleAlertIcon,
   CircleCheckIcon,
+  CircleSlash2Icon,
   ClockIcon,
   PlayIcon,
   SparklesIcon,
   TimerIcon,
-  WebhookIcon,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-import type { FlowNode, RunStatus, TriggerMode } from "./model";
+import type { FlowNode, RunStatus } from "./model";
 import { runStatusLabels } from "./model";
 
 const statusIcon: Record<RunStatus, ElementType> = {
@@ -27,19 +27,13 @@ const statusIcon: Record<RunStatus, ElementType> = {
   running: SparklesIcon,
   success: CircleCheckIcon,
   error: CircleAlertIcon,
-};
-
-const triggerIcon: Record<TriggerMode, ElementType> = {
-  manual: PlayIcon,
-  schedule: TimerIcon,
-  webhook: WebhookIcon,
+  canceled: CircleSlash2Icon,
 };
 
 export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
   const StatusIcon = statusIcon[data.status];
-  const TriggerIcon = triggerIcon[data.triggerMode ?? "manual"];
   const isTrigger = data.kind === "trigger";
-  const showRunStatus = data.canvasMode === "workflow";
+  const showRunStatus = data.status !== "idle";
   const onSelectNode =
     typeof data.onSelectNode === "function"
       ? (data.onSelectNode as () => void)
@@ -54,6 +48,9 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
         showRunStatus && data.status === "running" && "border-primary/70",
         showRunStatus && data.status === "success" && "border-chart-2/70",
         showRunStatus && data.status === "error" && "border-destructive/80",
+        showRunStatus &&
+          data.status === "canceled" &&
+          "border-muted-foreground/40",
       )}
     >
       {!isTrigger && (
@@ -68,7 +65,7 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
         <div className="flex items-center gap-4">
           <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border bg-background">
             {isTrigger ? (
-              <TriggerIcon className="size-6" />
+              <PlayIcon className="size-6" />
             ) : data.avatar ? (
               <span className="text-base font-medium">{data.avatar}</span>
             ) : (
@@ -82,7 +79,13 @@ export function WorkflowNode({ data, selected }: NodeProps<FlowNode>) {
         {showRunStatus && (
           <div className="flex items-center justify-between gap-2">
             <Badge
-              variant={data.status === "error" ? "destructive" : "secondary"}
+              variant={
+                data.status === "error"
+                  ? "destructive"
+                  : data.status === "canceled"
+                    ? "outline"
+                    : "secondary"
+              }
               className="gap-1.5 px-3 py-1 text-sm"
             >
               <StatusIcon className="size-4" />

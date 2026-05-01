@@ -185,7 +185,10 @@ function resetWorkspaceStore() {
       data: { ...node.data },
     })),
     edges: initialEdges.map((edge) => ({ ...edge })),
-    canvasMode: "blueprint",
+    workflowRunStatus: "idle",
+    runStartedAt: null,
+    runBlockedReason: null,
+    frozenRunGraph: null,
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
     nextNodeIndex: 3,
@@ -237,38 +240,22 @@ describe("App", () => {
       within(sidebar).getByRole("button", { name: "Settings" }),
     ).toBeInTheDocument();
     expect(
+      within(sidebar).getByRole("button", { name: "New workflow" }),
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole("button", { name: "Dark Mode" }),
     ).toBeInTheDocument();
     expect(screen.getAllByText("Launch Campaign").length).toBeGreaterThan(0);
     expect(
-      within(sidebar).queryByRole("button", { name: "Search workflows" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(sidebar).queryByRole("button", { name: "Create workflow" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(sidebar).queryByLabelText("Filter workflows"),
-    ).not.toBeInTheDocument();
-    expect(
       screen.getByRole("button", { name: "Open Launch Campaign" }),
     ).toBeInTheDocument();
     expect(within(sidebar).getByText("Workflow")).toBeInTheDocument();
+    expect(within(sidebar).queryByText(/Run/)).not.toBeInTheDocument();
     expect(
-      within(sidebar).queryByText(
-        "Draft launch copy, review it, and prepare the next step.",
-      ),
-    ).not.toBeInTheDocument();
-    expect(within(sidebar).queryByText("3 nodes")).not.toBeInTheDocument();
-    expect(within(sidebar).queryByText(/Updated/)).not.toBeInTheDocument();
-    expect(within(sidebar).queryByText("Runs")).not.toBeInTheDocument();
-    expect(within(sidebar).queryByText("No runs yet")).not.toBeInTheDocument();
-    expect(within(workflowContext).getByText("Runs")).toBeInTheDocument();
-    expect(
-      within(workflowContext).getByText("No runs yet"),
+      screen.getByRole("button", { name: "Run workflow" }),
     ).toBeInTheDocument();
-    expect(
-      within(workflowContext).getByRole("button", { name: "Run workflow" }),
-    ).toBeInTheDocument();
+    expect(workflowContext).toBeInTheDocument();
+    expect(screen.getByLabelText("Run status: Idle")).toBeInTheDocument();
     expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
     expect(screen.queryByText("Blueprint")).not.toBeInTheDocument();
 
@@ -283,8 +270,8 @@ describe("App", () => {
       within(overview).getByLabelText("Search workflows"),
     ).toBeInTheDocument();
     expect(
-      within(overview).getByLabelText("Filter workflows"),
-    ).toBeInTheDocument();
+      within(overview).queryByLabelText("Filter workflows"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the selected agent configuration", async () => {
@@ -292,16 +279,12 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
 
-    expect(screen.getByText("Runs")).toBeInTheDocument();
-    expect(screen.getByText("No runs yet")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Run workflow" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Manual Trigger")).toBeInTheDocument();
     expect(screen.getAllByText("Copywriter").length).toBeGreaterThan(0);
     expect(screen.getByTestId("canvas-minimap")).toBeInTheDocument();
-    expect(screen.getAllByText("Properties").length).toBeGreaterThan(0);
-    expect(screen.getByText("Editor")).toBeInTheDocument();
     expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
       "data-snap-to-grid",
       "true",
@@ -319,13 +302,9 @@ describe("App", () => {
     );
     expect(screen.getByLabelText("System Prompt")).toBeInTheDocument();
     expect(screen.getByText("Model Preset")).toBeInTheDocument();
-    expect(screen.queryByText("Idle")).not.toBeInTheDocument();
-    expect(screen.queryByText("Pending")).not.toBeInTheDocument();
-    expect(screen.queryByText("Thinking")).not.toBeInTheDocument();
-    expect(screen.queryByText("Success")).not.toBeInTheDocument();
   });
 
-  it("asks users to choose a model when an agent references a removed preset", async () => {
+  it("blocks running and surfaces a hint when an agent references a removed preset", async () => {
     useFlowentWorkspaceStore.setState({
       modelPresets: initialModelPresets.filter(
         (preset) => preset.id !== "preset-writing",
@@ -335,8 +314,6 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
-
-    expect(screen.getByRole("button", { name: "Run workflow" })).toBeDisabled();
     await waitFor(() =>
       expect(
         screen.getByText(
@@ -344,9 +321,17 @@ describe("App", () => {
         ),
       ).toBeInTheDocument(),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run workflow" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /Pick an available model/,
+      ),
+    );
   });
 
-  it("locks the canvas and shows run state feedback in workflow mode", async () => {
+  it("starts a run, surfaces running state, then lets the user stop it", async () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
@@ -355,139 +340,41 @@ describe("App", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Run workflow" }));
 
-    expect(screen.getByText("Runs")).toBeInTheDocument();
-    expect(screen.getByText("Run started.")).toBeInTheDocument();
-    expect(screen.getAllByText("Running").length).toBeGreaterThan(0);
-    expect(screen.getByText("Run view")).toBeInTheDocument();
-    expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
-      "data-read-only",
-      "true",
-    );
-    expect(screen.getByTestId("workflow-canvas")).toHaveAttribute(
-      "data-snap-to-grid",
-      "false",
-    );
-    expect(screen.getByText("Conversation History")).toBeInTheDocument();
-    expect(screen.getByText("System")).toBeInTheDocument();
-    expect(screen.getByText("User")).toBeInTheDocument();
-    expect(screen.getByText("Tool Calls")).toBeInTheDocument();
-    expect(screen.getByText("Assistant")).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("Copywriter")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("System Prompt")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Delete selection" }),
-    ).toBeDisabled();
-    expect(screen.getAllByText("Success").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Thinking").length).toBeGreaterThan(0);
-    expect(screen.getByText("Pending")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit workflow" }));
-
-    expect(screen.getByText("Editor")).toBeInTheDocument();
-    expect(screen.queryByText("Run view")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("workflow-canvas")).queryByText("Success"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("workflow-canvas")).queryByText("Thinking"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("workflow-canvas")).queryByText("Pending"),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("Properties")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Copywriter" }));
     await waitFor(() =>
-      expect(screen.getByDisplayValue("Copywriter")).not.toBeDisabled(),
+      expect(screen.getAllByText("Running").length).toBeGreaterThan(0),
     );
-
-    fireEvent.click(screen.getByText("Run started."));
-
-    expect(screen.getByText("Run view")).toBeInTheDocument();
-  });
-
-  it("keeps workflow runs in the current workflow panel", () => {
-    render(<App />);
-    const sidebar = screen.getByLabelText("Workspace navigation");
-    const workflowContext = screen.getByLabelText("Current workflow");
-
     expect(
-      within(sidebar).queryByRole("button", { name: "Run workflow" }),
-    ).not.toBeInTheDocument();
-    expect(within(sidebar).queryByText("No runs yet")).not.toBeInTheDocument();
-    expect(
-      within(workflowContext).getByRole("button", { name: "Run workflow" }),
+      screen.getByRole("button", { name: "Stop run" }),
     ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop run" }));
+
+    await waitFor(() =>
+      expect(screen.getAllByText("Canceled").length).toBeGreaterThan(0),
+    );
     expect(
-      within(workflowContext).getByText("No runs yet"),
+      screen.getByRole("button", { name: "Run workflow" }),
     ).toBeInTheDocument();
   });
 
-  it("creates a workflow from the workflows overview and opens it", () => {
+  it("creates a workflow from the sidebar New workflow button", () => {
     render(<App />);
 
     const sidebar = screen.getByLabelText("Workspace navigation");
-
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
-
-    const overview = screen.getByLabelText("Workflows overview");
 
     fireEvent.click(
-      within(overview).getByRole("button", { name: "Create workflow" }),
+      within(sidebar).getByRole("button", { name: "New workflow" }),
     );
 
     expect(
       screen.getByRole("heading", { level: 2, name: "Untitled workflow" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText("Blank workflow ready to build.").length,
-    ).toBeGreaterThan(0);
     expect(
       screen.getByRole("button", { name: "Open Untitled workflow" }),
     ).toHaveAttribute("aria-current", "true");
   });
 
-  it("searches workflows in the main view and opens a result", () => {
-    render(<App />);
-
-    const sidebar = screen.getByLabelText("Workspace navigation");
-
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
-
-    let overview = screen.getByLabelText("Workflows overview");
-
-    fireEvent.click(
-      within(overview).getByRole("button", { name: "Create workflow" }),
-    );
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Untitled workflow" }),
-    ).toBeInTheDocument();
-
-    fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
-
-    overview = screen.getByLabelText("Workflows overview");
-
-    fireEvent.change(within(overview).getByLabelText("Search workflows"), {
-      target: { value: "launch" },
-    });
-
-    expect(within(overview).getByText("Launch Campaign")).toBeInTheDocument();
-    expect(
-      within(overview).queryByText("Untitled workflow"),
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(
-      within(overview).getByRole("button", { name: "Open Launch Campaign" }),
-    );
-
-    expect(
-      screen.getByRole("heading", { level: 2, name: "Launch Campaign" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Open Launch Campaign" }),
-    ).toHaveAttribute("aria-current", "true");
-  });
-
-  it("clears workflow search filters with no results", () => {
+  it("clears the workflow search and returns to the full list", () => {
     render(<App />);
 
     const sidebar = screen.getByLabelText("Workspace navigation");
@@ -495,10 +382,6 @@ describe("App", () => {
     fireEvent.click(within(sidebar).getByRole("button", { name: "Workflows" }));
 
     const overview = screen.getByLabelText("Workflows overview");
-
-    expect(
-      within(overview).getByLabelText("Filter workflows"),
-    ).toBeInTheDocument();
 
     fireEvent.change(within(overview).getByLabelText("Search workflows"), {
       target: { value: "no matching workflow" },
@@ -509,7 +392,7 @@ describe("App", () => {
     ).toBeInTheDocument();
 
     fireEvent.click(
-      within(overview).getByRole("button", { name: "Clear filters" }),
+      within(overview).getByRole("button", { name: "Clear search" }),
     );
 
     expect(within(overview).getByText("Launch Campaign")).toBeInTheDocument();

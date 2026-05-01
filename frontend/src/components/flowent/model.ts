@@ -1,16 +1,15 @@
 import type { Edge, Node, SnapGrid, XYPosition } from "@xyflow/react";
 
 export type WorkflowNodeKind = "trigger" | "agent";
-export type CanvasMode = "blueprint" | "workflow";
-export type TriggerMode = "manual" | "schedule" | "webhook";
-export type RunStatus = "idle" | "pending" | "running" | "success" | "error";
-export type BlueprintLastRunStatus =
-  | "not-run"
+export type RunStatus =
+  | "idle"
+  | "pending"
   | "running"
   | "success"
-  | "error";
+  | "error"
+  | "canceled";
 export type WorkflowRunStatus =
-  | "queued"
+  | "idle"
   | "running"
   | "succeeded"
   | "failed"
@@ -54,10 +53,7 @@ export type WorkflowNodeData = {
   title: string;
   name?: string;
   avatar?: string;
-  triggerMode?: TriggerMode;
   initialPayload?: string;
-  cronExpression?: string;
-  webhookUrl?: string;
   modelPresetId?: string;
   systemPrompt?: string;
   tools?: string[];
@@ -70,26 +66,13 @@ export type WorkflowNodeData = {
 export type FlowNode = Node<WorkflowNodeData, "workflow">;
 export type FlowEdge = Edge;
 
-export type WorkflowRun = {
-  id: string;
-  startedAt: string;
-  updatedAt: string;
-  status: WorkflowRunStatus;
-  summary: string;
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-};
-
 export type BlueprintAsset = {
   id: string;
   name: string;
   updatedAt: string;
-  lastRunStatus: BlueprintLastRunStatus;
   summary: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
-  runHistory: WorkflowRun[];
-  selectedRunId: string | null;
 };
 
 export const canvasSnapGrid: SnapGrid = [20, 20];
@@ -177,7 +160,7 @@ export const connectionTypeParameterSupport: Record<
 };
 
 export const workflowRunStatusLabels: Record<WorkflowRunStatus, string> = {
-  queued: "Queued",
+  idle: "Idle",
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
@@ -190,6 +173,7 @@ export const runStatusLabels: Record<RunStatus, string> = {
   running: "Thinking",
   success: "Success",
   error: "Error",
+  canceled: "Canceled",
 };
 
 export const availableTools = [
@@ -270,10 +254,7 @@ export const initialNodes: FlowNode[] = [
     data: {
       kind: "trigger",
       title: "Manual Trigger",
-      triggerMode: "manual",
       initialPayload: "Draft a concise campaign outline for the launch.",
-      cronExpression: "0 9 * * 1",
-      webhookUrl: "https://flowent.local/webhooks/manual-trigger",
       status: "idle",
     },
   },
@@ -307,7 +288,6 @@ export const initialNodes: FlowNode[] = [
         "Review the upstream result in {{input}} for clarity, accuracy, and next actions.",
       tools: ["code-execution"],
       status: "idle",
-      errorMessage: "The selected service returned an empty response.",
     },
   },
 ];
@@ -336,12 +316,9 @@ export const initialBlueprints: BlueprintAsset[] = [
     id: "blueprint-launch-campaign",
     name: "Launch Campaign",
     updatedAt: "2026-04-27T09:00:00.000Z",
-    lastRunStatus: "not-run",
     summary: "Draft launch copy, review it, and prepare the next step.",
     nodes: initialNodes,
     edges: initialEdges,
-    runHistory: [],
-    selectedRunId: null,
   },
 ];
 
@@ -360,10 +337,7 @@ export function createNode(
       data: {
         kind,
         title: "Manual Trigger",
-        triggerMode: "manual",
         initialPayload: "",
-        cronExpression: "0 9 * * 1",
-        webhookUrl: `https://flowent.local/webhooks/${id}`,
         status: "idle",
       },
     };

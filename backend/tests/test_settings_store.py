@@ -167,7 +167,7 @@ def test_normalizes_older_saved_connection_settings():
     }
 
 
-def test_normalizes_saved_workflow_runs():
+def test_drops_legacy_run_fields_and_normalizes_node_data():
     blueprint = {
         "id": "blueprint-launch",
         "name": "Launch Campaign",
@@ -208,14 +208,16 @@ def test_normalizes_saved_workflow_runs():
 
     assert error is None
     assert parsed is not None
-    assert parsed["blueprints"][0]["nodes"][0]["data"]["modelName"] == "gpt-4.1"
-    assert "modelId" not in parsed["blueprints"][0]["nodes"][0]["data"]
+    parsed_blueprint = parsed["blueprints"][0]
+    assert parsed_blueprint["nodes"][0]["data"]["modelName"] == "gpt-4.1"
+    assert "modelId" not in parsed_blueprint["nodes"][0]["data"]
     assert (
-        parsed["blueprints"][0]["nodes"][0]["data"]["errorMessage"]
+        parsed_blueprint["nodes"][0]["data"]["errorMessage"]
         == "The selected service returned an empty response."
     )
-    assert parsed["blueprints"][0]["runHistory"][0]["status"] == "succeeded"
-    assert parsed["blueprints"][0]["selectedRunId"] == "run-1"
+    assert "runHistory" not in parsed_blueprint
+    assert "selectedRunId" not in parsed_blueprint
+    assert "lastRunStatus" not in parsed_blueprint
 
 
 def test_fails_without_falling_back_when_the_home_folder_cannot_hold_settings(

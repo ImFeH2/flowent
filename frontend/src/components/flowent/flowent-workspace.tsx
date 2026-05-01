@@ -17,17 +17,15 @@ import {
   BotIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  Clock3Icon,
-  CopyIcon,
   GitBranchIcon,
   Maximize2Icon,
   MessageSquareIcon,
   PlayIcon,
   PlusIcon,
-  RotateCcwIcon,
   SearchIcon,
   SettingsIcon,
   ShieldIcon,
+  SquareIcon,
   Trash2Icon,
   UserIcon,
   WrenchIcon,
@@ -74,8 +72,6 @@ import {
   connectionTypeLabels,
   connectionTypeParameterSupport,
   runStatusLabels,
-  workflowRunStatusLabels,
-  type CanvasMode,
   type ConnectionType,
   type FlowEdge,
   type FlowNode,
@@ -85,14 +81,10 @@ import {
   type Role,
   type RuntimeConversationEntry,
   type RuntimeConversationRole,
-  type RunStatus,
-  type TriggerMode,
   type WorkflowNodeData,
   type WorkflowNodeKind,
-  type WorkflowRun,
   type WorkflowRunStatus,
   type BlueprintAsset as WorkflowAsset,
-  type BlueprintLastRunStatus as WorkflowLastRunStatus,
 } from "./model";
 import { WorkflowNode } from "./workflow-node";
 import {
@@ -118,7 +110,7 @@ const nodeLibrary: Array<{
   {
     kind: "trigger",
     title: "Trigger",
-    subtitle: "Manual, schedule, or webhook start",
+    subtitle: "Manual workflow start",
     icon: PlayIcon,
   },
   {
@@ -141,31 +133,40 @@ const fixedNavigation: SidebarNavigationItem[] = [
   { view: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
-type WorkflowStatusFilter = "all" | WorkflowLastRunStatus;
-
-const workflowStatusPresentation: Record<
-  WorkflowLastRunStatus,
+const workflowRunStatusPresentation: Record<
+  WorkflowRunStatus,
   {
     label: string;
-    badgeVariant: "default" | "secondary" | "destructive" | "outline";
+    pillClass: string;
+    dotClass: string;
   }
 > = {
-  "not-run": { label: "Not run", badgeVariant: "outline" },
-  running: { label: "Running", badgeVariant: "secondary" },
-  success: { label: "Completed", badgeVariant: "default" },
-  error: { label: "Needs review", badgeVariant: "destructive" },
+  idle: {
+    label: "Idle",
+    pillClass: "border-border text-muted-foreground",
+    dotClass: "bg-muted-foreground/40",
+  },
+  running: {
+    label: "Running",
+    pillClass: "border-primary/40 bg-primary/10 text-primary",
+    dotClass: "bg-primary",
+  },
+  succeeded: {
+    label: "Succeeded",
+    pillClass: "border-chart-2/40 bg-chart-2/10 text-chart-2",
+    dotClass: "bg-chart-2",
+  },
+  failed: {
+    label: "Failed",
+    pillClass: "border-destructive/40 bg-destructive/10 text-destructive",
+    dotClass: "bg-destructive",
+  },
+  canceled: {
+    label: "Canceled",
+    pillClass: "border-border bg-muted/40 text-muted-foreground",
+    dotClass: "bg-muted-foreground",
+  },
 };
-
-const workflowStatusFilters: Array<{
-  value: WorkflowStatusFilter;
-  label: string;
-}> = [
-  { value: "all", label: "Any status" },
-  { value: "not-run", label: "Not run" },
-  { value: "running", label: "Running" },
-  { value: "success", label: "Completed" },
-  { value: "error", label: "Needs review" },
-];
 
 const conversationRolePresentation: Record<
   RuntimeConversationRole,
@@ -277,20 +278,13 @@ function FlowentWorkspaceShell() {
   const [workflowMainMode, setWorkflowMainMode] =
     useState<WorkflowMainMode>("editor");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [workflowPanelOverride, setWorkflowPanelOverride] = useState<{
-    tab: "properties" | "runs";
-    signature: string;
-  } | null>(null);
-  const [highlightedRun, setHighlightedRun] = useState<{
-    workflowId: string;
-    runId: string;
-  } | null>(null);
   const {
     blueprints,
     activeBlueprintId,
     nodes,
     edges,
-    canvasMode,
+    workflowRunStatus,
+    runBlockedReason,
     modelPresets,
     roles,
     localDataStatus,
@@ -312,8 +306,7 @@ function FlowentWorkspaceShell() {
     startWorkflowRun,
     advanceWorkflowRun,
     finishWorkflowRun,
-    selectWorkflowRun,
-    returnToBlueprintMode,
+    cancelWorkflowRun,
     createBlueprint,
     openBlueprint,
   } = useFlowentWorkspaceStore(
@@ -322,7 +315,8 @@ function FlowentWorkspaceShell() {
       activeBlueprintId: state.activeBlueprintId,
       nodes: state.nodes,
       edges: state.edges,
-      canvasMode: state.canvasMode,
+      workflowRunStatus: state.workflowRunStatus,
+      runBlockedReason: state.runBlockedReason,
       modelPresets: state.modelPresets,
       roles: state.roles,
       localDataStatus: state.localDataStatus,
@@ -344,8 +338,7 @@ function FlowentWorkspaceShell() {
       startWorkflowRun: state.startWorkflowRun,
       advanceWorkflowRun: state.advanceWorkflowRun,
       finishWorkflowRun: state.finishWorkflowRun,
-      selectWorkflowRun: state.selectWorkflowRun,
-      returnToBlueprintMode: state.returnToBlueprintMode,
+      cancelWorkflowRun: state.cancelWorkflowRun,
       createBlueprint: state.createBlueprint,
       openBlueprint: state.openBlueprint,
     })),
@@ -367,20 +360,21 @@ function FlowentWorkspaceShell() {
     [blueprints],
   );
 
+  const isRunning = workflowRunStatus === "running";
+
   const nodesWithContext = useMemo(
     () =>
       nodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
-          canvasMode,
           modelPresets,
           onSelectNode: () => {
             window.setTimeout(() => setSelection([node.id], []), 0);
           },
         },
       })),
-    [canvasMode, modelPresets, nodes, setSelection],
+    [modelPresets, nodes, setSelection],
   );
 
   const selectedNodes = useMemo(
@@ -389,45 +383,11 @@ function FlowentWorkspaceShell() {
   );
 
   const selectedNode = selectedNodes.length === 1 ? selectedNodes[0] : null;
-  const runBlockReason = useMemo(
-    () =>
-      nodes.some(
-        (node) =>
-          node.data.kind === "agent" &&
-          !hasAvailableModelPreset(modelPresets, node.data.modelPresetId),
-      )
-        ? "Choose models before running"
-        : null,
-    [modelPresets, nodes],
-  );
 
   const clearRunTimers = useCallback(() => {
     runTimers.current.forEach((timer) => window.clearTimeout(timer));
     runTimers.current = [];
   }, []);
-
-  const workflowPanelSignature =
-    canvasMode === "workflow"
-      ? selectedNodeIds.length === 1
-        ? "run-with-selection"
-        : "run-no-selection"
-      : "editor";
-  const defaultWorkflowPanelTab: "properties" | "runs" =
-    workflowPanelSignature === "run-no-selection" ? "runs" : "properties";
-  const workflowPanelTab =
-    workflowPanelOverride &&
-    workflowPanelOverride.signature === workflowPanelSignature
-      ? workflowPanelOverride.tab
-      : defaultWorkflowPanelTab;
-  const handleWorkflowPanelTabChange = useCallback(
-    (value: string) => {
-      setWorkflowPanelOverride({
-        tab: value as "properties" | "runs",
-        signature: workflowPanelSignature,
-      });
-    },
-    [workflowPanelSignature],
-  );
 
   useEffect(() => {
     void loadLocalSettings();
@@ -435,48 +395,14 @@ function FlowentWorkspaceShell() {
 
   useEffect(() => clearRunTimers, [clearRunTimers]);
 
-  const highlightedRunId =
-    highlightedRun?.workflowId === activeBlueprintId
-      ? highlightedRun.runId
-      : null;
-
-  useEffect(() => {
-    if (!highlightedRun) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setHighlightedRun((run) =>
-        run?.workflowId === highlightedRun.workflowId &&
-        run.runId === highlightedRun.runId
-          ? null
-          : run,
-      );
-    }, 2200);
-
-    return () => window.clearTimeout(timer);
-  }, [highlightedRun]);
-
   const runWorkflow = useCallback(() => {
-    if (runBlockReason) {
-      return;
-    }
-
-    const previousRunId = activeWorkflow?.runHistory[0]?.id ?? null;
-
     clearRunTimers();
     setActiveView("workflows");
     setWorkflowMainMode("editor");
     startWorkflowRun();
 
-    const nextRunId =
-      useFlowentWorkspaceStore
-        .getState()
-        .blueprints.find((blueprint) => blueprint.id === activeBlueprintId)
-        ?.selectedRunId ?? null;
-
-    if (activeBlueprintId && nextRunId && nextRunId !== previousRunId) {
-      setHighlightedRun({ workflowId: activeBlueprintId, runId: nextRunId });
+    if (useFlowentWorkspaceStore.getState().workflowRunStatus !== "running") {
+      return;
     }
 
     runTimers.current = [
@@ -487,30 +413,12 @@ function FlowentWorkspaceShell() {
         finishWorkflowRun();
       }, 1600),
     ];
-  }, [
-    advanceWorkflowRun,
-    activeWorkflow?.runHistory,
-    activeBlueprintId,
-    clearRunTimers,
-    finishWorkflowRun,
-    runBlockReason,
-    startWorkflowRun,
-  ]);
+  }, [advanceWorkflowRun, clearRunTimers, finishWorkflowRun, startWorkflowRun]);
 
-  const returnToWorkflowEditor = useCallback(() => {
+  const stopWorkflow = useCallback(() => {
     clearRunTimers();
-    returnToBlueprintMode();
-  }, [clearRunTimers, returnToBlueprintMode]);
-
-  const selectRunItem = useCallback(
-    (runId: string) => {
-      clearRunTimers();
-      setActiveView("workflows");
-      setWorkflowMainMode("editor");
-      selectWorkflowRun(runId);
-    },
-    [clearRunTimers, selectWorkflowRun],
-  );
+    cancelWorkflowRun();
+  }, [cancelWorkflowRun, clearRunTimers]);
 
   const openWorkflowView = useCallback(
     (blueprintId: string) => {
@@ -549,7 +457,7 @@ function FlowentWorkspaceShell() {
 
   const onDragStart = useCallback(
     (event: React.DragEvent<HTMLButtonElement>, kind: WorkflowNodeKind) => {
-      if (canvasMode === "workflow") {
+      if (isRunning) {
         event.preventDefault();
         return;
       }
@@ -557,14 +465,14 @@ function FlowentWorkspaceShell() {
       event.dataTransfer.setData("application/flowent-node", kind);
       event.dataTransfer.effectAllowed = "copy";
     },
-    [canvasMode],
+    [isRunning],
   );
 
   const onDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
 
-      if (canvasMode === "workflow") {
+      if (isRunning) {
         return;
       }
 
@@ -582,14 +490,14 @@ function FlowentWorkspaceShell() {
         ),
       );
     },
-    [addWorkflowNode, canvasMode, screenToFlowPosition],
+    [addWorkflowNode, isRunning, screenToFlowPosition],
   );
 
   const onPaneContextMenu = useCallback(
     (event: React.MouseEvent | MouseEvent) => {
       event.preventDefault();
 
-      if (canvasMode === "workflow") {
+      if (isRunning) {
         return;
       }
 
@@ -601,7 +509,7 @@ function FlowentWorkspaceShell() {
         ),
       );
     },
-    [addWorkflowNode, canvasMode, screenToFlowPosition],
+    [addWorkflowNode, isRunning, screenToFlowPosition],
   );
 
   return (
@@ -619,6 +527,7 @@ function FlowentWorkspaceShell() {
             activeView === "workflows" && workflowMainMode === "overview"
           }
           collapsed={sidebarCollapsed}
+          onCreateWorkflow={createWorkflowView}
           onNavigate={navigateTopLevelView}
           onOpenWorkflow={openWorkflowView}
           onOpenWorkflowsOverview={openWorkflowsOverview}
@@ -641,7 +550,9 @@ function FlowentWorkspaceShell() {
                   workflowName={activeWorkflow.name}
                   nodes={nodesWithContext}
                   edges={edges}
-                  canvasMode={canvasMode}
+                  workflowRunStatus={workflowRunStatus}
+                  runBlockedReason={runBlockedReason}
+                  isRunning={isRunning}
                   selectedNodeIds={selectedNodeIds}
                   selectedEdgeIds={selectedEdgeIds}
                   onNodesChange={applyNodeChanges}
@@ -652,7 +563,8 @@ function FlowentWorkspaceShell() {
                   onPaneContextMenu={onPaneContextMenu}
                   onNodesDelete={deleteConnectedEdges}
                   onSelectionChange={setSelection}
-                  onReturnToWorkflowEditor={returnToWorkflowEditor}
+                  onRun={runWorkflow}
+                  onStop={stopWorkflow}
                   onDeleteSelection={deleteSelection}
                   onFitView={() => fitView({ padding: 0.2, duration: 250 })}
                   onResetViewport={() =>
@@ -663,83 +575,20 @@ function FlowentWorkspaceShell() {
                   aria-label="Current workflow"
                   className="flex min-h-0 flex-col border-t bg-card lg:border-t-0 lg:border-l"
                 >
-                  <Tabs
-                    value={workflowPanelTab}
-                    onValueChange={handleWorkflowPanelTabChange}
-                    className="flex min-h-0 flex-1 flex-col"
-                  >
-                    <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
-                      <TabsList>
-                        <TabsTrigger value="properties">Properties</TabsTrigger>
-                        <TabsTrigger value="runs">
-                          <span>Runs</span>
-                          <Badge variant="outline" className="ml-1.5">
-                            {activeWorkflow.runHistory.length}
-                          </Badge>
-                        </TabsTrigger>
-                      </TabsList>
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              size="icon"
-                              aria-label="Run workflow"
-                              disabled={
-                                Boolean(runBlockReason) ||
-                                canvasMode === "workflow"
-                              }
-                              onClick={runWorkflow}
-                            >
-                              <PlayIcon />
-                            </Button>
-                          }
-                        />
-                        <TooltipContent>
-                          {runBlockReason ??
-                            (canvasMode === "workflow"
-                              ? "Run view is read-only"
-                              : "Run workflow")}
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <TabsContent
-                      value="properties"
-                      keepMounted
-                      className="min-h-0 flex-1 outline-none data-[hidden]:hidden"
-                    >
-                      <PropertyPanel
-                        selectedNode={selectedNode}
-                        selectedCount={
-                          selectedNodeIds.length + selectedEdgeIds.length
-                        }
-                        workflowName={activeWorkflow.name}
-                        workflowSummary={activeWorkflow.summary}
-                        workflowLastRunStatus={activeWorkflow.lastRunStatus}
-                        workflowUpdatedAt={activeWorkflow.updatedAt}
-                        workflowNodeCount={activeWorkflow.nodes.length}
-                        workflowRunCount={activeWorkflow.runHistory.length}
-                        canvasMode={canvasMode}
-                        modelPresets={modelPresets}
-                        updateNodeData={updateNodeData}
-                      />
-                    </TabsContent>
-                    <TabsContent
-                      value="runs"
-                      keepMounted
-                      className="min-h-0 flex-1 outline-none data-[hidden]:hidden"
-                    >
-                      <RunsPanel
-                        runs={activeWorkflow.runHistory}
-                        activeRunId={
-                          canvasMode === "workflow"
-                            ? (activeWorkflow.selectedRunId ?? null)
-                            : null
-                        }
-                        highlightedRunId={highlightedRunId}
-                        onSelectRun={selectRunItem}
-                      />
-                    </TabsContent>
-                  </Tabs>
+                  <PropertyPanel
+                    selectedNode={selectedNode}
+                    selectedCount={
+                      selectedNodeIds.length + selectedEdgeIds.length
+                    }
+                    workflowName={activeWorkflow.name}
+                    workflowSummary={activeWorkflow.summary}
+                    workflowUpdatedAt={activeWorkflow.updatedAt}
+                    workflowNodeCount={activeWorkflow.nodes.length}
+                    workflowRunStatus={workflowRunStatus}
+                    isRunning={isRunning}
+                    modelPresets={modelPresets}
+                    updateNodeData={updateNodeData}
+                  />
                 </aside>
               </div>
             ) : (
@@ -776,6 +625,7 @@ function AppSidebar({
   activeWorkflowId,
   workflowOverviewOpen,
   collapsed,
+  onCreateWorkflow,
   onNavigate,
   onOpenWorkflow,
   onOpenWorkflowsOverview,
@@ -786,6 +636,7 @@ function AppSidebar({
   activeWorkflowId: string | null;
   workflowOverviewOpen: boolean;
   collapsed: boolean;
+  onCreateWorkflow: () => void;
   onNavigate: (view: AppView) => void;
   onOpenWorkflow: (workflowId: string) => void;
   onOpenWorkflowsOverview: () => void;
@@ -827,6 +678,10 @@ function AppSidebar({
           onNavigate={onNavigate}
           onOpenWorkflowsOverview={onOpenWorkflowsOverview}
         />
+        <SidebarCreateWorkflow
+          collapsed={collapsed}
+          onCreateWorkflow={onCreateWorkflow}
+        />
         <WorkflowHistoryList
           activeWorkflowId={activeWorkflowId}
           collapsed={collapsed}
@@ -840,6 +695,49 @@ function AppSidebar({
         </div>
       </div>
     </motion.aside>
+  );
+}
+
+function SidebarCreateWorkflow({
+  collapsed,
+  onCreateWorkflow,
+}: {
+  collapsed: boolean;
+  onCreateWorkflow: () => void;
+}) {
+  if (collapsed) {
+    const button = (
+      <Button
+        variant="outline"
+        size="icon"
+        aria-label="New workflow"
+        onClick={onCreateWorkflow}
+      >
+        <PlusIcon />
+      </Button>
+    );
+
+    return (
+      <div className="flex shrink-0 justify-center">
+        <Tooltip>
+          <TooltipTrigger render={button} />
+          <TooltipContent side="right">New workflow</TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  }
+
+  return (
+    <div className="shrink-0">
+      <Button
+        variant="outline"
+        className="w-full justify-start gap-3"
+        onClick={onCreateWorkflow}
+      >
+        <PlusIcon className="size-4" />
+        <span className="truncate">New workflow</span>
+      </Button>
+    </div>
   );
 }
 
@@ -1061,25 +959,19 @@ function WorkflowsOverview({
   onOpenWorkflow: (workflowId: string) => void;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<WorkflowStatusFilter>("all");
   const normalizedSearch = searchTerm.trim().toLowerCase();
   const filteredWorkflows = useMemo(
     () =>
-      workflows.filter((workflow) => {
-        const matchesSearch =
+      workflows.filter(
+        (workflow) =>
           normalizedSearch.length === 0 ||
-          workflow.name.toLowerCase().includes(normalizedSearch);
-        const matchesStatus =
-          statusFilter === "all" || workflow.lastRunStatus === statusFilter;
-
-        return matchesSearch && matchesStatus;
-      }),
-    [normalizedSearch, statusFilter, workflows],
+          workflow.name.toLowerCase().includes(normalizedSearch),
+      ),
+    [normalizedSearch, workflows],
   );
-  const hasFilters = normalizedSearch.length > 0 || statusFilter !== "all";
+  const hasFilters = normalizedSearch.length > 0;
   const clearFilters = useCallback(() => {
     setSearchTerm("");
-    setStatusFilter("all");
   }, []);
 
   return (
@@ -1096,39 +988,15 @@ function WorkflowsOverview({
           Create workflow
         </Button>
       </div>
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            aria-label="Search workflows"
-            className="h-9 pl-9"
-            placeholder="Search workflows"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-          />
-        </div>
-        <Select
-          value={statusFilter}
-          onValueChange={(value) =>
-            setStatusFilter(value as WorkflowStatusFilter)
-          }
-        >
-          <SelectTrigger aria-label="Filter workflows" className="h-9 w-full">
-            <SelectValue>
-              {(value: WorkflowStatusFilter | null) =>
-                workflowStatusFilters.find((item) => item.value === value)
-                  ?.label ?? "Any status"
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {workflowStatusFilters.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          aria-label="Search workflows"
+          className="h-9 pl-9"
+          placeholder="Search workflows"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+        />
       </div>
       {workflows.length === 0 ? (
         <div className="rounded-lg border bg-card p-6">
@@ -1141,7 +1009,7 @@ function WorkflowsOverview({
         <div className="rounded-lg border bg-card p-6">
           <div className="text-lg font-medium">No matching workflows</div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Clear the current filters to return to the full workflow history.
+            Clear the current search to return to the full workflow list.
           </p>
           <Button
             variant="outline"
@@ -1149,7 +1017,7 @@ function WorkflowsOverview({
             className="mt-4"
             onClick={clearFilters}
           >
-            Clear filters
+            Clear search
           </Button>
         </div>
       ) : (
@@ -1169,7 +1037,7 @@ function WorkflowsOverview({
       {hasFilters && filteredWorkflows.length > 0 && (
         <div>
           <Button variant="ghost" size="sm" onClick={clearFilters}>
-            Clear filters
+            Clear search
           </Button>
         </div>
       )}
@@ -1186,8 +1054,6 @@ function WorkflowOverviewCard({
   active: boolean;
   onOpenWorkflow: (workflowId: string) => void;
 }) {
-  const status = workflowStatusPresentation[workflow.lastRunStatus];
-
   return (
     <motion.article layout>
       <button
@@ -1210,9 +1076,8 @@ function WorkflowOverviewCard({
           {active && <Badge variant="secondary">Current</Badge>}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant={status.badgeVariant}>{status.label}</Badge>
           <span>{workflow.nodes.length} nodes</span>
-          <span>{workflow.runHistory.length} runs</span>
+          <span aria-hidden>·</span>
           <span>Updated {formatWorkflowDate(workflow.updatedAt)}</span>
         </div>
       </button>
@@ -1255,129 +1120,6 @@ function formatWorkflowDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function formatRunDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function getWorkflowRunStatusVariant(
-  status: WorkflowRunStatus,
-): "default" | "secondary" | "destructive" | "outline" {
-  if (status === "failed") {
-    return "destructive";
-  }
-
-  if (status === "succeeded") {
-    return "default";
-  }
-
-  return status === "canceled" ? "outline" : "secondary";
-}
-
-function RunsPanel({
-  runs,
-  activeRunId,
-  highlightedRunId,
-  onSelectRun,
-}: {
-  runs: WorkflowRun[];
-  activeRunId: string | null;
-  highlightedRunId: string | null;
-  onSelectRun: (runId: string) => void;
-}) {
-  if (runs.length === 0) {
-    return (
-      <div className="flex h-full flex-col gap-3 p-4">
-        <div className="rounded-lg border bg-background p-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Clock3Icon className="size-4 text-muted-foreground" />
-            No runs yet
-          </div>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Run this workflow to watch its first run here.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <ScrollArea className="h-full">
-      <motion.ol layout className="space-y-2 p-3">
-        {runs.map((run) => (
-          <RunItem
-            key={run.id}
-            run={run}
-            active={run.id === activeRunId}
-            highlighted={run.id === highlightedRunId}
-            onSelectRun={onSelectRun}
-          />
-        ))}
-      </motion.ol>
-    </ScrollArea>
-  );
-}
-
-function RunItem({
-  run,
-  active,
-  highlighted,
-  onSelectRun,
-}: {
-  run: WorkflowRun;
-  active: boolean;
-  highlighted: boolean;
-  onSelectRun: (runId: string) => void;
-}) {
-  const statusLabel = workflowRunStatusLabels[run.status];
-
-  return (
-    <motion.li
-      layout
-      initial={highlighted ? { opacity: 0, y: -8 } : false}
-      animate={
-        highlighted
-          ? { opacity: 1, y: 0, scale: [1, 1.015, 1] }
-          : { opacity: 1, y: 0, scale: 1 }
-      }
-      transition={{ duration: highlighted ? 0.42 : 0.18, ease: "easeOut" }}
-    >
-      <button
-        type="button"
-        aria-current={active ? "true" : undefined}
-        aria-label={`${statusLabel} run from ${formatRunDate(run.startedAt)}`}
-        className={cn(
-          "w-full rounded-lg border bg-background p-3 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-          active && "border-primary bg-muted",
-          highlighted && "ring-2 ring-ring/60",
-        )}
-        onClick={() => onSelectRun(run.id)}
-      >
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 truncate text-sm font-medium">
-              {formatRunDate(run.startedAt)}
-            </div>
-            <Badge
-              variant={getWorkflowRunStatusVariant(run.status)}
-              className="shrink-0"
-            >
-              {statusLabel}
-            </Badge>
-          </div>
-          <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-            {run.summary}
-          </p>
-        </div>
-      </button>
-    </motion.li>
-  );
 }
 
 function RoleCard({
@@ -1475,7 +1217,9 @@ function CanvasWorkspace({
   workflowName,
   nodes,
   edges,
-  canvasMode,
+  workflowRunStatus,
+  runBlockedReason,
+  isRunning,
   selectedNodeIds,
   selectedEdgeIds,
   onNodesChange,
@@ -1486,7 +1230,8 @@ function CanvasWorkspace({
   onPaneContextMenu,
   onNodesDelete,
   onSelectionChange,
-  onReturnToWorkflowEditor,
+  onRun,
+  onStop,
   onDeleteSelection,
   onFitView,
   onResetViewport,
@@ -1494,7 +1239,9 @@ function CanvasWorkspace({
   workflowName: string;
   nodes: FlowNode[];
   edges: FlowEdge[];
-  canvasMode: CanvasMode;
+  workflowRunStatus: WorkflowRunStatus;
+  runBlockedReason: string | null;
+  isRunning: boolean;
   selectedNodeIds: string[];
   selectedEdgeIds: string[];
   onNodesChange: (changes: NodeChange<FlowNode>[]) => void;
@@ -1508,54 +1255,68 @@ function CanvasWorkspace({
   onPaneContextMenu: (event: React.MouseEvent | MouseEvent) => void;
   onNodesDelete: (deletedNodes: FlowNode[]) => void;
   onSelectionChange: (nodeIds: string[], edgeIds: string[]) => void;
-  onReturnToWorkflowEditor: () => void;
+  onRun: () => void;
+  onStop: () => void;
   onDeleteSelection: () => void;
   onFitView: () => void;
   onResetViewport: () => void;
 }) {
-  const isWorkflowMode = canvasMode === "workflow";
   const hasSelection = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
+  const statusPresentation = workflowRunStatusPresentation[workflowRunStatus];
 
   return (
     <section className="flex min-h-0 min-w-0 flex-col bg-background">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b px-6 py-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-6 py-3">
         <div className="flex min-w-0 items-center gap-3">
           <h2 className="truncate text-base font-medium">{workflowName}</h2>
           <Badge
             variant="outline"
-            className={cn(
-              "gap-1.5",
-              isWorkflowMode &&
-                "border-destructive/30 bg-destructive/10 text-destructive",
-            )}
+            aria-label={`Run status: ${statusPresentation.label}`}
+            className={cn("gap-1.5", statusPresentation.pillClass)}
           >
-            {isWorkflowMode && (
+            {workflowRunStatus === "running" ? (
               <motion.span
                 aria-hidden
-                className="size-1.5 rounded-full bg-current"
+                className={cn(
+                  "size-1.5 rounded-full",
+                  statusPresentation.dotClass,
+                )}
                 animate={{ opacity: [0.35, 1, 0.35] }}
                 transition={{ duration: 1.6, repeat: Infinity }}
               />
+            ) : (
+              <span
+                aria-hidden
+                className={cn(
+                  "size-1.5 rounded-full",
+                  statusPresentation.dotClass,
+                )}
+              />
             )}
-            {isWorkflowMode ? "Run view" : "Editor"}
+            {statusPresentation.label}
           </Badge>
+          {runBlockedReason && !isRunning && (
+            <span role="status" className="text-xs text-destructive">
+              {runBlockedReason}
+            </span>
+          )}
         </div>
-        {isWorkflowMode ? (
-          <Button variant="outline" onClick={onReturnToWorkflowEditor}>
-            <RotateCcwIcon />
-            Edit workflow
+        {isRunning ? (
+          <Button variant="destructive" onClick={onStop} aria-label="Stop run">
+            <SquareIcon />
+            Stop
           </Button>
-        ) : null}
-      </div>
-      <div
-        className={cn(
-          "relative min-h-0 flex-1",
-          isWorkflowMode && "ring-1 ring-inset ring-destructive/30",
+        ) : (
+          <Button onClick={onRun} aria-label="Run workflow">
+            <PlayIcon />
+            Run
+          </Button>
         )}
-      >
-        {!isWorkflowMode && <FloatingNodeLibrary onDragStart={onDragStart} />}
+      </div>
+      <div className="relative min-h-0 flex-1">
+        {!isRunning && <FloatingNodeLibrary onDragStart={onDragStart} />}
         <FloatingCanvasTools
-          canDelete={hasSelection && !isWorkflowMode}
+          canDelete={hasSelection && !isRunning}
           onFitView={onFitView}
           onResetViewport={onResetViewport}
           onDeleteSelection={onDeleteSelection}
@@ -1569,7 +1330,7 @@ function CanvasWorkspace({
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={(event) => {
-            if (!isWorkflowMode) {
+            if (!isRunning) {
               event.preventDefault();
             }
           }}
@@ -1592,13 +1353,13 @@ function CanvasWorkspace({
           }}
           isValidConnection={isValidConnection}
           fitView
-          nodesDraggable={!isWorkflowMode}
-          nodesConnectable={!isWorkflowMode}
-          edgesReconnectable={!isWorkflowMode}
-          snapToGrid={!isWorkflowMode}
+          nodesDraggable
+          nodesConnectable={!isRunning}
+          edgesReconnectable={!isRunning}
+          snapToGrid
           snapGrid={canvasSnapGrid}
           multiSelectionKeyCode="Shift"
-          deleteKeyCode={isWorkflowMode ? null : ["Backspace", "Delete"]}
+          deleteKeyCode={isRunning ? null : ["Backspace", "Delete"]}
           selectionOnDrag
         >
           <Background gap={canvasSnapGrid[0]} size={1} />
@@ -1727,11 +1488,10 @@ function PropertyPanel({
   selectedCount,
   workflowName,
   workflowSummary,
-  workflowLastRunStatus,
   workflowUpdatedAt,
   workflowNodeCount,
-  workflowRunCount,
-  canvasMode,
+  workflowRunStatus,
+  isRunning,
   modelPresets,
   updateNodeData,
 }: {
@@ -1739,27 +1499,15 @@ function PropertyPanel({
   selectedCount: number;
   workflowName: string;
   workflowSummary: string;
-  workflowLastRunStatus: WorkflowLastRunStatus;
   workflowUpdatedAt: string;
   workflowNodeCount: number;
-  workflowRunCount: number;
-  canvasMode: CanvasMode;
+  workflowRunStatus: WorkflowRunStatus;
+  isRunning: boolean;
   modelPresets: ModelPreset[];
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
 }) {
-  const readOnly = canvasMode === "workflow";
-
-  if (readOnly) {
-    return (
-      <ExecutionDetailsPanel
-        selectedNode={selectedNode}
-        selectedCount={selectedCount}
-      />
-    );
-  }
-
   if (!selectedNode) {
-    const status = workflowStatusPresentation[workflowLastRunStatus];
+    const status = workflowRunStatusPresentation[workflowRunStatus];
     return (
       <ScrollArea className="h-full">
         <div className="space-y-4 p-4">
@@ -1773,14 +1521,19 @@ function PropertyPanel({
                   {workflowSummary}
                 </p>
               </div>
-              <WorkflowStatusDot status={workflowLastRunStatus} />
+              <span
+                aria-label={status.label}
+                title={status.label}
+                className={cn(
+                  "mt-1.5 size-2 shrink-0 rounded-full",
+                  status.dotClass,
+                )}
+              />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>{status.label}</span>
               <span aria-hidden>·</span>
-              <span>
-                {workflowNodeCount} nodes · {workflowRunCount} runs
-              </span>
+              <span>{workflowNodeCount} nodes</span>
               <span aria-hidden>·</span>
               <span>Updated {formatWorkflowDate(workflowUpdatedAt)}</span>
             </div>
@@ -1801,122 +1554,67 @@ function PropertyPanel({
         {selectedNode.data.kind === "trigger" ? (
           <TriggerProperties
             node={selectedNode}
-            readOnly={readOnly}
             updateNodeData={updateNodeData}
           />
         ) : (
           <AgentProperties
             node={selectedNode}
-            readOnly={readOnly}
             modelPresets={modelPresets}
             updateNodeData={updateNodeData}
           />
         )}
+        <NodeRunResultSection node={selectedNode} isRunning={isRunning} />
       </div>
     </ScrollArea>
   );
 }
 
-const workflowStatusDotClass: Record<WorkflowLastRunStatus, string> = {
-  "not-run": "bg-muted-foreground/40",
-  running: "bg-secondary-foreground",
-  success: "bg-primary",
-  error: "bg-destructive",
-};
-
-function WorkflowStatusDot({ status }: { status: WorkflowLastRunStatus }) {
-  const label = workflowStatusPresentation[status].label;
-  return (
-    <span
-      aria-label={label}
-      title={label}
-      className={cn(
-        "mt-1.5 size-2 shrink-0 rounded-full",
-        workflowStatusDotClass[status],
-      )}
-    />
-  );
-}
-
-function ExecutionDetailsPanel({
-  selectedNode,
-  selectedCount,
-}: {
-  selectedNode: FlowNode | null;
-  selectedCount: number;
-}) {
-  const details = selectedNode?.data.runDetails;
-  const status = selectedNode?.data.status ?? "idle";
-
-  return (
-    <ScrollArea className="h-full">
-      <div className="space-y-4 p-4">
-        {selectedNode &&
-        details &&
-        status !== "idle" &&
-        status !== "pending" ? (
-          <NodeExecutionDetails
-            node={selectedNode}
-            details={details}
-            status={status}
-          />
-        ) : (
-          <ExecutionEmptyState
-            selectedCount={selectedCount}
-            selectedStatus={selectedNode?.data.status}
-          />
-        )}
-      </div>
-    </ScrollArea>
-  );
-}
-
-function NodeExecutionDetails({
+function NodeRunResultSection({
   node,
-  details,
-  status,
+  isRunning,
 }: {
   node: FlowNode;
-  details: NodeRunDetails;
-  status: Exclude<RunStatus, "idle" | "pending">;
+  isRunning: boolean;
 }) {
+  const details = node.data.runDetails;
+  const status = node.data.status;
+
+  if (!details || status === "idle") {
+    return (
+      <div className="rounded-lg border border-dashed bg-background p-3 text-sm text-muted-foreground">
+        {isRunning
+          ? "Waiting for the run to reach this node..."
+          : "This node has not run yet. Click Run to see its result here."}
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border bg-background p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-lg font-medium">
-              {node.data.title}
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              {node.data.kind === "agent" ? "Agent step" : "Trigger step"}
-            </div>
-          </div>
-          <RunStatusBadge status={status} />
-        </div>
+    <section className="space-y-3 rounded-lg border bg-background p-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">Last run result</h3>
+        <Badge
+          variant={
+            status === "error"
+              ? "destructive"
+              : status === "canceled"
+                ? "outline"
+                : "secondary"
+          }
+        >
+          {runStatusLabels[status]}
+        </Badge>
       </div>
       {details.kind === "agent" ? (
-        <AgentExecutionDetails details={details} />
+        <AgentRunResult details={details} />
       ) : (
-        <TriggerExecutionDetails details={details} />
+        <TriggerRunResult details={details} />
       )}
-    </div>
+    </section>
   );
 }
 
-function RunStatusBadge({
-  status,
-}: {
-  status: Exclude<RunStatus, "idle" | "pending">;
-}) {
-  return (
-    <Badge variant={status === "error" ? "destructive" : "secondary"}>
-      {runStatusLabels[status]}
-    </Badge>
-  );
-}
-
-function AgentExecutionDetails({
+function AgentRunResult({
   details,
 }: {
   details: Extract<NodeRunDetails, { kind: "agent" }>;
@@ -1955,7 +1653,7 @@ function AgentExecutionDetails({
   );
 }
 
-function TriggerExecutionDetails({
+function TriggerRunResult({
   details,
 }: {
   details: Extract<NodeRunDetails, { kind: "trigger" }>;
@@ -2022,135 +1720,45 @@ function ExecutionMetaItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ExecutionEmptyState({
-  selectedCount,
-  selectedStatus,
-}: {
-  selectedCount: number;
-  selectedStatus?: RunStatus;
-}) {
-  const message =
-    selectedStatus === "pending"
-      ? "This node has not started yet."
-      : selectedCount > 0
-        ? "Select a running, completed, or failed node to inspect this run."
-        : "Select a node to inspect this run.";
-
-  return (
-    <div className="rounded-lg border bg-background p-4 text-sm text-muted-foreground">
-      {message}
-    </div>
-  );
-}
-
 function TriggerProperties({
   node,
-  readOnly,
   updateNodeData,
 }: {
   node: FlowNode;
-  readOnly: boolean;
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
 }) {
-  const mode = node.data.triggerMode ?? "manual";
-
   return (
     <div className="space-y-4">
       <Field label="Name" htmlFor="trigger-name">
         <Input
           id="trigger-name"
           value={node.data.title}
-          disabled={readOnly}
           onChange={(event) =>
             updateNodeData(node.id, { title: event.target.value })
           }
         />
       </Field>
-      <Field label="Trigger Type" htmlFor="trigger-type">
-        <Select
-          value={mode}
-          disabled={readOnly}
-          onValueChange={(value) =>
-            updateNodeData(node.id, { triggerMode: value as TriggerMode })
+      <Field label="Trigger input" htmlFor="trigger-input">
+        <Textarea
+          id="trigger-input"
+          className="min-h-32"
+          placeholder="Initial payload sent to the workflow when you click Run."
+          value={node.data.initialPayload ?? ""}
+          onChange={(event) =>
+            updateNodeData(node.id, { initialPayload: event.target.value })
           }
-        >
-          <SelectTrigger id="trigger-type" className="w-full">
-            <SelectValue>
-              {(value: TriggerMode | null) =>
-                value === "schedule"
-                  ? "Cron / Schedule"
-                  : value === "webhook"
-                    ? "Webhook"
-                    : "Manual"
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="manual">Manual</SelectItem>
-            <SelectItem value="schedule">Cron / Schedule</SelectItem>
-            <SelectItem value="webhook">Webhook</SelectItem>
-          </SelectContent>
-        </Select>
+        />
       </Field>
-      {mode === "manual" && (
-        <Field label="Initial Payload" htmlFor="initial-payload">
-          <Textarea
-            id="initial-payload"
-            value={node.data.initialPayload ?? ""}
-            disabled={readOnly}
-            onChange={(event) =>
-              updateNodeData(node.id, { initialPayload: event.target.value })
-            }
-          />
-        </Field>
-      )}
-      {mode === "schedule" && (
-        <Field label="Cron Expression" htmlFor="cron-expression">
-          <Input
-            id="cron-expression"
-            value={node.data.cronExpression ?? ""}
-            disabled={readOnly}
-            onChange={(event) =>
-              updateNodeData(node.id, { cronExpression: event.target.value })
-            }
-          />
-        </Field>
-      )}
-      {mode === "webhook" && (
-        <Field label="Webhook URL" htmlFor="webhook-url">
-          <div className="flex gap-2">
-            <Input
-              id="webhook-url"
-              disabled={readOnly}
-              readOnly
-              value={node.data.webhookUrl ?? ""}
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Copy webhook URL"
-              disabled={readOnly}
-              onClick={() =>
-                navigator.clipboard?.writeText(node.data.webhookUrl ?? "")
-              }
-            >
-              <CopyIcon />
-            </Button>
-          </div>
-        </Field>
-      )}
     </div>
   );
 }
 
 function AgentProperties({
   node,
-  readOnly,
   modelPresets,
   updateNodeData,
 }: {
   node: FlowNode;
-  readOnly: boolean;
   modelPresets: ModelPreset[];
   updateNodeData: (nodeId: string, patch: Partial<WorkflowNodeData>) => void;
 }) {
@@ -2169,7 +1777,6 @@ function AgentProperties({
         <Input
           id="agent-name"
           value={node.data.title}
-          disabled={readOnly}
           onChange={(event) =>
             updateNodeData(node.id, {
               title: event.target.value,
@@ -2189,7 +1796,7 @@ function AgentProperties({
         )}
         <Select
           value={selectedPreset}
-          disabled={readOnly || modelPresets.length === 0}
+          disabled={modelPresets.length === 0}
           onValueChange={(value) => {
             if (typeof value === "string") {
               updateNodeData(node.id, { modelPresetId: value });
@@ -2218,7 +1825,6 @@ function AgentProperties({
           id="system-prompt"
           className="min-h-36"
           value={node.data.systemPrompt ?? ""}
-          disabled={readOnly}
           onChange={(event) =>
             updateNodeData(node.id, { systemPrompt: event.target.value })
           }
@@ -2233,7 +1839,6 @@ function AgentProperties({
           >
             <Checkbox
               checked={tools.includes(tool.id)}
-              disabled={readOnly}
               onCheckedChange={(checked) => {
                 updateNodeData(node.id, {
                   tools: checked
@@ -2246,7 +1851,7 @@ function AgentProperties({
           </label>
         ))}
       </div>
-      {readOnly && node.data.status === "error" && node.data.errorMessage && (
+      {node.data.status === "error" && node.data.errorMessage && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
           {node.data.errorMessage}
         </div>

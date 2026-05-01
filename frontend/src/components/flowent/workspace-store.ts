@@ -21,7 +21,6 @@ import {
   snapCanvasPosition,
   availableTools,
   type BlueprintAsset,
-  type CanvasMode,
   type FlowEdge,
   type FlowNode,
   type ModelConnection,
@@ -31,8 +30,14 @@ import {
   type RunStatus,
   type WorkflowNodeData,
   type WorkflowNodeKind,
-  type WorkflowRun,
+  type WorkflowRunStatus,
 } from "./model";
+
+type FrozenRunGraph = {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  modelPresets: ModelPreset[];
+};
 
 type WorkspaceState = {
   blueprints: BlueprintAsset[];
@@ -42,7 +47,10 @@ type WorkspaceState = {
   roles: Role[];
   nodes: FlowNode[];
   edges: FlowEdge[];
-  canvasMode: CanvasMode;
+  workflowRunStatus: WorkflowRunStatus;
+  runStartedAt: string | null;
+  runBlockedReason: string | null;
+  frozenRunGraph: FrozenRunGraph | null;
   selectedNodeIds: string[];
   selectedEdgeIds: string[];
   nextNodeIndex: number;
@@ -70,8 +78,7 @@ type WorkspaceActions = {
   startWorkflowRun: () => void;
   advanceWorkflowRun: () => void;
   finishWorkflowRun: () => void;
-  selectWorkflowRun: (runId: string) => void;
-  returnToBlueprintMode: () => void;
+  cancelWorkflowRun: () => void;
   upsertModelConnection: (
     modelConnection: ModelConnection,
     editingId: string | null,
@@ -152,18 +159,6 @@ function cloneEdges(edges: FlowEdge[]) {
   return edges.map((edge) => ({ ...edge }));
 }
 
-function cloneWorkflowRun(run: WorkflowRun): WorkflowRun {
-  return {
-    ...run,
-    nodes: cloneNodes(run.nodes),
-    edges: cloneEdges(run.edges),
-  };
-}
-
-function cloneWorkflowRuns(runHistory: WorkflowRun[] | undefined) {
-  return (runHistory ?? []).map(cloneWorkflowRun);
-}
-
 function cloneModelConnections(modelConnections: ModelConnection[]) {
   return modelConnections.map((modelConnection) => ({ ...modelConnection }));
 }
@@ -176,6 +171,10 @@ function cloneModelPresets(modelPresets: ModelPreset[]) {
   }));
 }
 
+function cloneFrozenModelPresets(modelPresets: ModelPreset[]) {
+  return modelPresets.map((preset) => ({ ...preset }));
+}
+
 function cloneRoles(roles: Role[]) {
   return roles.map((role) => ({ ...role }));
 }
@@ -185,19 +184,11 @@ function cloneBlueprint(blueprint: BlueprintAsset): BlueprintAsset {
     cloneNodes(blueprint.nodes),
     cloneEdges(blueprint.edges),
   );
-  const runHistory = cloneWorkflowRuns(blueprint.runHistory);
-  const selectedRunId =
-    blueprint.selectedRunId &&
-    runHistory.some((run) => run.id === blueprint.selectedRunId)
-      ? blueprint.selectedRunId
-      : null;
 
   return {
     ...blueprint,
     nodes: graph.nodes,
     edges: graph.edges,
-    runHistory,
-    selectedRunId,
   };
 }
 
@@ -221,17 +212,6 @@ function hasAvailableModelPreset(
 ) {
   return Boolean(
     presetId && modelPresets.some((preset) => preset.id === presetId),
-  );
-}
-
-function hasUnavailableAgentModelReference(
-  nodes: FlowNode[],
-  modelPresets: ModelPreset[],
-) {
-  return nodes.some(
-    (node) =>
-      node.data.kind === "agent" &&
-      !hasAvailableModelPreset(modelPresets, node.data.modelPresetId),
   );
 }
 
@@ -301,7 +281,6 @@ function applyLocalSettingsSnapshot(
   snapshot: LocalSettingsSnapshot,
 ): Partial<WorkspaceState> {
   const blueprints = snapshot.blueprints.map(cloneBlueprint);
-  const activeBlueprintId = blueprints.at(0)?.id ?? null;
   const activeBlueprint = blueprints.at(0);
   const graph = resetRunState(
     cloneNodes(activeBlueprint?.nodes ?? []),
@@ -312,11 +291,14 @@ function applyLocalSettingsSnapshot(
     modelConnections: cloneModelConnections(snapshot.modelConnections),
     modelPresets: cloneModelPresets(snapshot.modelPresets),
     blueprints,
-    activeBlueprintId,
+    activeBlueprintId: activeBlueprint?.id ?? null,
     roles: cloneRoles(snapshot.roles),
     nodes: graph.nodes,
     edges: graph.edges,
-    canvasMode: "blueprint",
+    workflowRunStatus: "idle",
+    runStartedAt: null,
+    runBlockedReason: null,
+    frozenRunGraph: null,
     selectedNodeIds: [],
     selectedEdgeIds: [],
     nextNodeIndex: getNextNodeIndex(graph.nodes),
@@ -330,9 +312,7 @@ function updateActiveBlueprint(
   state: WorkspaceState,
   nodes: FlowNode[],
   edges: FlowEdge[],
-  patch: Partial<
-    Pick<BlueprintAsset, "lastRunStatus" | "name" | "summary" | "updatedAt">
-  > = {},
+  patch: Partial<Pick<BlueprintAsset, "name" | "summary" | "updatedAt">> = {},
 ) {
   if (!state.activeBlueprintId) {
     return state.blueprints;
@@ -411,58 +391,31 @@ function shouldPersistEdgeChanges(changes: EdgeChange<FlowEdge>[]) {
   return changes.some((change) => change.type !== "select");
 }
 
+function isStructuralNodeChange(change: NodeChange<FlowNode>) {
+  return (
+    change.type === "add" ||
+    change.type === "remove" ||
+    change.type === "replace"
+  );
+}
+
+function isStructuralEdgeChange(change: EdgeChange<FlowEdge>) {
+  return change.type === "add" || change.type === "remove";
+}
+
 function resetRunState(nodes: FlowNode[], edges: FlowEdge[]) {
   return {
     nodes: nodes.map((node) => ({
       ...node,
-      data: { ...node.data, status: "idle" as const, runDetails: undefined },
+      data: {
+        ...node.data,
+        status: "idle" as const,
+        runDetails: undefined,
+        errorMessage: undefined,
+      },
     })),
     edges: edges.map((edge) => ({ ...edge, animated: false })),
   };
-}
-
-function getSelectedNodeIdsForRun(
-  selectedNodeIds: string[],
-  nodes: FlowNode[],
-) {
-  return selectedNodeIds.filter((nodeId) =>
-    nodes.some((node) => node.id === nodeId && node.data.runDetails),
-  );
-}
-
-function getSelectedEdgeIdsForGraph(
-  selectedEdgeIds: string[],
-  edges: FlowEdge[],
-) {
-  return selectedEdgeIds.filter((edgeId) =>
-    edges.some((edge) => edge.id === edgeId),
-  );
-}
-
-function updateActiveBlueprintRun(
-  state: WorkspaceState,
-  run: WorkflowRun,
-  lastRunStatus: BlueprintAsset["lastRunStatus"],
-) {
-  if (!state.activeBlueprintId) {
-    return state.blueprints;
-  }
-
-  const updatedAt = new Date().toISOString();
-
-  return state.blueprints.map((blueprint) =>
-    blueprint.id === state.activeBlueprintId
-      ? {
-          ...blueprint,
-          updatedAt,
-          lastRunStatus,
-          selectedRunId: run.id,
-          runHistory: blueprint.runHistory.map((item) =>
-            item.id === run.id ? cloneWorkflowRun(run) : item,
-          ),
-        }
-      : blueprint,
-  );
 }
 
 function findModelPreset(
@@ -516,13 +469,13 @@ function getUpstreamPayload(
 
 function buildNodeRunDetails(
   node: FlowNode,
-  status: Exclude<RunStatus, "idle" | "pending">,
+  status: Exclude<RunStatus, "idle" | "pending" | "canceled">,
   nodes: FlowNode[],
   edges: FlowEdge[],
   modelPresets: ModelPreset[],
 ): NodeRunDetails {
   if (node.data.kind === "trigger") {
-    const payload = node.data.initialPayload?.trim() || "No initial payload.";
+    const payload = node.data.initialPayload?.trim() || "No trigger input.";
 
     return {
       kind: "trigger",
@@ -590,8 +543,8 @@ function applyRunStatus(
   modelPresets: ModelPreset[],
 ) {
   const runDetails =
-    status === "idle" || status === "pending"
-      ? undefined
+    status === "idle" || status === "pending" || status === "canceled"
+      ? node.data.runDetails
       : buildNodeRunDetails(node, status, nodes, edges, modelPresets);
 
   return {
@@ -619,6 +572,167 @@ function applyRunStatuses(
   }
 
   return nextNodes;
+}
+
+function mergeRunStateIntoLiveNodes(
+  liveNodes: FlowNode[],
+  runNodes: FlowNode[],
+) {
+  const runNodeById = new Map(runNodes.map((node) => [node.id, node]));
+
+  return liveNodes.map((node) => {
+    const runNode = runNodeById.get(node.id);
+
+    if (!runNode) {
+      return node;
+    }
+
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        status: runNode.data.status,
+        errorMessage: runNode.data.errorMessage,
+        runDetails: cloneRunDetails(runNode.data.runDetails),
+      },
+    };
+  });
+}
+
+function cancelRunNodes(nodes: FlowNode[]) {
+  return nodes.map((node) => {
+    if (node.data.status === "running") {
+      return {
+        ...node,
+        data: { ...node.data, status: "canceled" as const },
+      };
+    }
+
+    if (node.data.status === "pending") {
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          status: "idle" as const,
+          runDetails: undefined,
+          errorMessage: undefined,
+        },
+      };
+    }
+
+    return node;
+  });
+}
+
+function detectGraphCycle(nodes: FlowNode[], edges: FlowEdge[]) {
+  const adjacency = new Map<string, string[]>();
+  for (const node of nodes) {
+    adjacency.set(node.id, []);
+  }
+  for (const edge of edges) {
+    adjacency.get(edge.source)?.push(edge.target);
+  }
+
+  const WHITE = 0;
+  const GRAY = 1;
+  const BLACK = 2;
+  const color = new Map<string, number>();
+  for (const node of nodes) {
+    color.set(node.id, WHITE);
+  }
+
+  const stack: string[] = [];
+  for (const node of nodes) {
+    if (color.get(node.id) !== WHITE) continue;
+    stack.push(node.id);
+    while (stack.length > 0) {
+      const current = stack[stack.length - 1];
+      if (color.get(current) === WHITE) {
+        color.set(current, GRAY);
+      }
+      const neighbors = adjacency.get(current) ?? [];
+      const next = neighbors.find((id) => color.get(id) !== BLACK);
+      if (next === undefined) {
+        color.set(current, BLACK);
+        stack.pop();
+      } else if (color.get(next) === GRAY) {
+        return true;
+      } else {
+        stack.push(next);
+      }
+    }
+  }
+
+  return false;
+}
+
+function findReachableFromTriggers(nodes: FlowNode[], edges: FlowEdge[]) {
+  const triggerIds = nodes
+    .filter((node) => node.data.kind === "trigger")
+    .map((node) => node.id);
+  const reachable = new Set<string>(triggerIds);
+  const adjacency = new Map<string, string[]>();
+  for (const edge of edges) {
+    if (!adjacency.has(edge.source)) {
+      adjacency.set(edge.source, []);
+    }
+    adjacency.get(edge.source)!.push(edge.target);
+  }
+  const queue = [...triggerIds];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const target of adjacency.get(current) ?? []) {
+      if (!reachable.has(target)) {
+        reachable.add(target);
+        queue.push(target);
+      }
+    }
+  }
+  return reachable;
+}
+
+function validateRunnability(
+  nodes: FlowNode[],
+  edges: FlowEdge[],
+  modelPresets: ModelPreset[],
+): string | null {
+  if (nodes.length === 0) {
+    return "Add a Trigger and at least one Agent before running.";
+  }
+
+  const triggers = nodes.filter((node) => node.data.kind === "trigger");
+  if (triggers.length === 0) {
+    return "Add a Trigger node to start the run.";
+  }
+  if (triggers.length > 1) {
+    return "A workflow can only have one Trigger node right now.";
+  }
+
+  if (detectGraphCycle(nodes, edges)) {
+    return "Remove the loop between connected nodes before running.";
+  }
+
+  const reachable = findReachableFromTriggers(nodes, edges);
+  const orphan = nodes.find((node) => !reachable.has(node.id));
+  if (orphan) {
+    const label = orphan.data.title || orphan.id;
+    return `Connect "${label}" to the Trigger so it can receive input.`;
+  }
+
+  for (const node of nodes) {
+    if (node.data.kind === "agent") {
+      if (!hasAvailableModelPreset(modelPresets, node.data.modelPresetId)) {
+        const label = node.data.title || node.id;
+        return `Pick an available model on "${label}" before running.`;
+      }
+      if (!node.data.systemPrompt?.trim()) {
+        const label = node.data.title || node.id;
+        return `Add a system prompt to "${label}" before running.`;
+      }
+    }
+  }
+
+  return null;
 }
 
 export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
@@ -690,6 +804,8 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     }
   };
 
+  const isRunning = () => get().workflowRunStatus === "running";
+
   return {
     blueprints: initialBlueprints.map(cloneBlueprint),
     activeBlueprintId: initialBlueprints[0]?.id ?? null,
@@ -698,7 +814,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     roles: cloneRoles(initialRoles),
     nodes: cloneNodes(initialBlueprints[0]?.nodes ?? []),
     edges: cloneEdges(initialBlueprints[0]?.edges ?? []),
-    canvasMode: "blueprint",
+    workflowRunStatus: "idle",
+    runStartedAt: null,
+    runBlockedReason: null,
+    frozenRunGraph: null,
     selectedNodeIds: ["agent-1"],
     selectedEdgeIds: [],
     nextNodeIndex: getNextNodeIndex(initialBlueprints[0]?.nodes ?? []),
@@ -742,12 +861,9 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
         id,
         name: name?.trim() || "Untitled workflow",
         updatedAt: new Date().toISOString(),
-        lastRunStatus: "not-run",
         summary: "Blank workflow ready to build.",
         nodes: [],
         edges: [],
-        runHistory: [],
-        selectedRunId: null,
       };
 
       set((state) => ({
@@ -755,7 +871,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
         activeBlueprintId: id,
         nodes: [],
         edges: [],
-        canvasMode: "blueprint",
+        workflowRunStatus: "idle",
+        runStartedAt: null,
+        runBlockedReason: null,
+        frozenRunGraph: null,
         selectedNodeIds: [],
         selectedEdgeIds: [],
         nextNodeIndex: 1,
@@ -800,7 +919,10 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
           activeBlueprintId: blueprintId,
           nodes: graph.nodes,
           edges: graph.edges,
-          canvasMode: "blueprint",
+          workflowRunStatus: "idle",
+          runStartedAt: null,
+          runBlockedReason: null,
+          frozenRunGraph: null,
           selectedNodeIds: [],
           selectedEdgeIds: [],
           nextNodeIndex: getNextNodeIndex(graph.nodes),
@@ -828,15 +950,24 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
       }),
 
     applyNodeChanges: (changes) => {
-      const shouldPersist = shouldPersistNodeChanges(changes);
+      const running = isRunning();
+      const allowedChanges = running
+        ? changes.filter((change) => !isStructuralNodeChange(change))
+        : changes;
+
+      if (allowedChanges.length === 0) {
+        return;
+      }
+
+      const shouldPersist = shouldPersistNodeChanges(allowedChanges);
 
       set((state) => {
-        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
+        if (!state.activeBlueprintId) {
           return state;
         }
 
         const nodes = applyNodeChanges(
-          changes.map(snapNodeChange),
+          allowedChanges.map(snapNodeChange),
           state.nodes,
         );
 
@@ -852,14 +983,23 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     applyEdgeChanges: (changes) => {
-      const shouldPersist = shouldPersistEdgeChanges(changes);
+      const running = isRunning();
+      const allowedChanges = running
+        ? changes.filter((change) => !isStructuralEdgeChange(change))
+        : changes;
+
+      if (allowedChanges.length === 0) {
+        return;
+      }
+
+      const shouldPersist = shouldPersistEdgeChanges(allowedChanges);
 
       set((state) => {
-        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
+        if (!state.activeBlueprintId) {
           return state;
         }
 
-        const edges = applyEdgeChanges(changes, state.edges);
+        const edges = applyEdgeChanges(allowedChanges, state.edges);
 
         return {
           edges,
@@ -873,7 +1013,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     connectNodes: (connection) => {
-      if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
+      if (isRunning() || !get().activeBlueprintId) {
         return;
       }
 
@@ -896,8 +1036,12 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     addWorkflowNode: (kind, position) => {
+      if (isRunning()) {
+        return;
+      }
+
       set((state) => {
-        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
+        if (!state.activeBlueprintId) {
           return state;
         }
 
@@ -916,7 +1060,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     addQuickNode: (kind) => {
-      if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
+      if (isRunning() || !get().activeBlueprintId) {
         return;
       }
 
@@ -926,7 +1070,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     deleteSelection: () => {
-      if (get().canvasMode === "workflow" || !get().activeBlueprintId) {
+      if (isRunning() || !get().activeBlueprintId) {
         return;
       }
 
@@ -959,8 +1103,12 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     deleteConnectedEdges: (deletedNodes) => {
+      if (isRunning()) {
+        return;
+      }
+
       set((state) => {
-        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
+        if (!state.activeBlueprintId) {
           return state;
         }
 
@@ -979,7 +1127,7 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
 
     updateNodeData: (nodeId, patch) => {
       set((state) => {
-        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
+        if (!state.activeBlueprintId) {
           return state;
         }
 
@@ -998,238 +1146,143 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     startWorkflowRun: () => {
-      set((state) => {
-        const activeBlueprint = state.blueprints.find(
-          (blueprint) => blueprint.id === state.activeBlueprintId,
-        );
+      const state = get();
+      if (state.workflowRunStatus === "running" || !state.activeBlueprintId) {
+        return;
+      }
 
-        if (
-          !state.activeBlueprintId ||
-          !activeBlueprint ||
-          hasUnavailableAgentModelReference(
-            activeBlueprint.nodes,
-            state.modelPresets,
-          )
-        ) {
-          return state;
-        }
+      const blockedReason = validateRunnability(
+        state.nodes,
+        state.edges,
+        state.modelPresets,
+      );
 
-        const baseGraph = resetRunState(
-          cloneNodes(activeBlueprint.nodes),
-          cloneEdges(activeBlueprint.edges),
-        );
-        const nodes = applyRunStatuses(
-          baseGraph.nodes,
-          baseGraph.edges,
-          state.modelPresets,
-          (node) =>
-            node.data.kind === "trigger"
-              ? "success"
-              : node.id === "agent-1"
-                ? "running"
-                : "pending",
-        );
-        const edges = baseGraph.edges.map((edge) => ({
-          ...edge,
-          animated: true,
-        }));
-        const now = new Date().toISOString();
-        const run: WorkflowRun = {
-          id: makeId("run"),
-          startedAt: now,
-          updatedAt: now,
-          status: "running",
-          summary: "Run started.",
-          nodes: cloneNodes(nodes),
-          edges: cloneEdges(edges),
-        };
+      if (blockedReason) {
+        set({ runBlockedReason: blockedReason });
+        return;
+      }
 
-        return {
-          canvasMode: "workflow",
-          nodes,
-          edges,
-          selectedNodeIds: getSelectedNodeIdsForRun(
-            state.selectedNodeIds,
-            nodes,
-          ),
-          selectedEdgeIds: getSelectedEdgeIdsForGraph(
-            state.selectedEdgeIds,
-            edges,
-          ),
-          blueprints: state.blueprints.map((blueprint) =>
-            blueprint.id === state.activeBlueprintId
-              ? {
-                  ...blueprint,
-                  updatedAt: now,
-                  lastRunStatus: "running",
-                  selectedRunId: run.id,
-                  runHistory: [run, ...cloneWorkflowRuns(blueprint.runHistory)],
-                }
-              : blueprint,
-          ),
-        };
+      const baseGraph = resetRunState(
+        cloneNodes(state.nodes),
+        cloneEdges(state.edges),
+      );
+      const triggerNode = baseGraph.nodes.find(
+        (node) => node.data.kind === "trigger",
+      );
+      const initialRunningId = triggerNode
+        ? baseGraph.edges.find((edge) => edge.source === triggerNode.id)?.target
+        : undefined;
+      const nodes = applyRunStatuses(
+        baseGraph.nodes,
+        baseGraph.edges,
+        state.modelPresets,
+        (node) =>
+          node.data.kind === "trigger"
+            ? "success"
+            : node.id === initialRunningId
+              ? "running"
+              : "pending",
+      );
+      const edges = baseGraph.edges.map((edge) => ({
+        ...edge,
+        animated: true,
+      }));
+      const frozenRunGraph = {
+        nodes: cloneNodes(nodes),
+        edges: cloneEdges(baseGraph.edges),
+        modelPresets: cloneFrozenModelPresets(state.modelPresets),
+      };
+
+      set({
+        nodes: mergeRunStateIntoLiveNodes(baseGraph.nodes, nodes),
+        edges,
+        workflowRunStatus: "running",
+        runStartedAt: new Date().toISOString(),
+        runBlockedReason: null,
+        frozenRunGraph,
       });
-      persistLocalData();
     },
 
     advanceWorkflowRun: () => {
       set((state) => {
-        if (state.canvasMode !== "workflow" || !state.activeBlueprintId) {
-          return state;
-        }
-
-        const activeBlueprint = state.blueprints.find(
-          (blueprint) => blueprint.id === state.activeBlueprintId,
-        );
-        const selectedRun = activeBlueprint?.runHistory.find(
-          (run) => run.id === activeBlueprint.selectedRunId,
-        );
-
-        if (!selectedRun || selectedRun.status !== "running") {
+        if (state.workflowRunStatus !== "running" || !state.frozenRunGraph) {
           return state;
         }
 
         const nodes = applyRunStatuses(
-          state.nodes,
-          state.edges,
-          state.modelPresets,
+          state.frozenRunGraph.nodes,
+          state.frozenRunGraph.edges,
+          state.frozenRunGraph.modelPresets,
           (node) =>
-            node.id === "agent-1"
+            node.data.status === "running"
               ? "success"
-              : node.data.kind === "agent"
+              : node.data.status === "pending" &&
+                  state
+                    .frozenRunGraph!.edges.filter(
+                      (edge) => edge.target === node.id,
+                    )
+                    .every((edge) =>
+                      state.frozenRunGraph!.nodes.find(
+                        (sourceNode) =>
+                          sourceNode.id === edge.source &&
+                          (sourceNode.data.status === "success" ||
+                            sourceNode.data.status === "running"),
+                      ),
+                    )
                 ? "running"
                 : node.data.status,
         );
-        const run: WorkflowRun = {
-          ...selectedRun,
-          updatedAt: new Date().toISOString(),
-          status: "running",
-          summary: "Run in progress.",
-          nodes: cloneNodes(nodes),
-          edges: cloneEdges(state.edges),
-        };
 
         return {
-          nodes,
-          blueprints: updateActiveBlueprintRun(state, run, "running"),
+          nodes: mergeRunStateIntoLiveNodes(state.nodes, nodes),
+          frozenRunGraph: {
+            ...state.frozenRunGraph,
+            nodes: cloneNodes(nodes),
+          },
         };
       });
-      persistLocalData();
     },
 
     finishWorkflowRun: () => {
       set((state) => {
-        if (state.canvasMode !== "workflow" || !state.activeBlueprintId) {
-          return state;
-        }
-
-        const activeBlueprint = state.blueprints.find(
-          (blueprint) => blueprint.id === state.activeBlueprintId,
-        );
-        const selectedRun = activeBlueprint?.runHistory.find(
-          (run) => run.id === activeBlueprint.selectedRunId,
-        );
-
-        if (!selectedRun || selectedRun.status !== "running") {
+        if (state.workflowRunStatus !== "running" || !state.frozenRunGraph) {
           return state;
         }
 
         const nodes = applyRunStatuses(
-          state.nodes,
-          state.edges,
-          state.modelPresets,
+          state.frozenRunGraph.nodes,
+          state.frozenRunGraph.edges,
+          state.frozenRunGraph.modelPresets,
           () => "success",
         );
         const edges = state.edges.map((edge) => ({ ...edge, animated: false }));
-        const run: WorkflowRun = {
-          ...selectedRun,
-          updatedAt: new Date().toISOString(),
-          status: "succeeded",
-          summary: "Run completed.",
-          nodes: cloneNodes(nodes),
-          edges: cloneEdges(edges),
-        };
 
         return {
-          nodes,
+          nodes: mergeRunStateIntoLiveNodes(state.nodes, nodes),
           edges,
-          blueprints: updateActiveBlueprintRun(state, run, "success"),
+          workflowRunStatus: "succeeded",
+          frozenRunGraph: null,
         };
       });
-      persistLocalData();
     },
 
-    selectWorkflowRun: (runId) => {
+    cancelWorkflowRun: () => {
       set((state) => {
-        const activeBlueprint = state.blueprints.find(
-          (blueprint) => blueprint.id === state.activeBlueprintId,
-        );
-        const selectedRun = activeBlueprint?.runHistory.find(
-          (run) => run.id === runId,
-        );
-
-        if (!activeBlueprint || !selectedRun) {
+        if (state.workflowRunStatus !== "running" || !state.frozenRunGraph) {
           return state;
         }
 
-        const nodes = cloneNodes(selectedRun.nodes);
-        const edges = cloneEdges(selectedRun.edges);
+        const runNodes = cancelRunNodes(state.frozenRunGraph.nodes);
+        const edges = state.edges.map((edge) => ({ ...edge, animated: false }));
 
         return {
-          canvasMode: "workflow",
-          nodes,
+          nodes: mergeRunStateIntoLiveNodes(state.nodes, runNodes),
           edges,
-          selectedNodeIds: getSelectedNodeIdsForRun(
-            state.selectedNodeIds,
-            nodes,
-          ),
-          selectedEdgeIds: getSelectedEdgeIdsForGraph(
-            state.selectedEdgeIds,
-            edges,
-          ),
-          blueprints: state.blueprints.map((blueprint) =>
-            blueprint.id === state.activeBlueprintId
-              ? {
-                  ...blueprint,
-                  selectedRunId: runId,
-                }
-              : blueprint,
-          ),
+          workflowRunStatus: "canceled",
+          frozenRunGraph: null,
         };
       });
-      persistLocalData();
     },
-
-    returnToBlueprintMode: () =>
-      set((state) => {
-        const activeBlueprint = state.blueprints.find(
-          (blueprint) => blueprint.id === state.activeBlueprintId,
-        );
-
-        if (!activeBlueprint) {
-          return {
-            canvasMode: "blueprint",
-            nodes: [],
-            edges: [],
-            selectedNodeIds: [],
-            selectedEdgeIds: [],
-            nextNodeIndex: 1,
-          };
-        }
-
-        const graph = resetRunState(
-          cloneNodes(activeBlueprint.nodes),
-          cloneEdges(activeBlueprint.edges),
-        );
-
-        return {
-          canvasMode: "blueprint",
-          ...graph,
-          selectedNodeIds: [],
-          selectedEdgeIds: [],
-          nextNodeIndex: getNextNodeIndex(graph.nodes),
-        };
-      }),
 
     upsertModelConnection: (modelConnection, editingId) =>
       commitLocalDataChange((state) => {
@@ -1383,8 +1436,12 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
     },
 
     addAgentFromRole: (roleId, position) => {
+      if (isRunning()) {
+        return;
+      }
+
       set((state) => {
-        if (state.canvasMode === "workflow" || !state.activeBlueprintId) {
+        if (!state.activeBlueprintId) {
           return state;
         }
 
@@ -1424,4 +1481,4 @@ export const useFlowentWorkspaceStore = create<FlowentWorkspaceStore>()((
   };
 });
 
-export { isValidConnection };
+export { isValidConnection, validateRunnability };

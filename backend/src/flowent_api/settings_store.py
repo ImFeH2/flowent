@@ -18,18 +18,6 @@ LEGACY_CONNECTION_TYPE_MAP = {
     "custom": "openai",
 }
 MODEL_PRESET_TEST_STATUSES = {"idle", "success", "error"}
-BLUEPRINT_LAST_RUN_STATUSES = {"not-run", "running", "success", "error"}
-WORKFLOW_RUN_STATUSES = {
-    "queued",
-    "running",
-    "succeeded",
-    "failed",
-    "canceled",
-}
-LEGACY_WORKFLOW_RUN_STATUS_MAP = {
-    "success": "succeeded",
-    "error": "failed",
-}
 
 
 class LocalSettingsStoreError(Exception):
@@ -192,50 +180,12 @@ def normalize_saved_json(value: Any) -> Any:
     return normalized
 
 
-def normalize_workflow_run_status(value: Any) -> str | None:
-    if not is_string(value):
-        return None
-    if value in WORKFLOW_RUN_STATUSES:
-        return value
-    return LEGACY_WORKFLOW_RUN_STATUS_MAP.get(value)
-
-
-def parse_workflow_run(value: Any) -> dict[str, Any] | None:
-    if (
-        not is_record(value)
-        or not is_string(value.get("id"))
-        or not is_string(value.get("startedAt"))
-        or not is_string(value.get("updatedAt"))
-        or not is_string(value.get("summary"))
-        or not isinstance(value.get("nodes"), list)
-        or not all(is_plain_json_value(item) for item in value["nodes"])
-        or not isinstance(value.get("edges"), list)
-        or not all(is_plain_json_value(item) for item in value["edges"])
-    ):
-        return None
-
-    status = normalize_workflow_run_status(value.get("status"))
-    if not status:
-        return None
-
-    return {
-        "id": value["id"],
-        "startedAt": value["startedAt"],
-        "updatedAt": value["updatedAt"],
-        "status": status,
-        "summary": value["summary"],
-        "nodes": [normalize_saved_json(item) for item in value["nodes"]],
-        "edges": [normalize_saved_json(item) for item in value["edges"]],
-    }
-
-
 def parse_blueprint_asset(value: Any) -> dict[str, Any] | None:
     if (
         not is_record(value)
         or not is_string(value.get("id"))
         or not is_string(value.get("name"))
         or not is_string(value.get("updatedAt"))
-        or value.get("lastRunStatus") not in BLUEPRINT_LAST_RUN_STATUSES
         or not is_string(value.get("summary"))
         or not isinstance(value.get("nodes"), list)
         or not all(is_plain_json_value(item) for item in value["nodes"])
@@ -244,34 +194,13 @@ def parse_blueprint_asset(value: Any) -> dict[str, Any] | None:
     ):
         return None
 
-    if "runHistory" in value and not isinstance(value["runHistory"], list):
-        return None
-
-    run_history = [parse_workflow_run(item) for item in value.get("runHistory", [])]
-    if any(item is None for item in run_history):
-        return None
-
-    selected_run_id = value.get("selectedRunId")
-    if selected_run_id is not None and not is_string(selected_run_id):
-        return None
-
-    valid_run_id = (
-        selected_run_id
-        if selected_run_id
-        and any(run and run["id"] == selected_run_id for run in run_history)
-        else None
-    )
-
     return {
         "id": value["id"],
         "name": value["name"],
         "updatedAt": value["updatedAt"],
-        "lastRunStatus": value["lastRunStatus"],
         "summary": value["summary"],
         "nodes": [normalize_saved_json(item) for item in value["nodes"]],
         "edges": [normalize_saved_json(item) for item in value["edges"]],
-        "runHistory": run_history,
-        "selectedRunId": valid_run_id,
     }
 
 

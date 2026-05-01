@@ -26,6 +26,10 @@ ENV UV_LINK_MODE=copy
 
 WORKDIR /app
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bubblewrap \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY backend ./backend
 RUN uv sync --project backend --frozen --no-dev
 

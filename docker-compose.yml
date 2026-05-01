@@ -6,3 +6,8 @@ services:
     restart: unless-stopped
     ports:
       - "${FLOWENT_PORT:-6873}:6873"
+    volumes:
+      - flowent-data:/home/flowent/.flowent
+
+volumes:
+  flowent-data:

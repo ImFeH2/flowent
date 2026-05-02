@@ -47,7 +47,7 @@ describe("App access gate", () => {
 
     expect(
       screen.getByText(
-        /Read the current admin access code from the local startup log and enter it here to unlock the admin console/i,
+        /Use the access code printed in the local startup log to continue/i,
       ),
     ).toBeInTheDocument();
   });
@@ -64,7 +64,7 @@ describe("App access gate", () => {
 
     expect(
       screen.getByText(
-        /Read the current admin access code from the local startup log and enter it here to unlock the admin console/i,
+        /Use the access code printed in the local startup log to continue/i,
       ),
     ).toBeInTheDocument();
   });

@@ -44,7 +44,7 @@
     "format:check": "prettier --check . && uv run --project backend ruff format --check",
     "lint": "pnpm lint:frontend && pnpm lint:backend",
     "lint:frontend": "pnpm --dir frontend lint",
-    "lint:backend": "uv run --project backend ruff check",
+    "lint:backend": "uv run --project backend ruff check && uv run --project backend mypy --config-file backend/pyproject.toml backend/src",
     "typecheck": "pnpm --dir frontend typecheck",
     "test": "pnpm test:frontend && pnpm test:backend",
     "test:frontend": "pnpm --dir frontend test",

@@ -58,9 +58,6 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Mypy
-        run: uv run --project backend mypy --config-file backend/pyproject.toml backend/src
-
       - name: Typecheck
         run: pnpm typecheck
 

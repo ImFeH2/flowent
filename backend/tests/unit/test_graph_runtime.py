@@ -1,7 +1,7 @@
-from flowent_api.agent import Agent
-from flowent_api.graph_runtime import resolve_node_ref
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.registry import registry
+from flowent.agent import Agent
+from flowent.graph_runtime import resolve_node_ref
+from flowent.models import NodeConfig, NodeType
+from flowent.registry import registry
 
 
 def setup_function():

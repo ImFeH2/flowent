@@ -4,17 +4,17 @@ from uuid import UUID
 
 from fastapi.testclient import TestClient
 
-from flowent_api.models import (
+from flowent.models import (
     AgentState,
     AssistantText,
     ImagePart,
     ReceivedMessage,
     TextPart,
 )
-from flowent_api.registry import registry
-from flowent_api.routes.nodes import router as nodes_router
-from flowent_api.settings import STEWARD_ROLE_INCLUDED_TOOLS
-from flowent_api.tools import MINIMUM_TOOLS
+from flowent.registry import registry
+from flowent.routes.nodes import router as nodes_router
+from flowent.settings import STEWARD_ROLE_INCLUDED_TOOLS
+from flowent.tools import MINIMUM_TOOLS
 
 _ONE_PIXEL_PNG = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"

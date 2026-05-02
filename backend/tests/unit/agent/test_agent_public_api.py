@@ -1,8 +1,8 @@
 import json
 import threading
 
-from flowent_api.agent import Agent
-from flowent_api.models import (
+from flowent.agent import Agent
+from flowent.models import (
     AgentState,
     Message,
     NodeConfig,
@@ -12,16 +12,16 @@ from flowent_api.models import (
     Tab,
     TodoItem,
 )
-from flowent_api.registry import registry
-from flowent_api.settings import RoleConfig, Settings
-from flowent_api.tools.contacts import ContactsTool
-from flowent_api.tools.idle import IdleTool
-from flowent_api.tools.list_roles import ListRolesTool
-from flowent_api.tools.list_tabs import ListTabsTool
-from flowent_api.tools.list_tools import ListToolsTool
-from flowent_api.tools.sleep import SleepTool
-from flowent_api.tools.todo import TodoTool
-from flowent_api.workspace_store import workspace_store
+from flowent.registry import registry
+from flowent.settings import RoleConfig, Settings
+from flowent.tools.contacts import ContactsTool
+from flowent.tools.idle import IdleTool
+from flowent.tools.list_roles import ListRolesTool
+from flowent.tools.list_tabs import ListTabsTool
+from flowent.tools.list_tools import ListToolsTool
+from flowent.tools.sleep import SleepTool
+from flowent.tools.todo import TodoTool
+from flowent.workspace_store import workspace_store
 
 
 def test_idle_tool_uses_request_idle(monkeypatch):
@@ -517,7 +517,7 @@ def test_list_roles_tool_returns_registered_roles(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(
@@ -659,9 +659,9 @@ def test_list_tools_tool_returns_registered_tool_names_and_descriptions():
 
 
 def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
-    from flowent_api.graph_service import create_agent_node, create_edge, create_tab
-    from flowent_api.workspace_store import workspace_store
+    import flowent.settings as settings_module
+    from flowent.graph_service import create_agent_node, create_edge, create_tab
+    from flowent.workspace_store import workspace_store
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(
@@ -680,7 +680,7 @@ def test_list_tabs_tool_returns_summaries_and_details(monkeypatch, tmp_path):
     monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
     monkeypatch.setattr(settings_module, "_cached_settings", None)
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(

@@ -44,4 +44,4 @@ WORKDIR /workspace
 
 EXPOSE 6873
 
-CMD ["uv", "run", "--project", "/app/backend", "--frozen", "--no-dev", "flowent-api"]
+CMD ["uv", "run", "--project", "/app/backend", "--frozen", "--no-dev", "flowent"]

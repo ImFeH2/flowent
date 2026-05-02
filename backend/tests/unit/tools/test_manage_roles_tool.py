@@ -1,15 +1,15 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.settings import (
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.settings import (
     AssistantSettings,
     ProviderConfig,
     RoleConfig,
     RoleModelConfig,
     Settings,
 )
-from flowent_api.tools.manage_roles import ManageRolesTool
+from flowent.tools.manage_roles import ManageRolesTool
 
 
 def test_manage_roles_list_includes_builtin_flags(monkeypatch):
@@ -29,7 +29,7 @@ def test_manage_roles_list_includes_builtin_flags(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(ManageRolesTool().execute(agent, {"action": "list"}))
 
@@ -72,9 +72,9 @@ def test_manage_roles_create_adds_custom_role(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
 
     result = json.loads(
@@ -128,7 +128,7 @@ def test_manage_roles_create_rejects_duplicate_name(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(roles=[RoleConfig(name="Reviewer", system_prompt="Review.")])
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageRolesTool().execute(
@@ -147,7 +147,7 @@ def test_manage_roles_create_rejects_duplicate_name(monkeypatch):
 
 def test_manage_roles_create_rejects_overlapping_tool_config(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: Settings())
 
     result = json.loads(
         ManageRolesTool().execute(
@@ -188,9 +188,9 @@ def test_manage_roles_update_renames_and_updates_role(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
 
     result = json.loads(
@@ -245,7 +245,7 @@ def test_manage_roles_update_rejects_builtin_rename(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageRolesTool().execute(
@@ -265,7 +265,7 @@ def test_manage_roles_update_rejects_builtin_prompt_change(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
     settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageRolesTool().execute(
@@ -288,9 +288,9 @@ def test_manage_roles_delete_removes_custom_role(monkeypatch):
     settings = Settings(roles=[RoleConfig(name="Reviewer", system_prompt="Review.")])
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
 
     result = json.loads(
@@ -307,7 +307,7 @@ def test_manage_roles_delete_removes_custom_role(monkeypatch):
 
 def test_manage_roles_delete_rejects_builtin_role(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_roles"]))
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: Settings())
 
     result = json.loads(
         ManageRolesTool().execute(
@@ -325,7 +325,7 @@ def test_manage_roles_update_rejects_designer_builtin_rename(monkeypatch):
         roles=[RoleConfig(name="Designer", system_prompt="Design interfaces.")]
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageRolesTool().execute(
@@ -347,7 +347,7 @@ def test_manage_roles_delete_rejects_designer_builtin_role(monkeypatch):
         roles=[RoleConfig(name="Designer", system_prompt="Design interfaces.")]
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageRolesTool().execute(
@@ -366,10 +366,10 @@ def test_manage_roles_update_renames_selected_assistant_role(monkeypatch):
         roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully.")],
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -394,10 +394,10 @@ def test_manage_roles_delete_resets_selected_assistant_role(monkeypatch):
         roles=[RoleConfig(name="Reviewer", system_prompt="Review.")],
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(

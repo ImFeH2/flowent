@@ -3,12 +3,12 @@ from uuid import UUID
 
 import pytest
 
-import flowent_api.settings as settings_module
-from flowent_api.agent import Agent
-from flowent_api.models import AgentState, AssistantText, ReceivedMessage, StateEntry
-from flowent_api.registry import registry
-from flowent_api.runtime import bootstrap_runtime, shutdown_runtime
-from flowent_api.settings import (
+import flowent.settings as settings_module
+from flowent.agent import Agent
+from flowent.models import AgentState, AssistantText, ReceivedMessage, StateEntry
+from flowent.registry import registry
+from flowent.runtime import bootstrap_runtime, shutdown_runtime
+from flowent.settings import (
     CONDUCTOR_ROLE_DESCRIPTION,
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,
@@ -28,8 +28,8 @@ from flowent_api.settings import (
     RoleConfig,
     build_default_assistant_write_dirs,
 )
-from flowent_api.tools import MINIMUM_TOOLS
-from flowent_api.workspace_store import workspace_store
+from flowent.tools import MINIMUM_TOOLS
+from flowent.workspace_store import workspace_store
 
 
 def test_bootstrap_runtime_creates_only_assistant(

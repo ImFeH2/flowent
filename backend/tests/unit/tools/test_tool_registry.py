@@ -1,6 +1,6 @@
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.tools import build_tool_registry
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.tools import build_tool_registry
 
 
 def test_empty_tools_list_grants_minimum_tools():

@@ -1,8 +1,8 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.tools.read import ReadTool
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.tools.read import ReadTool
 
 
 def test_read_tool_prefixes_each_line_with_cat_n_style_line_numbers(tmp_path):

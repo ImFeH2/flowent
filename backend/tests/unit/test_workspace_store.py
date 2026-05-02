@@ -1,16 +1,16 @@
 import json
 import sqlite3
 
-from flowent_api.settings import Settings
-from flowent_api.state_db import open_state_db
-from flowent_api.workspace_store import workspace_store
+from flowent.settings import Settings
+from flowent.state_db import open_state_db
+from flowent.workspace_store import workspace_store
 
 
 def test_workspace_store_normalizes_relative_write_dirs_on_load(
     monkeypatch,
     tmp_path,
 ):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     workspace_file = tmp_path / "workspace.json"
@@ -75,7 +75,7 @@ def test_workspace_store_prefers_legacy_workspace_data_when_state_db_is_still_em
     monkeypatch,
     tmp_path,
 ):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     workspace_file = tmp_path / "workspace.json"
@@ -130,7 +130,7 @@ def test_workspace_store_does_not_overwrite_state_db_with_legacy_workspace_data(
     monkeypatch,
     tmp_path,
 ):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     workspace_file = tmp_path / "workspace.json"

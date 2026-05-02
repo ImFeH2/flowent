@@ -6,12 +6,12 @@ from typing import Any, Literal
 
 import pytest
 
-from flowent_api.providers.errors import LLMProviderError
-from flowent_api.providers.openai_responses import (
+from flowent.providers.errors import LLMProviderError
+from flowent.providers.openai_responses import (
     OpenAIResponsesProvider,
     _extract_reasoning_text_from_item,
 )
-from flowent_api.settings import ModelParams
+from flowent.settings import ModelParams
 
 
 class _FakeStreamResponse:

@@ -2,12 +2,12 @@ import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from flowent_api.main import create_app
+from flowent.main import create_app
 
 
 def _create_client(monkeypatch, tmp_path, *, configured: bool) -> TestClient:
-    import flowent_api.settings as settings_module
-    from flowent_api.access import set_access_code
+    import flowent.settings as settings_module
+    from flowent.access import set_access_code
 
     settings_file = tmp_path / "settings.json"
     monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
@@ -57,7 +57,7 @@ def test_access_login_and_logout_flow(monkeypatch, tmp_path):
 
 
 def test_admin_session_survives_backend_restart(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     with _create_client(monkeypatch, tmp_path, configured=True) as client:
         login_response = client.post(
@@ -86,8 +86,8 @@ def test_access_code_rotation_invalidates_existing_admin_session(
     monkeypatch,
     tmp_path,
 ):
-    import flowent_api.settings as settings_module
-    from flowent_api.access import set_access_code
+    import flowent.settings as settings_module
+    from flowent.access import set_access_code
 
     with _create_client(monkeypatch, tmp_path, configured=True) as client:
         login_response = client.post(
@@ -148,8 +148,8 @@ def test_legacy_hashed_only_access_rotates_to_persisted_code_at_startup(
     monkeypatch,
     tmp_path,
 ):
-    import flowent_api.settings as settings_module
-    from flowent_api.access import set_access_code, verify_access_code
+    import flowent.settings as settings_module
+    from flowent.access import set_access_code, verify_access_code
 
     settings_file = tmp_path / "settings.json"
     monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)

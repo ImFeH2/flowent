@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from flowent_api.settings import Settings
+from flowent.settings import Settings
 
 
 def test_prompts_api_reads_and_updates_custom_prompt(
@@ -13,9 +13,9 @@ def test_prompts_api_reads_and_updates_custom_prompt(
     )
     saved: list[tuple[str, str]] = []
 
-    monkeypatch.setattr("flowent_api.routes.prompts.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.prompts.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.prompts.save_settings",
+        "flowent.routes.prompts.save_settings",
         lambda current: saved.append(
             (current.custom_prompt, current.custom_post_prompt)
         ),

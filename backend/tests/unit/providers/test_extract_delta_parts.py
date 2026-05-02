@@ -1,4 +1,4 @@
-from flowent_api.providers.openai import _extract_delta_parts
+from flowent.providers.openai import _extract_delta_parts
 
 
 def test_reasoning_field():

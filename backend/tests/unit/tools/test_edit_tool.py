@@ -1,8 +1,8 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.tools.edit import EditTool
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.tools.edit import EditTool
 
 
 def test_edit_tool_applies_multiple_edits_in_sequence(tmp_path):

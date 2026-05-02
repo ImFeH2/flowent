@@ -58,7 +58,7 @@ if (!existsSync(join(staticDirectory, "index.html"))) {
 const uvCommand = process.env.FLOWENT_UV_BINARY ?? "uv";
 const child = spawn(
   uvCommand,
-  ["run", "--project", backendProject, "flowent-api"],
+  ["run", "--project", backendProject, "flowent"],
   {
     cwd: packageRoot,
     stdio: "inherit",

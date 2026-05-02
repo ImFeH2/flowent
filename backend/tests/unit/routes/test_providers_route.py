@@ -3,8 +3,8 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
-from flowent_api.models import ModelInfo
-from flowent_api.routes.providers_route import (
+from flowent.models import ModelInfo
+from flowent.routes.providers_route import (
     CreateProviderRequest,
     ListModelsRequest,
     ProviderModelTestRequest,
@@ -14,7 +14,7 @@ from flowent_api.routes.providers_route import (
     run_provider_model_test_route,
     update_provider,
 )
-from flowent_api.settings import ProviderConfig, Settings
+from flowent.settings import ProviderConfig, Settings
 
 
 def test_create_provider_preserves_raw_base_url(monkeypatch):
@@ -22,15 +22,13 @@ def test_create_provider_preserves_raw_base_url(monkeypatch):
     saved: list[Settings] = []
     invalidations: list[str] = []
 
+    monkeypatch.setattr("flowent.routes.providers_route.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.get_settings", lambda: settings
-    )
-    monkeypatch.setattr(
-        "flowent_api.routes.providers_route.save_settings",
+        "flowent.routes.providers_route.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache",
+        "flowent.providers.gateway.gateway.invalidate_cache",
         lambda: invalidations.append("invalidate"),
     )
 
@@ -58,7 +56,7 @@ def test_create_provider_preserves_raw_base_url(monkeypatch):
 
 def test_create_provider_rejects_mismatched_base_url_suffix(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.get_settings", lambda: Settings()
+        "flowent.routes.providers_route.get_settings", lambda: Settings()
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -95,9 +93,7 @@ def test_update_provider_rejects_type_change_with_mismatched_existing_suffix(
         ]
     )
 
-    monkeypatch.setattr(
-        "flowent_api.routes.providers_route.get_settings", lambda: settings
-    )
+    monkeypatch.setattr("flowent.routes.providers_route.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as exc:
         asyncio.run(
@@ -130,15 +126,13 @@ def test_update_provider_persists_headers(monkeypatch):
     saved: list[Settings] = []
     invalidations: list[str] = []
 
+    monkeypatch.setattr("flowent.routes.providers_route.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.get_settings", lambda: settings
-    )
-    monkeypatch.setattr(
-        "flowent_api.routes.providers_route.save_settings",
+        "flowent.routes.providers_route.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache",
+        "flowent.providers.gateway.gateway.invalidate_cache",
         lambda: invalidations.append("invalidate"),
     )
 
@@ -162,7 +156,7 @@ def test_update_provider_persists_headers(monkeypatch):
 
 def test_create_provider_rejects_non_string_header_values(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.get_settings", lambda: Settings()
+        "flowent.routes.providers_route.get_settings", lambda: Settings()
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -184,7 +178,7 @@ def test_create_provider_rejects_non_string_header_values(monkeypatch):
 
 def test_create_provider_rejects_negative_retry_429_delay(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.get_settings", lambda: Settings()
+        "flowent.routes.providers_route.get_settings", lambda: Settings()
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -218,11 +212,11 @@ def test_list_provider_models_runs_gateway_in_threadpool(monkeypatch):
         return func(*args)
 
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.list_models_for",
+        "flowent.providers.gateway.gateway.list_models_for",
         fake_list_models_for,
     )
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.run_in_threadpool",
+        "flowent.routes.providers_route.run_in_threadpool",
         fake_run_in_threadpool,
     )
 
@@ -270,11 +264,11 @@ def test_test_provider_model_runs_against_provider_draft(monkeypatch):
         return func(*args)
 
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.create_llm_provider",
+        "flowent.routes.providers_route.create_llm_provider",
         lambda **kwargs: captured.update(kwargs) or FakeProvider(),
     )
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.run_in_threadpool",
+        "flowent.routes.providers_route.run_in_threadpool",
         fake_run_in_threadpool,
     )
 
@@ -308,11 +302,11 @@ def test_list_provider_models_from_draft_passes_raw_base_url_to_provider(
         return func(*args)
 
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.create_llm_provider",
+        "flowent.routes.providers_route.create_llm_provider",
         lambda **kwargs: captured.update(kwargs) or FakeProvider(),
     )
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.run_in_threadpool",
+        "flowent.routes.providers_route.run_in_threadpool",
         fake_run_in_threadpool,
     )
 
@@ -354,7 +348,7 @@ def test_test_provider_model_returns_normalized_error_summary(monkeypatch):
             )
 
     monkeypatch.setattr(
-        "flowent_api.routes.providers_route.create_llm_provider",
+        "flowent.routes.providers_route.create_llm_provider",
         lambda **kwargs: FakeProvider(),
     )
 

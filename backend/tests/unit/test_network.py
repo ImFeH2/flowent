@@ -2,7 +2,7 @@ import socket
 import threading
 import time
 
-from flowent_api.network import create_http_session
+from flowent.network import create_http_session
 
 
 def _capture_raw_request() -> str:

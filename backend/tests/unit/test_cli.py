@@ -2,14 +2,14 @@ import os
 
 import pytest
 
-from flowent_api.access import is_access_configured, set_access_code, verify_access_code
-from flowent_api.cli import APP_DATA_DIR_ENV_VAR, main
+from flowent.access import is_access_configured, set_access_code, verify_access_code
+from flowent.cli import APP_DATA_DIR_ENV_VAR, main
 
 
 def test_access_refresh_command_generates_new_persisted_access_code(
     monkeypatch, tmp_path, capsys
 ):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
@@ -36,7 +36,7 @@ def test_access_refresh_command_generates_new_persisted_access_code(
 def test_access_reset_command_clears_persisted_access_code(
     monkeypatch, tmp_path, capsys
 ):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
@@ -86,7 +86,7 @@ def test_cli_sets_app_data_dir_env_before_dispatch(monkeypatch, tmp_path, capsys
     called: list[str] = []
 
     monkeypatch.setattr(
-        "flowent_api.access.refresh_local_access",
+        "flowent.access.refresh_local_access",
         lambda: called.append("refresh") or "Generated new access code: TEST",
     )
 

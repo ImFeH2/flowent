@@ -1,9 +1,9 @@
 import json
 from dataclasses import asdict
 
-import flowent_api.settings as settings_module
-from flowent_api.access import set_access_code, verify_access_code
-from flowent_api.settings import (
+import flowent.settings as settings_module
+from flowent.access import set_access_code, verify_access_code
+from flowent.settings import (
     CONDUCTOR_ROLE_DESCRIPTION,
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_NAME,

@@ -1,7 +1,7 @@
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.security import authorize
-from flowent_api.settings import Settings
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.security import authorize
+from flowent.settings import Settings
 
 
 def test_authorize_allows_edit_within_write_dirs(tmp_path):
@@ -65,7 +65,7 @@ def test_authorize_resolves_relative_write_dirs_against_working_dir(
     )
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(working_dir=str(tmp_path)),
     )
 

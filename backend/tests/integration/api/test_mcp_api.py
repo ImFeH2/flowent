@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 def test_mcp_api_returns_only_external_server_state(client: TestClient, monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.routes.mcp.mcp_service.list_server_payloads",
+        "flowent.routes.mcp.mcp_service.list_server_payloads",
         lambda: [
             {
                 "config": {

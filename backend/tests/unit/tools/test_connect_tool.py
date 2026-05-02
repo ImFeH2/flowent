@@ -2,23 +2,23 @@ import json
 
 import pytest
 
-from flowent_api.agent import Agent
-from flowent_api.graph_service import build_workflow_node_definition, create_tab
-from flowent_api.models import (
+from flowent.agent import Agent
+from flowent.graph_service import build_workflow_node_definition, create_tab
+from flowent.models import (
     AgentState,
     GraphNodeRecord,
     NodeConfig,
     NodeType,
     WorkflowNodeKind,
 )
-from flowent_api.registry import registry
-from flowent_api.tools.connect import ConnectTool
-from flowent_api.workspace_store import workspace_store
+from flowent.registry import registry
+from flowent.tools.connect import ConnectTool
+from flowent.workspace_store import workspace_store
 
 
 @pytest.fixture(autouse=True)
 def reset_runtime_state(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text("{}", encoding="utf-8")

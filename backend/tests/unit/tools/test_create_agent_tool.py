@@ -2,18 +2,18 @@ import json
 
 import pytest
 
-from flowent_api.agent import Agent
-from flowent_api.graph_service import create_tab
-from flowent_api.models import AgentState, GraphNodeRecord, NodeConfig, NodeType
-from flowent_api.registry import registry
-from flowent_api.settings import CONDUCTOR_ROLE_NAME, RoleConfig, Settings
-from flowent_api.tools.create_agent import CreateAgentTool
-from flowent_api.workspace_store import workspace_store
+from flowent.agent import Agent
+from flowent.graph_service import create_tab
+from flowent.models import AgentState, GraphNodeRecord, NodeConfig, NodeType
+from flowent.registry import registry
+from flowent.settings import CONDUCTOR_ROLE_NAME, RoleConfig, Settings
+from flowent.tools.create_agent import CreateAgentTool
+from flowent.workspace_store import workspace_store
 
 
 @pytest.fixture(autouse=True)
 def reset_runtime_state(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text("{}", encoding="utf-8")
@@ -31,7 +31,7 @@ def test_leader_create_agent_defaults_to_current_tab_without_network_edge(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(
@@ -75,7 +75,7 @@ def test_leader_create_agent_defaults_to_current_tab_without_network_edge(
 
 def test_create_agent_places_new_agent_after_anchor(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(
@@ -132,7 +132,7 @@ def test_create_agent_places_new_agent_after_anchor(monkeypatch):
 
 def test_create_agent_rejects_assistant_for_ordinary_nodes(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[RoleConfig(name="Worker", system_prompt="Do work.")],
         ),
@@ -162,7 +162,7 @@ def test_create_agent_rejects_assistant_for_ordinary_nodes(monkeypatch):
 
 def test_create_agent_allows_explicitly_granted_task_node(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(
@@ -217,7 +217,7 @@ def test_create_agent_allows_explicitly_granted_task_node(monkeypatch):
 
 def test_create_agent_rejects_task_node_without_tool(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
     tab = create_tab(title="Task")
@@ -246,7 +246,7 @@ def test_create_agent_rejects_task_node_without_tool(monkeypatch):
 
 def test_create_agent_rejects_workflow_id_parameter(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
     tab = create_tab(title="Task")
@@ -276,7 +276,7 @@ def test_create_agent_rejects_workflow_id_parameter(monkeypatch):
 
 def test_create_agent_rejects_reserved_conductor_role(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[RoleConfig(name=CONDUCTOR_ROLE_NAME, system_prompt="Orchestrate.")],
         ),
@@ -311,7 +311,7 @@ def test_create_agent_rejects_reserved_conductor_role(monkeypatch):
 
 def test_create_agent_respects_write_dir_and_network_boundaries(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
 
@@ -362,7 +362,7 @@ def test_create_agent_respects_write_dir_and_network_boundaries(monkeypatch, tmp
 
 def test_create_agent_also_respects_tab_leader_boundaries(monkeypatch, tmp_path):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
 
@@ -442,7 +442,7 @@ def test_create_agent_also_respects_tab_leader_boundaries(monkeypatch, tmp_path)
 
 def test_create_agent_rejects_removed_connect_to_creator_parameter(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")]),
     )
     tab = create_tab(title="Task")

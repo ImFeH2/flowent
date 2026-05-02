@@ -5,15 +5,15 @@ import time
 import pytest
 from loguru import logger
 
-from flowent_api.agent import (
+from flowent.agent import (
     Agent,
     ContextPreflight,
     InterruptRequestedError,
     PreparedLLMContext,
     WakeSignal,
 )
-from flowent_api.events import event_bus
-from flowent_api.models import (
+from flowent.events import event_bus
+from flowent.models import (
     AgentState,
     AssistantText,
     AssistantThinking,
@@ -35,16 +35,16 @@ from flowent_api.models import (
     ToolCall,
     ToolCallResult,
 )
-from flowent_api.providers.errors import LLMProviderError
-from flowent_api.registry import registry
-from flowent_api.settings import ModelSettings, ProviderConfig, Settings
-from flowent_api.stats_service import stats_store
-from flowent_api.workspace_store import workspace_store
+from flowent.providers.errors import LLMProviderError
+from flowent.registry import registry
+from flowent.settings import ModelSettings, ProviderConfig, Settings
+from flowent.stats_service import stats_store
+from flowent.workspace_store import workspace_store
 
 
 @pytest.fixture(autouse=True)
 def reset_runtime_state(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text("{}", encoding="utf-8")
@@ -105,7 +105,7 @@ def test_agent_keeps_running_after_pure_text_response(monkeypatch):
         return next(responses)
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -164,10 +164,10 @@ def test_agent_retries_transient_llm_errors_before_succeeding(monkeypatch):
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(agent, "_get_llm_retry_delay", lambda retry_number: 0.0)
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(model=ModelSettings(max_retries=2)),
     )
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -211,7 +211,7 @@ def test_chat_with_retries_records_single_request_stat(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: settings)
     monkeypatch.setattr(agent, "_get_llm_retry_delay", lambda retry_number: 0.0)
 
     llm_calls = 0
@@ -242,7 +242,7 @@ def test_chat_with_retries_records_single_request_stat(monkeypatch):
             raw_usage={"total_tokens": 120, "input_tokens": 90},
         )
 
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     response, _ = agent._chat_with_retries(
         prepared_context=PreparedLLMContext(
@@ -304,7 +304,7 @@ def test_agent_does_not_retry_transient_llm_errors_when_retry_policy_is_no_retry
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 retry_policy="no_retry",
@@ -312,7 +312,7 @@ def test_agent_does_not_retry_transient_llm_errors_when_retry_policy_is_no_retry
             )
         ),
     )
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -366,10 +366,10 @@ def test_agent_does_not_retry_non_transient_llm_errors(monkeypatch):
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(model=ModelSettings(max_retries=5)),
     )
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -435,10 +435,10 @@ def test_agent_interrupt_stops_retry_backoff(monkeypatch):
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(agent, "_get_llm_retry_delay", lambda retry_number: 1.0)
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(model=ModelSettings(max_retries=5)),
     )
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
     if interrupter is not None:
@@ -492,7 +492,7 @@ def test_agent_retries_transient_errors_when_retry_policy_is_unlimited(monkeypat
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(agent, "_get_llm_retry_delay", lambda retry_number: 0.0)
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 retry_policy="unlimited",
@@ -500,7 +500,7 @@ def test_agent_retries_transient_errors_when_retry_policy_is_unlimited(monkeypat
             )
         ),
     )
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -518,7 +518,7 @@ def test_get_llm_retry_delay_uses_configured_backoff_settings(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.AGENT))
 
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 retry_initial_delay_seconds=0.75,
@@ -538,7 +538,7 @@ def test_get_llm_retry_429_delay_uses_active_provider_only_for_429(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.AGENT, role_name="Worker"))
 
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 active_provider_id="provider-1",
@@ -587,7 +587,7 @@ def test_prepare_messages_records_auto_compact_stat(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: settings)
 
     prepared_context = PreparedLLMContext(
         messages=[{"role": "user", "content": "hello"}],
@@ -830,7 +830,7 @@ def test_retry_human_message_reuses_image_parts(monkeypatch):
     queued_messages: list[Message] = []
     monkeypatch.setattr(assistant, "supports_input_image", lambda: True)
     monkeypatch.setattr(
-        "flowent_api.agent.require_image_asset",
+        "flowent.agent.require_image_asset",
         lambda asset_id: object() if asset_id == "asset-1" else None,
     )
     monkeypatch.setattr(
@@ -936,7 +936,7 @@ def test_leader_retry_received_message_requires_human_anchor(monkeypatch):
         ]
     )
     monkeypatch.setattr(
-        "flowent_api.graph_service.is_tab_leader",
+        "flowent.graph_service.is_tab_leader",
         lambda **kwargs: kwargs["node_id"] == leader.uuid,
     )
 
@@ -958,7 +958,7 @@ def test_execute_compact_command_replaces_history_with_summary(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "flowent_api.agent.gateway.chat",
+        "flowent.agent.gateway.chat",
         lambda *args, **kwargs: LLMResponse(
             content=(
                 "## Current Goal\nShip the command layer.\n\n"
@@ -1048,7 +1048,7 @@ def test_compact_command_excludes_queued_messages_from_summary(monkeypatch):
         return True
 
     monkeypatch.setattr(assistant, "request_interrupt", fake_request_interrupt)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     assistant.compact_chat_history()
 
@@ -1104,7 +1104,7 @@ def test_agent_normalizes_think_tags_in_final_content(monkeypatch):
         return LLMResponse(content="<think>Drafting plan</think>\nHello there")
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -1158,7 +1158,7 @@ def test_agent_dedupes_structured_thinking_and_raw_think_tags(monkeypatch):
         )
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -1195,7 +1195,7 @@ def test_agent_unregisters_from_registry_after_termination_request(monkeypatch):
         agent.request_termination("done")
         return LLMResponse()
 
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     agent._run()
@@ -1234,7 +1234,7 @@ def test_finalize_termination_removes_bidirectional_connections():
 
 
 def test_agent_interrupts_streaming_response_and_returns_to_idle(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
     registry.reset()
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     registry.register(assistant)
@@ -1267,7 +1267,7 @@ def test_agent_interrupts_streaming_response_and_returns_to_idle(monkeypatch):
         raise AssertionError("interrupt should stop streaming before completion")
 
     monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
@@ -1326,7 +1326,7 @@ def test_agent_normalizes_think_tags_in_streaming_content(monkeypatch):
         return LLMResponse(content="<think>Drafting plan</think>\nHello there")
 
     monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     assistant._run()
@@ -1383,7 +1383,7 @@ def test_agent_does_not_duplicate_thinking_when_provider_returns_both(monkeypatc
         )
 
     monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     assistant._run()
 
@@ -1459,7 +1459,7 @@ def test_request_sleep_timeout_queues_deadline_notice():
 
 
 def test_agent_interrupts_blocked_provider_without_streaming_output(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
     registry.reset()
     assistant = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     registry.register(assistant)
@@ -1501,7 +1501,7 @@ def test_agent_interrupts_blocked_provider_without_streaming_output(monkeypatch)
     interrupter.start()
 
     monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     try:
@@ -1535,7 +1535,7 @@ def test_provider_resolution_error_is_recorded_in_history(monkeypatch):
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
     monkeypatch.setattr(
-        "flowent_api.agent.gateway.chat",
+        "flowent.agent.gateway.chat",
         lambda messages, tools=None, on_chunk=None, register_interrupt=None, role_name=None: (
             (_ for _ in ()).throw(RuntimeError("No active provider configured"))
         ),
@@ -1587,7 +1587,7 @@ def test_assistant_content_streams_even_when_response_has_tool_calls(monkeypatch
         )
 
     monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
     monkeypatch.setattr(
         assistant,
         "_handle_tool_call",
@@ -1868,7 +1868,7 @@ def test_multiple_send_tool_calls_stop_after_first_failure(monkeypatch):
         return LLMResponse()
 
     monkeypatch.setattr(child, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     try:
         child._run()
@@ -1898,7 +1898,7 @@ def test_multiple_send_tool_calls_stop_after_first_failure(monkeypatch):
 
 
 def test_build_messages_replays_sent_messages_as_message_to_context(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
@@ -1923,7 +1923,7 @@ def test_context_preflight_prefers_usage_baseline_and_estimates_only_new_tail(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(
             providers=[
                 ProviderConfig(
@@ -1979,7 +1979,7 @@ def test_context_preflight_prefers_usage_baseline_and_estimates_only_new_tail(
 
 def test_context_preflight_bootstraps_again_when_runtime_tail_changes(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(
             providers=[
                 ProviderConfig(
@@ -2020,7 +2020,7 @@ def test_prepare_messages_for_llm_uses_token_limit_even_without_context_window(
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(
             providers=[
                 ProviderConfig(
@@ -2056,7 +2056,7 @@ def test_prepare_messages_for_llm_uses_token_limit_even_without_context_window(
 
 
 def test_idle_is_blocked_when_fresh_input_has_no_progress(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     agent.set_state(AgentState.RUNNING, "processing")
     agent._turn_started_with_pending_input = True
@@ -2078,7 +2078,7 @@ def test_idle_is_blocked_when_fresh_input_has_no_progress(monkeypatch):
 
 
 def test_idle_is_blocked_when_first_todo_is_actionable(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT), uuid="assistant")
     agent.set_state(AgentState.RUNNING, "processing")
     agent.set_todos(
@@ -2104,7 +2104,7 @@ def test_idle_is_blocked_when_first_todo_is_actionable(monkeypatch):
 
 
 def test_build_messages_appends_runtime_todo_context_without_history_entry(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
@@ -2133,7 +2133,7 @@ def test_build_messages_appends_runtime_todo_context_without_history_entry(monke
 
 def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.agent.get_settings",
+        "flowent.agent.get_settings",
         lambda: Settings(custom_post_prompt="Append this after history."),
     )
 
@@ -2166,7 +2166,7 @@ def test_build_messages_appends_runtime_post_prompt_and_idle_guidance(monkeypatc
 def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
     monkeypatch,
 ):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
@@ -2234,7 +2234,7 @@ def test_build_messages_warns_about_newly_created_agents_waiting_for_first_task(
 def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
     monkeypatch,
 ):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
@@ -2297,7 +2297,7 @@ def test_build_messages_uses_role_name_when_created_agent_has_no_explicit_name(
 
 
 def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
@@ -2373,7 +2373,7 @@ def test_build_messages_clears_new_agent_warning_after_first_sent_message(monkey
 
 
 def test_build_messages_keeps_sleep_tool_results_in_context(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(
@@ -2414,7 +2414,7 @@ def test_build_messages_keeps_sleep_tool_results_in_context(monkeypatch):
 
 
 def test_build_messages_keeps_idle_tool_results_in_context(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="resume after wait", from_id="human"))
@@ -2453,7 +2453,7 @@ def test_build_messages_keeps_idle_tool_results_in_context(monkeypatch):
 
 
 def test_build_messages_keeps_error_entries_in_context(monkeypatch):
-    monkeypatch.setattr("flowent_api.agent.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.agent.get_settings", lambda: Settings())
 
     agent = Agent(NodeConfig(node_type=NodeType.AGENT), uuid="agent")
     agent._append_history(ReceivedMessage(content="begin", from_id="human"))
@@ -2506,7 +2506,7 @@ def test_assistant_emits_human_content_for_plain_text_with_target_like_prefix(
 
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
     monkeypatch.setattr(assistant, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     try:
         assistant._run()
@@ -2576,7 +2576,7 @@ def test_idle_tool_records_wakeup_message_as_new_input_block(monkeypatch):
         return next(responses)
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     agent._run()
 
@@ -2644,7 +2644,7 @@ def test_agent_contextualizes_plain_loguru_calls(monkeypatch):
         return LLMResponse()
 
     monkeypatch.setattr(agent, "_wait_for_input", fake_wait_for_input)
-    monkeypatch.setattr("flowent_api.agent.gateway.chat", fake_chat)
+    monkeypatch.setattr("flowent.agent.gateway.chat", fake_chat)
 
     try:
         agent._run()
@@ -2663,7 +2663,7 @@ def test_agent_denies_tool_call_before_edit_execute(monkeypatch, tmp_path):
     def fail_execute(*_args, **_kwargs):
         raise AssertionError("edit execute should not be called")
 
-    monkeypatch.setattr("flowent_api.tools.edit.EditTool.execute", fail_execute)
+    monkeypatch.setattr("flowent.tools.edit.EditTool.execute", fail_execute)
 
     result = agent._handle_tool_call(
         "edit",
@@ -2706,7 +2706,7 @@ def test_handle_tool_call_emits_streaming_tool_result_deltas(monkeypatch):
                 return FakeTool()
             return None
 
-    monkeypatch.setattr("flowent_api.agent._get_tool_registry", lambda: FakeRegistry())
+    monkeypatch.setattr("flowent.agent._get_tool_registry", lambda: FakeRegistry())
     monkeypatch.setattr(event_bus, "emit", lambda event: events.append(event))
 
     result = agent._handle_tool_call("streaming_tool", {}, "call-stream")

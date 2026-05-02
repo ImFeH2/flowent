@@ -2,11 +2,11 @@ import json
 
 from fastapi.testclient import TestClient
 
-from flowent_api.main import create_app
+from flowent.main import create_app
 
 
 def _create_client(monkeypatch, tmp_path, *, serve_frontend: bool) -> TestClient:
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text(

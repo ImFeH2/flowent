@@ -2,18 +2,18 @@ import json
 
 import pytest
 
-from flowent_api.agent import Agent
-from flowent_api.graph_service import create_agent_node, create_edge, create_tab
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.registry import registry
-from flowent_api.settings import RoleConfig, Settings
-from flowent_api.tools.delete_tab import DeleteTabTool
-from flowent_api.workspace_store import workspace_store
+from flowent.agent import Agent
+from flowent.graph_service import create_agent_node, create_edge, create_tab
+from flowent.models import NodeConfig, NodeType
+from flowent.registry import registry
+from flowent.settings import RoleConfig, Settings
+from flowent.tools.delete_tab import DeleteTabTool
+from flowent.workspace_store import workspace_store
 
 
 @pytest.fixture(autouse=True)
 def reset_runtime_state(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text("{}", encoding="utf-8")
@@ -29,7 +29,7 @@ def reset_runtime_state(monkeypatch, tmp_path):
 
 def test_delete_tab_tool_deletes_tab_and_graph(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(

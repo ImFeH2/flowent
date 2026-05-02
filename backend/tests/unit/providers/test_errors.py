@@ -1,4 +1,4 @@
-from flowent_api.providers.errors import (
+from flowent.providers.errors import (
     build_access_blocked_error,
     build_configuration_error,
     build_network_error,

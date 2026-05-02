@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from loguru import logger
 
-from flowent_api.logging import (
+from flowent.logging import (
     HealthcheckAccessFilter,
     configure_uvicorn_access_logging,
     detect_runtime_mode,
@@ -26,8 +26,8 @@ def test_detect_runtime_mode_from_fastapi_command() -> None:
 
 
 def test_detect_runtime_mode_from_reload_flag() -> None:
-    assert detect_runtime_mode(["uvicorn", "flowent_api.main:app", "--reload"]) == "dev"
-    assert detect_runtime_mode(["uvicorn", "flowent_api.main:app"]) == "release"
+    assert detect_runtime_mode(["uvicorn", "flowent.main:app", "--reload"]) == "dev"
+    assert detect_runtime_mode(["uvicorn", "flowent.main:app"]) == "release"
 
 
 def test_setup_logging_creates_timestamped_file_and_prunes_old_logs(

@@ -1,4 +1,4 @@
-from flowent_api.providers.thinking import ThinkTagParser, split_thinking_content
+from flowent.providers.thinking import ThinkTagParser, split_thinking_content
 
 
 def test_normal_thinking_and_content():

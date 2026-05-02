@@ -2,16 +2,16 @@ import json
 
 import pytest
 
-from flowent_api.agent import Agent
-from flowent_api.models import AgentState, GraphNodeRecord, NodeConfig, NodeType, Tab
-from flowent_api.registry import registry
-from flowent_api.tools.set_permissions import SetPermissionsTool
-from flowent_api.workspace_store import workspace_store
+from flowent.agent import Agent
+from flowent.models import AgentState, GraphNodeRecord, NodeConfig, NodeType, Tab
+from flowent.registry import registry
+from flowent.tools.set_permissions import SetPermissionsTool
+from flowent.workspace_store import workspace_store
 
 
 @pytest.fixture(autouse=True)
 def reset_runtime_state(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text("{}", encoding="utf-8")

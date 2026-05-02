@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
-from flowent_api.routes.roles import (
+from flowent.routes.roles import (
     CreateRoleRequest,
     RoleModelRequest,
     UpdateRoleRequest,
@@ -12,7 +12,7 @@ from flowent_api.routes.roles import (
     list_roles,
     update_role,
 )
-from flowent_api.settings import (
+from flowent.settings import (
     CONDUCTOR_ROLE_NAME,
     DESIGNER_ROLE_NAME,
     AssistantSettings,
@@ -59,7 +59,7 @@ def test_list_roles_returns_is_builtin_flags(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     result = asyncio.run(list_roles())
 
@@ -118,9 +118,9 @@ def test_create_role_uses_name_as_identifier(monkeypatch):
     settings = Settings()
     saved: list[list[str]] = []
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.roles.save_settings",
+        "flowent.routes.roles.save_settings",
         lambda current: saved.append([role.name for role in current.roles]),
     )
 
@@ -161,7 +161,7 @@ def test_create_role_rejects_duplicate_name(monkeypatch):
         roles=[RoleConfig(name="Reviewer", system_prompt="Review code carefully")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -191,9 +191,9 @@ def test_update_role_uses_name_path_parameter(monkeypatch):
     )
     saved: list[list[str]] = []
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.roles.save_settings",
+        "flowent.routes.roles.save_settings",
         lambda current: saved.append([role.name for role in current.roles]),
     )
 
@@ -239,7 +239,7 @@ def test_update_role_rejects_duplicate_name(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(update_role("Reviewer", UpdateRoleRequest(name="Architect")))
@@ -257,7 +257,7 @@ def test_update_role_rejects_renaming_builtin_role(monkeypatch, builtin_role_nam
         roles=[RoleConfig(name=builtin_role_name, system_prompt="Do work.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(update_role(builtin_role_name, UpdateRoleRequest(name="Helper")))
@@ -273,7 +273,7 @@ def test_update_role_rejects_builtin_prompt_change(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -299,9 +299,9 @@ def test_delete_role_uses_name_path_parameter(monkeypatch):
     )
     saved: list[list[str]] = []
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.roles.save_settings",
+        "flowent.routes.roles.save_settings",
         lambda current: saved.append([role.name for role in current.roles]),
     )
 
@@ -323,7 +323,7 @@ def test_delete_role_rejects_builtin_role(monkeypatch, builtin_role_name):
         roles=[RoleConfig(name=builtin_role_name, system_prompt="Do work.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(delete_role(builtin_role_name))
@@ -333,7 +333,7 @@ def test_delete_role_rejects_builtin_role(monkeypatch, builtin_role_name):
 
 
 def test_create_role_rejects_overlapping_included_and_excluded_tools(monkeypatch):
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: Settings())
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -368,8 +368,8 @@ def test_update_role_persists_model(monkeypatch):
         roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully")],
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.routes.roles.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.save_settings", lambda current: None)
 
     result = asyncio.run(
         update_role(
@@ -399,8 +399,8 @@ def test_update_role_renames_selected_assistant_role(monkeypatch):
         roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully")],
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.routes.roles.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.save_settings", lambda current: None)
 
     asyncio.run(
         update_role(
@@ -418,8 +418,8 @@ def test_delete_role_resets_selected_assistant_role_to_steward(monkeypatch):
         roles=[RoleConfig(name="Reviewer", system_prompt="Review carefully")],
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.routes.roles.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.save_settings", lambda current: None)
 
     asyncio.run(delete_role("Reviewer"))
 

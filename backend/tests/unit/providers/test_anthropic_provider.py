@@ -6,8 +6,8 @@ from typing import Any, Literal
 
 import pytest
 
-from flowent_api.providers.anthropic import AnthropicProvider
-from flowent_api.providers.errors import LLMProviderError
+from flowent.providers.anthropic import AnthropicProvider
+from flowent.providers.errors import LLMProviderError
 
 
 class _FakeStreamResponse:

@@ -1,15 +1,15 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.models import ModelInfo, NodeConfig, NodeType
-from flowent_api.settings import (
+from flowent.agent import Agent
+from flowent.models import ModelInfo, NodeConfig, NodeType
+from flowent.settings import (
     ModelSettings,
     ProviderConfig,
     RoleConfig,
     RoleModelConfig,
     Settings,
 )
-from flowent_api.tools.manage_providers import ManageProvidersTool
+from flowent.tools.manage_providers import ManageProvidersTool
 
 
 def test_manage_providers_list_omits_api_keys(monkeypatch):
@@ -26,7 +26,7 @@ def test_manage_providers_list_omits_api_keys(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(ManageProvidersTool().execute(agent, {"action": "list"}))
 
@@ -49,12 +49,12 @@ def test_manage_providers_create_persists_provider(monkeypatch):
     saved: list[Settings] = []
     invalidations: list[str] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache",
+        "flowent.providers.gateway.gateway.invalidate_cache",
         lambda: invalidations.append("invalidate"),
     )
 
@@ -116,12 +116,12 @@ def test_manage_providers_update_changes_only_supplied_fields(monkeypatch):
     saved: list[Settings] = []
     invalidations: list[str] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache",
+        "flowent.providers.gateway.gateway.invalidate_cache",
         lambda: invalidations.append("invalidate"),
     )
 
@@ -157,10 +157,10 @@ def test_manage_providers_create_persists_headers(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -195,10 +195,10 @@ def test_manage_providers_update_persists_headers(monkeypatch):
         ]
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -221,7 +221,7 @@ def test_manage_providers_update_persists_headers(monkeypatch):
 
 def test_manage_providers_rejects_non_string_header_values(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: Settings())
 
     result = json.loads(
         ManageProvidersTool().execute(
@@ -241,7 +241,7 @@ def test_manage_providers_rejects_non_string_header_values(monkeypatch):
 
 def test_manage_providers_rejects_negative_retry_429_delay(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: Settings())
 
     result = json.loads(
         ManageProvidersTool().execute(
@@ -263,7 +263,7 @@ def test_manage_providers_rejects_negative_retry_429_delay(monkeypatch):
 
 def test_manage_providers_update_rejects_unknown_provider(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: Settings())
 
     result = json.loads(
         ManageProvidersTool().execute(
@@ -289,7 +289,7 @@ def test_manage_providers_update_rejects_mismatched_base_url_suffix(monkeypatch)
         ]
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageProvidersTool().execute(
@@ -320,12 +320,12 @@ def test_manage_providers_delete_removes_provider(monkeypatch):
     saved: list[Settings] = []
     invalidations: list[str] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache",
+        "flowent.providers.gateway.gateway.invalidate_cache",
         lambda: invalidations.append("invalidate"),
     )
 
@@ -357,10 +357,10 @@ def test_manage_providers_delete_clears_active_model_for_active_provider(monkeyp
         ],
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -399,10 +399,10 @@ def test_manage_providers_delete_clears_role_model_references(monkeypatch):
         ],
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -420,9 +420,9 @@ def test_manage_providers_list_models_streams_model_ids(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_providers"]))
     chunks: list[str] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: Settings())
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.list_models_for",
+        "flowent.providers.gateway.gateway.list_models_for",
         lambda provider_id, register_interrupt=None: [
             ModelInfo(id=f"{provider_id}-a"),
             ModelInfo(id=f"{provider_id}-b"),

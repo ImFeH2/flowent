@@ -1,9 +1,9 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.events import event_bus
-from flowent_api.models import EventType, NodeConfig, NodeType
-from flowent_api.tools.todo import TodoTool
+from flowent.agent import Agent
+from flowent.events import event_bus
+from flowent.models import EventType, NodeConfig, NodeType
+from flowent.tools.todo import TodoTool
 
 
 def test_todo_tool_emits_node_todos_changed(monkeypatch):

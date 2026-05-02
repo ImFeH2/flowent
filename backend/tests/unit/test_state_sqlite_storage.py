@@ -2,9 +2,9 @@ import base64
 import sqlite3
 import time
 
-import flowent_api.settings as settings_module
-from flowent_api.image_assets import create_image_asset
-from flowent_api.mcp_service import MCPDiscoverySnapshot, mcp_service
+import flowent.settings as settings_module
+from flowent.image_assets import create_image_asset
+from flowent.mcp_service import MCPDiscoverySnapshot, mcp_service
 
 _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII="

@@ -4,8 +4,8 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def client(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
-    from flowent_api.access import set_access_code
+    import flowent.settings as settings_module
+    from flowent.access import set_access_code
 
     settings_file = tmp_path / "settings.json"
     monkeypatch.setattr(settings_module, "_SETTINGS_FILE", settings_file)
@@ -16,7 +16,7 @@ def client(monkeypatch, tmp_path):
     settings_module.save_settings(settings)
     monkeypatch.setattr(settings_module, "_cached_settings", None)
 
-    from flowent_api.main import app
+    from flowent.main import app
 
     with TestClient(app) as client:
         login_response = client.post(

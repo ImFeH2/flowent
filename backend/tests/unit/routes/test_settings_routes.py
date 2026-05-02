@@ -4,12 +4,12 @@ from pathlib import Path
 import pytest
 from fastapi import HTTPException
 
-from flowent_api.access import set_access_code, verify_access_code
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType, SystemEntry
-from flowent_api.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
-from flowent_api.registry import registry
-from flowent_api.routes.settings import (
+from flowent.access import set_access_code, verify_access_code
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType, SystemEntry
+from flowent.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
+from flowent.registry import registry
+from flowent.routes.settings import (
     UpdateSettingsRequest,
     UpdateTelegramSettingsRequest,
     approve_telegram_chat,
@@ -21,7 +21,7 @@ from flowent_api.routes.settings import (
     update_settings,
     update_telegram_settings,
 )
-from flowent_api.settings import (
+from flowent.settings import (
     ProviderConfig,
     RoleConfig,
     Settings,
@@ -37,7 +37,7 @@ def test_get_settings_returns_assistant_configuration(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     result = asyncio.run(get_settings_api())
 
@@ -69,8 +69,8 @@ def test_get_settings_bootstrap_returns_related_resources(monkeypatch):
         ],
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api._version.__version__", "1.2.3")
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent._version.__version__", "1.2.3")
 
     result = asyncio.run(get_settings_bootstrap())
 
@@ -193,7 +193,7 @@ def test_get_telegram_settings_masks_bot_token(monkeypatch):
         )
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     result = asyncio.run(get_telegram_settings())
 
@@ -245,13 +245,13 @@ def test_update_telegram_settings_restarts_channel_when_token_changes(monkeypatc
     saved: list[Settings] = []
     restarted: list[str] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.runtime.restart_telegram_channel",
+        "flowent.runtime.restart_telegram_channel",
         lambda: restarted.append("restart"),
     )
 
@@ -328,12 +328,12 @@ def test_approve_telegram_chat_moves_pending_chat_to_approved(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
-    monkeypatch.setattr("flowent_api.routes.settings.time.time", lambda: 42.0)
+    monkeypatch.setattr("flowent.routes.settings.time.time", lambda: 42.0)
 
     result = asyncio.run(approve_telegram_chat(3003))
 
@@ -381,9 +381,9 @@ def test_delete_pending_telegram_chat_removes_pending_chat(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
 
@@ -423,9 +423,9 @@ def test_delete_telegram_chat_removes_approved_chat(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
 
@@ -463,13 +463,13 @@ def test_update_settings_accepts_xhigh_reasoning_effort(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -493,16 +493,16 @@ def test_update_settings_rotates_access_code_and_requires_reauth(monkeypatch):
     saved: list[Settings] = []
     closed: list[dict[str, object]] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
     monkeypatch.setattr(
-        "flowent_api.routes.settings.event_bus.close_all_connections",
+        "flowent.routes.settings.event_bus.close_all_connections",
         lambda **kwargs: closed.append(kwargs),
     )
 
@@ -531,9 +531,9 @@ def test_update_settings_does_not_mutate_cached_access_when_save_fails(monkeypat
     )
     set_access_code(settings, "OLD-ACCESS-CODE")
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: (_ for _ in ()).throw(RuntimeError("disk full")),
     )
 
@@ -559,13 +559,13 @@ def test_update_settings_accepts_model_max_retries(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -600,13 +600,13 @@ def test_update_settings_accepts_model_metadata_overrides_and_token_limit(
     settings.model.active_model = "gpt-5.2"
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -642,13 +642,13 @@ def test_update_settings_accepts_model_retry_policy(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -669,7 +669,7 @@ def test_update_settings_rejects_invalid_model_retry_policy(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -693,13 +693,13 @@ def test_update_settings_accepts_model_timeout_ms(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -721,13 +721,13 @@ def test_update_settings_accepts_retry_backoff_fields(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -756,7 +756,7 @@ def test_update_settings_rejects_retry_backoff_when_max_below_initial(monkeypatc
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -782,7 +782,7 @@ def test_update_settings_rejects_non_positive_model_timeout_ms(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -806,13 +806,13 @@ def test_update_settings_persists_assistant_role(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -859,17 +859,15 @@ def test_update_settings_keeps_live_assistant_entry_semantics_for_non_steward_ro
     saved: list[Settings] = []
 
     registry.register(assistant)
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
+    monkeypatch.setattr("flowent.graph_service.sync_tab_leaders", lambda reason: None)
     monkeypatch.setattr(
-        "flowent_api.graph_service.sync_tab_leaders", lambda reason: None
-    )
-    monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     try:
@@ -909,13 +907,13 @@ def test_update_settings_persists_assistant_permissions(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -946,13 +944,13 @@ def test_update_settings_persists_working_dir(monkeypatch, tmp_path):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -977,13 +975,13 @@ def test_update_settings_resolves_assistant_write_dirs_against_new_working_dir(
     target_dir = tmp_path / "project"
     target_dir.mkdir()
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -1008,7 +1006,7 @@ def test_update_settings_rejects_blank_working_dir(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -1026,7 +1024,7 @@ def test_update_settings_rejects_missing_working_dir(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -1050,13 +1048,13 @@ def test_update_settings_persists_leader_role(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.settings.save_settings",
+        "flowent.routes.settings.save_settings",
         lambda current: saved.append(current),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = asyncio.run(
@@ -1075,7 +1073,7 @@ def test_update_settings_rejects_unknown_assistant_role(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -1093,7 +1091,7 @@ def test_update_settings_rejects_invalid_assistant_allow_network(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -1111,7 +1109,7 @@ def test_update_settings_rejects_removed_assistant_mcp_servers(monkeypatch):
         roles=[RoleConfig(name="Steward", system_prompt="Default assistant role.")]
     )
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(
@@ -1127,7 +1125,7 @@ def test_update_settings_rejects_removed_assistant_mcp_servers(monkeypatch):
 def test_update_settings_rejects_unknown_leader_role(monkeypatch):
     settings = Settings(roles=[RoleConfig(name="Conductor", system_prompt="Default.")])
 
-    monkeypatch.setattr("flowent_api.routes.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.settings.get_settings", lambda: settings)
 
     with pytest.raises(HTTPException) as excinfo:
         asyncio.run(

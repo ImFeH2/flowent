@@ -1,6 +1,6 @@
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.prompts import get_system_prompt
-from flowent_api.prompts.common import (
+from flowent.models import NodeConfig, NodeType
+from flowent.prompts import get_system_prompt
+from flowent.prompts.common import (
     ASSISTANT_ONLY_PROMPT,
     COMMUNICATION_USAGE_GUIDANCE,
     CONNECT_TOOL_GUIDANCE,
@@ -20,8 +20,8 @@ from flowent_api.prompts.common import (
     SLEEP_TOOL_GUIDANCE,
     compose_system_prompt,
 )
-from flowent_api.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
-from flowent_api.settings import (
+from flowent.prompts.steward import STEWARD_ROLE_SYSTEM_PROMPT
+from flowent.settings import (
     CONDUCTOR_ROLE_INCLUDED_TOOLS,
     CONDUCTOR_ROLE_SYSTEM_PROMPT,
     DESIGNER_ROLE_INCLUDED_TOOLS,
@@ -35,7 +35,7 @@ from flowent_api.settings import (
     build_conductor_role,
     build_designer_role,
 )
-from flowent_api.tools import MINIMUM_TOOLS
+from flowent.tools import MINIMUM_TOOLS
 
 
 def _join(*parts: str) -> str:
@@ -235,7 +235,7 @@ def test_compose_system_prompt_injects_send_guidance_when_tool_present():
 
 def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             custom_prompt="Global custom instructions.",
             custom_post_prompt="Runtime-only reminder.",
@@ -262,7 +262,7 @@ def test_get_system_prompt_reads_global_custom_prompt(monkeypatch):
 
 def test_get_system_prompt_merges_minimum_tools_for_guidance(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(
@@ -285,7 +285,7 @@ def test_get_system_prompt_reads_assistant_role_prompt_when_custom_prompt_is_emp
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             custom_prompt="",
             roles=[
@@ -343,7 +343,7 @@ def test_get_system_prompt_keeps_steward_identity_for_non_steward_assistant_role
     monkeypatch,
 ):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(
@@ -377,7 +377,7 @@ def test_get_system_prompt_keeps_steward_identity_for_non_steward_assistant_role
 
 def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[build_conductor_role()],
         ),
@@ -427,7 +427,7 @@ def test_get_system_prompt_reads_conductor_prompt_via_role_system(monkeypatch):
 
 def test_get_system_prompt_for_worker_omits_graph_creation_guidance(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[
                 RoleConfig(
@@ -453,7 +453,7 @@ def test_get_system_prompt_for_worker_omits_graph_creation_guidance(monkeypatch)
 
 def test_get_system_prompt_reads_designer_prompt_via_role_system(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             roles=[build_designer_role()],
         ),
@@ -500,7 +500,7 @@ def test_designer_default_tools_match_frontend_scope():
 
 def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(roles=[]),
     )
 
@@ -520,7 +520,7 @@ def test_get_system_prompt_falls_back_when_role_is_missing(monkeypatch):
 
 def test_get_system_prompt_falls_back_to_steward_role_for_assistant(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(roles=[]),
     )
 

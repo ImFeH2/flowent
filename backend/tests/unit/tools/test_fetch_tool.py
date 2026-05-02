@@ -1,8 +1,8 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.tools.fetch import FetchTool
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.tools.fetch import FetchTool
 
 
 class _FakeResponse:
@@ -50,7 +50,7 @@ def test_fetch_tool_streams_response_body_chunks(monkeypatch):
     chunks: list[str] = []
     _FakeClient.last_impersonate_browser = None
 
-    monkeypatch.setattr("flowent_api.tools.fetch.create_http_session", _FakeClient)
+    monkeypatch.setattr("flowent.tools.fetch.create_http_session", _FakeClient)
 
     result = json.loads(
         FetchTool().execute(

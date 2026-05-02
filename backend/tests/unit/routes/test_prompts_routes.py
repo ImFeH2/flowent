@@ -1,16 +1,16 @@
 import asyncio
 
-from flowent_api.routes.prompts import (
+from flowent.routes.prompts import (
     UpdatePromptSettingsRequest,
     get_prompts,
     update_prompts,
 )
-from flowent_api.settings import Settings
+from flowent.settings import Settings
 
 
 def test_get_prompts_returns_current_custom_prompt(monkeypatch):
     monkeypatch.setattr(
-        "flowent_api.routes.prompts.get_settings",
+        "flowent.routes.prompts.get_settings",
         lambda: Settings(
             custom_prompt="Global instructions.",
             custom_post_prompt="Runtime reminder.",
@@ -29,9 +29,9 @@ def test_update_prompts_persists_custom_prompt(monkeypatch):
     settings = Settings(custom_prompt="", custom_post_prompt="")
     saved: list[tuple[str, str]] = []
 
-    monkeypatch.setattr("flowent_api.routes.prompts.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.prompts.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.prompts.save_settings",
+        "flowent.routes.prompts.save_settings",
         lambda current: saved.append(
             (current.custom_prompt, current.custom_post_prompt)
         ),
@@ -59,9 +59,9 @@ def test_update_prompts_allows_custom_post_prompt_only(monkeypatch):
     settings = Settings(custom_prompt="Keep this.", custom_post_prompt="")
     saved: list[tuple[str, str]] = []
 
-    monkeypatch.setattr("flowent_api.routes.prompts.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.prompts.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.prompts.save_settings",
+        "flowent.routes.prompts.save_settings",
         lambda current: saved.append(
             (current.custom_prompt, current.custom_post_prompt)
         ),
@@ -85,10 +85,8 @@ def test_update_prompts_allows_custom_post_prompt_only(monkeypatch):
 def test_update_prompts_accepts_legacy_post_prompt_alias(monkeypatch):
     settings = Settings(custom_prompt="Keep this.", custom_post_prompt="")
 
-    monkeypatch.setattr("flowent_api.routes.prompts.get_settings", lambda: settings)
-    monkeypatch.setattr(
-        "flowent_api.routes.prompts.save_settings", lambda current: None
-    )
+    monkeypatch.setattr("flowent.routes.prompts.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.prompts.save_settings", lambda current: None)
 
     result = asyncio.run(
         update_prompts(

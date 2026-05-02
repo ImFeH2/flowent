@@ -2,14 +2,14 @@ import asyncio
 
 import pytest
 
-from flowent_api.channels.telegram import (
+from flowent.channels.telegram import (
     IMAGE_INPUT_UNSUPPORTED_MESSAGE,
     IMAGE_OUTPUT_UNSUPPORTED_MESSAGE,
     PRIVATE_ONLY_MESSAGE,
     TelegramChannel,
 )
-from flowent_api.models import Event, EventType
-from flowent_api.settings import (
+from flowent.models import Event, EventType
+from flowent.settings import (
     Settings,
     TelegramApprovedChat,
     TelegramPendingChat,
@@ -60,7 +60,7 @@ def test_telegram_channel_replies_with_private_only_message_for_group_chat(
     settings = Settings(telegram=TelegramSettings(bot_token="123456:ABCDE"))
     sent_messages: list[tuple[int, str, bool]] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
 
     channel = TelegramChannel()
 
@@ -92,9 +92,9 @@ def test_telegram_channel_tracks_pending_private_chat_and_replies_with_chat_id(
     saved: list[Settings] = []
     sent_messages: list[tuple[int, str, bool]] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.save_settings",
+        "flowent.channels.telegram.save_settings",
         lambda current: saved.append(current),
     )
 
@@ -157,9 +157,9 @@ def test_telegram_channel_delivers_messages_from_approved_private_chat(monkeypat
     )
     assistant = DummyAssistant()
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.registry.get_assistant",
+        "flowent.channels.telegram.registry.get_assistant",
         lambda: assistant,
     )
 
@@ -200,9 +200,9 @@ def test_telegram_channel_rejects_image_input_from_approved_private_chat(monkeyp
     assistant = DummyAssistant()
     sent_messages: list[tuple[int, str, bool]] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.registry.get_assistant",
+        "flowent.channels.telegram.registry.get_assistant",
         lambda: assistant,
     )
 
@@ -250,9 +250,9 @@ def test_telegram_channel_sends_typing_while_running_before_first_visible_text(
     assistant = DummyAssistant()
     sent_actions: list[tuple[int, str]] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.registry.get_assistant",
+        "flowent.channels.telegram.registry.get_assistant",
         lambda: assistant,
     )
 
@@ -265,7 +265,7 @@ def test_telegram_channel_sends_typing_while_running_before_first_visible_text(
         channel._assistant_running = False
 
     monkeypatch.setattr(channel, "_send_chat_action", fake_send_chat_action)
-    monkeypatch.setattr("flowent_api.channels.telegram.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("flowent.channels.telegram.asyncio.sleep", fake_sleep)
 
     async def run_test() -> None:
         await channel._process_event(
@@ -300,7 +300,7 @@ def test_telegram_channel_stops_typing_after_first_visible_text(monkeypatch):
     sent_messages: list[tuple[int, str, bool]] = []
     sent_actions: list[tuple[int, str]] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
 
     channel = TelegramChannel()
 
@@ -343,9 +343,9 @@ def test_telegram_channel_sends_explicit_notice_for_image_output(monkeypatch):
     assistant = DummyAssistant()
     sent_messages: list[tuple[int, str, bool]] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.registry.get_assistant",
+        "flowent.channels.telegram.registry.get_assistant",
         lambda: assistant,
     )
 
@@ -390,9 +390,9 @@ def test_telegram_channel_ignores_tool_progress_events(monkeypatch):
     assistant = DummyAssistant()
     broadcast_messages: list[str] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.registry.get_assistant",
+        "flowent.channels.telegram.registry.get_assistant",
         lambda: assistant,
     )
 
@@ -439,9 +439,9 @@ def test_telegram_channel_stops_without_placeholder_when_running_ends_no_content
     sent_messages: list[tuple[int, str, bool]] = []
     sent_actions: list[tuple[int, str]] = []
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.registry.get_assistant",
+        "flowent.channels.telegram.registry.get_assistant",
         lambda: assistant,
     )
 
@@ -465,7 +465,7 @@ def test_telegram_channel_stops_without_placeholder_when_running_ends_no_content
 
     monkeypatch.setattr(channel, "_send_message", fake_send_message)
     monkeypatch.setattr(channel, "_send_chat_action", fake_send_chat_action)
-    monkeypatch.setattr("flowent_api.channels.telegram.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("flowent.channels.telegram.asyncio.sleep", fake_sleep)
 
     async def run_test() -> None:
         await channel._process_event(
@@ -504,7 +504,7 @@ def test_telegram_channel_stop_cancels_typing_task_on_app_loop(monkeypatch):
             callback()
 
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.event_bus.unsubscribe", lambda _: None
+        "flowent.channels.telegram.event_bus.unsubscribe", lambda _: None
     )
 
     channel = TelegramChannel()
@@ -527,9 +527,9 @@ def test_telegram_channel_call_api_uses_shared_async_transport(monkeypatch):
         _FakeTelegramResponse(200, {"ok": True, "result": {"message_id": 1}})
     )
 
-    monkeypatch.setattr("flowent_api.channels.telegram.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.channels.telegram.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.channels.telegram.create_async_http_session",
+        "flowent.channels.telegram.create_async_http_session",
         lambda timeout: fake_session,
     )
 

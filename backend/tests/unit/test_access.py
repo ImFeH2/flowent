@@ -1,11 +1,11 @@
 from loguru import logger
 
-from flowent_api.access import (
+from flowent.access import (
     ensure_access_bootstrap,
     is_access_configured,
     set_access_code,
 )
-from flowent_api.settings import Settings
+from flowent.settings import Settings
 
 
 def test_ensure_access_bootstrap_generates_and_logs_access_code() -> None:

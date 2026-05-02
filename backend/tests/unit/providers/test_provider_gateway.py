@@ -1,8 +1,8 @@
 import pytest
 
-from flowent_api.providers.errors import LLMProviderError
-from flowent_api.providers.gateway import ProviderGateway
-from flowent_api.settings import (
+from flowent.providers.errors import LLMProviderError
+from flowent.providers.gateway import ProviderGateway
+from flowent.settings import (
     ModelParams,
     ModelSettings,
     ProviderConfig,
@@ -16,11 +16,11 @@ def test_gateway_requires_active_provider(monkeypatch):
     gateway = ProviderGateway()
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(model=ModelSettings(active_provider_id="", active_model="")),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.registry.create_provider",
+        "flowent.providers.registry.create_provider",
         lambda **kwargs: (_ for _ in ()).throw(
             AssertionError("create_provider should not be called")
         ),
@@ -34,7 +34,7 @@ def test_gateway_requires_active_model(monkeypatch):
     gateway = ProviderGateway()
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             model=ModelSettings(active_provider_id="provider-1", active_model=""),
             providers=[
@@ -49,7 +49,7 @@ def test_gateway_requires_active_model(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        "flowent_api.providers.registry.create_provider",
+        "flowent.providers.registry.create_provider",
         lambda **kwargs: (_ for _ in ()).throw(
             AssertionError("create_provider should not be called")
         ),
@@ -64,7 +64,7 @@ def test_gateway_prefers_role_model(monkeypatch):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 active_provider_id="provider-1",
@@ -128,7 +128,7 @@ def test_gateway_prefers_role_model(monkeypatch):
             return []
 
     monkeypatch.setattr(
-        "flowent_api.providers.registry.create_provider",
+        "flowent.providers.registry.create_provider",
         lambda **kwargs: (
             captured.update(
                 {
@@ -155,7 +155,7 @@ def test_gateway_omits_model_params_when_all_values_are_empty(monkeypatch):
     captured: dict[str, bool] = {}
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 active_provider_id="provider-1",
@@ -194,7 +194,7 @@ def test_gateway_omits_model_params_when_all_values_are_empty(monkeypatch):
             return []
 
     monkeypatch.setattr(
-        "flowent_api.providers.registry.create_provider",
+        "flowent.providers.registry.create_provider",
         lambda **kwargs: ProviderStub(),
     )
 
@@ -208,7 +208,7 @@ def test_gateway_passes_provider_headers_to_registry(monkeypatch):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 active_provider_id="provider-1",
@@ -246,7 +246,7 @@ def test_gateway_passes_provider_headers_to_registry(monkeypatch):
             return []
 
     monkeypatch.setattr(
-        "flowent_api.providers.registry.create_provider",
+        "flowent.providers.registry.create_provider",
         lambda **kwargs: captured.update(kwargs) or ProviderStub(),
     )
 
@@ -260,7 +260,7 @@ def test_gateway_list_models_does_not_reuse_model_timeout(monkeypatch):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 active_provider_id="provider-1",
@@ -298,7 +298,7 @@ def test_gateway_list_models_does_not_reuse_model_timeout(monkeypatch):
             return []
 
     monkeypatch.setattr(
-        "flowent_api.providers.registry.create_provider",
+        "flowent.providers.registry.create_provider",
         lambda **kwargs: captured.update(kwargs) or ProviderStub(),
     )
 
@@ -312,7 +312,7 @@ def test_gateway_passes_custom_timeout_to_chat_provider(monkeypatch):
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(
             model=ModelSettings(
                 active_provider_id="provider-1",
@@ -350,7 +350,7 @@ def test_gateway_passes_custom_timeout_to_chat_provider(monkeypatch):
             return []
 
     monkeypatch.setattr(
-        "flowent_api.providers.registry.create_provider",
+        "flowent.providers.registry.create_provider",
         lambda **kwargs: captured.update(kwargs) or ProviderStub(),
     )
 

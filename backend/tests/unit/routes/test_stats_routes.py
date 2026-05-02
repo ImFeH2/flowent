@@ -3,22 +3,22 @@ import asyncio
 import pytest
 from fastapi import HTTPException
 
-from flowent_api.agent import Agent
-from flowent_api.models import AgentState, NodeConfig, NodeType, Tab
-from flowent_api.registry import registry
-from flowent_api.routes.stats import get_stats
-from flowent_api.settings import ModelSettings, ProviderConfig, Settings
-from flowent_api.stats_service import (
+from flowent.agent import Agent
+from flowent.models import AgentState, NodeConfig, NodeType, Tab
+from flowent.registry import registry
+from flowent.routes.stats import get_stats
+from flowent.settings import ModelSettings, ProviderConfig, Settings
+from flowent.stats_service import (
     CompactRecordInput,
     RequestRecordInput,
     stats_store,
 )
-from flowent_api.workspace_store import workspace_store
+from flowent.workspace_store import workspace_store
 
 
 @pytest.fixture(autouse=True)
 def reset_stats_route_state(monkeypatch, tmp_path):
-    import flowent_api.settings as settings_module
+    import flowent.settings as settings_module
 
     settings_file = tmp_path / "settings.json"
     settings_file.write_text("{}", encoding="utf-8")
@@ -50,7 +50,7 @@ def test_get_stats_returns_current_snapshots_and_recent_records(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr("flowent_api.routes.stats.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.stats.get_settings", lambda: settings)
 
     workspace_store.upsert_tab(Tab(id="tab-1", title="Main Task", leader_id="leader-1"))
     leader = Agent(
@@ -66,7 +66,7 @@ def test_get_stats_returns_current_snapshots_and_recent_records(monkeypatch):
     registry.register(leader)
 
     now = 1_760_000_000.0
-    monkeypatch.setattr("flowent_api.routes.stats.time.time", lambda: now)
+    monkeypatch.setattr("flowent.routes.stats.time.time", lambda: now)
     stats_store.record_request(
         RequestRecordInput(
             node_id="leader-1",

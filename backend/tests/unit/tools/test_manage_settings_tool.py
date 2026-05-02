@@ -1,8 +1,8 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.settings import (
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.settings import (
     AssistantSettings,
     EventLogSettings,
     LeaderSettings,
@@ -12,7 +12,7 @@ from flowent_api.settings import (
     Settings,
     build_assistant_write_dirs,
 )
-from flowent_api.tools.manage_settings import ManageSettingsTool
+from flowent.tools.manage_settings import ManageSettingsTool
 
 
 def test_manage_settings_get_returns_current_settings(monkeypatch):
@@ -28,7 +28,7 @@ def test_manage_settings_get_returns_current_settings(monkeypatch):
         model=ModelSettings(active_provider_id="provider-1", active_model="gpt-4o"),
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(ManageSettingsTool().execute(agent, {"action": "get"}))
 
@@ -78,12 +78,12 @@ def test_manage_settings_update_changes_active_provider_and_model(monkeypatch):
     saved: list[Settings] = []
     invalidations: list[str] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache",
+        "flowent.providers.gateway.gateway.invalidate_cache",
         lambda: invalidations.append("invalidate"),
     )
 
@@ -138,12 +138,12 @@ def test_manage_settings_update_changes_assistant_role(monkeypatch):
     expected_write_dirs = list(settings.assistant.write_dirs)
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -170,10 +170,10 @@ def test_manage_settings_update_changes_assistant_permissions(monkeypatch):
     settings = Settings()
     expected_write_dirs = build_assistant_write_dirs([" ./tmp ", "./tmp/", ""])
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -200,10 +200,10 @@ def test_manage_settings_update_changes_working_dir(monkeypatch, tmp_path):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -229,10 +229,10 @@ def test_manage_settings_update_resolves_write_dirs_against_new_working_dir(
     target_dir = tmp_path / "project"
     target_dir.mkdir()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -256,7 +256,7 @@ def test_manage_settings_update_rejects_blank_working_dir(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageSettingsTool().execute(
@@ -281,12 +281,12 @@ def test_manage_settings_update_changes_leader_role(monkeypatch):
     )
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -308,10 +308,10 @@ def test_manage_settings_update_changes_max_retries(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -332,10 +332,10 @@ def test_manage_settings_update_changes_retry_policy(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -356,10 +356,10 @@ def test_manage_settings_update_changes_timeout_ms(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -380,10 +380,10 @@ def test_manage_settings_update_changes_retry_backoff(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -424,10 +424,10 @@ def test_manage_settings_update_changes_model_metadata_overrides_and_token_limit
     settings.model.active_provider_id = "provider-1"
     settings.model.active_model = "gpt-5.2"
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(
@@ -460,7 +460,7 @@ def test_manage_settings_update_rejects_non_positive_timeout_ms(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageSettingsTool().execute(
@@ -479,7 +479,7 @@ def test_manage_settings_update_rejects_invalid_retry_policy(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageSettingsTool().execute(
@@ -504,7 +504,7 @@ def test_manage_settings_update_rejects_retry_backoff_when_max_below_initial(
     original_retry_initial_delay_seconds = settings.model.retry_initial_delay_seconds
     original_retry_max_delay_seconds = settings.model.retry_max_delay_seconds
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageSettingsTool().execute(
@@ -531,7 +531,7 @@ def test_manage_settings_update_rejects_unknown_assistant_role(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(roles=[RoleConfig(name="Steward", system_prompt="Default.")])
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageSettingsTool().execute(
@@ -550,7 +550,7 @@ def test_manage_settings_update_rejects_invalid_assistant_allow_network(monkeypa
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageSettingsTool().execute(
@@ -569,7 +569,7 @@ def test_manage_settings_update_rejects_unknown_leader_role(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings(roles=[RoleConfig(name="Conductor", system_prompt="Default.")])
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(
         ManageSettingsTool().execute(
@@ -588,10 +588,10 @@ def test_manage_settings_update_accepts_xhigh_reasoning_effort(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_settings"]))
     settings = Settings()
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
     monkeypatch.setattr(
-        "flowent_api.providers.gateway.gateway.invalidate_cache", lambda: None
+        "flowent.providers.gateway.gateway.invalidate_cache", lambda: None
     )
 
     result = json.loads(

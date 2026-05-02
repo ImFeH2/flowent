@@ -4,7 +4,7 @@ import json
 from collections.abc import Iterator
 from typing import Any, Literal
 
-from flowent_api.providers.openai import OpenAIProvider
+from flowent.providers.openai import OpenAIProvider
 
 
 class _FakeStreamResponse:

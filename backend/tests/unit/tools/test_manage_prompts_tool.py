@@ -1,9 +1,9 @@
 import json
 
-from flowent_api.agent import Agent
-from flowent_api.models import NodeConfig, NodeType
-from flowent_api.settings import Settings
-from flowent_api.tools.manage_prompts import ManagePromptsTool
+from flowent.agent import Agent
+from flowent.models import NodeConfig, NodeType
+from flowent.settings import Settings
+from flowent.tools.manage_prompts import ManagePromptsTool
 
 
 def test_manage_prompts_get_returns_current_prompt(monkeypatch):
@@ -13,7 +13,7 @@ def test_manage_prompts_get_returns_current_prompt(monkeypatch):
         custom_post_prompt="Stay routed.",
     )
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
 
     result = json.loads(ManagePromptsTool().execute(agent, {"action": "get"}))
 
@@ -28,9 +28,9 @@ def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
     settings = Settings(custom_prompt="", custom_post_prompt="")
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.settings.save_settings", lambda current: saved.append(current)
+        "flowent.settings.save_settings", lambda current: saved.append(current)
     )
 
     result = json.loads(
@@ -55,7 +55,7 @@ def test_manage_prompts_update_saves_custom_prompt(monkeypatch):
 
 def test_manage_prompts_update_requires_prompt_field(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: Settings())
 
     result = json.loads(
         ManagePromptsTool().execute(
@@ -71,8 +71,8 @@ def test_manage_prompts_update_allows_custom_post_prompt_only(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
     settings = Settings(custom_prompt="Keep this.", custom_post_prompt="")
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
 
     result = json.loads(
         ManagePromptsTool().execute(
@@ -96,8 +96,8 @@ def test_manage_prompts_update_accepts_legacy_post_prompt_alias(monkeypatch):
     agent = Agent(NodeConfig(node_type=NodeType.ASSISTANT, tools=["manage_prompts"]))
     settings = Settings(custom_prompt="Keep this.", custom_post_prompt="")
 
-    monkeypatch.setattr("flowent_api.settings.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.settings.save_settings", lambda current: None)
+    monkeypatch.setattr("flowent.settings.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.settings.save_settings", lambda current: None)
 
     result = json.loads(
         ManagePromptsTool().execute(

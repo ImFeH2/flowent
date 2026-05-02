@@ -1,5 +1,5 @@
 [project]
-name = "flowent-api"
+name = "flowent"
 version = "0.0.1"
 description = "Add your description here"
 authors = [
@@ -28,7 +28,7 @@ dev = [
 ]
 
 [project.scripts]
-flowent-api = "flowent_api:main"
+flowent = "flowent:main"
 
 [build-system]
 requires = ["uv_build>=0.8.14,<0.9.0"]

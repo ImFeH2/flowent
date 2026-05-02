@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from flowent_api.settings import (
+from flowent.settings import (
     CONDUCTOR_ROLE_NAME,
     ProviderConfig,
     RoleConfig,
@@ -44,7 +44,7 @@ def test_roles_bootstrap_includes_tools_and_providers(client: TestClient, monkey
         ],
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     response = client.get("/api/roles/bootstrap")
 
@@ -73,9 +73,9 @@ def test_create_role_rejects_duplicate_name(client: TestClient, monkeypatch):
     settings = Settings(roles=[RoleConfig(name="Writer", system_prompt="draft")])
     saved: list[Settings] = []
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.roles.save_settings",
+        "flowent.routes.roles.save_settings",
         lambda updated: saved.append(updated),
     )
 
@@ -106,9 +106,9 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
     )
     saved: list[list[tuple[str, str]]] = []
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
     monkeypatch.setattr(
-        "flowent_api.routes.roles.save_settings",
+        "flowent.routes.roles.save_settings",
         lambda updated: saved.append(
             [(role.name, role.system_prompt) for role in updated.roles]
         ),
@@ -156,7 +156,7 @@ def test_update_and_delete_role_use_name_path(client: TestClient, monkeypatch):
 def test_delete_builtin_role_returns_error(client: TestClient, monkeypatch):
     settings = Settings(roles=[RoleConfig(name="Worker", system_prompt="Do work.")])
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
 
     response = client.delete("/api/roles/Worker")
 
@@ -168,7 +168,7 @@ def test_create_role_rejects_overlapping_included_and_excluded_tools(
     client: TestClient,
     monkeypatch,
 ):
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: Settings())
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: Settings())
 
     response = client.post(
         "/api/roles",
@@ -200,8 +200,8 @@ def test_create_role_accepts_model_override(client: TestClient, monkeypatch):
         ]
     )
 
-    monkeypatch.setattr("flowent_api.routes.roles.get_settings", lambda: settings)
-    monkeypatch.setattr("flowent_api.routes.roles.save_settings", lambda updated: None)
+    monkeypatch.setattr("flowent.routes.roles.get_settings", lambda: settings)
+    monkeypatch.setattr("flowent.routes.roles.save_settings", lambda updated: None)
 
     response = client.post(
         "/api/roles",

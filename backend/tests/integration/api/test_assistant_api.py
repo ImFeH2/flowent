@@ -1,14 +1,14 @@
 import base64
 from uuid import UUID
 
-from flowent_api.models import (
+from flowent.models import (
     AssistantText,
     ImagePart,
     LLMResponse,
     ReceivedMessage,
     TextPart,
 )
-from flowent_api.registry import registry
+from flowent.registry import registry
 
 _ONE_PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII="
@@ -89,7 +89,7 @@ def test_compact_command_replaces_history_with_summary(monkeypatch, client):
     )
 
     monkeypatch.setattr(
-        "flowent_api.agent.gateway.chat",
+        "flowent.agent.gateway.chat",
         lambda *args, **kwargs: LLMResponse(
             content=(
                 "## Current Goal\nShip the slash commands.\n\n"

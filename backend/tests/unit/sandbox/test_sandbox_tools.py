@@ -1,5 +1,5 @@
-from flowent_api.sandbox import build_bwrap_cmd
-from flowent_api.settings import Settings
+from flowent.sandbox import build_bwrap_cmd
+from flowent.settings import Settings
 
 
 def test_build_bwrap_cmd_mounts_cwd_read_only_and_chdirs_into_it(tmp_path):
@@ -64,7 +64,7 @@ def test_build_bwrap_cmd_resolves_relative_write_dirs_against_working_dir(
     writable.mkdir()
 
     monkeypatch.setattr(
-        "flowent_api.settings.get_settings",
+        "flowent.settings.get_settings",
         lambda: Settings(working_dir=str(tmp_path)),
     )
 

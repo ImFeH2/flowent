@@ -2,7 +2,6 @@ import "@/styles/App.css";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
-  KeyRound,
   LoaderCircle,
   LogOut,
   PanelLeftClose,
@@ -321,30 +320,12 @@ function AccessGate() {
               onSubmit={(event) => void handleSubmit(event)}
             >
               <div className="flex flex-col items-center text-center">
-                <div className="relative">
-                  <div
-                    aria-hidden="true"
-                    className="absolute -inset-2 rounded-2xl border border-border/60"
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="absolute -inset-1 rounded-xl bg-gradient-to-b from-accent/45 via-accent/10 to-transparent opacity-80 blur-md"
-                  />
-                  <div className="relative flex size-12 items-center justify-center rounded-xl border border-border bg-background/55 text-foreground backdrop-blur">
-                    <KeyRound className="size-5" aria-hidden="true" />
-                  </div>
-                </div>
-
-                <h1 className="mt-6 text-[22px] font-medium leading-tight tracking-tight text-foreground">
+                <h1 className="text-[22px] font-medium leading-tight tracking-tight text-foreground">
                   Enter access code
                 </h1>
-                <p className="mt-2 max-w-[300px] text-[13px] leading-snug text-muted-foreground">
-                  Find the one-time code printed in your Flowent startup log,
-                  then paste it below to unlock the workspace.
-                </p>
               </div>
 
-              <div className="mt-7 space-y-3.5">
+              <div className="mt-6 space-y-3.5">
                 <div className="space-y-2">
                   <label
                     htmlFor="access-code"

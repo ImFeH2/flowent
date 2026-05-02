@@ -7,7 +7,6 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  ShieldCheck,
 } from "lucide-react";
 import {
   Suspense,
@@ -95,9 +94,6 @@ const accessInputClass =
 
 const accessButtonClass =
   "flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-[13px] font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
-
-const accessHintClass =
-  "rounded-xl border border-border/80 bg-background/35 px-3.5 py-3 text-[12px] leading-5 text-muted-foreground";
 
 function AppContent() {
   const { currentPage } = useAgentUI();
@@ -269,9 +265,9 @@ function AccessGate() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const accessUnavailable = state.requires_restart;
-  const description = accessUnavailable
-    ? "Access was reset locally. Restart Flowent to generate a new access code in the startup log."
-    : "Use the access code printed in the local startup log to continue.";
+  const restartMessage =
+    "Access was reset locally. Restart Flowent to generate a new access code.";
+  const feedbackMessage = accessUnavailable ? restartMessage : error;
 
   const handleSubmit = async (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
@@ -279,7 +275,7 @@ function AccessGate() {
       return;
     }
     if (!code.trim()) {
-      setError("Enter the access code from the startup log");
+      setError("Enter the access code");
       return;
     }
     setSubmitting(true);
@@ -308,34 +304,24 @@ function AccessGate() {
             transition={{ duration: 0.24, ease: "easeOut" }}
             onSubmit={(event) => void handleSubmit(event)}
           >
-            <div className="flex items-start gap-3.5">
+            <div className="flex items-center gap-3.5">
               <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-accent/40 text-foreground">
                 <KeyRound className="size-5" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <p className="text-[12px] font-medium tracking-normal text-muted-foreground">
-                  Flowent
-                </p>
-                <h1 className="mt-1 text-[24px] font-medium tracking-normal text-foreground">
+                <h1 className="text-[24px] font-medium tracking-normal text-foreground">
                   Enter Access Code
                 </h1>
               </div>
             </div>
 
-            <p
-              id="access-code-description"
-              className="mt-5 text-[13px] leading-6 text-muted-foreground"
-            >
-              {description}
-            </p>
-
-            <div className="mt-6 space-y-4">
+            <div className="mt-7 space-y-4">
               <div className="space-y-2">
                 <label
                   htmlFor="access-code"
                   className="text-[12px] font-medium text-foreground/80"
                 >
-                  Access Code
+                  Startup Log Access Code
                 </label>
                 <SecretInput
                   id="access-code"
@@ -346,15 +332,17 @@ function AccessGate() {
                   spellCheck={false}
                   value={code}
                   disabled={submitting || accessUnavailable}
-                  aria-describedby="access-code-description access-code-feedback"
-                  aria-invalid={Boolean(error)}
+                  aria-describedby={
+                    feedbackMessage ? "access-code-feedback" : undefined
+                  }
+                  aria-invalid={Boolean(feedbackMessage)}
                   onChange={(event) => {
                     setCode(event.target.value);
                     if (error) {
                       setError("");
                     }
                   }}
-                  placeholder="Enter access code"
+                  placeholder="Paste access code"
                   showLabel="Show access code"
                   hideLabel="Hide access code"
                   buttonSize="default"
@@ -364,9 +352,9 @@ function AccessGate() {
               </div>
 
               <AnimatePresence mode="wait" initial={false}>
-                {error ? (
+                {feedbackMessage ? (
                   <motion.p
-                    key="error"
+                    key={accessUnavailable ? "restart" : "error"}
                     id="access-code-feedback"
                     role="alert"
                     initial={{ opacity: 0, y: -4 }}
@@ -375,29 +363,9 @@ function AccessGate() {
                     transition={{ duration: 0.16 }}
                     className="rounded-xl border border-graph-status-error/30 bg-graph-status-error/10 px-3.5 py-3 text-[12px] leading-5 text-graph-status-error"
                   >
-                    {error}
+                    {feedbackMessage}
                   </motion.p>
-                ) : (
-                  <motion.div
-                    key="hint"
-                    id="access-code-feedback"
-                    role="status"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 4 }}
-                    transition={{ duration: 0.16 }}
-                    className={cn(accessHintClass, "flex gap-2.5")}
-                  >
-                    <ShieldCheck
-                      className="mt-0.5 size-3.5 shrink-0 text-foreground/70"
-                      aria-hidden="true"
-                    />
-                    <span>
-                      This browser stays unlocked until you sign out or the
-                      access code changes.
-                    </span>
-                  </motion.div>
-                )}
+                ) : null}
               </AnimatePresence>
 
               <Button
@@ -411,7 +379,7 @@ function AccessGate() {
                 ) : (
                   <ArrowRight className="size-4" />
                 )}
-                {submitting ? "Verifying..." : "Unlock Flowent"}
+                {submitting ? "Verifying..." : "Unlock"}
               </Button>
             </div>
           </motion.form>

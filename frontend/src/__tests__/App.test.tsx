@@ -46,9 +46,7 @@ describe("App access gate", () => {
     render(<App />);
 
     expect(
-      screen.getByText(
-        /Use the access code printed in the local startup log to continue/i,
-      ),
+      screen.getByLabelText(/Startup Log Access Code/i),
     ).toBeInTheDocument();
   });
 
@@ -63,9 +61,7 @@ describe("App access gate", () => {
     render(<App />);
 
     expect(
-      screen.getByText(
-        /Use the access code printed in the local startup log to continue/i,
-      ),
+      screen.getByLabelText(/Startup Log Access Code/i),
     ).toBeInTheDocument();
   });
 
@@ -81,7 +77,7 @@ describe("App access gate", () => {
 
     expect(
       screen.getByText(
-        /Access was reset locally\. Restart Flowent to generate a new access code in the startup log\./i,
+        /Access was reset locally\. Restart Flowent to generate a new access code\./i,
       ),
     ).toBeInTheDocument();
   });

@@ -296,7 +296,7 @@ function AccessGate() {
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.32, delay: 0.04, ease: "easeOut" }}
-          className="mb-7 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.32em] text-muted-foreground/80"
+          className="mb-7 flex items-center gap-2 text-[12px] font-medium tracking-[0.04em] text-muted-foreground/80"
         >
           <span
             aria-hidden="true"
@@ -329,7 +329,7 @@ function AccessGate() {
                 <div className="space-y-2">
                   <label
                     htmlFor="access-code"
-                    className="block text-[10.5px] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+                    className="block text-[12px] font-medium text-foreground/80"
                   >
                     Startup Log Access Code
                   </label>

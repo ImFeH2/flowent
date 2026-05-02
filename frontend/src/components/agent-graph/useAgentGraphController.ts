@@ -29,7 +29,9 @@ import type {
   AgentGraphController,
   AgentGraphProps,
   AgentNodeData,
+  QuickCreateState,
 } from "@/components/agent-graph/lib";
+import type { Node as RuntimeNode } from "@/types";
 import {
   EDGE_EXIT_MS,
   LAYOUT_RETRY_LIMIT,
@@ -173,6 +175,11 @@ export function useAgentGraphController({
   onConnectModeChange,
   onCreateConnection = async () => undefined,
   onDeleteConnection = async () => undefined,
+  onCreateStandaloneAgent = async () => undefined,
+  onCreateLinkedAgent = async () => undefined,
+  onDeleteAgent = async () => undefined,
+  onInsertAgentBetween = async () => undefined,
+  onOpenConnectDialog = () => undefined,
 }: AgentGraphProps): AgentGraphController {
   const { agents } = useAgentNodesRuntime();
   const { tabs } = useAgentTabsRuntime();
@@ -181,12 +188,20 @@ export function useAgentGraphController({
   const [tooltip, setTooltip] = useState<AgentGraphController["tooltip"]>(null);
   const [contextMenu, setContextMenu] =
     useState<AgentGraphController["contextMenu"]>(null);
+  const [quickCreate, setQuickCreate] =
+    useState<AgentGraphController["quickCreate"]>(null);
+  const [quickCreateName, setQuickCreateName] = useState("");
+  const [quickCreateRoleName, setQuickCreateRoleName] = useState("");
+  const [submittingQuickCreate, setSubmittingQuickCreate] = useState(false);
   const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(
     null,
   );
   const [viewportZoom, setViewportZoom] = useState(1);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [connectMode, setConnectMode] = useState(false);
+  const [targetPickSourceId, setTargetPickSourceId] = useState<string | null>(
+    null,
+  );
   const layoutWorker = useRef<Worker | null>(null);
   const requestedLayoutKey = useRef("");
   const layoutRetryCounts = useRef(new Map<string, number>());
@@ -211,6 +226,10 @@ export function useAgentGraphController({
   const workflowEdges = useMemo(
     () => activeTab?.definition.edges ?? [],
     [activeTab?.definition.edges],
+  );
+  const workflowNodeMap = useMemo(
+    () => new Map(workflowNodes.map((node) => [node.id, node] as const)),
+    [workflowNodes],
   );
 
   const scheduleLayoutRetry = useCallback(
@@ -347,6 +366,99 @@ export function useAgentGraphController({
     [agents],
   );
 
+  const buildDefinitionAgentNode = useCallback(
+    (nodeId: string): RuntimeNode | null => {
+      const workflowNode = workflowNodeMap.get(nodeId);
+      if (!workflowNode || workflowNode.type !== "agent") {
+        return null;
+      }
+
+      return {
+        id: workflowNode.id,
+        node_type: "agent",
+        tab_id: activeTabId,
+        is_leader: false,
+        state: "idle",
+        connections: workflowEdges
+          .filter((edge) => edge.from_node_id === workflowNode.id)
+          .map((edge) => edge.to_node_id),
+        name:
+          typeof workflowNode.config.name === "string"
+            ? workflowNode.config.name
+            : null,
+        todos: [],
+        role_name:
+          typeof workflowNode.config.role_name === "string"
+            ? workflowNode.config.role_name
+            : null,
+      };
+    },
+    [activeTabId, workflowEdges, workflowNodeMap],
+  );
+
+  const getContextAgentNode = useCallback(
+    (nodeId: string): RuntimeNode | null =>
+      runtimeAgentMap.get(nodeId) ?? buildDefinitionAgentNode(nodeId),
+    [buildDefinitionAgentNode, runtimeAgentMap],
+  );
+
+  const workflowRuntimeNodes = useMemo(
+    () =>
+      workflowNodes.flatMap((node) => {
+        const runtimeNode = runtimeAgentMap.get(node.id);
+        if (runtimeNode) {
+          return [runtimeNode];
+        }
+        const definitionNode = buildDefinitionAgentNode(node.id);
+        return definitionNode ? [definitionNode] : [];
+      }),
+    [buildDefinitionAgentNode, runtimeAgentMap, workflowNodes],
+  );
+  const getConnectionPorts = useCallback(
+    (sourceNodeId: string, targetNodeId: string) => {
+      const sourceNode = workflowNodeMap.get(sourceNodeId);
+      const targetNode = workflowNodeMap.get(targetNodeId);
+      const sourcePort =
+        sourceNode?.outputs.find((output) =>
+          targetNode?.inputs.some((input) => input.kind === output.kind),
+        ) ?? sourceNode?.outputs[0];
+      const targetPort =
+        sourcePort && targetNode
+          ? (targetNode.inputs.find(
+              (input) => input.kind === sourcePort.kind,
+            ) ?? targetNode.inputs[0])
+          : null;
+
+      if (!sourcePort || !targetPort) {
+        return null;
+      }
+      return {
+        sourcePortKey: sourcePort.key,
+        targetPortKey: targetPort.key,
+      };
+    },
+    [workflowNodeMap],
+  );
+  const isValidDirectConnection = useCallback(
+    (sourceNodeId: string, targetNodeId: string) => {
+      if (sourceNodeId === targetNodeId) {
+        return false;
+      }
+      const ports = getConnectionPorts(sourceNodeId, targetNodeId);
+      if (!ports) {
+        return false;
+      }
+      return !workflowEdges.some(
+        (edge) =>
+          edge.from_node_id === sourceNodeId &&
+          edge.from_port_key === ports.sourcePortKey &&
+          edge.to_node_id === targetNodeId &&
+          edge.to_port_key === ports.targetPortKey,
+      );
+    },
+    [getConnectionPorts, workflowEdges],
+  );
+
   const transientData = useMemo(() => {
     const data = new Map<string, AgentNodeData>();
 
@@ -379,8 +491,15 @@ export function useAgentGraphController({
         toolCall: runtimeNode ? (activeToolCalls.get(node.id) ?? null) : null,
         leaving: false,
         canConnect: Boolean(activeTabId),
-        showConnectionEntryHint: connectMode,
-        connectionState: null,
+        showConnectionEntryHint: connectMode || Boolean(targetPickSourceId),
+        connectionState:
+          targetPickSourceId === node.id
+            ? "source"
+            : targetPickSourceId
+              ? isValidDirectConnection(targetPickSourceId, node.id)
+                ? "valid-target"
+                : "invalid-target"
+              : null,
         inputPorts: node.inputs,
         outputPorts: node.outputs,
       });
@@ -391,9 +510,11 @@ export function useAgentGraphController({
     activeTabId,
     activeToolCalls,
     connectMode,
+    isValidDirectConnection,
     runtimeAgentMap,
     selectedAgentId,
     selectedEdgeId,
+    targetPickSourceId,
     workflowNodes,
   ]);
 
@@ -499,16 +620,74 @@ export function useAgentGraphController({
   const { nodes: animatedNodes, edges: animatedEdges } =
     useTransientGraphElements(graphElements.nodes, graphElements.edges);
 
+  const closeQuickCreate = useCallback(() => {
+    setQuickCreate(null);
+    setQuickCreateName("");
+    setQuickCreateRoleName("");
+    setSubmittingQuickCreate(false);
+  }, []);
+
+  const openQuickCreate = useCallback((state: QuickCreateState) => {
+    setQuickCreate(state);
+    setQuickCreateName("");
+    setQuickCreateRoleName("");
+    setSubmittingQuickCreate(false);
+    setContextMenu(null);
+    setTooltip(null);
+  }, []);
+
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
+      if (targetPickSourceId && activeTabId) {
+        if (node.id === targetPickSourceId) {
+          return;
+        }
+        if (!isValidDirectConnection(targetPickSourceId, node.id)) {
+          toast.error("This connection is not available");
+          return;
+        }
+        const ports = getConnectionPorts(targetPickSourceId, node.id);
+        if (!ports) {
+          toast.error("This connection is not available");
+          return;
+        }
+        void onCreateConnection(
+          activeTabId,
+          targetPickSourceId,
+          node.id,
+          ports.sourcePortKey,
+          ports.targetPortKey,
+        )
+          .then(() => {
+            setTargetPickSourceId(null);
+            setConnectMode(false);
+            setSelectedEdgeId(null);
+          })
+          .catch((error) => {
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : "Failed to connect nodes",
+            );
+          });
+        return;
+      }
       setSelectedEdgeId(null);
-      if (runtimeAgentMap.has(node.id)) {
+      if (getContextAgentNode(node.id)) {
         selectAgent(node.id);
       } else {
         selectAgent(null);
       }
     },
-    [runtimeAgentMap, selectAgent],
+    [
+      activeTabId,
+      getConnectionPorts,
+      isValidDirectConnection,
+      onCreateConnection,
+      getContextAgentNode,
+      selectAgent,
+      targetPickSourceId,
+    ],
   );
 
   const onNodeMouseEnter: NodeMouseHandler = useCallback(
@@ -549,29 +728,44 @@ export function useAgentGraphController({
     setSelectedEdgeId(null);
     setTooltip(null);
     setContextMenu(null);
+    setTargetPickSourceId(null);
+    closeQuickCreate();
     selectAgent(null);
-  }, [selectAgent]);
+  }, [closeQuickCreate, selectAgent]);
 
   const onPaneContextMenu = useCallback(
     (event: ReactMouseEvent | globalThis.MouseEvent) => {
       event.preventDefault();
-      setContextMenu(null);
+      const mouseEvent = event as globalThis.MouseEvent;
+      setSelectedEdgeId(null);
+      setTooltip(null);
+      setTargetPickSourceId(null);
+      closeQuickCreate();
+      selectAgent(null);
+      setContextMenu({
+        kind: "pane",
+        x: mouseEvent.clientX,
+        y: mouseEvent.clientY,
+      });
     },
-    [],
+    [closeQuickCreate, selectAgent],
   );
 
   const onNodeContextMenu: NodeMouseHandler = useCallback(
     (event, node) => {
-      const runtimeNode = runtimeAgentMap.get(node.id);
+      const contextNode = getContextAgentNode(node.id);
       const mouseEvent = event as unknown as globalThis.MouseEvent;
       mouseEvent.preventDefault();
-      if (!runtimeNode || !activeTabId) {
+      mouseEvent.stopPropagation();
+      if (!contextNode || !activeTabId) {
         setContextMenu(null);
         return;
       }
       selectAgent(node.id);
       setSelectedEdgeId(null);
+      setTargetPickSourceId(null);
       setTooltip(null);
+      closeQuickCreate();
       setContextMenu({
         kind: "node",
         x: mouseEvent.clientX,
@@ -579,7 +773,7 @@ export function useAgentGraphController({
         agentId: node.id,
       });
     },
-    [activeTabId, runtimeAgentMap, selectAgent],
+    [activeTabId, closeQuickCreate, getContextAgentNode, selectAgent],
   );
 
   const onConnect = useCallback(
@@ -596,6 +790,7 @@ export function useAgentGraphController({
       )
         .then(() => {
           setConnectMode(false);
+          setTargetPickSourceId(null);
           setSelectedEdgeId(null);
         })
         .catch((error) => {
@@ -620,9 +815,11 @@ export function useAgentGraphController({
       setSelectedEdgeId(edge.id);
       setTooltip(null);
       setContextMenu(null);
+      setTargetPickSourceId(null);
+      closeQuickCreate();
       selectAgent(null);
     },
-    [selectAgent],
+    [closeQuickCreate, selectAgent],
   );
 
   const onEdgeContextMenu: EdgeMouseHandler = useCallback(
@@ -632,6 +829,8 @@ export function useAgentGraphController({
       mouseEvent.stopPropagation();
       setSelectedEdgeId(edge.id);
       setTooltip(null);
+      setTargetPickSourceId(null);
+      closeQuickCreate();
       selectAgent(null);
       setContextMenu({
         kind: "edge",
@@ -639,9 +838,11 @@ export function useAgentGraphController({
         y: mouseEvent.clientY,
         sourceId: edge.source,
         targetId: edge.target,
+        sourcePortKey: edge.sourceHandle,
+        targetPortKey: edge.targetHandle,
       });
     },
-    [selectAgent],
+    [closeQuickCreate, selectAgent],
   );
 
   const closeContextMenu = useCallback(() => {
@@ -649,27 +850,208 @@ export function useAgentGraphController({
   }, []);
 
   const contextMenuItems = useMemo((): ContextMenuEntry[] => {
-    if (!contextMenu || contextMenu.kind !== "edge" || !activeTabId) {
+    if (!contextMenu) {
       return [];
     }
+
+    if (contextMenu.kind === "node") {
+      const contextNode = getContextAgentNode(contextMenu.agentId);
+      if (!contextNode || !activeTabId) {
+        return [];
+      }
+      return [
+        {
+          label: "Add Agent After",
+          onClick: () => {
+            openQuickCreate({
+              kind: "linked",
+              x: contextMenu.x,
+              y: contextMenu.y,
+              anchorNodeId: contextNode.id,
+            });
+          },
+        },
+        {
+          label: "Connect to...",
+          onClick: () => {
+            setQuickCreate(null);
+            setQuickCreateName("");
+            setQuickCreateRoleName("");
+            setConnectMode(false);
+            setTargetPickSourceId(contextNode.id);
+            setSelectedEdgeId(null);
+            selectAgent(contextNode.id);
+          },
+        },
+        "divider",
+        {
+          label: "Delete Agent",
+          danger: true,
+          onClick: () => {
+            void onDeleteAgent({
+              tabId: activeTabId,
+              node: contextNode,
+              tabAgents: workflowRuntimeNodes,
+            }).catch((error) => {
+              toast.error(
+                error instanceof Error
+                  ? error.message
+                  : "Failed to delete agent",
+              );
+            });
+          },
+        },
+      ];
+    }
+
+    if (contextMenu.kind === "edge") {
+      if (!activeTabId) {
+        return [];
+      }
+      return [
+        {
+          label: "Insert Agent Between",
+          onClick: () => {
+            openQuickCreate({
+              kind: "between",
+              x: contextMenu.x,
+              y: contextMenu.y,
+              sourceNodeId: contextMenu.sourceId,
+              targetNodeId: contextMenu.targetId,
+            });
+          },
+        },
+        {
+          label: "Delete Edge",
+          danger: true,
+          onClick: () => {
+            void onDeleteConnection(
+              activeTabId,
+              contextMenu.sourceId,
+              contextMenu.targetId,
+              contextMenu.sourcePortKey ?? undefined,
+              contextMenu.targetPortKey ?? undefined,
+            ).catch((error) => {
+              toast.error(
+                error instanceof Error
+                  ? error.message
+                  : "Failed to delete edge",
+              );
+            });
+          },
+        },
+      ];
+    }
+
     return [
       {
-        label: "Delete Edge",
-        danger: true,
+        label: "Add Agent",
+        disabled: !activeTabId,
         onClick: () => {
-          void onDeleteConnection(
-            activeTabId,
-            contextMenu.sourceId,
-            contextMenu.targetId,
-          ).catch((error) => {
-            toast.error(
-              error instanceof Error ? error.message : "Failed to delete edge",
-            );
+          openQuickCreate({
+            kind: "standalone",
+            x: contextMenu.x,
+            y: contextMenu.y,
           });
         },
       },
+      {
+        label: "Connect Ports",
+        disabled: !activeTabId || workflowRuntimeNodes.length < 2,
+        onClick: onOpenConnectDialog,
+      },
+      "divider",
+      {
+        label: "Fit View",
+        disabled: !flowInstance,
+        onClick: () => {
+          void fitViewport({
+            padding: VIEWPORT_FIT_PADDING,
+            maxZoom: VIEWPORT_FIT_MAX_ZOOM,
+            duration: 350,
+          });
+        },
+      },
+      {
+        label: "Clear Selection",
+        onClick: () => {
+          setSelectedEdgeId(null);
+          setTargetPickSourceId(null);
+          selectAgent(null);
+        },
+      },
     ];
-  }, [activeTabId, contextMenu, onDeleteConnection]);
+  }, [
+    activeTabId,
+    contextMenu,
+    fitViewport,
+    flowInstance,
+    onDeleteAgent,
+    onDeleteConnection,
+    onOpenConnectDialog,
+    openQuickCreate,
+    getContextAgentNode,
+    selectAgent,
+    workflowRuntimeNodes,
+  ]);
+
+  const submitQuickCreate = useCallback(() => {
+    if (
+      !activeTabId ||
+      !quickCreate ||
+      !quickCreateRoleName ||
+      submittingQuickCreate
+    ) {
+      return;
+    }
+    const name = quickCreateName.trim() || undefined;
+    setSubmittingQuickCreate(true);
+
+    const request =
+      quickCreate.kind === "standalone"
+        ? onCreateStandaloneAgent({
+            tabId: activeTabId,
+            roleName: quickCreateRoleName,
+            name,
+          })
+        : quickCreate.kind === "linked"
+          ? onCreateLinkedAgent({
+              tabId: activeTabId,
+              anchorNodeId: quickCreate.anchorNodeId,
+              roleName: quickCreateRoleName,
+              name,
+            })
+          : onInsertAgentBetween({
+              tabId: activeTabId,
+              sourceNodeId: quickCreate.sourceNodeId,
+              targetNodeId: quickCreate.targetNodeId,
+              roleName: quickCreateRoleName,
+              name,
+            });
+
+    void request
+      .then(() => {
+        closeQuickCreate();
+        setSelectedEdgeId(null);
+        setTargetPickSourceId(null);
+      })
+      .catch((error) => {
+        setSubmittingQuickCreate(false);
+        toast.error(
+          error instanceof Error ? error.message : "Failed to add agent",
+        );
+      });
+  }, [
+    activeTabId,
+    closeQuickCreate,
+    onCreateLinkedAgent,
+    onCreateStandaloneAgent,
+    onInsertAgentBetween,
+    quickCreate,
+    quickCreateName,
+    quickCreateRoleName,
+    submittingQuickCreate,
+  ]);
 
   const tooltipAgent = tooltip
     ? (runtimeAgentMap.get(tooltip.agentId) ?? null)
@@ -791,7 +1173,11 @@ export function useAgentGraphController({
     };
   }, [activeTabId, tabs.size]);
 
-  const connectHintLabel = connectMode ? "Connect Ports" : null;
+  const connectHintLabel = targetPickSourceId
+    ? "Choose target Agent"
+    : connectMode
+      ? "Connect Ports"
+      : null;
 
   const isValidConnection = useCallback(
     (edgeOrConnection: FlowEdge | Connection) => {
@@ -823,7 +1209,7 @@ export function useAgentGraphController({
     animatedNodes,
     availableRoles: roles,
     closeContextMenu,
-    closeQuickCreate: () => undefined,
+    closeQuickCreate,
     connectHintLabel,
     containerRef,
     contextMenu,
@@ -846,13 +1232,13 @@ export function useAgentGraphController({
     onNodeMouseMove,
     onPaneClick,
     onPaneContextMenu,
-    quickCreate: null,
-    quickCreateName: "",
-    quickCreateRoleName: "",
-    setQuickCreateName: () => undefined,
-    setQuickCreateRoleName: () => undefined,
-    submitQuickCreate: () => undefined,
-    submittingQuickCreate: false,
+    quickCreate,
+    quickCreateName,
+    quickCreateRoleName,
+    setQuickCreateName,
+    setQuickCreateRoleName,
+    submitQuickCreate,
+    submittingQuickCreate,
     tooltip,
     tooltipAgent,
     tooltipRef,

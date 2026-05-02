@@ -3,9 +3,17 @@ import ELK, {
   type ElkExtendedEdge,
   type ElkNode,
 } from "elkjs/lib/elk.bundled.js";
+import elkWorkerUrl from "elkjs/lib/elk-worker.min.js?url";
 import { AGENT_NODE_HEIGHT, AGENT_NODE_MIN_WIDTH } from "./layout";
 
-const elk = new ELK();
+const shouldUseNestedWorker =
+  typeof Worker === "function" && import.meta.env.MODE !== "test";
+
+const elk = shouldUseNestedWorker
+  ? new ELK({
+      workerFactory: () => new Worker(elkWorkerUrl),
+    })
+  : new ELK();
 
 const LAYOUT_COMPONENT_GAP_X = 120;
 const LAYOUT_COMPONENT_GAP_Y = 140;

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Edge as FlowEdge, Node as FlowNode } from "@xyflow/react";
 import { AgentGraph, type AgentGraphHandle } from "@/components/AgentGraph";
 import { getAgentGraphLayoutedElements } from "@/lib/agentGraphLayout";
-import type { Node, TaskTab, WorkflowDefinition } from "@/types";
+import type { Node, Role, TaskTab, WorkflowDefinition } from "@/types";
 
 const fitViewMock = vi.fn().mockResolvedValue(true);
 const getZoomMock = vi.fn(() => 1);
@@ -103,6 +103,7 @@ vi.mock("@xyflow/react", async () => {
     nodeTypes,
     onInit,
     onNodeClick,
+    onNodeContextMenu,
     onNodeMouseEnter,
     onNodeMouseMove,
     onNodeMouseLeave,
@@ -140,6 +141,7 @@ vi.mock("@xyflow/react", async () => {
       getZoom: typeof getZoomMock;
     }) => void;
     onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
+    onNodeContextMenu?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseEnter?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseMove?: (event: React.MouseEvent, node: { id: string }) => void;
     onNodeMouseLeave?: (event: React.MouseEvent, node: { id: string }) => void;
@@ -238,6 +240,7 @@ vi.mock("@xyflow/react", async () => {
               className="react-flow__node"
               data-testid={`node-${node.id}`}
               onClick={(event) => onNodeClick?.(event, node)}
+              onContextMenu={(event) => onNodeContextMenu?.(event, node)}
               onMouseEnter={(event) => onNodeMouseEnter?.(event, node)}
               onMouseMove={(event) => onNodeMouseMove?.(event, node)}
               onMouseLeave={(event) => onNodeMouseLeave?.(event, node)}
@@ -391,6 +394,8 @@ function renderGraph(
     selectedAgentId?: string | null;
     tabs?: TaskTab[];
     ref?: React.Ref<AgentGraphHandle>;
+    roles?: Role[];
+    runtimeNodes?: Node[];
     onCreateConnection?: (
       tabId: string,
       sourceNodeId: string,
@@ -398,10 +403,18 @@ function renderGraph(
       sourcePortKey?: string,
       targetPortKey?: string,
     ) => Promise<void>;
+    onCreateLinkedAgent?: (input: {
+      tabId: string;
+      anchorNodeId: string;
+      roleName: string;
+      name?: string;
+    }) => Promise<unknown>;
   },
 ) {
   useAgentNodesRuntimeMock.mockReturnValue({
-    agents: new Map(nodes.map((node) => [node.id, node] as const)),
+    agents: new Map(
+      (options?.runtimeNodes ?? nodes).map((node) => [node.id, node] as const),
+    ),
   });
   useAgentTabsRuntimeMock.mockReturnValue({
     tabs: new Map(
@@ -422,6 +435,8 @@ function renderGraph(
     <AgentGraph
       ref={options?.ref}
       onCreateConnection={options?.onCreateConnection}
+      onCreateLinkedAgent={options?.onCreateLinkedAgent}
+      roles={options?.roles}
     />,
   );
 }
@@ -636,6 +651,84 @@ describe("AgentGraph", () => {
     expect(
       within(screen.getByTestId("react-flow")).queryByText("Connections"),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows agent node actions from the right-click menu", async () => {
+    const onCreateLinkedAgent = vi.fn().mockResolvedValue("new-worker");
+
+    renderGraph(
+      [
+        buildNode({
+          id: "worker-1",
+          role_name: "Planner",
+        }),
+      ],
+      {
+        onCreateLinkedAgent,
+        roles: [
+          {
+            name: "Reviewer",
+            description: "Checks the work before it is finished.",
+            system_prompt: "",
+            model: null,
+            model_params: null,
+            included_tools: [],
+            excluded_tools: [],
+            is_builtin: true,
+          },
+        ],
+      },
+    );
+
+    await screen.findByText("Planner");
+
+    fireEvent.contextMenu(screen.getByTestId("node-worker-1"), {
+      clientX: 160,
+      clientY: 120,
+    });
+
+    expect(screen.getByText("Add Agent After")).toBeInTheDocument();
+    expect(screen.getByText("Connect to...")).toBeInTheDocument();
+    expect(screen.getByText("Delete Agent")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Add Agent After"));
+    fireEvent.click(await screen.findByText("Reviewer"));
+    fireEvent.change(screen.getByLabelText("Display Name"), {
+      target: { value: "Review step" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Agent After" }));
+
+    await waitFor(() => {
+      expect(onCreateLinkedAgent).toHaveBeenCalledWith({
+        tabId: "tab-1",
+        anchorNodeId: "worker-1",
+        roleName: "Reviewer",
+        name: "Review step",
+      });
+    });
+  });
+
+  it("shows agent node actions when only the workflow definition is loaded", async () => {
+    renderGraph(
+      [
+        buildNode({
+          id: "worker-1",
+          role_name: "Planner",
+        }),
+      ],
+      { runtimeNodes: [] },
+    );
+
+    await screen.findByText("Planner");
+
+    fireEvent.contextMenu(screen.getByTestId("node-worker-1"), {
+      clientX: 160,
+      clientY: 120,
+    });
+
+    expect(screen.getByText("Add Agent After")).toBeInTheDocument();
+    expect(screen.getByText("Connect to...")).toBeInTheDocument();
+    expect(screen.getByText("Delete Agent")).toBeInTheDocument();
   });
 
   it("re-fits the graph when the container is resized", async () => {

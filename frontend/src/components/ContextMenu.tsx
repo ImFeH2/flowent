@@ -58,6 +58,10 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  if (items.length === 0) {
+    return null;
+  }
+
   return (
     <ViewportPortal>
       <motion.div

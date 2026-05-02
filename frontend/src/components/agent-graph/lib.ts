@@ -58,6 +58,8 @@ export type ContextMenuState =
       y: number;
       sourceId: string;
       targetId: string;
+      sourcePortKey?: string | null;
+      targetPortKey?: string | null;
     };
 
 export type QuickCreateState =
@@ -119,6 +121,8 @@ export interface AgentGraphProps {
     tabId: string,
     sourceNodeId: string,
     targetNodeId: string,
+    sourcePortKey?: string,
+    targetPortKey?: string,
   ) => Promise<void>;
   onCreateStandaloneAgent?: (input: {
     tabId: string;
@@ -262,7 +266,7 @@ export function getQuickCreateTitle(state: QuickCreateState) {
   if (state.kind === "between") {
     return "Insert Agent Between";
   }
-  return "Add Connected Agent";
+  return "Add Agent After";
 }
 
 export function getPointerPosition(event: globalThis.MouseEvent | TouchEvent) {

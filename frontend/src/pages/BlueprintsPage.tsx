@@ -104,7 +104,7 @@ function BlueprintFlowNode({ data }: NodeProps) {
           <p className="truncate text-[13px] font-semibold text-foreground">
             {label}
           </p>
-          <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">
+          <p className="mt-1 text-[11px] text-muted-foreground/80">
             {roleName}
           </p>
         </div>
@@ -355,7 +355,7 @@ export function BlueprintsPage() {
                 <Trash2 className="size-5" />
               </div>
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+                <p className="text-[10px] font-semibold text-muted-foreground">
                   Destructive Action
                 </p>
                 <AlertDialogTitle className="mt-1 text-foreground">
@@ -417,10 +417,10 @@ function BlueprintLibraryColumn({
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
+              <p className="text-[13px] font-semibold text-muted-foreground/80">
                 Library
               </p>
-              <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] text-muted-foreground">
                 {totalCount}
               </span>
             </div>
@@ -496,14 +496,14 @@ function BlueprintLibraryColumn({
                     <p className="truncate text-[13px] font-medium text-foreground">
                       {blueprint.name}
                     </p>
-                    <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/80">
+                    <span className="text-[10px] text-muted-foreground/80">
                       v{blueprint.version}
                     </span>
                   </div>
                   <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
                     {blueprint.description || "No description"}
                   </p>
-                  <div className="mt-2 flex items-center gap-3 text-[11px] uppercase tracking-[0.12em] text-muted-foreground/75">
+                  <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground/75">
                     <span>{blueprint.node_count} slots</span>
                     <span>{blueprint.edge_count} connections</span>
                   </div>
@@ -558,13 +558,13 @@ function BlueprintStageColumn({
                   : "Blueprint Stage"}
               </h2>
               {blueprint?.isDraft ? (
-                <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] text-muted-foreground">
                   {blueprint.version == null
                     ? "New Draft"
                     : `Draft from v${blueprint.version}`}
                 </span>
               ) : blueprint?.version != null ? (
-                <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                <span className="rounded-full border border-border bg-accent/25 px-2 py-0.5 text-[10px] text-muted-foreground">
                   v{blueprint.version}
                 </span>
               ) : null}
@@ -722,7 +722,7 @@ function BlueprintInspectorColumn({
       <div className="border-b border-border px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/80">
+            <p className="text-[13px] font-semibold text-muted-foreground/80">
               {selectedSlot ? "Slot Inspector" : "Inspector"}
             </p>
             <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -764,10 +764,7 @@ function BlueprintInspectorColumn({
             </InspectorSection>
             {draft ? (
               <>
-                <InspectorSection
-                  title="Role"
-                  description="Choose a role for this slot."
-                >
+                <InspectorSection title="Role">
                   <div className="space-y-3">
                     <div className={blueprintChoiceListClass}>
                       {loadingRoles ? (
@@ -810,7 +807,7 @@ function BlueprintInspectorColumn({
                     </div>
                   </div>
                 </InspectorSection>
-                <InspectorSection title="Display Name" description="Optional">
+                <InspectorSection title="Display Name">
                   <Input
                     aria-label="Slot display name"
                     value={selectedSlot.display_name ?? ""}
@@ -851,10 +848,7 @@ function BlueprintInspectorColumn({
           </div>
         ) : (
           <div className="space-y-4">
-            <InspectorSection
-              title="Name"
-              description={draft ? "Required" : undefined}
-            >
+            <InspectorSection title="Name">
               {draft ? (
                 <Input
                   aria-label="Blueprint name"
@@ -870,10 +864,7 @@ function BlueprintInspectorColumn({
               )}
             </InspectorSection>
 
-            <InspectorSection
-              title="Description"
-              description={draft ? "Optional" : undefined}
-            >
+            <InspectorSection title="Description">
               {draft ? (
                 <Textarea
                   aria-label="Blueprint description"
@@ -909,10 +900,7 @@ function BlueprintInspectorColumn({
               </div>
             </InspectorSection>
 
-            <InspectorSection
-              title="Version Summary"
-              description="Latest version and update history summary."
-            >
+            <InspectorSection title="Version Summary">
               <div className="space-y-2">
                 {versionHistory.length === 0 ? (
                   <div className="rounded-md border border-dashed border-border px-3 py-3 text-[12px] text-muted-foreground">
@@ -943,14 +931,7 @@ function BlueprintInspectorColumn({
               </div>
             </InspectorSection>
 
-            <InspectorSection
-              title="Connections"
-              description={
-                draft
-                  ? "Edit the formal slot-to-slot connections preserved by this blueprint."
-                  : "Formal slot-to-slot connections preserved by this blueprint."
-              }
-            >
+            <InspectorSection title="Connections">
               <div className="space-y-3">
                 {draft ? (
                   <Button size="sm" variant="outline" onClick={onAddEdge}>
@@ -1046,22 +1027,15 @@ function BlueprintInspectorColumn({
 
 function InspectorSection({
   title,
-  description,
   children,
 }: {
   title: string;
-  description?: string;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-border bg-card/30 p-4">
       <div className="mb-3">
         <h3 className="text-[13px] font-medium text-foreground">{title}</h3>
-        {description ? (
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        ) : null}
       </div>
       {children}
     </section>

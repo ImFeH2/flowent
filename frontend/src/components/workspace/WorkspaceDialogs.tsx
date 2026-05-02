@@ -489,7 +489,7 @@ export function DeleteTabDialog({
               <Trash2 className="size-5" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-muted-foreground">
+              <p className="text-[10px] font-semibold text-muted-foreground">
                 Destructive Action
               </p>
               <AlertDialogTitle className="mt-1 text-foreground">

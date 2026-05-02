@@ -539,7 +539,7 @@ function ToolCallCard({
     >
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+          <div className="text-[10px] font-medium text-muted-foreground/80">
             Arguments
           </div>
           <pre className="select-text whitespace-pre-wrap break-words rounded-xl border border-border bg-background/40 px-3.5 py-3 text-[11px] font-mono leading-relaxed text-foreground/78">
@@ -548,7 +548,7 @@ function ToolCallCard({
         </div>
         {item.result || !isIdleTool ? (
           <div className="space-y-1.5">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80">
+            <div className="text-[10px] font-medium text-muted-foreground/80">
               Result
             </div>
             {item.result ? (
@@ -590,7 +590,7 @@ function CommandResultCard({
     >
       <div className="flex items-center gap-2">
         <Sparkles className="size-4 text-graph-status-running" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-graph-status-running/90">
+        <span className="text-[11px] font-medium text-graph-status-running/90">
           Command Result
         </span>
         {item.command_name ? (
@@ -636,7 +636,7 @@ function ErrorCard({
     >
       <div className="flex items-center gap-2">
         <AlertCircle className="size-4 text-graph-status-error" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-graph-status-error">
+        <span className="text-[11px] font-medium text-graph-status-error">
           Error
         </span>
         <span className="ml-auto">
@@ -697,7 +697,7 @@ function ActivityDisclosure({
           {icon}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="block truncate text-[11px] font-medium text-muted-foreground">
             {label}
           </span>
         </span>

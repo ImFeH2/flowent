@@ -168,7 +168,7 @@ export function AgentDetailPanel({
           <div className="min-w-0 flex flex-wrap items-center gap-2">
             <p className="text-[13px] font-semibold">{label}</p>
             {detailIsLeader ? (
-              <span className="rounded-full border border-accent bg-accent/45 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-accent-foreground">
+              <span className="rounded-full border border-accent bg-accent/45 px-2 py-0.5 text-[10px] font-semibold text-accent-foreground">
                 Leader
               </span>
             ) : null}
@@ -208,7 +208,7 @@ export function AgentDetailPanel({
         <div className="space-y-3.5">
           <div className="grid gap-3.5 border-b border-border pb-3.5 sm:grid-cols-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[10px] font-semibold text-muted-foreground">
                 Status
               </p>
               <div className="mt-2">
@@ -222,7 +222,7 @@ export function AgentDetailPanel({
             </div>
 
             <div className="min-w-0 sm:border-l sm:border-border sm:pl-3.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[10px] font-semibold text-muted-foreground">
                 Contacts
               </p>
               <p className="mt-2 select-text text-sm text-foreground">
@@ -231,7 +231,7 @@ export function AgentDetailPanel({
             </div>
 
             <div className="min-w-0 sm:border-l sm:border-border sm:pl-3.5">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[10px] font-semibold text-muted-foreground">
                 Workflow
               </p>
               <p className="mt-2 select-text text-sm text-foreground">
@@ -244,7 +244,7 @@ export function AgentDetailPanel({
             {detailTabId ? (
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[10px] font-semibold text-muted-foreground">
                     ID
                   </p>
                   <p className="mt-1 select-text font-mono text-[11px] text-foreground">
@@ -252,7 +252,7 @@ export function AgentDetailPanel({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[10px] font-semibold text-muted-foreground">
                     Title
                   </p>
                   <p className="mt-1 select-text text-foreground">
@@ -260,7 +260,7 @@ export function AgentDetailPanel({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="text-[10px] font-semibold text-muted-foreground">
                     Role
                   </p>
                   <p className="mt-1 select-text text-foreground">
@@ -375,7 +375,7 @@ export function AgentDetailPanel({
           <DetailSection title="Permissions">
             <div className="space-y-3">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="text-[10px] font-semibold text-muted-foreground">
                   Network
                 </p>
                 <p className="mt-1 select-text text-sm text-foreground">
@@ -384,7 +384,7 @@ export function AgentDetailPanel({
               </div>
 
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="text-[10px] font-semibold text-muted-foreground">
                   Write Dirs
                 </p>
                 {detailWriteDirs.length === 0 ? (
@@ -432,7 +432,7 @@ export function AgentDetailPanel({
 
           <div className="border-t border-border pt-4">
             <div className="px-0 pb-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[10px] font-semibold text-muted-foreground">
                 History
               </p>
             </div>
@@ -704,9 +704,7 @@ function DetailSection({
 }) {
   return (
     <section className="border-t border-border pt-3.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </p>
+      <p className="text-[10px] font-semibold text-muted-foreground">{title}</p>
       <div className="mt-2">{children}</div>
     </section>
   );

@@ -78,7 +78,7 @@ function ToolCard({
       <code className="block text-[13px] font-mono font-medium text-foreground">
         {tool.name}
       </code>
-      <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/75">
+      <p className="mt-2 text-[10px] text-muted-foreground/75">
         {tool.source === "mcp"
           ? `MCP · ${tool.server_name ?? "unknown"}`
           : "Builtin"}
@@ -112,7 +112,7 @@ function ToolCard({
                       {tool.fully_qualified_id ?? tool.name}
                     </code>
                   </div>
-                  <div className="flex flex-wrap gap-2 uppercase tracking-[0.14em]">
+                  <div className="flex flex-wrap gap-2">
                     {tool.read_only_hint ? (
                       <span className="rounded-full border border-primary/15 bg-primary/10 px-2 py-1 text-[10px] text-primary">
                         readOnly
@@ -131,7 +131,7 @@ function ToolCard({
                   </div>
                 </div>
               ) : null}
-              <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/75">
+              <p className="mb-2 text-[10px] font-medium text-muted-foreground/75">
                 Parameters
               </p>
               <pre className="max-h-48 select-text overflow-auto rounded-xl border border-border bg-background/50 p-3.5 text-[11px] font-mono text-foreground/70 scrollbar-none">

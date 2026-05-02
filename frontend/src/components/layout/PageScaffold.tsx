@@ -90,33 +90,20 @@ export function PageTitleBar({
   );
 }
 
-export function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
+export function SectionHeader({ title }: { title: string }) {
   return (
     <div className="mb-2.5 px-1">
-      <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-        {title}
-      </h2>
-      {description ? (
-        <p className="mt-1 text-[12px] text-muted-foreground">{description}</p>
-      ) : null}
+      <h2 className="text-[13px] font-semibold text-foreground/85">{title}</h2>
     </div>
   );
 }
 
 export function SettingsRow({
   label,
-  description,
   children,
   valueClassName,
 }: {
   label: string;
-  description?: string;
   children: ReactNode;
   valueClassName?: string;
 }) {
@@ -126,11 +113,6 @@ export function SettingsRow({
         <label className="block text-[13px] font-medium text-foreground">
           {label}
         </label>
-        {description ? (
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground/80">
-            {description}
-          </p>
-        ) : null}
       </div>
       <div
         className={cn(

@@ -87,10 +87,6 @@ function StatsEmptyState() {
         <ChartColumnBig className="size-5" />
       </div>
       <h2 className="mt-5 text-xl font-medium text-foreground">No stats yet</h2>
-      <p className="mt-2 max-w-xl text-[13px] leading-6 text-muted-foreground">
-        There are no request records, compact records, or current runtime
-        activity in the selected range.
-      </p>
     </SoftPanel>
   );
 }
@@ -201,7 +197,7 @@ function StatsTrendChart({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-border bg-card/30 px-4 py-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="text-[11px] font-medium text-muted-foreground">
             {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
           </p>
           <p className="mt-2 text-sm text-foreground">
@@ -377,20 +373,15 @@ function StatsTrendChart({
 
 function StatsSectionTitle({
   title,
-  description,
   action,
 }: {
   title: string;
-  description: string;
   action?: ReactNode;
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 className="text-[15px] font-medium text-foreground">{title}</h2>
-        <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
-          {description}
-        </p>
       </div>
       {action}
     </div>
@@ -438,7 +429,7 @@ function EventDetail({ event }: { event: StatsEvent }) {
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="text-[11px] font-medium text-muted-foreground">
             Normalized Usage
           </p>
           <pre className="max-h-[240px] overflow-auto rounded-xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
@@ -446,7 +437,7 @@ function EventDetail({ event }: { event: StatsEvent }) {
           </pre>
         </div>
         <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="text-[11px] font-medium text-muted-foreground">
             Raw Usage
           </p>
           <pre className="max-h-[240px] overflow-auto rounded-xl border border-border bg-background/50 p-4 text-[11px] leading-6 text-foreground/75">
@@ -723,7 +714,6 @@ export function StatsPage() {
               <SoftPanel className="overflow-hidden">
                 <StatsSectionTitle
                   title="Trend"
-                  description="Switch between request, token, error, latency, compact, and cache metrics over time."
                   action={
                     <Select value={metric} onValueChange={handleMetricChange}>
                       <SelectTrigger
@@ -746,10 +736,7 @@ export function StatsPage() {
 
               <div className="grid gap-6 xl:grid-cols-2">
                 <SoftPanel className="overflow-hidden">
-                  <StatsSectionTitle
-                    title="By Provider / Model"
-                    description="Request aggregates grouped by provider and then by concrete model."
-                  />
+                  <StatsSectionTitle title="By Provider / Model" />
                   <div className="space-y-4">
                     {providerGroups.length === 0 ? (
                       <div className="rounded-xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">
@@ -826,7 +813,6 @@ export function StatsPage() {
                   <SoftPanel className="overflow-hidden">
                     <StatsSectionTitle
                       title="By Workflow / Agent"
-                      description="Current activity and historical request aggregates grouped by workflow and by node."
                       action={
                         <Select
                           value={sortKey}
@@ -852,7 +838,7 @@ export function StatsPage() {
                     />
                     <div className="space-y-5">
                       <div className="space-y-2">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+                        <p className="text-[11px] font-medium text-muted-foreground/80">
                           Tabs
                         </p>
                         {tabGroups.length === 0 ? (
@@ -882,7 +868,7 @@ export function StatsPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+                        <p className="text-[11px] font-medium text-muted-foreground/80">
                           Agents
                         </p>
                         {agentGroups.length === 0 ? (
@@ -938,10 +924,7 @@ export function StatsPage() {
               </div>
 
               <SoftPanel className="overflow-hidden">
-                <StatsSectionTitle
-                  title="Recent Events"
-                  description="Failed requests, retried requests, and manual or automatic compact records."
-                />
+                <StatsSectionTitle title="Recent Events" />
                 <div className="space-y-2">
                   {recentEvents.length === 0 ? (
                     <div className="rounded-xl border border-border bg-card/30 px-4 py-6 text-[13px] text-muted-foreground">

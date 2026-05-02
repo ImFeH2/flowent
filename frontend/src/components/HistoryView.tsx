@@ -302,7 +302,7 @@ const HistoryItem = memo(function HistoryItem({
         >
           <div className="space-y-2">
             <div>
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+              <div className="text-[10px] text-muted-foreground mb-1">
                 Arguments
               </div>
               <pre className="select-text text-[11px] whitespace-pre-wrap break-words leading-relaxed text-foreground/78">
@@ -311,7 +311,7 @@ const HistoryItem = memo(function HistoryItem({
             </div>
             {entry.result && (
               <div>
-                <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+                <div className="text-[10px] text-muted-foreground mb-1">
                   Result
                 </div>
                 <MarkdownOrJsonBlock
@@ -404,7 +404,7 @@ function CollapsibleBlock({
         </span>
         <span
           className={cn(
-            "flex-1 truncate text-[11px] font-medium uppercase tracking-wide",
+            "flex-1 truncate text-[11px] font-medium",
             labelClassName || "text-muted-foreground",
           )}
         >

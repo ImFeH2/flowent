@@ -301,7 +301,7 @@ export function WorkspaceShell({
             <div className="flex h-full flex-col p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  <p className="text-[11px] font-semibold text-muted-foreground">
                     Workflow JSON
                   </p>
                   <p className="mt-1 text-[13px] text-muted-foreground">

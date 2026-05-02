@@ -18,7 +18,6 @@ import {
   FormInput,
   FormTextarea,
   SecretInput,
-  formHelpTextClass,
   formSelectTriggerClass,
 } from "@/components/form/FormControls";
 import { providerTypeOptions } from "@/lib/providerTypes";
@@ -149,10 +148,7 @@ export function ProvidersPage() {
                 </div>
 
                 <div className="mx-auto w-full max-w-[720px] flex-1">
-                  <SectionHeader
-                    title="Identity"
-                    description="Set the provider name and runtime type."
-                  />
+                  <SectionHeader title="Identity" />
                   <div className="mb-10 border border-dashed border-border rounded-lg bg-card/30">
                     <SettingsRow label="Name">
                       <FormInput
@@ -189,10 +185,7 @@ export function ProvidersPage() {
                   </div>
 
                   <div className="border-t border-border pt-8">
-                    <SectionHeader
-                      title="Endpoint & Auth"
-                      description="Configure connection details, request preview, credentials, and retry behavior."
-                    />
+                    <SectionHeader title="Endpoint & Auth" />
                     <div className="border border-dashed border-border rounded-lg bg-card/30">
                       <SettingsRow label="Base URL">
                         <FormInput
@@ -203,10 +196,7 @@ export function ProvidersPage() {
                           placeholder="https://api.openai.com/v1"
                         />
                       </SettingsRow>
-                      <SettingsRow
-                        label="Request Preview"
-                        description="Resolved endpoint based on the current draft"
-                      >
+                      <SettingsRow label="Request Preview">
                         <div
                           className={cn(
                             "w-full select-text rounded-md border px-3 py-2 text-[12px]",
@@ -228,7 +218,7 @@ export function ProvidersPage() {
                           )}
                         </div>
                       </SettingsRow>
-                      <SettingsRow label="API Key" description="Optional">
+                      <SettingsRow label="API Key">
                         <SecretInput
                           value={draft.api_key}
                           onChange={(event) =>
@@ -240,10 +230,7 @@ export function ProvidersPage() {
                           hideLabel="Hide API key"
                         />
                       </SettingsRow>
-                      <SettingsRow
-                        label="Headers"
-                        description="Optional JSON object"
-                      >
+                      <SettingsRow label="Headers">
                         <div className="space-y-2">
                           <FormTextarea
                             value={draft.headers_text}
@@ -272,10 +259,7 @@ export function ProvidersPage() {
                           ) : null}
                         </div>
                       </SettingsRow>
-                      <SettingsRow
-                        label="429 Retry Delay"
-                        description="Extra wait after HTTP 429"
-                      >
+                      <SettingsRow label="429 Retry Delay">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <FormInput
@@ -306,20 +290,13 @@ export function ProvidersPage() {
                               s
                             </span>
                           </div>
-                          <p className={formHelpTextClass}>
-                            Adds extra wait only when this provider returns HTTP
-                            429 and the system continues retrying.
-                          </p>
                         </div>
                       </SettingsRow>
                     </div>
                   </div>
 
                   <div className="border-t border-border pt-8">
-                    <SectionHeader
-                      title="Models"
-                      description="Manage this provider-scoped model catalog, fetch discovered entries, and run model-level tests against the current draft."
-                    />
+                    <SectionHeader title="Models" />
 
                     <div className="space-y-4 rounded-xl border border-border bg-card/30 p-5">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -400,7 +377,7 @@ export function ProvidersPage() {
                                       </p>
                                       <span
                                         className={cn(
-                                          "rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em]",
+                                          "rounded-full border px-2 py-0.5 text-[10px] font-medium",
                                           entry.source === "manual"
                                             ? "border-graph-status-idle/20 bg-graph-status-idle/[0.12] text-graph-status-idle"
                                             : "border-graph-status-running/20 bg-graph-status-running/[0.12] text-graph-status-running",
@@ -479,10 +456,7 @@ export function ProvidersPage() {
                   {!isCreating && selectedProvider ? (
                     <div className="border-t border-border pt-8">
                       <div className="border border-dashed border-border rounded-lg bg-card/30">
-                        <SettingsRow
-                          label="Provider ID"
-                          description="Read-only"
-                        >
+                        <SettingsRow label="Provider ID">
                           <div className="select-text rounded-md border border-border bg-card/30 px-3 py-2 font-mono text-[12px] text-foreground/80">
                             {selectedProvider.id}
                           </div>

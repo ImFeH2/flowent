@@ -5,8 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-export const formLabelClass =
-  "text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground";
+export const formLabelClass = "text-[12px] font-medium text-foreground/80";
 export const formHelpTextClass =
   "text-[11px] leading-relaxed text-muted-foreground";
 export const formInputClass =

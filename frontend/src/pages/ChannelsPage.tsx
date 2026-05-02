@@ -139,7 +139,7 @@ export function ChannelsPage() {
               </div>
               <div
                 className={cn(
-                  "rounded-full border px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider",
+                  "rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
                   configured
                     ? "border-graph-status-running/20 bg-graph-status-running/[0.12] text-graph-status-running"
                     : "border-graph-status-idle/20 bg-graph-status-idle/[0.12] text-graph-status-idle",

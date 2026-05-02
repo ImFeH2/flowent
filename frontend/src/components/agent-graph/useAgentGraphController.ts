@@ -1150,27 +1150,12 @@ export function useAgentGraphController({
 
   const emptyState = useMemo(() => {
     if (tabs.size === 0) {
-      return {
-        eyebrow: "Workspace",
-        title: "No workflows yet",
-        description: "Create a workflow to start building a workflow graph.",
-        hint: "Use the + button in the workflow strip to open your first workspace.",
-      };
+      return { title: "No workflows yet" };
     }
     if (!activeTabId) {
-      return {
-        eyebrow: "Workspace",
-        title: "Select a workflow",
-        description: "Choose a workflow to inspect and edit its graph.",
-        hint: "Each workflow keeps its own nodes and edges.",
-      };
+      return { title: "Select a workflow" };
     }
-    return {
-      eyebrow: "Empty canvas",
-      title: "This workflow is ready for its first node",
-      description: "Add nodes and connect ports to build the graph.",
-      hint: "Start with an agent, a trigger, or another workflow node.",
-    };
+    return { title: "This workflow is ready for its first node" };
   }, [activeTabId, tabs.size]);
 
   const connectHintLabel = targetPickSourceId

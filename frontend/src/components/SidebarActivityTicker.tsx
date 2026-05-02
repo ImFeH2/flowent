@@ -190,7 +190,7 @@ export function SidebarActivityTicker({ width }: SidebarActivityTickerProps) {
       className="flex items-center gap-2.5 overflow-hidden"
       style={responsiveStyles}
     >
-      <div className="flex shrink-0 items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/62">
+      <div className="flex shrink-0 items-center gap-2 text-[10px] font-semibold text-muted-foreground/62">
         <span
           className={cn(
             "size-1.5 rounded-full transition-all duration-300",

@@ -94,10 +94,7 @@ export function AccessConfigurationSection({
     <section className="mt-8 first:mt-0">
       <SectionHeader title="Access Configuration" />
       <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
-        <SettingsRow
-          label="New Access Code"
-          description="Leave empty to keep the current access code."
-        >
+        <SettingsRow label="New Access Code">
           <div className="space-y-2 w-full">
             <SecretInput
               id="new-access-code"
@@ -116,10 +113,7 @@ export function AccessConfigurationSection({
           </div>
         </SettingsRow>
 
-        <SettingsRow
-          label="Confirm Access Code"
-          description="Saving a new access code signs out all current admin sessions."
-        >
+        <SettingsRow label="Confirm Access Code">
           <div className="space-y-2 w-full">
             <SecretInput
               id="confirm-access-code"
@@ -135,18 +129,16 @@ export function AccessConfigurationSection({
               hideLabel="Hide confirmed access code"
               buttonSize="default"
             />
-            <div className={cn("space-y-2 pt-1", formHelpTextClass)}>
-              {accessDraftError ? (
-                <p className="text-destructive font-medium">
-                  {accessDraftError}
-                </p>
-              ) : null}
-              <p>
-                If no access code is configured, Flowent generates one at
-                startup. The current access code is written to the local startup
-                log on every startup and is never shown here.
+            {accessDraftError ? (
+              <p
+                className={cn(
+                  "text-destructive font-medium pt-1",
+                  formHelpTextClass,
+                )}
+              >
+                {accessDraftError}
               </p>
-            </div>
+            ) : null}
           </div>
         </SettingsRow>
       </div>
@@ -167,10 +159,7 @@ export function PathConfigurationSection({
     <section className="mt-10">
       <SectionHeader title="Path Configuration" />
       <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
-        <SettingsRow
-          label="App Data Directory"
-          description="Instance storage root"
-        >
+        <SettingsRow label="App Data Directory">
           <div className="space-y-2">
             <FormInput
               aria-label="App Data Directory"
@@ -178,14 +167,10 @@ export function PathConfigurationSection({
               readOnly
               mono
             />
-            <div className={cn("space-y-2", formHelpTextClass)}></div>
           </div>
         </SettingsRow>
 
-        <SettingsRow
-          label="Working Directory"
-          description="Default system task root"
-        >
+        <SettingsRow label="Working Directory">
           <div className="space-y-2">
             <FormInput
               aria-label="Working Directory"
@@ -230,7 +215,7 @@ export function AssistantConfigurationSection({
     <section className="mt-10">
       <SectionHeader title="Assistant Configuration" />
       <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
-        <SettingsRow label="Assistant Role" description="System role">
+        <SettingsRow label="Assistant Role">
           <Select
             value={settings.assistant.role_name}
             onValueChange={(value) =>
@@ -262,22 +247,14 @@ export function AssistantConfigurationSection({
           {assistantRole ? (
             <div
               data-testid="assistant-role-guidance"
-              className={cn("mt-2 space-y-2", formHelpTextClass)}
+              className={cn("mt-2", formHelpTextClass)}
             >
               <p>{assistantRole.description}</p>
-              <p>
-                This role only changes the Assistant&apos;s behavior template.
-                Regardless of the selected role, Assistant remains the system
-                default entry and task boundary manager.
-              </p>
             </div>
           ) : null}
         </SettingsRow>
 
-        <SettingsRow
-          label="Network Access"
-          description="Hard network permission boundary"
-        >
+        <SettingsRow label="Network Access">
           <div className="space-y-2">
             <FormSwitch
               checked={settings.assistant.allow_network}
@@ -293,17 +270,10 @@ export function AssistantConfigurationSection({
               }
               showStateText
             />
-            <p className={formHelpTextClass}>
-              When disabled, the Assistant cannot make networked tool calls even
-              if its role still includes network-capable tools.
-            </p>
           </div>
         </SettingsRow>
 
-        <SettingsRow
-          label="Write Dirs"
-          description="Writable directory boundaries"
-        >
+        <SettingsRow label="Write Dirs">
           <div className="space-y-2">
             <FormTextarea
               aria-label="Write Dirs"
@@ -323,11 +293,6 @@ export function AssistantConfigurationSection({
               className="min-h-[108px]"
               mono
             />
-            <p className={formHelpTextClass}>
-              One directory per line. Empty lines are ignored. These paths bound
-              both the Assistant&apos;s own writes and the maximum write access
-              it can delegate to execution chains.
-            </p>
           </div>
         </SettingsRow>
       </div>
@@ -352,10 +317,7 @@ export function LeaderConfigurationSection({
     <section className="mt-10">
       <SectionHeader title="Leader Configuration" />
       <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
-        <SettingsRow
-          label="Leader Role"
-          description="Default workflow owner role"
-        >
+        <SettingsRow label="Leader Role">
           <Select
             value={settings.leader.role_name}
             onValueChange={(value) =>
@@ -424,10 +386,7 @@ export function ModelConfigurationSection({
     <section className="mt-10">
       <SectionHeader title="Model Configuration" />
       <div className="rounded-xl border border-border bg-surface-2 shadow-sm overflow-hidden">
-        <SettingsRow
-          label="Active Provider"
-          description="Used when roles do not override"
-        >
+        <SettingsRow label="Active Provider">
           <Select
             value={settings.model.active_provider_id}
             onValueChange={(value) => {
@@ -459,7 +418,7 @@ export function ModelConfigurationSection({
           ) : null}
         </SettingsRow>
 
-        <SettingsRow label="Model" description="Catalog or manual ID">
+        <SettingsRow label="Model">
           <div className="space-y-3">
             {settings.model.active_provider_id ? (
               activeProviderModels.length > 0 ? (
@@ -496,10 +455,7 @@ export function ModelConfigurationSection({
                   </Select>
                 </div>
               ) : (
-                <p className={formHelpTextClass}>
-                  No saved provider models. Manage this catalog in Providers, or
-                  enter a model ID manually below.
-                </p>
+                <p className={formHelpTextClass}>No saved provider models.</p>
               )
             ) : null}
 
@@ -539,10 +495,7 @@ export function ModelConfigurationSection({
           ) : null}
         </SettingsRow>
 
-        <SettingsRow
-          label="Model Metadata Overrides"
-          description="Explicit active-model capability and limit overrides"
-        >
+        <SettingsRow label="Model Metadata Overrides">
           <div className="space-y-3">
             <div className="grid gap-3 md:grid-cols-3">
               <div className="space-y-1">
@@ -646,12 +599,6 @@ export function ModelConfigurationSection({
                 </Select>
               </div>
             </div>
-
-            <p className={formHelpTextClass}>
-              These fields override the resolved metadata for the current active
-              model only. Auto keeps using the catalog result or other resolved
-              metadata instead of forcing a value.
-            </p>
           </div>
         </SettingsRow>
 
@@ -680,10 +627,7 @@ export function ModelConfigurationSection({
           </div>
         </SettingsRow>
 
-        <SettingsRow
-          label="Request Timeout"
-          description="Single attempt budget"
-        >
+        <SettingsRow label="Request Timeout">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <FormInput
@@ -714,17 +658,10 @@ export function ModelConfigurationSection({
                 ms
               </span>
             </div>
-            <p className={formHelpTextClass}>
-              Applies to a single LLM request attempt. Default is 10000ms.
-              Automatic retries can still make the full call take longer.
-            </p>
           </div>
         </SettingsRow>
 
-        <SettingsRow
-          label="Retry Policy"
-          description="Transient error behavior"
-        >
+        <SettingsRow label="Retry Policy">
           <div className="space-y-3">
             <Select
               value={settings.model.retry_policy}
@@ -784,20 +721,10 @@ export function ModelConfigurationSection({
                 </div>
               </div>
             ) : null}
-
-            <p className={formHelpTextClass}>
-              No retry fails immediately on transient errors. Limited retries
-              automatically up to the configured attempt count. Unlimited keeps
-              retrying transient failures until success, interruption, or a
-              non-transient error.
-            </p>
           </div>
         </SettingsRow>
 
-        <SettingsRow
-          label="Retry Backoff"
-          description="Global exponential backoff"
-        >
+        <SettingsRow label="Retry Backoff">
           <div className="space-y-3">
             <div className="grid gap-3 md:grid-cols-3">
               <div className="space-y-1">
@@ -904,18 +831,10 @@ export function ModelConfigurationSection({
                 />
               </div>
             </div>
-
-            <p className={formHelpTextClass}>
-              Retries use exponential backoff from Initial Delay, stop doubling
-              after Cap Retries, and never exceed Max Delay.
-            </p>
           </div>
         </SettingsRow>
 
-        <SettingsRow
-          label="Automatic Compact"
-          description="Token-limit based preflight execution-context compaction"
-        >
+        <SettingsRow label="Automatic Compact">
           <div className="space-y-3">
             <div className="space-y-1">
               <label
@@ -962,11 +881,6 @@ export function ModelConfigurationSection({
               </div>
             </div>
 
-            <p className={formHelpTextClass}>
-              Automatic compact is triggered by the latest successful API usage
-              baseline plus any locally added tail context after that response.
-              Leave this empty to disable automatic <code>/compact</code>.
-            </p>
             {knownSafeInputTokens !== null ? (
               <p className={formHelpTextClass}>
                 Known safe input window: {knownSafeInputTokens.toLocaleString()}{" "}
@@ -996,7 +910,7 @@ interface SettingsFooterProps {
 export function SettingsFooter({ appVersion }: SettingsFooterProps) {
   return (
     <div className="mt-12 flex flex-col items-center pt-2 pb-6 text-center">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <p className="text-[11px] font-medium text-muted-foreground">
         Flowent Agent Studio v{appVersion ?? "—"}
       </p>
       <p className="mt-1.5 text-[10px] text-muted-foreground/80">

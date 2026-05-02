@@ -222,7 +222,7 @@ function StatusBadge({ connected }: { connected: boolean }) {
   return (
     <span
       className={cn(
-        "rounded-full border px-2.5 py-0.5 text-[9px] font-medium uppercase tracking-wider transition-colors",
+        "rounded-full border px-2.5 py-0.5 text-[9px] font-medium transition-colors",
         connected
           ? "border-graph-status-running/18 bg-graph-status-running/[0.12] text-graph-status-running"
           : "border-graph-status-idle/18 bg-graph-status-idle/[0.12] text-graph-status-idle",

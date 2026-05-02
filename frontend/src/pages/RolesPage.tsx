@@ -125,16 +125,10 @@ export function RolesPage() {
                 </div>
 
                 <section className="mb-10">
-                  <SectionHeader
-                    title="Identity"
-                    description="Define the role name, selection description, and baseline prompt used by agents created with this role."
-                  />
+                  <SectionHeader title="Identity" />
 
                   <div className="border border-dashed border-border rounded-lg bg-card/30">
-                    <SettingsRow
-                      label="Role Name"
-                      description="Unique identifier"
-                    >
+                    <SettingsRow label="Role Name">
                       <FormInput
                         value={draft.name}
                         onChange={(event) =>
@@ -153,10 +147,7 @@ export function RolesPage() {
                       />
                     </SettingsRow>
 
-                    <SettingsRow
-                      label="Description"
-                      description="Short summary shown when humans or agents choose a role"
-                    >
+                    <SettingsRow label="Description">
                       <FormTextarea
                         value={draft.description}
                         onChange={(event) =>
@@ -177,10 +168,7 @@ export function RolesPage() {
                       />
                     </SettingsRow>
 
-                    <SettingsRow
-                      label="System Prompt"
-                      description="Appended after the built-in collaboration prompt"
-                    >
+                    <SettingsRow label="System Prompt">
                       <div className="space-y-2">
                         <FormTextarea
                           value={draft.system_prompt}
@@ -216,10 +204,7 @@ export function RolesPage() {
                 </section>
 
                 <section className="mb-10 border-t border-border pt-8">
-                  <SectionHeader
-                    title="Model Configuration"
-                    description="Choose whether this role follows Settings or uses its own provider and model override."
-                  />
+                  <SectionHeader title="Model Configuration" />
 
                   <div className="space-y-6">
                     <div className="flex flex-wrap gap-3">
@@ -386,10 +371,7 @@ export function RolesPage() {
                 </section>
 
                 <section className="mb-10 border-t border-border pt-8">
-                  <SectionHeader
-                    title="Model Parameters"
-                    description="Optionally override the canonical model parameters for this role."
-                  />
+                  <SectionHeader title="Model Parameters" />
 
                   <div className="space-y-6">
                     <div className="flex flex-wrap gap-3">
@@ -458,10 +440,7 @@ export function RolesPage() {
                 </section>
 
                 <section className="mb-10 border-t border-border pt-8">
-                  <SectionHeader
-                    title="Tool Configuration"
-                    description="Minimum tools are injected by the framework. Configure the remaining tools as Allowed, Included, or Excluded."
-                  />
+                  <SectionHeader title="Tool Configuration" />
 
                   <div className="overflow-hidden rounded-xl border border-border bg-card/30">
                     {configurableTools.map((tool) => {
@@ -616,7 +595,7 @@ export function RolesPage() {
                               {role.name}
                             </span>
                             {role.is_builtin ? (
-                              <span className="shrink-0 rounded-full border border-border bg-accent/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">
+                              <span className="shrink-0 rounded-full border border-border bg-accent/25 px-1.5 py-0.5 text-[9px] text-muted-foreground">
                                 Built-in
                               </span>
                             ) : null}

@@ -51,7 +51,7 @@ export const SORT_OPTIONS: Array<{ value: StatsSortKey; label: string }> = [
 export const statsSelectTriggerClass =
   "h-8 rounded-md bg-background/50 text-foreground";
 export const statsFilterLabelClass =
-  "text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80";
+  "text-[10px] font-medium text-muted-foreground/80";
 
 function hasOption(
   options: Array<{ value: string }>,

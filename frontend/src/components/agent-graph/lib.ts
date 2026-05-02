@@ -159,10 +159,7 @@ export interface AgentGraphController {
   contextMenu: ContextMenuState | null;
   contextMenuItems: ContextMenuEntry[];
   emptyState: {
-    eyebrow: string;
     title: string;
-    description: string;
-    hint: string;
   };
   enterConnectMode: () => void;
   loadingRoles: boolean;

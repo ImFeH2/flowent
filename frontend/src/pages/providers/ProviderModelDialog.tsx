@@ -53,8 +53,8 @@ export function ProviderModelDialog({
           <DialogTitle>
             {state?.mode === "edit" ? "Edit Model" : "Add Model"}
           </DialogTitle>
-          <DialogDescription>
-            Maintain one provider-scoped catalog entry at a time.
+          <DialogDescription className="sr-only">
+            {state?.mode === "edit" ? "Edit Model" : "Add Model"}
           </DialogDescription>
         </DialogHeader>
 

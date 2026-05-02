@@ -109,17 +109,8 @@ export const AgentGraph = forwardRef<AgentGraphHandle, AgentGraphProps>(
                 <div className="mx-auto flex size-10 items-center justify-center rounded-lg border border-border bg-accent/35 text-muted-foreground">
                   <Network className="size-4.5" />
                 </div>
-                <p className="mt-3.5 text-[9px] font-semibold uppercase tracking-[0.28em] text-muted-foreground/75">
-                  {emptyState.eyebrow}
-                </p>
-                <p className="mt-2.5 text-[18px] font-semibold leading-tight text-foreground">
+                <p className="mt-3.5 text-[18px] font-semibold leading-tight text-foreground">
                   {emptyState.title}
-                </p>
-                <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
-                  {emptyState.description}
-                </p>
-                <p className="mt-3 text-[11px] leading-5 text-muted-foreground/75">
-                  {emptyState.hint}
                 </p>
               </div>
             </div>

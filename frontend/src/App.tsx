@@ -406,15 +406,6 @@ function AccessGate() {
             </form>
           </ShellSurface>
         </motion.div>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.32, delay: 0.18 }}
-          className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground/65"
-        >
-          Need a fresh code? Restart Flowent and check the startup log.
-        </motion.p>
       </div>
     </ShellBackground>
   );

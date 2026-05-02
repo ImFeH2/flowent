@@ -3,10 +3,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const mcpEyebrowClass =
-  "text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80";
+  "text-[12px] font-medium text-muted-foreground/80";
 
 const mcpMetricEyebrowClass =
-  "text-[11px] uppercase tracking-[0.16em] text-muted-foreground/80";
+  "text-[12px] font-medium text-muted-foreground/80";
 const mcpMetricCardClass =
   "rounded-xl border border-border bg-card/20 px-4 py-4";
 const mcpReadonlyBlockClass =

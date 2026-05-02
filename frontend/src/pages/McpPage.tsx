@@ -105,7 +105,7 @@ export function McpPage() {
           {quickAdd.parse.draft ? (
             <span
               className={cn(
-                "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em]",
+                "rounded-full border px-2.5 py-1 text-[10px] font-medium",
                 statusClassName(
                   quickAdd.parse.draft.transport === "streamable_http"
                     ? "connected"
@@ -258,10 +258,6 @@ export function McpPage() {
                 <h2 className="mt-5 text-[16px] font-medium text-foreground">
                   No MCP servers
                 </h2>
-                <p className="mt-2 max-w-lg text-[13px] leading-6 text-muted-foreground">
-                  Start with Quick Add to connect one server that every agent
-                  can use after the first successful refresh.
-                </p>
               </SoftPanel>
             </div>
           ) : (
@@ -354,12 +350,12 @@ export function McpPage() {
                                       {record.config.name}
                                     </p>
                                     {record.config.required ? (
-                                      <span className="rounded-full border border-graph-status-idle/18 bg-graph-status-idle/[0.12] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-graph-status-idle">
+                                      <span className="rounded-full border border-graph-status-idle/18 bg-graph-status-idle/[0.12] px-2 py-0.5 text-[10px] font-medium text-graph-status-idle">
                                         required
                                       </span>
                                     ) : null}
                                     {visibility ? (
-                                      <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
+                                      <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2 py-0.5 text-[10px] font-medium text-primary">
                                         {visibility}
                                       </span>
                                     ) : null}
@@ -388,7 +384,7 @@ export function McpPage() {
                                 <div className="flex shrink-0 flex-col items-end gap-1.5">
                                   <span
                                     className={cn(
-                                      "rounded-full border px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em]",
+                                      "rounded-full border px-2.5 py-1 text-[10px] font-medium",
                                       statusClassName(record.snapshot.status),
                                     )}
                                   >
@@ -497,7 +493,7 @@ export function McpPage() {
                                   {statusLabel(selectedServer.snapshot.status)}
                                 </span>
                                 {globalAvailabilityLabel(selectedServer) ? (
-                                  <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-primary">
+                                  <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2.5 py-1 text-[10px] font-medium text-primary">
                                     {globalAvailabilityLabel(selectedServer)}
                                   </span>
                                 ) : null}
@@ -889,7 +885,7 @@ export function McpPage() {
                                                   {tool.fully_qualified_id}
                                                 </p>
                                               </div>
-                                              <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-[0.14em]">
+                                              <div className="flex flex-wrap gap-2 text-[10px]">
                                                 {tool.read_only_hint ? (
                                                   <span className="rounded-full border border-primary/20 bg-primary/[0.1] px-2 py-1 text-primary">
                                                     readOnly
@@ -1071,7 +1067,7 @@ export function McpPage() {
                                               promptPreviewState.selectedPromptName
                                             }
                                           </p>
-                                          <p className="mt-4 text-[11px] uppercase tracking-[0.14em] text-muted-foreground/80">
+                                          <p className="mt-4 text-[11px] text-muted-foreground/80">
                                             Arguments
                                           </p>
                                           <Textarea
@@ -1181,7 +1177,7 @@ export function McpPage() {
                                       <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                           <div className="flex flex-wrap items-center gap-2">
-                                            <span className="rounded-full border border-border bg-accent/20 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                                            <span className="rounded-full border border-border bg-accent/20 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
                                               {activityCategoryLabel(entry)}
                                             </span>
                                             <p className="text-[14px] font-medium text-foreground">

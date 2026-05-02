@@ -100,7 +100,7 @@ export function AgentTooltip({
               ) : null}
             </div>
             <div className="mt-1.5 space-y-1">
-              <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] font-medium text-muted-foreground">
                 Todos
               </div>
               {agent.todos.length === 0 ? (

@@ -48,10 +48,13 @@ import { useProvidersPageState } from "@/pages/providers/useProvidersPageState";
 
 export function ProvidersPage() {
   const {
+    cancelClearModels,
+    clearModelsConfirmOpen,
     draft,
     endpointPreview,
     fetchingModels,
     handleCancel,
+    handleClearModels,
     handleCreateNew,
     handleDelete,
     handleDeleteModel,
@@ -74,6 +77,7 @@ export function ProvidersPage() {
     providerToDelete,
     providers,
     refreshProviders,
+    requestClearModels,
     saving,
     selectedId,
     selectedProvider,
@@ -354,6 +358,18 @@ export function ProvidersPage() {
                             <Plus className="size-3.5" />
                             Add Model
                           </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={
+                              draft.models.length === 0 || fetchingModels
+                            }
+                            onClick={requestClearModels}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Clear Models
+                          </Button>
                         </div>
                       </div>
 
@@ -504,6 +520,42 @@ export function ProvidersPage() {
           onSave={handleSaveModel}
           state={modelEditorState}
         />
+
+        <AlertDialog
+          open={clearModelsConfirmOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              cancelClearModels();
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear all models?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes every model from this provider, including
+                discovered and manual entries. Save the provider to keep the
+                cleared list.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel asChild>
+                <Button type="button" variant="ghost">
+                  Cancel
+                </Button>
+              </AlertDialogCancel>
+              <AlertDialogAction asChild>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleClearModels}
+                >
+                  Clear Models
+                </Button>
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog
           open={providerToDelete !== null}

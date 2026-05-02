@@ -163,6 +163,148 @@ describe("ProvidersPage", () => {
     );
   });
 
+  it("disables clearing when the current provider draft has no models", () => {
+    swrProvidersState.data = [
+      buildProvider({ id: "provider-1", name: "Primary" }),
+    ];
+
+    renderPage();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
+
+    expect(
+      screen.getByRole("button", { name: /Clear Models/i }),
+    ).toBeDisabled();
+  });
+
+  it("clears all models from the current draft after confirmation without fetching or testing", () => {
+    swrProvidersState.data = [
+      buildProvider({
+        id: "provider-1",
+        name: "Primary",
+        models: [
+          {
+            model: "gpt-5",
+            source: "discovered",
+            context_window_tokens: 128000,
+            input_image: true,
+            output_image: false,
+          },
+          {
+            model: "manual-model",
+            source: "manual",
+            context_window_tokens: null,
+            input_image: null,
+            output_image: null,
+          },
+        ],
+      }),
+    ];
+
+    renderPage();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: /Clear Models/i }));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(
+      within(dialog).getByRole("heading", { name: "Clear all models?" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Clear Models" }),
+    );
+
+    expect(
+      screen.getByText("No models in this provider draft"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("gpt-5")).not.toBeInTheDocument();
+    expect(screen.queryByText("manual-model")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Save/i })).toBeInTheDocument();
+    expect(fetchProviderCatalogPreviewMock).not.toHaveBeenCalled();
+    expect(testProviderModelRequestMock).not.toHaveBeenCalled();
+    expect(updateProviderMock).not.toHaveBeenCalled();
+  });
+
+  it("restores the saved model catalog when canceling after clearing", () => {
+    swrProvidersState.data = [
+      buildProvider({
+        id: "provider-1",
+        name: "Primary",
+        models: [
+          {
+            model: "gpt-5",
+            source: "discovered",
+            context_window_tokens: 128000,
+            input_image: true,
+            output_image: false,
+          },
+        ],
+      }),
+    ];
+
+    renderPage();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: /Clear Models/i }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Clear Models",
+      }),
+    );
+
+    expect(
+      screen.getByText("No models in this provider draft"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+
+    expect(screen.getByText("gpt-5")).toBeInTheDocument();
+    expect(
+      screen.queryByText("No models in this provider draft"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("persists the cleared model catalog when saving after clearing", async () => {
+    swrProvidersState.data = [
+      buildProvider({
+        id: "provider-1",
+        name: "Primary",
+        models: [
+          {
+            model: "gpt-5",
+            source: "discovered",
+            context_window_tokens: 128000,
+            input_image: true,
+            output_image: false,
+          },
+        ],
+      }),
+    ];
+    updateProviderMock.mockResolvedValue(
+      buildProvider({ id: "provider-1", name: "Primary", models: [] }),
+    );
+
+    renderPage();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Primary/i })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: /Clear Models/i }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Clear Models",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Save/i }));
+
+    await waitFor(() =>
+      expect(updateProviderMock).toHaveBeenCalledWith(
+        "provider-1",
+        expect.objectContaining({ models: [] }),
+      ),
+    );
+  });
+
   it("adds a manual model and submits the updated catalog", async () => {
     swrProvidersState.data = [
       buildProvider({

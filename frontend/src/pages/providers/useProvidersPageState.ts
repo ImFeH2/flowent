@@ -37,6 +37,7 @@ export function useProvidersPageState() {
   const [providerToDelete, setProviderToDelete] = useState<Provider | null>(
     null,
   );
+  const [clearModelsConfirmOpen, setClearModelsConfirmOpen] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [modelEditorState, setModelEditorState] =
     useState<ProviderModelEditorState>(null);
@@ -59,6 +60,7 @@ export function useProvidersPageState() {
       setIsCreating(false);
       setDraft(createProviderDraft());
       setModelTestStates({});
+      setClearModelsConfirmOpen(false);
     },
   });
 
@@ -103,6 +105,7 @@ export function useProvidersPageState() {
     setDraft(createProviderDraft(provider));
     setModelTestStates({});
     setModelEditorState(null);
+    setClearModelsConfirmOpen(false);
   }, []);
 
   const handleCreateNew = useCallback(() => {
@@ -111,6 +114,7 @@ export function useProvidersPageState() {
     setDraft(createProviderDraft());
     setModelTestStates({});
     setModelEditorState(null);
+    setClearModelsConfirmOpen(false);
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -122,6 +126,7 @@ export function useProvidersPageState() {
     }
     setModelTestStates({});
     setModelEditorState(null);
+    setClearModelsConfirmOpen(false);
   }, [isCreating, selectedProvider]);
 
   const handleSave = useCallback(async () => {
@@ -171,6 +176,7 @@ export function useProvidersPageState() {
         toast.success("Provider updated");
       }
       setModelTestStates({});
+      setClearModelsConfirmOpen(false);
     } catch {
       toast.error(
         isCreating ? "Failed to create provider" : "Failed to update provider",
@@ -195,6 +201,7 @@ export function useProvidersPageState() {
     }
     const providerId = providerToDelete.id;
     setProviderToDelete(null);
+    setClearModelsConfirmOpen(false);
     try {
       await deleteProvider(providerId);
       void mutateProviders(
@@ -288,6 +295,26 @@ export function useProvidersPageState() {
       delete next[modelId];
       return next;
     });
+  }, []);
+
+  const requestClearModels = useCallback(() => {
+    if (draft.models.length === 0) {
+      return;
+    }
+    setClearModelsConfirmOpen(true);
+  }, [draft.models.length]);
+
+  const cancelClearModels = useCallback(() => {
+    setClearModelsConfirmOpen(false);
+  }, []);
+
+  const handleClearModels = useCallback(() => {
+    setDraft((current) => ({
+      ...current,
+      models: [],
+    }));
+    setModelTestStates({});
+    setClearModelsConfirmOpen(false);
   }, []);
 
   const handleFetchModels = useCallback(async () => {
@@ -395,10 +422,13 @@ export function useProvidersPageState() {
   );
 
   return {
+    cancelClearModels,
+    clearModelsConfirmOpen,
     draft,
     endpointPreview,
     fetchingModels,
     handleCancel,
+    handleClearModels,
     handleCreateNew,
     handleDelete,
     handleDeleteModel,
@@ -421,6 +451,7 @@ export function useProvidersPageState() {
     providerToDelete,
     providers,
     refreshProviders,
+    requestClearModels,
     saving,
     selectedId,
     selectedProvider,

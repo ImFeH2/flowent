@@ -37,7 +37,7 @@
     "dev:backend": "uv run --project backend uvicorn flowent.main:app --reload --host 0.0.0.0 --port 6874",
     "build": "pnpm build:frontend && pnpm build:backend",
     "build:frontend": "pnpm --dir frontend build",
-    "build:backend": "uv build --project backend",
+    "build:backend": "node scripts/prepare-python-package.mjs && uv build --project backend",
     "build:npm": "pnpm build && node scripts/prepare-npm-package.mjs",
     "start": "uv run --project backend flowent",
     "format": "prettier --write . && uv run --project backend ruff format",

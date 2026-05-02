@@ -1,0 +1,122 @@
+name: Publish Python package
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag to publish"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Python package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HUSKY: 0
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.29.3
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync --project backend --frozen
+
+      - name: Check package version
+        run: |
+          package_version="$(node -p "require('./package.json').version")"
+          python_version="$(uv run --project backend python -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")"
+          if [ "$package_version" != "$python_version" ]; then
+            echo "package.json version $package_version does not match backend version $python_version."
+            exit 1
+          fi
+          if [ "$RELEASE_TAG" != "v$python_version" ]; then
+            echo "Release tag $RELEASE_TAG does not match package version $python_version."
+            exit 1
+          fi
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify Python artifacts
+        run: |
+          python_version="$(uv run --project backend python -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml','rb'))['project']['version'])")"
+          wheel="backend/dist/flowent-${python_version}-py3-none-any.whl"
+          sdist="backend/dist/flowent-${python_version}.tar.gz"
+          test -f "$wheel"
+          test -f "$sdist"
+          python -c "import sys, zipfile; names = set(zipfile.ZipFile(sys.argv[1]).namelist()); assert 'flowent/static/index.html' in names; assert 'flowent/static/favicon.svg' in names" "$wheel"
+
+      - name: Upload Python artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: |
+            backend/dist/flowent-*.whl
+            backend/dist/flowent-*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download Python artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1

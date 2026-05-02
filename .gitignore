@@ -29,6 +29,7 @@ out/
 build/
 coverage/
 dist/
+backend/src/flowent/static/
 .vercel/
 *.tsbuildinfo
 *.tgz

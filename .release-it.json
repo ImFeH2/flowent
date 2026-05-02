@@ -16,5 +16,18 @@
   },
   "npm": {
     "publish": false
+  },
+  "plugins": {
+    "@release-it/bumper": {
+      "out": [
+        {
+          "file": "backend/pyproject.toml",
+          "path": "project.version"
+        }
+      ]
+    }
+  },
+  "hooks": {
+    "after:bump": "uv lock --project backend"
   }
 }

@@ -64,6 +64,7 @@
     "*.{css,json,jsonc,md,mdx,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
+    "@release-it/bumper": "^7.0.5",
     "concurrently": "^9.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",

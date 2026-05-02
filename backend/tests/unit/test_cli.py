@@ -70,6 +70,33 @@ def test_help_output_no_longer_lists_mcp_command(capsys):
     assert "mcp" not in output
 
 
+def test_version_short_option_matches_version_output(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["-v"])
+
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.startswith("flowent ")
+
+
+def test_server_options_accept_npm_wrapper_aliases(monkeypatch):
+    called: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "uvicorn.run",
+        lambda app, *, host, port: called.update(
+            {"app": app, "host": host, "port": port}
+        ),
+    )
+
+    main(["--hostname", "127.0.0.1", "-p", "7000"])
+
+    assert called == {
+        "app": "flowent.main:app",
+        "host": "127.0.0.1",
+        "port": 7000,
+    }
+
+
 def test_removed_mcp_command_is_rejected(capsys):
     with pytest.raises(SystemExit) as exc:
         main(["mcp", "serve"])

@@ -1,44 +1,51 @@
 #!/usr/bin/env node
 
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const backendProject = join(packageRoot, "backend");
 const staticDirectory = join(packageRoot, "dist", "frontend");
-const packageJson = JSON.parse(
-  readFileSync(join(packageRoot, "package.json"), "utf8"),
-);
+const passthroughArgs = process.argv.slice(2);
 
-const args = process.argv.slice(2);
-let port = process.env.PORT ?? "6873";
-let hostname = process.env.HOSTNAME ?? "0.0.0.0";
+function firstCommand(args) {
+  const optionsWithValues = new Set([
+    "--app-data-dir",
+    "--host",
+    "--hostname",
+    "--port",
+    "-p",
+  ]);
 
-for (let index = 0; index < args.length; index += 1) {
-  const arg = args[index];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
 
-  if (arg === "--help" || arg === "-h") {
-    console.log("Usage: flowent [--port <port>] [--hostname <host>]");
-    process.exit(0);
+    if (
+      arg === "--help" ||
+      arg === "-h" ||
+      arg === "--version" ||
+      arg === "-v"
+    ) {
+      return arg;
+    }
+
+    if (arg.startsWith("-")) {
+      if (optionsWithValues.has(arg) && args[index + 1]) {
+        index += 1;
+      }
+      continue;
+    }
+
+    return arg;
   }
 
-  if (arg === "--version" || arg === "-v") {
-    console.log(packageJson.version);
-    process.exit(0);
-  }
+  return "";
+}
 
-  if ((arg === "--port" || arg === "-p") && args[index + 1]) {
-    port = args[index + 1];
-    index += 1;
-    continue;
-  }
-
-  if ((arg === "--hostname" || arg === "--host") && args[index + 1]) {
-    hostname = args[index + 1];
-    index += 1;
-  }
+function startsServer(args) {
+  return firstCommand(args) === "";
 }
 
 if (!existsSync(join(backendProject, "pyproject.toml"))) {
@@ -48,7 +55,10 @@ if (!existsSync(join(backendProject, "pyproject.toml"))) {
   process.exit(1);
 }
 
-if (!existsSync(join(staticDirectory, "index.html"))) {
+if (
+  startsServer(passthroughArgs) &&
+  !existsSync(join(staticDirectory, "index.html"))
+) {
   console.error(
     "Flowent application files are missing. Reinstall the package and try again.",
   );
@@ -58,15 +68,13 @@ if (!existsSync(join(staticDirectory, "index.html"))) {
 const uvCommand = process.env.FLOWENT_UV_BINARY ?? "uv";
 const child = spawn(
   uvCommand,
-  ["run", "--project", backendProject, "flowent"],
+  ["run", "--project", backendProject, "flowent", ...passthroughArgs],
   {
     cwd: packageRoot,
     stdio: "inherit",
     env: {
       ...process.env,
       FLOWENT_STATIC_DIR: staticDirectory,
-      HOSTNAME: hostname,
-      PORT: port,
     },
   },
 );

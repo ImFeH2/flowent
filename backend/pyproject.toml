@@ -2,6 +2,7 @@
 name = "flowent"
 version = "0.0.4"
 description = "A workflow orchestration platform for multi-agent collaboration."
+readme = "README.md"
 authors = [
     { name = "ImFeH2", email = "i@feh2.im" }
 ]

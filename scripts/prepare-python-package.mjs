@@ -5,6 +5,8 @@ import process from "node:process";
 
 const root = process.cwd();
 const frontendDist = join(root, "frontend", "dist");
+const rootReadme = join(root, "README.md");
+const backendReadme = join(root, "backend", "README.md");
 const backendStatic = join(root, "backend", "src", "flowent", "static");
 
 if (!existsSync(join(frontendDist, "index.html"))) {
@@ -13,6 +15,9 @@ if (!existsSync(join(frontendDist, "index.html"))) {
   );
   process.exit(1);
 }
+
+await rm(backendReadme, { force: true });
+await cp(rootReadme, backendReadme);
 
 await rm(backendStatic, { recursive: true, force: true });
 await mkdir(backendStatic, { recursive: true });

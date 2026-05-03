@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/flowent-banner.png" alt="Flowent" width="100%" />
+  <img src="https://raw.githubusercontent.com/ImFeH2/flowent/main/assets/flowent-banner.png" alt="Flowent" width="100%" />
 </p>
 
 <p align="center">

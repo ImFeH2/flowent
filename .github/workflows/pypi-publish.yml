@@ -52,6 +52,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Python README
+        run: node scripts/prepare-python-readme.mjs
+
       - name: Install Python dependencies
         run: uv sync --project backend --frozen
 
